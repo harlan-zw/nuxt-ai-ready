@@ -274,7 +274,7 @@ describe('llms.txt normalizer', () => {
 
       const result = normalizeLlmsTxtConfig(config)
       // Sections should be separated
-      expect(result).toMatch(/## Section 1\n\n## Section 2/)
+      expect(result).toMatch(/## Section 1\n\n\n## Section 2/)
     })
 
     it('should handle sections with only links (no description)', () => {

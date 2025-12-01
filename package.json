@@ -47,7 +47,7 @@
     "test": "pnpm run prepare:fixtures && vitest",
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "nuxt typecheck",
     "test:attw": "attw --pack"
   },
   "dependencies": {

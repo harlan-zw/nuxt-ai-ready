@@ -1,3 +1,4 @@
+// @ts-expect-error untyped
 import { defineMcpPrompt } from '#imports'
 import { streamBulkDocuments } from '../../utils/db'
 
@@ -16,6 +17,7 @@ export default defineMcpPrompt({
       required: false,
     },
   ],
+  // @ts-expect-error untyped
   handler: async ({ topic, detail = 'detailed' }) => {
     const searchLower = topic.toLowerCase()
     const seenRoutes = new Set<string>()

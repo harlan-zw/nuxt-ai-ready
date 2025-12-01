@@ -47,7 +47,7 @@ describe('mdream hooks', () => {
     })
 
     it('should handle hook that does not modify content', () => {
-      const mockHook = vi.fn((payload: LlmsTxtGeneratePayload) => {
+      const mockHook = vi.fn(() => {
         // Hook does nothing
       })
 
@@ -57,6 +57,7 @@ describe('mdream hooks', () => {
         pages: [],
       }
 
+      // @ts-expect-error untyped
       mockHook(payload)
 
       expect(payload.content).toBe('# Original')

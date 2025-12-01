@@ -1,3 +1,4 @@
+// @ts-expect-error untyped
 import { defineMcpTool, errorResult, jsonResult } from '#imports'
 import { streamBulkDocuments } from '../../utils/db'
 
@@ -30,6 +31,7 @@ OUTPUT: Returns complete page data including:
     },
     required: ['route'],
   },
+  // @ts-expect-error untyped
   handler: async ({ route }) => {
     // Normalize route (ensure leading slash, no trailing slash)
     const normalizedRoute = route.startsWith('/') ? route : `/${route}`

@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import type { HTMLToMarkdownOptions } from 'mdream'
-import type { MdreamMarkdownContext, ModuleRuntimeConfig } from '../../../types'
+import type { ModulePublicRuntimeConfig } from '../../../module'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { htmlToMarkdown } from 'mdream'
@@ -8,6 +8,7 @@ import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
 import { logger } from '../logger'
+import type {MarkdownContext} from "~/src/runtime/types";
 
 // Detect if client prefers markdown based on Accept header
 // Clients like Claude Code, Bun, and other API clients typically don't include text/html
@@ -32,7 +33,7 @@ function shouldServeMarkdown(event: H3Event): boolean {
 }
 
 // Convert HTML to Markdown
-async function convertHtmlToMarkdown(html: string, url: string, config: ModuleRuntimeConfig, route: string, event: H3Event) {
+async function convertHtmlToMarkdown(html: string, url: string, config: ModulePublicRuntimeConfig, route: string, event: H3Event) {
   const nitroApp = useNitroApp()
 
   let title = ''
@@ -64,10 +65,11 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModuleRu
     options.plugins = [extractPlugin, ...(options.plugins || [])]
   }
 
+  // @ts-expect-error untyped
   await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
   let markdown = htmlToMarkdown(html, options)
 
-  const context: MdreamMarkdownContext = {
+  const context: MarkdownContext = {
     html,
     markdown,
     route,
@@ -78,6 +80,7 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModuleRu
   }
 
   // Call Nitro runtime hook if available
+  // @ts-expect-error untyped
   await nitroApp.hooks.callHook('ai-ready:markdown', context)
   markdown = context.markdown // Use potentially modified markdown
   return { markdown, title, description }
@@ -85,7 +88,7 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModuleRu
 
 export default defineEventHandler(async (event) => {
   let path = event.path
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModuleRuntimeConfig
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
   // never run on API routes or internal routes
   if (path.startsWith('/api') || path.startsWith('/_') || path.startsWith('/@')) {
@@ -153,7 +156,7 @@ export default defineEventHandler(async (event) => {
       return
     }
 
-    html = response._data
+    html = response._data as string
   }
   catch (e) {
     logger.error(`Failed to fetch HTML for ${path}`, e)

@@ -1,3 +1,4 @@
+// @ts-expect-error untyped
 import { defineMcpTool, jsonResult } from '#imports'
 import { streamBulkDocuments } from '../../utils/db'
 
@@ -48,6 +49,7 @@ FIELD OPTIONS: Control which fields to include in the output:
       },
     },
   },
+  // @ts-expect-error untyped
   handler: async ({ fields = ['route', 'title', 'description'], search, limit = 100 }) => {
     const searchLower = search?.toLowerCase()
     const result: Array<Record<string, any>> = []

@@ -1,6 +1,6 @@
 import type { ProcessedFile } from 'mdream/llms-txt'
 import type { Nitro, PrerenderRoute } from 'nitropack'
-import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { LlmsTxtConfig } from './runtime/types'
 import type { LlmsTxtGeneratePayload } from './types.js'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -14,7 +14,6 @@ const logger = consola.withTag('nuxt-mdream')
 
 export function setupPrerenderHandler() {
   const nuxt = useNuxt()
-  const config = (nuxt.options.aiReady || {}) as ModuleOptions
   const pages: ProcessedFile[] = []
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {

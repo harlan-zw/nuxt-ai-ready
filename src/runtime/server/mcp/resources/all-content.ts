@@ -1,3 +1,4 @@
+// @ts-expect-error untyped
 import { defineMcpResource, textResult } from '#imports'
 import { streamBulkDocuments } from '../../utils/db'
 
