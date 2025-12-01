@@ -50,14 +50,14 @@ npx nuxi@latest module add nuxt-ai-ready
 
 ## License
 
-This module requires a [Nuxt SEO Pro license](https://nuxtseo.com/pro), see [LICENSE](https://github.com/harlan-zw/nuxt-skew-protection/blob/main/LICENSE) for full details.
+This module requires a [Nuxt SEO Pro license](https://nuxtseo.com/pro), see [LICENSE](https://github.com/harlan-zw/nuxt-ai-ready/blob/main/LICENSE) for full details.
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/nuxt-skew-protection/latest.svg?style=flat&colorA=18181B&colorB=28CF8D
-[npm-version-href]: https://npmjs.com/package/nuxt-skew-protection
+[npm-version-src]: https://img.shields.io/npm/v/nuxt-ai-ready/latest.svg?style=flat&colorA=18181B&colorB=28CF8D
+[npm-version-href]: https://npmjs.com/package/nuxt-ai-ready
 
-[npm-downloads-src]: https://img.shields.io/npm/dm/nuxt-skew-protection.svg?style=flat&colorA=18181B&colorB=28CF8D
-[npm-downloads-href]: https://npmjs.com/package/nuxt-skew-protection
+[npm-downloads-src]: https://img.shields.io/npm/dm/nuxt-ai-ready.svg?style=flat&colorA=18181B&colorB=28CF8D
+[npm-downloads-href]: https://npmjs.com/package/nuxt-ai-ready
 
 [nuxt-src]: https://img.shields.io/badge/Nuxt-18181B?logo=nuxt
 [nuxt-href]: https://nuxt.com

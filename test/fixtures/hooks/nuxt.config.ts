@@ -1,7 +1,8 @@
 import type { BulkChunk } from '../../../src/runtime/types'
 import type { LlmsTxtGeneratePayload } from '../../../src/types'
-import { writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineNuxtConfig } from 'nuxt/config'
 
 const chunks: Array<{
@@ -11,6 +12,8 @@ const chunks: Array<{
   title: string
   contentPreview: string
 }> = []
+
+const rootDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
@@ -45,10 +48,11 @@ export default defineNuxtConfig({
       })
     },
 
-    'build:done': () => {
+    'close': () => {
       // Write chunks metadata to a file for testing
       if (chunks.length > 0) {
-        const outputPath = resolve(__dirname, '.output/test-chunks.json')
+        const outputPath = join(rootDir, '.output/test-chunks.json')
+        mkdirSync(dirname(outputPath), { recursive: true })
         writeFileSync(outputPath, JSON.stringify(chunks, null, 2))
         console.log(`[Chunk Tracker] Wrote ${chunks.length} chunks to ${outputPath}`)
       }
