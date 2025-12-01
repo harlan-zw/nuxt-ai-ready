@@ -1,0 +1,7 @@
+imports.autoImport=false
+typescript.includeWorkspace=true
+modules[]=nuxt-ai-ready
+modules[]=@nuxtjs/robots
+modules[]=@nuxtjs/sitemap
+modules[]=nuxt-site-config
+modules[]=@nuxtjs/mcp-toolkit

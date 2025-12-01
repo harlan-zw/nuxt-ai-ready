@@ -1,0 +1,115 @@
+{
+  "name": "nuxt-ai-ready",
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.24.0",
+  "description": "Best practice AI & LLM discoverability for Nuxt sites.",
+  "author": {
+    "name": "Harlan Wilton",
+    "email": "harlan@harlanzw.com",
+    "url": "https://harlanzw.com/"
+  },
+  "contributors": [
+    "Harlan Wilton <harlan@harlanzw.com>"
+  ],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/harlan-zw",
+  "homepage": "https://nuxtseo.com/ai-ready",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nuxt-seo-pro/nuxt-ai-ready.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nuxt-seo-pro/nuxt-ai-ready/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/module.mjs"
+    }
+  },
+  "main": "./dist/module.mjs",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "lint": "eslint . --fix",
+    "build": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build",
+    "dev": "nuxi dev playground",
+    "dev:minimal": "nuxi dev playground",
+    "prepare:fixtures": "nuxi prepare playground && nuxi prepare playground && nuxi prepare test/fixtures/basic",
+    "dev:build": "nuxi build playground",
+    "dev:build:minimal": "nuxi build playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxi prepare playground",
+    "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxi prepare playground",
+    "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
+    "prepack": "pnpm run build",
+    "test": "pnpm run prepare:fixtures && vitest",
+    "test:unit": "vitest run --project=unit",
+    "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
+    "typecheck": "tsc --noEmit",
+    "test:attw": "attw --pack"
+  },
+  "dependencies": {
+    "nuxt-site-config": "^3.2.11",
+    "@nuxt/kit": "4.2.1",
+    "consola": "^3.4.2",
+    "defu": "^6.1.4",
+    "mdream": "^0.14.0",
+    "minimatch": "^10.1.1",
+    "pathe": "^2.0.3",
+    "pkg-types": "^2.3.0",
+    "std-env": "^3.10.0",
+    "tokenx": "^1.2.1",
+    "ufo": "^1.6.1"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^6.2.0",
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@headlessui/vue": "^1.7.23",
+    "@nuxt/content": "^3.8.2",
+    "@nuxt/devtools-ui-kit": "^3.1.1",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/test-utils": "^3.20.1",
+    "@nuxtjs/color-mode": "^4.0.0",
+    "@nuxtjs/eslint-config-typescript": "^12.1.0",
+    "@nuxtjs/i18n": "^10.2.1",
+    "@nuxtjs/mcp-toolkit": "^0.4.1",
+    "@nuxtjs/robots": "^5.6.0",
+    "@nuxtjs/sitemap": "^7.4.7",
+    "@vitest/coverage-v8": "^4.0.14",
+    "@vueuse/nuxt": "^14.1.0",
+    "better-sqlite3": "^12.5.0",
+    "bumpp": "^10.3.2",
+    "eslint": "^9.39.1",
+    "execa": "^9.6.1",
+    "happy-dom": "^20.0.11",
+    "nuxt": "^4.2.1",
+    "nuxt-site-config": "^3.2.11",
+    "playwright-core": "^1.57.0",
+    "postgres": "^3.4.7",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14",
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.3",
+    "vue-tsc": "^3.1.5",
+    "zod": "^4.1.13"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "@parcel/watcher",
+      "@tailwindcss/oxide",
+      "better-sqlite3",
+      "esbuild",
+      "onnxruntime-node",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver",
+      "vue-demi"
+    ]
+  },
+  "resolutions": {
+    "nuxt-ai-ready": "workspace:*"
+  }
+}
