@@ -1,6 +1,6 @@
 import type { LlmsTxtConfig } from '../../src/runtime/types'
 import { describe, expect, it } from 'vitest'
-import { normalizeLlmsTxtConfig } from '../../src/utils'
+import { normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt'
 
 describe('llms.txt normalizer', () => {
   describe('normalizeLink', () => {
