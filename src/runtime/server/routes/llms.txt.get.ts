@@ -2,7 +2,7 @@ import type { LlmsTxtConfig } from '#ai-ready/types'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { normalizeLlmsTxtConfig } from '../../../utils'
+import { normalizeLlmsTxtConfig } from '../../llms-txt'
 
 export default eventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any

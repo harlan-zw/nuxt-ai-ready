@@ -1,4 +1,4 @@
-import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './runtime/types'
+import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './types'
 
 /**
  * Normalize a link to markdown format

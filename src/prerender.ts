@@ -5,12 +5,10 @@ import type { LlmsTxtGeneratePayload } from './types.js'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
-import { consola } from 'consola'
 import { generateLlmsTxtArtifacts } from 'mdream/llms-txt'
 import { useSiteConfig } from 'nuxt-site-config/kit'
-import { normalizeLlmsTxtConfig } from './utils'
-
-const logger = consola.withTag('nuxt-mdream')
+import { logger } from './logger'
+import { normalizeLlmsTxtConfig } from './runtime/llms-txt'
 
 export function setupPrerenderHandler() {
   const nuxt = useNuxt()
