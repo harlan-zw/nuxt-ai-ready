@@ -50,6 +50,25 @@ export interface ModuleOptions {
    * Structured llms.txt configuration
    */
   llmsTxt?: LlmsTxtConfig
+
+  /**
+   * Content Signal Directives
+   */
+  contentSignal?: false | {
+    /**
+     * Allow Training or fine-tuning AI models.
+     */
+    aiTrain?: boolean
+    /**
+     * Allow building a search index and providing search results (e.g., returning hyperlinks and short excerpts from your website's contents).
+     * Search does not include providing AI-generated search summaries.
+     */
+    search?: boolean
+    /**
+     * Inputting content into one or more AI models (e.g., retrieval augmented generation, grounding, or other real-time taking of content for generative AI search answers).
+     */
+    aiInput?: boolean
+  }
 }
 
 /**

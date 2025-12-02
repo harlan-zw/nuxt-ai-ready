@@ -64,15 +64,6 @@ export default defineNuxtModule<ModuleOptions>({
   moduleDependencies: {
     '@nuxtjs/robots': {
       version: '>=5.6.0',
-      defaults: {
-        groups: [
-          {
-            userAgent: '*',
-            contentUsage: ['train-ai=y'],
-            contentSignal: ['ai-train=yes', 'search=yes', 'ai-input=yes'],
-          },
-        ],
-      },
     },
     'nuxt-site-config': {
       version: '>=3',
@@ -127,6 +118,14 @@ export default defineNuxtModule<ModuleOptions>({
       resolve('./runtime/server/mcp'),
     )
 
+    if (typeof config.contentSignal === 'object') {
+      nuxt.options.robots.groups.push({
+        userAgent: '*',
+        contentUsage: [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`],
+        contentSignal: [`ai-train=${config.contentSignal.aiTrain ? 'yes' : 'no'}`, `search=${config.contentSignal.search ? 'yes' : 'no'}`, `ai-input=${config.contentSignal.aiInput ? 'yes' : 'no'}`],
+      })
+    }
+
     addTypeTemplate({
       filename: 'module/nuxt-ai-ready.d.ts',
       getContents: (data) => {
@@ -157,7 +156,7 @@ export {}
     if (config.bulkRoute !== false) {
       const resolvedBulkRoute = withSiteUrl(config.bulkRoute)
       defaultLlmsTxtSections.push({
-        title: 'AI Tools',
+        title: 'LLM Tools',
         links: [
           {
             title: 'Bulk Data',
@@ -192,7 +191,7 @@ export {}
       }
       else {
         defaultLlmsTxtSections.push({
-          title: 'AI Tools - API Endpoints',
+          title: 'LLM Tools',
           links: [mcpLink],
         })
       }
