@@ -1,4 +1,3 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
 import { createResolver } from '@nuxt/kit'
 import { $fetch, setup } from '@nuxt/test-utils'
 import { describe, expect, it } from 'vitest'

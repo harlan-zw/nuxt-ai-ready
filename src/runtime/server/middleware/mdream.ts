@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { MarkdownContext } from '~/src/runtime/types'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { htmlToMarkdown } from 'mdream'
@@ -8,7 +9,6 @@ import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
 import { logger } from '../logger'
-import type {MarkdownContext} from "~/src/runtime/types";
 
 // Detect if client prefers markdown based on Accept header
 // Clients like Claude Code, Bun, and other API clients typically don't include text/html
