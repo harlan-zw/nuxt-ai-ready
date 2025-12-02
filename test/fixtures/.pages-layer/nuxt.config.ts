@@ -9,7 +9,7 @@ export default defineNuxtConfig({
     'nuxt-ai-index': resolve.resolve('../../../src/module.ts'),
   },
   compatibilityDate: '2025-10-15',
-  aiIndex: {
+  aiReady: {
     debug: true,
   },
 })

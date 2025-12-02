@@ -273,7 +273,11 @@ export {}
         let bulkStreamEntries = 0
         nitro.hooks.hook('prerender:route', async (route) => {
           const isHtml = route.fileName?.endsWith('.html') && route.contents!.startsWith('<!DOCTYPE html')
-          if (!isHtml || !route._sitemap || !route.contents) {
+          if (!isHtml || !route.contents) {
+            return
+          }
+          // explicitely not in sitemap
+          if (typeof route._sitemap !== 'undefined' && !route._sitemap) {
             return
           }
           let title = ''
@@ -324,9 +328,13 @@ export {}
             logger.info(`Bulk JSONL stream created at ${relative(nuxt.options.rootDir, bulkPath)}`)
           }
 
+          logger.debug(`Processing chunks for route: ${route.route}`)
+
           // Stream chunks immediately without holding all in memory
           let idx = 0
-          for (const chunk of chunksStream) {
+          for await (const chunk of chunksStream) {
+            logger.debug(`  Chunk ${idx}: ${chunk.content.length} chars, headers: ${JSON.stringify(chunk.metadata?.headers)}`)
+
             const bulkChunk: BulkChunk = {
               id: generateVectorId(route.route, idx),
               route: route.route,
@@ -351,6 +359,8 @@ export {}
             bulkStreamEntries++
             idx++
           }
+
+          logger.debug(`Completed ${idx} chunks for ${route.route}`)
         })
         // Setup bulk JSONL stream path for low-memory bulk export
         nitro.hooks.hook('prerender:done', () => {
