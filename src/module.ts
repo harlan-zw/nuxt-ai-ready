@@ -1,7 +1,6 @@
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { WriteStream } from 'node:fs'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import type { LlmsTxtGeneratePayload } from './types'
 import { createHash } from 'node:crypto'
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
