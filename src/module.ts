@@ -1,7 +1,7 @@
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { WriteStream } from 'node:fs'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import type { LlmsTxtGeneratePayload } from '~/src/types'
+import type { LlmsTxtGeneratePayload } from './types'
 import { createHash } from 'node:crypto'
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
@@ -10,6 +10,7 @@ import { TagIdMap } from 'mdream'
 import { extractionPlugin } from 'mdream/plugins'
 import { htmlToMarkdownSplitChunksStream } from 'mdream/splitter'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { isPathFile } from 'nuxt-site-config/urls'
 import { dirname, resolve as pathResolve, relative } from 'pathe'
 import { readPackageJSON } from 'pkg-types'
 import { estimateTokenCount } from 'tokenx'
@@ -22,12 +23,6 @@ function generateVectorId(route: string, chunkIdx: number): string {
 }
 
 export interface ModuleHooks {
-  /**
-   * Hook to modify llms.txt content before final output
-   * Other modules can append their own API endpoints here
-   */
-  'ai-ready:llms-txt': (payload: LlmsTxtGeneratePayload) => void | Promise<void>
-
   /**
    * Hook to add routes to the AI ready
    * Other modules can register their own API routes
@@ -279,6 +274,9 @@ export {}
           if (typeof route._sitemap !== 'undefined' && !route._sitemap) {
             return
           }
+          if (isPathFile(route.route)) {
+            return
+          }
           let title = ''
           let description = ''
           const headings: Array<Record<string, string>> = []
@@ -375,3 +373,7 @@ export {}
 })
 
 export type { BulkChunk, ModuleOptions }
+
+declare module '@nuxt/schema' {
+  interface NuxtHooks extends ModuleHooks {}
+}
