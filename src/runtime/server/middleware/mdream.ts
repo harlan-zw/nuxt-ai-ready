@@ -4,10 +4,12 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { MarkdownContext } from '~/src/runtime/types'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
-import { htmlToMarkdown } from 'mdream'
+import { htmlToMarkdown, TagIdMap } from 'mdream'
 import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
+import { htmlToMarkdownSplitChunksStream } from 'mdream/splitter'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
+import { estimateTokenCount } from 'tokenx'
 import { logger } from '../logger'
 
 // Detect if client prefers markdown based on Accept header
@@ -38,6 +40,7 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModulePu
 
   let title = ''
   let description = ''
+  const headings: Array<Record<string, string>> = []
 
   // Create extraction plugin first - must run before isolateMainPlugin
   const extractPlugin = extractionPlugin({
@@ -46,6 +49,12 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModulePu
     },
     'meta[name="description"]': (el) => {
       description = el.attributes.content || ''
+    },
+    'h1, h2, h3, h4, h5, h6': (el) => {
+      const text = el.textContent?.trim()
+      const level = el.name.toLowerCase()
+      if (text)
+        headings.push({ [level]: text })
     },
   })
 
@@ -83,7 +92,62 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModulePu
   // @ts-expect-error untyped
   await nitroApp.hooks.callHook('ai-ready:markdown', context)
   markdown = context.markdown // Use potentially modified markdown
-  return { markdown, title, description }
+  return { markdown, title, description, headings }
+}
+
+// Convert HTML to Markdown chunks for prerender
+async function convertHtmlToMarkdownChunks(html: string, url: string, config: ModulePublicRuntimeConfig) {
+  let title = ''
+  let description = ''
+  const headings: Array<Record<string, string>> = []
+
+  // Create extraction plugin first
+  const extractPlugin = extractionPlugin({
+    title(el) {
+      title = el.textContent
+    },
+    'meta[name="description"]': (el) => {
+      description = el.attributes.content || ''
+    },
+    'h1, h2, h3, h4, h5, h6': (el) => {
+      const text = el.textContent?.trim()
+      const level = el.name.toLowerCase()
+      if (text)
+        headings.push({ [level]: text })
+    },
+  })
+
+  let options: HTMLToMarkdownOptions = {
+    origin: url,
+    ...config.mdreamOptions,
+  }
+
+  // Apply preset if specified
+  if (config.mdreamOptions?.preset === 'minimal') {
+    options = withMinimalPreset(options)
+    options.plugins = [extractPlugin, ...(options.plugins || [])]
+  }
+  else {
+    options.plugins = [extractPlugin, ...(options.plugins || [])]
+  }
+
+  const chunksStream = htmlToMarkdownSplitChunksStream(html, {
+    ...options,
+    headersToSplitOn: [TagIdMap.h1, TagIdMap.h2, TagIdMap.h3],
+    origin: url,
+    chunkSize: 256,
+    stripHeaders: false,
+    lengthFunction(text) {
+      return estimateTokenCount(text)
+    },
+  })
+
+  const chunks = []
+  for await (const chunk of chunksStream) {
+    chunks.push(chunk)
+  }
+
+  return { chunks, title, description, headings }
 }
 
 export default defineEventHandler(async (event) => {
@@ -169,7 +233,18 @@ export default defineEventHandler(async (event) => {
     }
     return
   }
-  // Convert to markdown
+  if (import.meta.prerender) {
+    // During prerender, generate chunks for bulk JSONL processing
+    const result = await convertHtmlToMarkdownChunks(
+      html,
+      withSiteUrl(event, path),
+      config,
+    )
+    // return JSON which will be transformed by the build hooks
+    return JSON.stringify(result)
+  }
+
+  // Runtime: convert to markdown
   const result = await convertHtmlToMarkdown(
     html,
     withSiteUrl(event, path),
@@ -179,8 +254,8 @@ export default defineEventHandler(async (event) => {
   )
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
 
-  // Set cache headers if not prerendering
-  if (!import.meta.prerender && config.markdownCacheHeaders) {
+  // Set cache headers
+  if (config.markdownCacheHeaders) {
     const { maxAge, swr } = config.markdownCacheHeaders
     const cacheControl = swr
       ? `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`
@@ -188,10 +263,6 @@ export default defineEventHandler(async (event) => {
     setHeader(event, 'cache-control', cacheControl)
   }
 
-  if (import.meta.prerender) {
-    // return JSON which will be transformed by the build hooks
-    return JSON.stringify(result)
-  }
-  // Set appropriate headers and return markdown
+  // Return markdown
   return result.markdown
 })

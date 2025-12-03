@@ -1,25 +1,11 @@
-import type { HTMLToMarkdownOptions } from 'mdream'
-import type { WriteStream } from 'node:fs'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { createHash } from 'node:crypto'
-import { createWriteStream, mkdirSync } from 'node:fs'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
-import { TagIdMap } from 'mdream'
-import { extractionPlugin } from 'mdream/plugins'
-import { htmlToMarkdownSplitChunksStream } from 'mdream/splitter'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
-import { isPathFile } from 'nuxt-site-config/urls'
-import { dirname, resolve as pathResolve, relative } from 'pathe'
+import { relative } from 'pathe'
 import { readPackageJSON } from 'pkg-types'
-import { estimateTokenCount } from 'tokenx'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
-
-function generateVectorId(route: string, chunkIdx: number): string {
-  const hash = createHash('sha256').update(route).digest('hex').substring(0, 48)
-  return `${hash}-${chunkIdx}`
-}
 
 export interface ModuleHooks {
   /**
@@ -242,132 +228,6 @@ export {}
         },
       }
     }
-
-    // Bulk route served as static file (no handler needed)
-    // MCP route handled by @nuxtjs/mcp-toolkit
-    const isBuildMode = !nuxt.options._prepare && !nuxt.options.dev
-
-    nuxt.hooks.hook('modules:done', () => {
-      nuxt.hook('nitro:init', async (nitro) => {
-        // Skip build-time indexing in dev mode
-        if (!isBuildMode) {
-          logger.debug('Dev mode: skipping llms.txt generation')
-          return
-        }
-
-        // Skip bulk generation if disabled
-        if (config.bulkRoute === false) {
-          logger.debug('Bulk route disabled, skipping bulk generation')
-          return
-        }
-
-        const bulkPath = pathResolve(nitro.options.output.dir, `public${config.bulkRoute}`)
-        let bulkStream: WriteStream | null = null
-        let bulkStreamEntries = 0
-        nitro.hooks.hook('prerender:route', async (route) => {
-          const isHtml = route.fileName?.endsWith('.html') && route.contents!.startsWith('<!DOCTYPE html')
-          if (!isHtml || !route.contents) {
-            return
-          }
-          // explicitely not in sitemap
-          if (typeof route._sitemap !== 'undefined' && !route._sitemap) {
-            return
-          }
-          if (isPathFile(route.route)) {
-            return
-          }
-          let title = ''
-          let description = ''
-          const headings: Array<Record<string, string>> = []
-
-          // Create extraction plugin first - must run before isolateMainPlugin
-          const extractPlugin = extractionPlugin({
-            title(el) {
-              title = el.textContent
-            },
-            'meta[name="description"]': (el) => {
-              description = el.attributes.content || ''
-            },
-            'h1, h2, h3, h4, h5, h6': (el) => {
-              const text = el.textContent?.trim()
-              const level = el.name.toLowerCase()
-              if (text)
-                headings.push({ [level]: text })
-            },
-          })
-
-          const options: HTMLToMarkdownOptions = {
-            origin: useSiteConfig().url,
-            ...(config.mdreamOptions || {}),
-          }
-
-          // Apply preset if specified
-          // options = withMinimalPreset(options)
-          // Manually insert extraction plugin at the beginning, before all preset plugins
-          options.plugins = [extractPlugin, ...(options.plugins || [])]
-
-          const chunksStream = htmlToMarkdownSplitChunksStream(route.contents, {
-            ...options,
-            headersToSplitOn: [TagIdMap.h1, TagIdMap.h2, TagIdMap.h3],
-            origin: useSiteConfig().url,
-            chunkSize: 256,
-            stripHeaders: false,
-            lengthFunction(text) {
-              return estimateTokenCount(text)
-            },
-          })
-
-          // Create stream on first write
-          if (!bulkStream) {
-            mkdirSync(dirname(bulkPath), { recursive: true })
-            bulkStream = createWriteStream(bulkPath)
-            logger.info(`Bulk JSONL stream created at ${relative(nuxt.options.rootDir, bulkPath)}`)
-          }
-
-          logger.debug(`Processing chunks for route: ${route.route}`)
-
-          // Stream chunks immediately without holding all in memory
-          let idx = 0
-          for await (const chunk of chunksStream) {
-            logger.debug(`  Chunk ${idx}: ${chunk.content.length} chars, headers: ${JSON.stringify(chunk.metadata?.headers)}`)
-
-            const bulkChunk: BulkChunk = {
-              id: generateVectorId(route.route, idx),
-              route: route.route,
-              chunkIndex: idx,
-              content: chunk.content,
-              headers: chunk.metadata?.headers,
-              loc: chunk.metadata?.loc,
-              title,
-              description,
-            }
-
-            // Call hook for modules to process chunk (e.g., RAG tooling)
-            await nuxt.hooks.callHook('ai-ready:chunk', {
-              chunk: bulkChunk,
-              route: route.route,
-              title,
-              description,
-              headings,
-            })
-
-            bulkStream.write(`${JSON.stringify(bulkChunk)}\n`)
-            bulkStreamEntries++
-            idx++
-          }
-
-          logger.debug(`Completed ${idx} chunks for ${route.route}`)
-        })
-        // Setup bulk JSONL stream path for low-memory bulk export
-        nitro.hooks.hook('prerender:done', () => {
-          // Close bulk JSONL stream if it was created
-          if (bulkStream) {
-            bulkStream.end()
-            logger.success(`Bulk JSONL exported ${bulkStreamEntries} entries.`)
-          }
-        })
-      })
-    })
   },
 })
 
