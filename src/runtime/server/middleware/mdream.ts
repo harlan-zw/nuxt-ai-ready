@@ -193,7 +193,7 @@ export default defineEventHandler(async (event) => {
 
   // Fetch the HTML page
   try {
-    const response = await globalThis.$fetch.raw(path)
+    const response = await event.fetch(path)
 
     // Check if response is successful
     if (!response.ok) {
@@ -220,7 +220,7 @@ export default defineEventHandler(async (event) => {
       return
     }
 
-    html = response._data as string
+    html = await response.text() as string
   }
   catch (e) {
     logger.error(`Failed to fetch HTML for ${path}`, e)
