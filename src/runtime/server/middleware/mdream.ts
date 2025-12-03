@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import type { MarkdownContext } from '~/src/runtime/types'
+import type { MarkdownContext } from '../../types'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { htmlToMarkdown, TagIdMap } from 'mdream'

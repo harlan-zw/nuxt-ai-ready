@@ -37,6 +37,11 @@ useSeoMeta({
             API Reference
           </NuxtLink>
         </li>
+        <li>
+          <NuxtLink to="/docs/foo/bar">
+            /docs/foo/bar.md
+          </NuxtLink>
+        </li>
       </ul>
     </nav>
   </div>

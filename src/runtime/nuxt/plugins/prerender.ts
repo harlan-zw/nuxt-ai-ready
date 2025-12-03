@@ -1,3 +1,4 @@
+import { isPathFile } from 'nuxt-site-config/urls'
 import { defineNuxtPlugin, prerenderRoutes } from 'nuxt/app'
 
 export default defineNuxtPlugin({
@@ -7,7 +8,7 @@ export default defineNuxtPlugin({
     }
     nuxtApp.hooks.hook('app:rendered', (ctx) => {
       let url = ctx.ssrContext?.url || ''
-      if (url.endsWith('.md')) {
+      if (isPathFile(url)) {
         return
       }
       if (url.endsWith('/')) {
