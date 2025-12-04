@@ -1,4 +1,4 @@
-import type { BulkChunk, LlmsTxtConfig } from '../../../src/runtime/types'
+import type { BulkChunk } from '../../../src/runtime/types'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

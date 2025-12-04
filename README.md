@@ -21,10 +21,10 @@ Nuxt AI Ready converts your indexable pages into clean markdown that AI systems 
 
 ## Features
 
-- 📄 **LLM Optimized Output**: Generate `llms.txt` as well as `llms.toon` (tabular, token efficient) artifacts 
-- 🚀 **On-Demand Markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`)
-- 🤖 **Smart Bot Detection**: Serves markdown to AI crawlers automatically
-- 📡 **Content Signals**: Help AI systems understand how to use your pages
+- 📄 **LLM Optimized Output**: Generate `llms.txt` artifacts including [TOON format](https://toonformat.dev)
+- 🚀 **On-Demand Markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`), automatically served to AI crawlers
+- 📡 **Content Signals**: Signals AI Crawlers using [Nuxt Robots](https://nuxtseo.com/robots)
+- 🌐 **Indexable Pages**: Integrating with [Nuxt Sitemap](https://nuxtseo.com/sitemap) to index only AI-allowed pages
 - 📦 **Bulk Chunk Export**: Exported token optimized chunks ready for RAG and semantic search
 - ⚡ **MCP Integration**: Let AI agents query your site directly
 
