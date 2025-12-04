@@ -33,6 +33,21 @@ useSeoMeta({
           </NuxtLink>
         </li>
         <li>
+          <NuxtLink to="/missing">
+            404 link
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink to="/llms.txt">
+            /llms.txt
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink to="/llms-full.txt">
+            /llms-full.txt
+          </NuxtLink>
+        </li>
+        <li>
           <NuxtLink to="/docs/api">
             API Reference
           </NuxtLink>

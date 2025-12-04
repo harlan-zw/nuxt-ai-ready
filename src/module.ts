@@ -230,9 +230,9 @@ export {}
     if (nuxt.options.build) {
       addPlugin({ mode: 'server', src: resolve('./runtime/nuxt/plugins/prerender') })
     }
-    if (nuxt.options.dev) {
-      addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
-    }
+    // gets replaced with a static file
+    addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
+    addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
 
     // Setup prerendering hooks for static generation
     // @ts-expect-error untyped
