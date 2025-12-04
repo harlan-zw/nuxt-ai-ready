@@ -52,9 +52,10 @@
   },
   "dependencies": {
     "@nuxt/kit": "4.2.1",
+    "@toon-format/toon": "^2.0.1",
     "consola": "^3.4.2",
     "defu": "^6.1.4",
-    "mdream": "^0.15.0",
+    "mdream": "^0.15.1",
     "minimatch": "^10.1.1",
     "nuxt-site-config": "^3.2.11",
     "pathe": "^2.0.3",

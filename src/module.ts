@@ -26,7 +26,6 @@ export interface ModuleHooks {
 }
 
 export interface ModulePublicRuntimeConfig {
-  bulkRoute: string | false
   debug: boolean
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
@@ -57,7 +56,6 @@ export default defineNuxtModule<ModuleOptions>({
     return {
       enabled: true,
       debug: false,
-      bulkRoute: '/content.jsonl',
       mdreamOptions: {
         preset: 'minimal',
       } satisfies ModuleOptions['mdreamOptions'],
@@ -132,20 +130,23 @@ export {}
 
     // Build default llms.txt config with API endpoints
     const defaultLlmsTxtSections: LlmsTxtConfig['sections'] = []
-
-    if (config.bulkRoute !== false) {
-      const resolvedBulkRoute = withSiteUrl(config.bulkRoute)
-      defaultLlmsTxtSections.push({
-        title: 'LLM Tools',
-        links: [
-          {
-            title: 'Bulk Data',
-            href: resolvedBulkRoute,
-            description: `\`\`\`bash\ncurl "${resolvedBulkRoute}"\n\`\`\`\n\nReturns JSONL (newline-delimited JSON) with all indexed content.`,
-          },
-        ],
-      })
-    }
+    const pagesRoute = withSiteUrl('llms.toon')
+    const pagesChunksRoute = withSiteUrl('llms-full.toon')
+    defaultLlmsTxtSections.push({
+      title: 'LLM Resources',
+      links: [
+        {
+          title: 'Pages Minimal',
+          href: pagesRoute,
+          description: `Page-level metadata in TOON format (token-efficient JSON encoding, see https://toonformat.dev). Contains: route, title, description, headings, chunkIds. Use with llms-full.toon for complete content. Fields: { route, title, description, headings, chunkIds }.\n\n  <code lang="bash">curl "${pagesRoute}"</code>`,
+        },
+        {
+          title: 'Page Chunks',
+          href: pagesChunksRoute,
+          description: `Individual content chunks in TOON format for RAG/embeddings. Contains: id, route, content. Fields: { id, route, content }. Join with llms.toon using route to get title/description/headings metadata. Chunk index inferred from id suffix (e.g., "hash-0", "hash-1").\n\n  <code lang="bash">curl "${pagesChunksRoute}"</code>`,
+        },
+      ],
+    })
 
     const hasMCP = hasNuxtModule('@nuxtjs/mcp-toolkit')
     if (hasMCP) {
@@ -155,18 +156,31 @@ export {}
         paths.tools = paths.tools || []
         paths.resources = paths.resources || []
         paths.prompts = paths.prompts || []
-        paths.tools.push(`${mcpRuntimeDir}/tools`)
-        paths.resources.push(`${mcpRuntimeDir}/resources`)
-        paths.prompts.push(`${mcpRuntimeDir}/prompts`)
+
+        // Default: all enabled (backward compatible)
+        const mcpConfig = config.mcp || {}
+        const toolsConfig = mcpConfig.tools ?? {}
+        const resourcesConfig = mcpConfig.resources ?? {}
+        // Conditionally add tools
+        if (toolsConfig.listPages !== false) {
+          paths.tools.push(`${mcpRuntimeDir}/tools/list-pages.ts`)
+        }
+        if (resourcesConfig.pages !== false) {
+          paths.resources.push(`${mcpRuntimeDir}/resources/pages.ts`)
+        }
+        if (resourcesConfig.pagesChunks !== false) {
+          paths.resources.push(`${mcpRuntimeDir}/resources/pages-chunks.ts`)
+        }
       })
 
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
       const mcpLink = {
         title: 'MCP',
         href: withSiteUrl(nuxt.options.mcp?.route || '/mcp'),
+        description: 'Model Context Protocol server endpoint for AI agent integration.',
       }
 
-      if (config.bulkRoute !== false && defaultLlmsTxtSections[0]) {
+      if (defaultLlmsTxtSections[0]) {
         defaultLlmsTxtSections[0].links!.push(mcpLink)
       }
       else {
@@ -188,10 +202,18 @@ export {}
         }
       : { sections: defaultLlmsTxtSections }
 
+    // Allow other modules to extend llms.txt content via hook
+    const llmsTxtPayload = {
+      sections: mergedLlmsTxt.sections || [],
+      notes: typeof mergedLlmsTxt.notes === 'string' ? [mergedLlmsTxt.notes] : (mergedLlmsTxt.notes || []),
+    }
+    await nuxt.callHook('ai-ready:llms-txt', llmsTxtPayload)
+    mergedLlmsTxt.sections = llmsTxtPayload.sections
+    mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
+
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
-      bulkRoute: config.bulkRoute,
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,
@@ -216,18 +238,13 @@ export {}
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     if (isStatic || nuxt.options.nitro.prerender?.routes?.length) {
-      setupPrerenderHandler()
+      setupPrerenderHandler(mergedLlmsTxt)
     }
 
-    // Add route rules for static bulk file
-    if (config.bulkRoute !== false) {
-      nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
-      nuxt.options.nitro.routeRules[config.bulkRoute] = {
-        headers: {
-          'Content-Type': 'application/x-ndjson; charset=utf-8',
-        },
-      }
-    }
+    // Add route rules for static TOON files
+    nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
+    nuxt.options.nitro.routeRules['/llms.toon'] = { headers: { 'Content-Type': 'text/toon; charset=utf-8' } }
+    nuxt.options.nitro.routeRules['/llms-full.toon'] = { headers: { 'Content-Type': 'text/toon; charset=utf-8' } }
   },
 })
 

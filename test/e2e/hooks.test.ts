@@ -54,9 +54,10 @@ describe('mdream hooks e2e', async () => {
       expect(llmsFullTxt).toBeTruthy()
       expect(typeof llmsFullTxt).toBe('string')
 
-      // Should contain the custom section added by the hook
-      expect(llmsFullTxt).toContain('## Custom Hook Section (Full)')
+      // Should contain the custom section and notes added by the hook
+      expect(llmsFullTxt).toContain('## Custom Hook Section')
       expect(llmsFullTxt).toContain('This was added by a hook!')
+      expect(llmsFullTxt).toContain('Custom Hook Section (Full)')
     })
   })
 
@@ -99,7 +100,7 @@ describe('mdream hooks e2e', async () => {
       expect(homeChunk).toBeTruthy()
       expect(homeChunk.title).toBe('Welcome to Test Site')
       expect(homeChunk.chunkIndex).toBeGreaterThanOrEqual(0)
-      expect(homeChunk.id).toMatch(/^[a-f0-9]{48}-\d+$/)
+      expect(homeChunk.id).toMatch(/^[a-f0-9]{8}-\d+$/)
     })
   })
 })

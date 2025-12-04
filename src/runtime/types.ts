@@ -15,12 +15,6 @@ export interface ModuleOptions {
   debug?: boolean
 
   /**
-   * Bulk data API (JSONL streaming)
-   * @default '/_ai-ready/bulk'
-   */
-  bulkRoute: string | false
-
-  /**
    * Options to pass to mdream htmlToMarkdown function
    */
   mdreamOptions?: HTMLToMarkdownOptions & {
@@ -69,27 +63,64 @@ export interface ModuleOptions {
      */
     aiInput?: boolean
   }
+
+  /**
+   * MCP (Model Context Protocol) configuration
+   * Control which tools and resources are exposed via MCP
+   * @default All enabled when @nuxtjs/mcp-toolkit is installed
+   */
+  mcp?: {
+    /**
+     * Enable/disable specific MCP tools
+     * @default All tools enabled
+     */
+    tools?: {
+      /** Get page by route - fetches markdown content for specific page */
+      listPages?: boolean
+    }
+    /**
+     * Enable/disable specific MCP resources
+     * @default All resources enabled
+     */
+    resources?: {
+      /** pages://list - all pages without markdown content */
+      pages?: boolean
+      /** pages://chunks - individual content chunks from all pages */
+      pagesChunks?: boolean
+    }
+  }
 }
 
 /**
- * Individual chunk entry in bulk.jsonl (one per chunk)
- * Consumers can reassemble by route if needed
+ * Individual chunk entry in llms-full.toon (one per chunk)
+ * Used for RAG, embeddings, and semantic search
+ * Optimized for token efficiency - join with llms.toon for title/description
+ * Chunk index can be inferred from id suffix (e.g., "hash-0", "hash-1")
+ * Tabular TOON format (primitives only)
  */
 export interface BulkChunk {
   id: string
   route: string
-  chunkIndex: number
   content: string
-  headers?: Record<string, string>
-  loc?: {
-    lines: {
-      from: number
-      to: number
-    }
-  }
-  // Document-level metadata (same across all chunks for a route)
+}
+
+/**
+ * Page-level entry in llms.toon (one per page)
+ * Used for page discovery, listing, and metadata queries
+ */
+export interface BulkDocument {
+  /** Page route/path */
+  route: string
+  /** Page title */
   title: string
+  /** Page description */
   description: string
+  /** Full markdown content reassembled from chunks */
+  markdown: string
+  /** Page headings structure (e.g., [{ "h1": "Title" }, { "h2": "Subtitle" }]) */
+  headings: Array<Record<string, string>>
+  /** All chunk IDs for this page (first ID can be used as document ID) */
+  chunkIds: string[]
 }
 
 /**

@@ -17,6 +17,16 @@ const rootDir = dirname(fileURLToPath(import.meta.url))
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   hooks: {
+    // Test ai-ready:llms-txt hook
+    'ai-ready:llms-txt': (payload: { sections: any[], notes: string[] }) => {
+      console.log('[Hook] ai-ready:llms-txt called')
+      payload.sections.push({
+        title: 'Custom Hook Section',
+        description: 'This was added by a hook!',
+      })
+      payload.notes.push('Custom Hook Section (Full)\nThis was added by a hook!')
+    },
+
     // Test ai-ready:chunk hook
     'ai-ready:chunk': (context: {
       chunk: BulkChunk
@@ -25,13 +35,15 @@ export default defineNuxtConfig({
       description: string
       headings: Array<Record<string, string>>
     }) => {
-      console.log('[Hook] ai-ready:chunk called for:', context.route, 'chunk', context.chunk.chunkIndex)
+      // Extract chunk index from id (format: "hash-N")
+      const chunkIndex = Number.parseInt(context.chunk.id.split('-')[1])
+      console.log('[Hook] ai-ready:chunk called for:', context.route, 'chunk', chunkIndex)
 
       // Track chunk metadata
       chunks.push({
         id: context.chunk.id,
         route: context.route,
-        chunkIndex: context.chunk.chunkIndex,
+        chunkIndex,
         title: context.title,
         contentPreview: context.chunk.content.substring(0, 50),
       })

@@ -34,37 +34,32 @@ describe('bulkChunk format', () => {
     for (let idx = 0; idx < mdreamChunks.length; idx++) {
       const chunk = mdreamChunks[idx]!
       const bulkChunk: BulkChunk = {
-        id: generateVectorId(route, idx),
-        route,
-        chunkIndex: idx,
-        content: chunk.content,
-        headers: chunk.metadata?.headers,
-        loc: chunk.metadata?.loc,
-        title,
-        description,
+        i: generateVectorId(route, idx),
+        r: route,
+        c: chunk.content,
+        ...(chunk.metadata?.headers && { h: chunk.metadata.headers }),
+        ...(chunk.metadata?.loc?.lines && { l: [chunk.metadata.loc.lines.from, chunk.metadata.loc.lines.to] }),
       }
       bulkChunks.push(bulkChunk)
     }
 
     expect(bulkChunks.length).toBeGreaterThan(0)
 
-    // Each chunk should be a complete JSONL entry
+    // Each chunk should be a complete entry
     bulkChunks.forEach((chunk, idx) => {
-      expect(chunk.id).toBe(generateVectorId(route, idx))
-      expect(chunk.route).toBe(route)
-      expect(chunk.chunkIndex).toBe(idx)
-      expect(chunk.content).toBeDefined()
-      expect(chunk.title).toBe(title)
-      expect(chunk.description).toBe(description)
+      expect(chunk.i).toBe(generateVectorId(route, idx))
+      expect(chunk.r).toBe(route)
+      expect(chunk.c).toBeDefined()
 
       // Metadata should be present
-      expect(chunk.headers).toBeDefined()
-      expect(chunk.headers).toHaveProperty('h1')
-      expect(chunk.loc).toBeDefined()
+      expect(chunk.h).toBeDefined()
+      expect(chunk.h).toHaveProperty('h1')
+      expect(chunk.l).toBeDefined()
+      expect(chunk.l).toHaveLength(2)
     })
 
     // Verify headers are different across chunks
-    const uniqueH2s = new Set(bulkChunks.map(c => c.headers?.h2))
+    const uniqueH2s = new Set(bulkChunks.map(c => c.h?.h2))
     expect(uniqueH2s.size).toBeGreaterThan(1)
   })
 
@@ -83,24 +78,25 @@ describe('bulkChunk format', () => {
     for (let idx = 0; idx < mdreamChunks.length; idx++) {
       const chunk = mdreamChunks[idx]!
       bulkChunks.push({
-        id: generateVectorId(route, idx),
-        route,
-        chunkIndex: idx,
-        content: chunk.content,
-        headers: chunk.metadata?.headers,
-        loc: chunk.metadata?.loc,
-        title,
-        description,
+        i: generateVectorId(route, idx),
+        r: route,
+        c: chunk.content,
+        ...(chunk.metadata?.headers && { h: chunk.metadata.headers }),
+        ...(chunk.metadata?.loc?.lines && { l: [chunk.metadata.loc.lines.from, chunk.metadata.loc.lines.to] }),
       })
     }
 
     // Simulate consumer reassembling chunks by route
-    const chunksByRoute = bulkChunks.filter(c => c.route === route)
+    const chunksByRoute = bulkChunks.filter(c => c.r === route)
     expect(chunksByRoute.length).toBe(mdreamChunks.length)
 
-    // Reassemble in order
-    const sortedChunks = chunksByRoute.sort((a, b) => a.chunkIndex - b.chunkIndex)
-    const reassembled = sortedChunks.map(c => c.content).join('\n\n')
+    // Reassemble in order - extract index from id suffix
+    const sortedChunks = chunksByRoute.sort((a, b) => {
+      const aIdx = Number.parseInt(a.i.split('-').pop()!)
+      const bIdx = Number.parseInt(b.i.split('-').pop()!)
+      return aIdx - bIdx
+    })
+    const reassembled = sortedChunks.map(c => c.c).join('\n\n')
     expect(reassembled.length).toBeGreaterThan(0)
     expect(reassembled).toContain('Getting Started')
   })
