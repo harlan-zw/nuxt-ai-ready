@@ -1,4 +1,4 @@
-import type { BulkChunk } from '../../../src/runtime/types'
+import type { BulkChunk, LlmsTxtConfig } from '../../../src/runtime/types'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   hooks: {
     // Test ai-ready:llms-txt hook
-    'ai-ready:llms-txt': (payload: { sections: any[] | undefined, notes: string[] }) => {
+    'ai-ready:llms-txt': (payload) => {
       console.log('[Hook] ai-ready:llms-txt called')
       payload.sections?.push({
         title: 'Custom Hook Section',
