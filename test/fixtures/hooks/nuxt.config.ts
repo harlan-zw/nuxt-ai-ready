@@ -18,9 +18,9 @@ export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   hooks: {
     // Test ai-ready:llms-txt hook
-    'ai-ready:llms-txt': (payload: { sections: any[], notes: string[] }) => {
+    'ai-ready:llms-txt': (payload: { sections: any[] | undefined, notes: string[] }) => {
       console.log('[Hook] ai-ready:llms-txt called')
-      payload.sections.push({
+      payload.sections?.push({
         title: 'Custom Hook Section',
         description: 'This was added by a hook!',
       })
@@ -36,7 +36,7 @@ export default defineNuxtConfig({
       headings: Array<Record<string, string>>
     }) => {
       // Extract chunk index from id (format: "hash-N")
-      const chunkIndex = Number.parseInt(context.chunk.id.split('-')[1])
+      const chunkIndex = Number.parseInt(context.chunk.id.split('-')[1] || '0')
       console.log('[Hook] ai-ready:chunk called for:', context.route, 'chunk', chunkIndex)
 
       // Track chunk metadata

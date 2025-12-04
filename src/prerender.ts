@@ -21,6 +21,7 @@ async function updateFirstLine(filePath: string, newFirstLine: string) {
   const fh = await open(filePath, 'r+')
   try {
     // Read current first line to get its length
+    // eslint-disable-next-line node/prefer-global/buffer
     const buffer = Buffer.alloc(1024)
     await fh.read(buffer, 0, 1024, 0)
     const content = buffer.toString('utf-8')

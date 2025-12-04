@@ -23,6 +23,13 @@ export interface ModuleHooks {
     description: string
     headings: Array<Record<string, string>>
   }) => void | Promise<void>
+  /**
+   * Hook to modify llms.txt configuration before it is finalized
+   */
+  'ai-ready:llms-txt': (payload: {
+    sections: LlmsTxtConfig['sections']
+    notes: string[]
+  }) => void | Promise<void>
 }
 
 export interface ModulePublicRuntimeConfig {
