@@ -1,16 +1,16 @@
 <script setup lang="ts">
 useSeoMeta({
-  title: 'About - Test Site',
+  title: 'About · Test Site — UTF-8 Support',
   description: 'Learn about this test site demonstrating Nuxt AI Search module capabilities for end-to-end testing across different deployment environments.',
-  ogTitle: 'About - Test Site',
+  ogTitle: 'About · Test Site — UTF-8 Support',
   ogDescription: 'Learn about this test site demonstrating Nuxt AI Search module capabilities for end-to-end testing across different deployment environments.',
 })
 </script>
 
 <template>
   <div>
-    <h1>About</h1>
-    <p>This test site demonstrates the Nuxt AI Search module capabilities.</p>
+    <h1>About · Test Site — UTF-8 Support</h1>
+    <p>This test site demonstrates the Nuxt AI Search module capabilities with proper UTF-8 encoding: é, ñ, 中文, emoji 🚀, and special chars like "quotes" & 'apostrophes'.</p>
 
     <h2>Purpose</h2>
     <p>

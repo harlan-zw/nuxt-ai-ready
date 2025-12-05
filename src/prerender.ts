@@ -82,12 +82,12 @@ export function setupPrerenderHandler(llmsTxtConfig: LlmsTxtConfig) {
         mkdirSync(dirname(pagesChunksPath), { recursive: true })
         mkdirSync(dirname(pagesPath), { recursive: true })
 
-        chunksStream = createWriteStream(pagesChunksPath, 'utf-8')
+        chunksStream = createWriteStream(pagesChunksPath, { encoding: 'utf-8' })
         // Write placeholder - will update with correct count later
         // Use longest possible format to ensure we can fit the final count
         chunksStream.write('pageChunks[999999]{id,route,content}:\n')
 
-        pagesStream = createWriteStream(pagesPath, 'utf-8')
+        pagesStream = createWriteStream(pagesPath, { encoding: 'utf-8' })
         // Write placeholder - will update with correct count later
         pagesStream.write('pages[999999]{route,title,description,headings,chunkIds}:\n')
       }
