@@ -1,7 +1,11 @@
 catalogMode: prefer
+
 cleanupUnusedCatalogs: true
+
 shellEmulator: true
+
 trustPolicy: no-downgrade
+
 trustPolicyExclude:
   - chokidar@4.0.3
   - eslint-import-resolver-typescript@3.10.1
@@ -23,9 +27,9 @@ catalog:
   '@nuxtjs/eslint-config-typescript': ^12.1.0
   '@nuxtjs/i18n': ^10.2.1
   '@nuxtjs/mcp-toolkit': ^0.5.1
-  '@nuxtjs/robots': ^5.6.0
+  '@nuxtjs/robots': ^5.6.1
   '@nuxtjs/sitemap': ^7.4.8
-  '@toon-format/toon': ^2.0.1
+  '@toon-format/toon': ^2.1.0
   '@vitest/coverage-v8': ^4.0.15
   '@vueuse/nuxt': ^14.1.0
   better-sqlite3: ^12.5.0
@@ -35,7 +39,7 @@ catalog:
   eslint: ^9.39.1
   execa: ^9.6.1
   happy-dom: ^20.0.11
-  mdream: ^0.15.1
+  mdream: ^0.15.2
   minimatch: ^10.1.1
   nuxt: ^4.2.1
   nuxt-site-config: ^3.2.11
@@ -53,6 +57,7 @@ catalog:
   vue-router: ^4.6.3
   vue-tsc: ^3.1.5
   zod: ^4.1.13
+
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
