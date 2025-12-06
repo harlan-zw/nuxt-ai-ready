@@ -4,7 +4,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![Nuxt][nuxt-src]][nuxt-href]
 
-> Best practice AI & LLM discoverability for Nuxt sites 
+> Best practice AI & LLM discoverability for Nuxt sites
 
 ## Why Nuxt AI Ready?
 
