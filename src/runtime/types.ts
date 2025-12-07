@@ -89,6 +89,23 @@ export interface ModuleOptions {
       pagesChunks?: boolean
     }
   }
+
+  /**
+   * Content timestamp tracking configuration
+   */
+  timestamps?: {
+    /**
+     * Enable timestamp tracking
+     * @default false
+     */
+    enabled?: boolean
+
+    /**
+     * Path to store content hash manifest
+     * @default 'node_modules/.cache/nuxt-seo/ai-index/content-hashes.json'
+     */
+    manifestPath?: string
+  }
 }
 
 /**
@@ -121,6 +138,8 @@ export interface BulkDocument {
   headings: Array<Record<string, string>>
   /** All chunk IDs for this page (first ID can be used as document ID) */
   chunkIds: string[]
+  /** ISO 8601 timestamp of last content update */
+  updatedAt?: string
 }
 
 /**
