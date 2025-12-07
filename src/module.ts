@@ -1,4 +1,5 @@
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import { join } from 'node:path'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
@@ -69,6 +70,10 @@ export default defineNuxtModule<ModuleOptions>({
       markdownCacheHeaders: {
         maxAge: 3600, // 1 hour
         swr: true,
+      },
+      timestamps: {
+        enabled: false,
+        manifestPath: 'node_modules/.cache/nuxt-seo/ai-index/content-hashes.json',
       },
     }
   },
@@ -218,6 +223,10 @@ export {}
     mergedLlmsTxt.sections = llmsTxtPayload.sections
     mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
 
+    const timestampsManifestPath = config.timestamps?.enabled
+      ? join(nuxt.options.rootDir, config.timestamps.manifestPath || 'node_modules/.cache/nuxt-seo/ai-index/content-hashes.json')
+      : undefined
+
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
@@ -227,7 +236,16 @@ export {}
         swr: true,
       }) as Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>,
       llmsTxt: mergedLlmsTxt,
+      timestampsManifestPath,
     } as any
+
+    // Register sitemap integration when timestamps enabled
+    if (config.timestamps?.enabled && hasNuxtModule('@nuxtjs/sitemap')) {
+      nuxt.hook('nitro:config', (nitroConfig) => {
+        nitroConfig.plugins = nitroConfig.plugins || []
+        nitroConfig.plugins.push(resolve('./runtime/server/plugins/sitemap-lastmod'))
+      })
+    }
 
     addServerHandler({
       middleware: true,
@@ -245,7 +263,7 @@ export {}
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     if (isStatic || nuxt.options.nitro.prerender?.routes?.length) {
-      setupPrerenderHandler(mergedLlmsTxt)
+      setupPrerenderHandler(mergedLlmsTxt, config.timestamps)
     }
 
     // Add route rules for static TOON files
