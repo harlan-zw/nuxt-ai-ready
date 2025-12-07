@@ -4,7 +4,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![Nuxt][nuxt-src]][nuxt-href]
 
-> Best practice AI & LLM discoverability for Nuxt sites 
+> Best practice AI & LLM discoverability for Nuxt sites
 
 ## Why Nuxt AI Ready?
 
@@ -27,6 +27,7 @@ Nuxt AI Ready converts your indexable pages into clean markdown that AI systems 
 - 🌐 **Indexable Pages**: Integrating with [Nuxt Sitemap](https://nuxtseo.com/sitemap) to index only AI-allowed pages
 - 📦 **Bulk Chunk Export**: Exported token optimized chunks ready for RAG and semantic search
 - ⚡ **MCP Integration**: Let AI agents query your site directly
+- ⏱️ **Automatic Last Updated**: Content freshness automatically tracked and added to your [sitemap.xml](https://nuxtseo.com/docs/ai-ready/guides/automatic-updated-at)
 
 ## Installation
 

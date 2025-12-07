@@ -9,6 +9,7 @@ import { estimateTokenCount } from 'tokenx'
 export async function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
   let title = ''
   let description = ''
+  let updatedAt: string | undefined
   // Create extraction plugin first
   const extractPlugin = extractionPlugin({
     title(el) {
@@ -16,6 +17,12 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     },
     'meta[name="description"]': (el) => {
       description = el.attributes.content || ''
+    },
+    // Extract timestamp from various meta tag formats
+    'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
+      if (!updatedAt && el.attributes.content) {
+        updatedAt = el.attributes.content
+      }
     },
   })
 
@@ -50,14 +57,20 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
   }
 
   // compute headings from chunk meta
-  return { chunks, title, description, headings: chunks.reduce((set, m) => {
-    Object.entries(m.metadata?.headers || {}).forEach(([k, v]) => {
-      // should be an array of unique values
-      if (!set[k])
-        set[k] = []
-      if (v && !set[k].includes(v))
-        set[k].push(v)
-    })
-    return set
-  }, {} as Record<string, string[]>) }
+  return {
+    chunks,
+    title,
+    description,
+    ...(updatedAt && { updatedAt }),
+    headings: chunks.reduce((set, m) => {
+      Object.entries(m.metadata?.headers || {}).forEach(([k, v]) => {
+        // should be an array of unique values
+        if (!set[k])
+          set[k] = []
+        if (v && !set[k].includes(v))
+          set[k].push(v)
+      })
+      return set
+    }, {} as Record<string, string[]>),
+  }
 }

@@ -13,4 +13,10 @@ export default defineNuxtConfig({
     name: 'Test Site',
     description: 'Test site for Nuxt AI Search',
   },
+
+  aiReady: {
+    timestamps: {
+      enabled: true,
+    },
+  },
 })

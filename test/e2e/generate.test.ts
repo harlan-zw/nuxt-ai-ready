@@ -59,6 +59,22 @@ describe('nuxt generate (static build)', async () => {
       })
     })
 
+    it('includes updatedAt timestamp in page-level TOON', async () => {
+      const result = await $fetch('/llms.toon', {
+        responseType: 'text',
+      })
+
+      const data = decode(result) as { pages: Array<{ route: string, updatedAt?: string }> }
+      expect(data.pages.length).toBeGreaterThan(0)
+
+      data.pages.forEach((page) => {
+        expect(page).toHaveProperty('updatedAt')
+        expect(typeof page.updatedAt).toBe('string')
+        // Verify ISO 8601 format
+        expect(page.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+      })
+    })
+
     it('preserves UTF-8 characters correctly in TOON files', async () => {
       const result = await $fetch('/llms.toon', {
         responseType: 'text',
