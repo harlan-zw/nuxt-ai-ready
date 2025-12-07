@@ -11,8 +11,10 @@ trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1
   - undici-types@6.21.0
   - semver
+
 packages:
   - playground
+
 catalog:
   '@antfu/eslint-config': ^6.4.2
   '@arethetypeswrong/cli': ^0.18.2
@@ -52,6 +54,7 @@ catalog:
   tokenx: ^1.2.1
   typescript: ^5.9.3
   ufo: ^1.6.1
+  unstorage: ^1.17.3
   vitest: ^4.0.15
   vue: ^3.5.25
   vue-router: ^4.6.3

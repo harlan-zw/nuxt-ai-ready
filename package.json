@@ -62,7 +62,8 @@
     "pkg-types": "catalog:",
     "std-env": "catalog:",
     "tokenx": "catalog:",
-    "ufo": "catalog:"
+    "ufo": "catalog:",
+    "unstorage": "catalog:"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:",
