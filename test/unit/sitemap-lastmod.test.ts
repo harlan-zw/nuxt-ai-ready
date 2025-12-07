@@ -1,9 +1,12 @@
+import type { NitroApp } from 'nitropack/types'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { useRuntimeConfig } from 'nitropack/runtime'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+interface SitemapUrl { loc: string, lastmod?: string }
 
 // Mock nitropack/runtime
 vi.mock('nitropack/runtime', () => ({
@@ -55,9 +58,9 @@ describe('sitemap-lastmod plugin', () => {
       },
     }
 
-    plugin(nitroApp)
+    plugin(nitroApp as unknown as NitroApp)
 
-    const ctx = {
+    const ctx: { urls: SitemapUrl[] } = {
       urls: [
         { loc: 'https://example.com/' },
         { loc: 'https://example.com/about' },
@@ -65,11 +68,11 @@ describe('sitemap-lastmod plugin', () => {
       ],
     }
 
-    await hooks['sitemap:resolved'](ctx)
+    await hooks['sitemap:resolved']!(ctx)
 
-    expect(ctx.urls[0].lastmod).toBe('2025-01-01T00:00:00.000Z')
-    expect(ctx.urls[1].lastmod).toBe('2025-02-15T12:00:00.000Z')
-    expect(ctx.urls[2].lastmod).toBeUndefined()
+    expect(ctx.urls[0]!.lastmod).toBe('2025-01-01T00:00:00.000Z')
+    expect(ctx.urls[1]!.lastmod).toBe('2025-02-15T12:00:00.000Z')
+    expect(ctx.urls[2]!.lastmod).toBeUndefined()
   })
 
   it('should normalize trailing slashes', async () => {
@@ -94,17 +97,17 @@ describe('sitemap-lastmod plugin', () => {
       },
     }
 
-    plugin(nitroApp)
+    plugin(nitroApp as unknown as NitroApp)
 
-    const ctx = {
+    const ctx: { urls: SitemapUrl[] } = {
       urls: [
         { loc: 'https://example.com/docs/' }, // trailing slash
       ],
     }
 
-    await hooks['sitemap:resolved'](ctx)
+    await hooks['sitemap:resolved']!(ctx)
 
-    expect(ctx.urls[0].lastmod).toBe('2025-03-01T00:00:00.000Z')
+    expect(ctx.urls[0]!.lastmod).toBe('2025-03-01T00:00:00.000Z')
   })
 
   it('should not register hook when manifest path not configured', async () => {
@@ -121,7 +124,7 @@ describe('sitemap-lastmod plugin', () => {
       },
     }
 
-    plugin(nitroApp)
+    plugin(nitroApp as unknown as NitroApp)
 
     expect(hooks['sitemap:resolved']).toBeUndefined()
   })
@@ -140,15 +143,15 @@ describe('sitemap-lastmod plugin', () => {
       },
     }
 
-    plugin(nitroApp)
+    plugin(nitroApp as unknown as NitroApp)
 
-    const ctx = {
+    const ctx: { urls: SitemapUrl[] } = {
       urls: [{ loc: '/' }],
     }
 
     // Should not throw
-    await hooks['sitemap:resolved'](ctx)
+    await hooks['sitemap:resolved']!(ctx)
 
-    expect(ctx.urls[0].lastmod).toBeUndefined()
+    expect(ctx.urls[0]!.lastmod).toBeUndefined()
   })
 })
