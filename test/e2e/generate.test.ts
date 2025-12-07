@@ -28,7 +28,7 @@ describe('nuxt generate (static build)', async () => {
       })
 
       expect(typeof result).toBe('string')
-      const data = decode(result) as { pageChunks: Array<{ id: string, route: string, content: string }> }
+      const data = decode(result as string) as { pageChunks: Array<{ id: string, route: string, content: string }> }
       expect(data).toHaveProperty('pageChunks')
       expect(Array.isArray(data.pageChunks)).toBe(true)
       expect(data.pageChunks.length).toBeGreaterThan(0)
@@ -46,7 +46,7 @@ describe('nuxt generate (static build)', async () => {
       })
 
       expect(typeof result).toBe('string')
-      const data = decode(result) as { pages: Array<{ route: string, title: string, description: string, headings: string, chunkIds: string }> }
+      const data = decode(result as string) as { pages: Array<{ route: string, title: string, description: string, headings: string, chunkIds: string }> }
       expect(data).toHaveProperty('pages')
       expect(Array.isArray(data.pages)).toBe(true)
       expect(data.pages.length).toBeGreaterThan(0)
@@ -64,7 +64,7 @@ describe('nuxt generate (static build)', async () => {
         responseType: 'text',
       })
 
-      const data = decode(result) as { pages: Array<{ route: string, updatedAt?: string }> }
+      const data = decode(result as string) as { pages: Array<{ route: string, updatedAt?: string }> }
       expect(data.pages.length).toBeGreaterThan(0)
 
       data.pages.forEach((page) => {
@@ -80,7 +80,7 @@ describe('nuxt generate (static build)', async () => {
         responseType: 'text',
       })
 
-      const data = decode(result) as { pages: Array<{ route: string, title: string, description: string }> }
+      const data = decode(result as string) as { pages: Array<{ route: string, title: string, description: string }> }
       const aboutPage = data.pages.find(p => p.route === '/about')
 
       expect(aboutPage).toBeDefined()
@@ -95,7 +95,7 @@ describe('nuxt generate (static build)', async () => {
       const chunksResult = await $fetch('/llms-full.toon', {
         responseType: 'text',
       })
-      const chunksData = decode(chunksResult) as { pageChunks: Array<{ route: string, content: string }> }
+      const chunksData = decode(chunksResult as string) as { pageChunks: Array<{ route: string, content: string }> }
       const aboutChunks = chunksData.pageChunks.filter(c => c.route === '/about')
 
       expect(aboutChunks.length).toBeGreaterThan(0)

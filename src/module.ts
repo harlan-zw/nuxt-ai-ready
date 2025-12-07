@@ -1,12 +1,32 @@
+import type { Nuxt, NuxtPage } from '@nuxt/schema'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { join } from 'node:path'
-import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
+import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, extendPages, hasNuxtModule, useNuxt } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { relative } from 'pathe'
 import { readPackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
+
+function createPagesPromise(nuxt: Nuxt = useNuxt()) {
+  return new Promise<NuxtPage[]>((resolve) => {
+    nuxt.hooks.hook('modules:done', () => {
+      if ((typeof nuxt.options.pages === 'boolean' && !nuxt.options.pages) || (typeof nuxt.options.pages === 'object' && !nuxt.options.pages.enabled)) {
+        return resolve([])
+      }
+      extendPages(resolve)
+    })
+  })
+}
+
+function flattenPages(pages: NuxtPage[], parent = ''): Array<{ path: string, name?: string, meta?: Record<string, unknown> }> {
+  return pages.flatMap((page) => {
+    const path = parent + page.path
+    const current = { path, name: page.name, meta: page.meta }
+    return page.children?.length ? [current, ...flattenPages(page.children, path)] : [current]
+  })
+}
 
 export interface ModuleHooks {
   /**
@@ -105,8 +125,18 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.nitro.scanDirs = nuxt.options.nitro.scanDirs || []
     nuxt.options.nitro.scanDirs.push(
       resolve('./runtime/server/utils'),
-      resolve('./runtime/server/mcp'),
     )
+
+    // Create virtual module for routes (used by dev MCP)
+    const pagesPromise = createPagesPromise(nuxt)
+    nuxt.hooks.hook('nitro:config', (nitroConfig) => {
+      nitroConfig.virtual = nitroConfig.virtual || {}
+      nitroConfig.virtual['#ai-ready/routes.mjs'] = async () => {
+        const pages = await pagesPromise
+        const routes = flattenPages(pages)
+        return `export default ${JSON.stringify(routes)}`
+      }
+    })
 
     if (typeof config.contentSignal === 'object') {
       nuxt.options.robots.groups.push({
@@ -162,27 +192,14 @@ export {}
 
     const hasMCP = hasNuxtModule('@nuxtjs/mcp-toolkit')
     if (hasMCP) {
-      // Register MCP definitions from runtime directory
+      // Register MCP definitions from runtime directory (dev uses sitemap, prod uses .toon files)
       nuxt.hook('mcp:definitions:paths', (paths) => {
-        const mcpRuntimeDir = resolve('./runtime/server/mcp')
-        paths.tools = paths.tools || []
-        paths.resources = paths.resources || []
-        paths.prompts = paths.prompts || []
-
-        // Default: all enabled (backward compatible)
+        const mcpRuntimeDir = resolve(`./runtime/server/mcp/${nuxt.options.dev ? 'dev' : 'prod'}`)
         const mcpConfig = config.mcp || {}
-        const toolsConfig = mcpConfig.tools ?? {}
-        const resourcesConfig = mcpConfig.resources ?? {}
-        // Conditionally add tools
-        if (toolsConfig.listPages !== false) {
-          paths.tools.push(`${mcpRuntimeDir}/tools/list-pages.ts`)
-        }
-        if (resourcesConfig.pages !== false) {
-          paths.resources.push(`${mcpRuntimeDir}/resources/pages.ts`)
-        }
-        if (resourcesConfig.pagesChunks !== false) {
-          paths.resources.push(`${mcpRuntimeDir}/resources/pages-chunks.ts`)
-        }
+        if (mcpConfig.tools !== false)
+          (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
+        if (mcpConfig.resources !== false)
+          (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
       })
 
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
@@ -230,6 +247,7 @@ export {}
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
+      hasSitemap: hasNuxtModule('@nuxtjs/sitemap'),
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,

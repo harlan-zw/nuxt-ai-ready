@@ -70,24 +70,10 @@ export interface ModuleOptions {
    * @default All enabled when @nuxtjs/mcp-toolkit is installed
    */
   mcp?: {
-    /**
-     * Enable/disable specific MCP tools
-     * @default All tools enabled
-     */
-    tools?: {
-      /** Get page by route - fetches markdown content for specific page */
-      listPages?: boolean
-    }
-    /**
-     * Enable/disable specific MCP resources
-     * @default All resources enabled
-     */
-    resources?: {
-      /** pages://list - all pages without markdown content */
-      pages?: boolean
-      /** pages://chunks - individual content chunks from all pages */
-      pagesChunks?: boolean
-    }
+    /** Enable MCP tools (list-pages) @default true */
+    tools?: boolean
+    /** Enable MCP resources (pages, pages-chunks) @default true */
+    resources?: boolean
   }
 
   /**

@@ -1,6 +1,6 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
 import { z } from 'zod'
-import { toonResult } from '../utils'
+import { toonResult } from '../../utils'
 
 const schema = {
   mode: z.enum(['chunks', 'minimal'])
