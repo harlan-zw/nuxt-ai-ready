@@ -10,6 +10,20 @@ interface RouteRecord {
   meta?: Record<string, unknown>
 }
 
+function routeToRegex(routePath: string): RegExp {
+  const pattern = routePath
+    .replace(/:[^/]+\(\.\*\)\*?/g, '.*') // :param(.*)* or :param(.*)
+    .replace(/:[^/]+/g, '[^/]+') // :param
+  return new RegExp(`^${pattern}$`)
+}
+
+function matchRoute(path: string, routeRecords: RouteRecord[]) {
+  for (const r of routeRecords) {
+    if (routeToRegex(r.path).test(path))
+      return r
+  }
+}
+
 export async function getDevPages() {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as { hasSitemap?: boolean }
   if (!config.hasSitemap)
@@ -23,11 +37,13 @@ export async function getDevPages() {
   const xml = await sitemapRes.text()
   const { urls } = await parseSitemapXml(xml)
   return urls.map((entry) => {
-    if (typeof entry === 'string')
-      return { route: new URL(entry).pathname }
+    const pathname = typeof entry === 'string' ? new URL(entry).pathname : new URL(entry.loc).pathname
+    const matched = matchRoute(pathname, routes as RouteRecord[])
     return {
-      route: new URL(entry.loc).pathname,
-      lastmod: entry.lastmod,
+      route: pathname,
+      ...(typeof entry !== 'string' && entry.lastmod && { lastmod: entry.lastmod }),
+      ...(matched?.name && { name: matched.name }),
+      ...(matched?.meta && { meta: matched.meta }),
     }
   })
 }
