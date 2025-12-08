@@ -4,7 +4,7 @@ import Module from '../../../src/module'
 const resolve = createResolver(import.meta.url)
 
 export default defineNuxtConfig({
-  modules: [Module, '@nuxtjs/sitemap'],
+  modules: [Module, 'nuxt-site-config', '@nuxtjs/sitemap'],
   alias: {
     'nuxt-ai-index': resolve.resolve('../../../src/module.ts'),
   },
