@@ -15,6 +15,11 @@ function stripFrontmatter(text: string): string {
   return text.slice(endIdx + 4).trimStart()
 }
 
+// Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\u00A0/g, ' ')
+}
+
 export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
   let title = ''
   let description = ''
@@ -49,7 +54,7 @@ export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOpt
 
   // Single pass for full markdown
   const rawMarkdown = htmlToMarkdown(html, options)
-  const markdown = stripFrontmatter(rawMarkdown)
+  const markdown = normalizeWhitespace(stripFrontmatter(rawMarkdown))
 
   // Separate pass for chunks (avoids recombination issues)
   const rawChunks = htmlToMarkdownSplitChunks(html, {
@@ -64,6 +69,8 @@ export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOpt
   })
 
   const chunks = rawChunks.filter((chunk, idx) => {
+    // Normalize whitespace in chunk content
+    chunk.content = normalizeWhitespace(chunk.content)
     if (idx === 0 && chunk.content.startsWith('---\n')) {
       const endIdx = chunk.content.indexOf('\n---', 4)
       if (endIdx !== -1) {
@@ -88,8 +95,8 @@ export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOpt
   return {
     markdown,
     chunks,
-    title,
-    description,
+    title: normalizeWhitespace(title),
+    description: normalizeWhitespace(description),
     headings,
     ...(updatedAt && { updatedAt }),
   }

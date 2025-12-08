@@ -215,6 +215,39 @@ describe('hTML to Markdown Chunking', () => {
     `)
   })
 
+  it('should normalize NBSP to regular spaces', () => {
+    // HTML with &nbsp; entities in body content (where they get decoded to U+00A0)
+    const htmlWithNbsp = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Test\u00A0Page</title>
+  <meta name="description" content="A test description">
+</head>
+<body>
+  <main>
+    <h1>Hello&nbsp;World</h1>
+    <p>Some&nbsp;text&nbsp;here</p>
+  </main>
+</body>
+</html>`
+
+    const out = convertHtmlToMarkdownChunks(htmlWithNbsp, '/test.md', {
+      preset: 'minimal',
+    })
+
+    // Title should have regular spaces, not NBSP
+    expect(out.title).toBe('Test Page')
+    expect(out.title).not.toContain('\u00A0')
+
+    // Markdown content should have regular spaces (mdream decodes &nbsp; to U+00A0)
+    expect(out.markdown).not.toContain('\u00A0')
+
+    // Chunks should have regular spaces
+    out.chunks.forEach((chunk) => {
+      expect(chunk.content).not.toContain('\u00A0')
+    })
+  })
+
   it('should use TagIdMap for headersToSplitOn', () => {
     const chunks = htmlToMarkdownSplitChunks(tmpHtml, {
       headersToSplitOn: [TagIdMap.h1, TagIdMap.h2, TagIdMap.h3],

@@ -11,6 +11,11 @@ import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
 import { logger } from '../logger'
 import { convertHtmlToMarkdownChunks } from '../utils'
 
+// Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\u00A0/g, ' ')
+}
+
 // Detect if client prefers markdown based on Accept header
 // Clients like Claude Code, Bun, and other API clients typically don't include text/html
 function shouldServeMarkdown(event: H3Event): boolean {
@@ -90,8 +95,8 @@ async function convertHtmlToMarkdown(html: string, url: string, config: ModulePu
   // Call Nitro runtime hook if available
   // @ts-expect-error untyped
   await nitroApp.hooks.callHook('ai-ready:markdown', context)
-  markdown = context.markdown // Use potentially modified markdown
-  return { markdown, title, description, headings }
+  markdown = normalizeWhitespace(context.markdown) // Use potentially modified markdown
+  return { markdown, title: normalizeWhitespace(title), description: normalizeWhitespace(description), headings }
 }
 
 export default defineEventHandler(async (event) => {
