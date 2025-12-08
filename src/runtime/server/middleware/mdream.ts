@@ -179,7 +179,7 @@ export default defineEventHandler(async (event) => {
   }
   if (import.meta.prerender) {
     // During prerender, generate chunks for bulk JSONL processing
-    const result = await convertHtmlToMarkdownChunks(
+    const result = convertHtmlToMarkdownChunks(
       html,
       withSiteUrl(event, path),
       config.mdreamOptions,

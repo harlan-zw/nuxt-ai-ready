@@ -18,8 +18,8 @@ describe('hTML to Markdown Chunking', () => {
     }
   })
 
-  it('should extract chunks from tmp.html', async () => {
-    const out = await convertHtmlToMarkdownChunks(tmpHtml, '/foo.md', {
+  it('should extract chunks from tmp.html', () => {
+    const out = convertHtmlToMarkdownChunks(tmpHtml, '/foo.md', {
       preset: 'minimal',
     })
 
@@ -27,13 +27,7 @@ describe('hTML to Markdown Chunking', () => {
       {
         "chunks": [
           {
-            "content": "---
-      title: "Getting Started"
-      meta:
-        description: "Quick start guide to installing and configuring nuxt-ai-ready in your Nuxt application"
-      ---
-
-      # **Getting Started**
+            "content": "# **Getting Started**
 
       Welcome to the Nuxt AI Ready module! This guide will help you get up and running with AI-powered content indexing for your Nuxt application.
 
@@ -157,6 +151,65 @@ describe('hTML to Markdown Chunking', () => {
             "Next Steps",
           ],
         },
+        "markdown": "# **Getting Started**
+
+      Welcome to the Nuxt AI Ready module! This guide will help you get up and running with AI-powered content indexing for your Nuxt application.
+
+      ## [Installation](#installation)
+
+      Install the module using your preferred package manager:
+
+      \`\`\`
+      pnpm add nuxt-ai-ready
+      \`\`\`
+
+      \`\`\`
+      npm install nuxt-ai-ready
+      \`\`\`
+
+      \`\`\`
+      yarn add nuxt-ai-ready
+      \`\`\`
+
+      Alternatively, use the Nuxt CLI:
+
+      \`\`\`
+      npx nuxi@latest module add nuxt-ai-ready
+      \`\`\`
+
+      ## [Configuration](#configuration)
+
+      Add the module to your \`nuxt.config.ts\`:
+
+      \`\`\`
+      export default defineNuxtConfig({
+        modules: ['nuxt-ai-ready'],
+
+        aiReady: {
+          enabled: true,
+          debug: false,
+          bulk: {
+            enabled: true,
+            route: '/_ai-ready/bulk',
+          },
+        },
+      })
+      \`\`\`
+
+      ## [What You Get](#what-you-get)
+
+      Once installed, your site automatically gains several AI-friendly features:
+
+      - **Bulk API**: JSONL stream of all your content at \`/_ai-ready/bulk\`
+      - **MCP Server**: Integration with AI agents via Model Context Protocol
+      - **llms.txt**: AI-friendly site context (via @mdream/nuxt)
+      - **Well-Known Discovery**: RFC 8615 compliant discovery endpoint
+
+      All content is automatically indexed at build time with zero configuration required!
+
+      ## [Next Steps](#next-steps)
+
+      Explore the features and API reference to learn more about what you can do with nuxt-ai-ready.",
         "title": "Getting Started",
       }
     `)

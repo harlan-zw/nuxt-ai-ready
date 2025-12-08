@@ -116,16 +116,14 @@ export function setupPrerenderHandler(
         pagesStream.write('pages[999999]{route,title,description,headings,chunkIds,updatedAt}:\n')
       }
 
-      const { chunks, title, description, headings, updatedAt: metaUpdatedAt } = JSON.parse(route.contents || '{}') as {
+      const { markdown, chunks, title, description, headings, updatedAt: metaUpdatedAt } = JSON.parse(route.contents || '{}') as {
+        markdown: string
         chunks: Array<{ content: string, metadata?: { headers?: Record<string, string>, loc?: { lines: { from: number, to: number } } } }>
         title: string
         description: string
         headings: Record<string, string[]>
         updatedAt?: string
       }
-
-      // Reassemble full markdown from chunks for llms.txt
-      const markdown = chunks.map(c => c.content).join('\n\n')
 
       // Get timestamp - prioritize meta tag, fall back to content hash
       let pageTimestamp: { updatedAt: string } = {

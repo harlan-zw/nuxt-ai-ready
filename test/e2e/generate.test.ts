@@ -38,6 +38,50 @@ describe('nuxt generate (static build)', async () => {
         expect(chunk).toHaveProperty('route')
         expect(chunk).toHaveProperty('content')
       })
+
+      // Snapshot first 3 chunks (sorted by route for consistency)
+      const sortedChunks = [...data.pageChunks].sort((a, b) => a.route.localeCompare(b.route) || a.id.localeCompare(b.id))
+      expect(sortedChunks.slice(0, 3)).toMatchInlineSnapshot(`
+        [
+          {
+            "content": "# Welcome to Test Site
+
+        This is a test site for the Nuxt AI Search module.
+
+        ## Features
+
+        - AI-powered semantic search
+        - Vector embeddings for content
+        - MCP protocol support
+        - Well-known endpoint discovery",
+            "id": "8a5edab2-0",
+            "route": "/",
+          },
+          {
+            "content": "# About · Test Site — UTF-8 Support
+
+        This test site demonstrates the Nuxt AI Search module capabilities with proper UTF-8 encoding: é, ñ, 中文, emoji 🚀, and special chars like "quotes" & 'apostrophes'.
+
+        ## Purpose
+
+        This site is used for end-to-end testing of the module across different deployment environments including standard Node.js and Cloudflare Workers.",
+            "id": "979bddc4-0",
+            "route": "/about",
+          },
+          {
+            "content": "## Technology Stack
+
+        - Nuxt 3 - Vue.js framework
+        - AI SDK - Embedding generation
+        - SQLite - Vector storage
+        - Transformers.js - Local embeddings
+
+        [Back to Home](https://test.example.com/about/)",
+            "id": "979bddc4-1",
+            "route": "/about",
+          },
+        ]
+      `)
     })
 
     it('serves llms.toon as static file (page-level)', async () => {

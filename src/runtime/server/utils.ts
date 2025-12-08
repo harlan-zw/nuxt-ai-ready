@@ -1,16 +1,25 @@
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../module'
-import { TagIdMap } from 'mdream'
+import { htmlToMarkdown, TagIdMap } from 'mdream'
 import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
-import { htmlToMarkdownSplitChunksStream } from 'mdream/splitter'
+import { htmlToMarkdownSplitChunks } from 'mdream/splitter'
 import { estimateTokenCount } from 'tokenx'
 
-export async function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
+function stripFrontmatter(text: string): string {
+  if (!text.startsWith('---\n'))
+    return text
+  const endIdx = text.indexOf('\n---', 4)
+  if (endIdx === -1)
+    return text
+  return text.slice(endIdx + 4).trimStart()
+}
+
+export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
   let title = ''
   let description = ''
   let updatedAt: string | undefined
-  // Create extraction plugin first
+
   const extractPlugin = extractionPlugin({
     title(el) {
       title = el.textContent
@@ -18,7 +27,6 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     'meta[name="description"]': (el) => {
       description = el.attributes.content || ''
     },
-    // Extract timestamp from various meta tag formats
     'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
       if (!updatedAt && el.attributes.content) {
         updatedAt = el.attributes.content
@@ -31,7 +39,6 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     ...mdreamOptions,
   }
 
-  // Apply preset if specified
   if (mdreamOptions?.preset === 'minimal') {
     options = withMinimalPreset(options)
     options.plugins = [extractPlugin, ...(options.plugins || [])]
@@ -40,7 +47,12 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     options.plugins = [extractPlugin, ...(options.plugins || [])]
   }
 
-  const chunksStream = htmlToMarkdownSplitChunksStream(html, {
+  // Single pass for full markdown
+  const rawMarkdown = htmlToMarkdown(html, options)
+  const markdown = stripFrontmatter(rawMarkdown)
+
+  // Separate pass for chunks (avoids recombination issues)
+  const rawChunks = htmlToMarkdownSplitChunks(html, {
     ...options,
     headersToSplitOn: [TagIdMap.h1, TagIdMap.h2, TagIdMap.h3],
     origin: url,
@@ -51,26 +63,34 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     },
   })
 
-  const chunks = []
-  for await (const chunk of chunksStream) {
-    chunks.push(chunk)
-  }
+  const chunks = rawChunks.filter((chunk, idx) => {
+    if (idx === 0 && chunk.content.startsWith('---\n')) {
+      const endIdx = chunk.content.indexOf('\n---', 4)
+      if (endIdx !== -1) {
+        chunk.content = chunk.content.slice(endIdx + 4).trimStart()
+        return chunk.content.length > 0
+      }
+    }
+    return true
+  })
 
-  // compute headings from chunk meta
+  // Extract headings from chunk metadata
+  const headings = chunks.reduce((set, chunk) => {
+    Object.entries(chunk.metadata?.headers || {}).forEach(([k, v]) => {
+      if (!set[k])
+        set[k] = []
+      if (v && !set[k].includes(v))
+        set[k].push(v)
+    })
+    return set
+  }, {} as Record<string, string[]>)
+
   return {
+    markdown,
     chunks,
     title,
     description,
+    headings,
     ...(updatedAt && { updatedAt }),
-    headings: chunks.reduce((set, m) => {
-      Object.entries(m.metadata?.headers || {}).forEach(([k, v]) => {
-        // should be an array of unique values
-        if (!set[k])
-          set[k] = []
-        if (v && !set[k].includes(v))
-          set[k].push(v)
-      })
-      return set
-    }, {} as Record<string, string[]>),
   }
 }
