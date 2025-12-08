@@ -44,7 +44,7 @@ export async function convertHtmlToMarkdownChunks(html: string, url: string, mdr
     ...options,
     headersToSplitOn: [TagIdMap.h1, TagIdMap.h2, TagIdMap.h3],
     origin: url,
-    chunkSize: 256,
+    chunkSize: 512,
     stripHeaders: false,
     lengthFunction(text) {
       return estimateTokenCount(text)
