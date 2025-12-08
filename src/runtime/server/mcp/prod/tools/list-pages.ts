@@ -1,4 +1,6 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
+import { getNitroOrigin } from '#site-config/server/composables'
+import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
 import { toonResult } from '../../utils'
 
@@ -20,11 +22,11 @@ export default {
   cache: '1h',
   async handler({ mode }) {
     // Fetch and return TOON-encoded file directly (token-efficient format)
-    const response = await fetch(mode === 'chunks' ? '/llms-full.toon' : '/llms.toon')
-    if (!response.ok)
-      throw new Error(`Failed to fetch pages: ${response.statusText}`)
-
-    const toon = await response.text()
-    return toonResult(toon)
+    const event = useEvent()
+    const nitroOrigin = getNitroOrigin(event)
+    const text = await $fetch(mode === 'chunks' ? '/llms-full.toon' : '/llms.toon', {
+      baseURL: nitroOrigin,
+    })
+    return toonResult(text)
   },
 } satisfies McpToolDefinition
