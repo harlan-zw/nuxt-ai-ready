@@ -82,8 +82,8 @@ catalogs:
       specifier: ^20.0.11
       version: 20.0.11
     mdream:
-      specifier: ^0.15.2
-      version: 0.15.2
+      specifier: ^0.15.3
+      version: 0.15.3
     minimatch:
       specifier: ^10.1.1
       version: 10.1.1
@@ -160,7 +160,7 @@ importers:
         version: 6.1.4
       mdream:
         specifier: 'catalog:'
-        version: 0.15.2
+        version: 0.15.3
       minimatch:
         specifier: 'catalog:'
         version: 10.1.1
@@ -5847,8 +5847,8 @@ packages:
   mdn-data@2.12.2:
     resolution: {integrity: sha512-IEn+pegP1aManZuckezWCO+XZQDplx1366JoVhTpMpBB1sPey/SbveZQUosKiKiGYjg1wH4pMlNgXbCiYgihQA==}
 
-  mdream@0.15.2:
-    resolution: {integrity: sha512-+eGIaOhJR56tY2/edKd4GNnZy3ClU9/pe9AgHKg9bD4A7zU1L4wGBu89DXplweJMLrb13LfGO++t5b4R6b27MA==}
+  mdream@0.15.3:
+    resolution: {integrity: sha512-mB367AFnSiL/45kqWVR4/eIdOwzcvXTuJuVcTO7OVkOqePMXba9eK0y81BWDAFR98W6g3KJztz/upLl/5nfssA==}
     hasBin: true
 
   media-typer@1.1.0:
@@ -14793,7 +14793,7 @@ snapshots:
 
   mdn-data@2.12.2: {}
 
-  mdream@0.15.2:
+  mdream@0.15.3:
     dependencies:
       cac: 6.7.14
       pathe: 2.0.3
