@@ -27,6 +27,6 @@ export default {
     const text = await $fetch(mode === 'chunks' ? '/llms-full.toon' : '/llms.toon', {
       baseURL: nitroOrigin,
     })
-    return toonResult(text)
+    return toonResult(text as string)
   },
 } satisfies McpToolDefinition

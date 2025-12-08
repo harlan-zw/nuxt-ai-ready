@@ -20,7 +20,7 @@ export default ({
       contents: [{
         uri: uri.toString(),
         mimeType: 'text/toon',
-        text,
+        text: text as string,
       }],
     }
   },

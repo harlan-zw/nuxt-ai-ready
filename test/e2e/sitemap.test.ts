@@ -39,7 +39,7 @@ describe('sitemap lastmod integration', async () => {
     expect(Object.keys(manifest.pages).length).toBeGreaterThan(0)
 
     // Fetch sitemap at runtime (sitemap:resolved hook runs here)
-    const sitemap = await $fetch<string>('/sitemap.xml', { responseType: 'text' })
+    const sitemap = await $fetch('/sitemap.xml', { responseType: 'text' })
 
     expect(sitemap).toContain('<?xml')
 
