@@ -6,15 +6,6 @@ import { withMinimalPreset } from 'mdream/preset/minimal'
 import { htmlToMarkdownSplitChunks } from 'mdream/splitter'
 import { estimateTokenCount } from 'tokenx'
 
-function stripFrontmatter(text: string): string {
-  if (!text.startsWith('---\n'))
-    return text
-  const endIdx = text.indexOf('\n---', 4)
-  if (endIdx === -1)
-    return text
-  return text.slice(endIdx + 4).trimStart()
-}
-
 // Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
 function normalizeWhitespace(text: string): string {
   return text.replace(/\u00A0/g, ' ')
@@ -52,9 +43,9 @@ export function convertHtmlToMarkdownChunks(html: string, url: string, mdreamOpt
     options.plugins = [extractPlugin, ...(options.plugins || [])]
   }
 
-  // Single pass for full markdown
+  // Single pass for full markdown (keep frontmatter for the full doc)
   const rawMarkdown = htmlToMarkdown(html, options)
-  const markdown = normalizeWhitespace(stripFrontmatter(rawMarkdown))
+  const markdown = normalizeWhitespace(rawMarkdown)
 
   // Separate pass for chunks (avoids recombination issues)
   const rawChunks = htmlToMarkdownSplitChunks(html, {

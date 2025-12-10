@@ -151,7 +151,13 @@ describe('hTML to Markdown Chunking', () => {
             "Next Steps",
           ],
         },
-        "markdown": "# **Getting Started**
+        "markdown": "---
+      title: \"Getting Started\"
+      meta:
+        description: \"Quick start guide to installing and configuring nuxt-ai-ready in your Nuxt application\"
+      ---
+
+      # **Getting Started**
 
       Welcome to the Nuxt AI Ready module! This guide will help you get up and running with AI-powered content indexing for your Nuxt application.
 
@@ -263,5 +269,21 @@ describe('hTML to Markdown Chunking', () => {
       chunk.metadata?.headers && Object.keys(chunk.metadata.headers).length > 0,
     )
     expect(hasHeaderMetadata).toBe(true)
+  })
+
+  it('should preserve frontmatter in markdown but strip from chunks', () => {
+    const out = convertHtmlToMarkdownChunks(tmpHtml, '/test.md', {
+      preset: 'minimal',
+    })
+
+    // Full markdown should include frontmatter
+    expect(out.markdown).toMatch(/^---\n/)
+    expect(out.markdown).toContain('title: "Getting Started"')
+
+    // Chunks should NOT have frontmatter
+    out.chunks.forEach((chunk) => {
+      expect(chunk.content).not.toMatch(/^---\n/)
+      expect(chunk.content).not.toContain('title: "Getting Started"')
+    })
   })
 })
