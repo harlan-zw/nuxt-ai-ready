@@ -4,7 +4,7 @@ import * as p from '@clack/prompts'
 import { tryUseNuxt, useNuxt } from '@nuxt/kit'
 import { useSiteConfig } from 'nuxt-site-config/kit'
 import { $fetch } from 'ofetch'
-import { env, isCI, provider } from 'std-env'
+import { env, isCI, isTest, provider } from 'std-env'
 import { logger } from './logger'
 
 export function isStaticPreset(nuxt: Nuxt = useNuxt()) {
@@ -52,6 +52,9 @@ export function hookNuxtSeoProLicense() {
   // @ts-expect-error untyped
   if (isBuild && !nuxt._isNuxtSeoProVerifying) {
     const license = nuxt.options.runtimeConfig.seoProKey || process.env.NUXT_SEO_PRO_KEY
+    if (isTest) {
+      return
+    }
     if (!isCI && !license) {
       p.log.warn('⚠️  Building without license in non-CI environment. A license is required for production builds.')
       return
