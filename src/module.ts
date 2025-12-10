@@ -6,6 +6,7 @@ import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { relative } from 'pathe'
 import { readPackageJSON } from 'pkg-types'
+import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 
@@ -110,6 +111,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+    hookNuxtSeoProLicense()
 
     // Set up alias
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}

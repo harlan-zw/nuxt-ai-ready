@@ -51,6 +51,7 @@
     "test:attw": "attw --pack"
   },
   "dependencies": {
+    "@clack/prompts": "catalog:",
     "@nuxt/kit": "catalog:",
     "@toon-format/toon": "catalog:",
     "consola": "catalog:",
@@ -58,6 +59,7 @@
     "mdream": "catalog:",
     "minimatch": "catalog:",
     "nuxt-site-config": "catalog:",
+    "ofetch": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "std-env": "catalog:",

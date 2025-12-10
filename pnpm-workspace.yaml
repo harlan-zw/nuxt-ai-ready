@@ -1,25 +1,14 @@
-catalogMode: prefer
-
-cleanupUnusedCatalogs: true
-
-shellEmulator: true
-
-trustPolicy: no-downgrade
-
-trustPolicyExclude:
-  - chokidar@4.0.3
-  - eslint-import-resolver-typescript@3.10.1
-  - undici-types@6.21.0
-  - semver
 packages:
   - playground
+
 catalog:
   '@antfu/eslint-config': ^6.5.1
   '@arethetypeswrong/cli': ^0.18.2
+  '@clack/prompts': ^0.11.0
   '@headlessui/vue': ^1.7.23
   '@nuxt/content': ^3.9.0
   '@nuxt/devtools-ui-kit': ^3.1.1
-  '@nuxt/kit': 4.2.1
+  '@nuxt/kit': 4.2.2
   '@nuxt/module-builder': ^1.0.2
   '@nuxt/test-utils': ^3.21.0
   '@nuxt/ui': ^4.2.1
@@ -41,14 +30,15 @@ catalog:
   happy-dom: ^20.0.11
   mdream: ^0.15.3
   minimatch: ^10.1.1
-  nuxt: ^4.2.1
-  nuxt-site-config: ^3.2.11
+  nuxt: ^4.2.2
+  nuxt-site-config: 3.2.11
+  ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0
   playwright: ^1.57.0
   playwright-core: ^1.57.0
   postgres: ^3.4.7
-  std-env: ^3.10.0
+  std-env: 3.10.0
   tokenx: ^1.2.1
   typescript: ^5.9.3
   ufo: ^1.6.1
@@ -56,8 +46,12 @@ catalog:
   vitest: ^4.0.15
   vue: ^3.5.25
   vue-router: ^4.6.3
-  vue-tsc: ^3.1.7
+  vue-tsc: ^3.1.8
   zod: ^4.1.13
+
+catalogMode: prefer
+
+cleanupUnusedCatalogs: true
 
 onlyBuiltDependencies:
   - '@firebase/util'
@@ -70,3 +64,13 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
+
+shellEmulator: true
+
+trustPolicy: no-downgrade
+
+trustPolicyExclude:
+  - chokidar@4.0.3
+  - eslint-import-resolver-typescript@3.10.1
+  - undici-types@6.21.0
+  - semver
