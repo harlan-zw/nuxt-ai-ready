@@ -28,6 +28,10 @@ pnpm test                     # Run all tests (unit + e2e) - runs prepare:fixtur
 pnpm test:unit                # Run unit tests only (no fixture prep)
 pnpm test:e2e                 # Run e2e tests only (includes prepare:fixtures)
 pnpm prepare:fixtures         # Prepare test fixtures (playground + test/fixtures/basic)
+
+# Run single test file
+pnpm vitest run path/to/test.ts --project=unit
+pnpm vitest run path/to/test.ts --project=e2e
 ```
 
 **Note:** E2E tests expect:
@@ -68,12 +72,15 @@ Build-time flow (via `src/prerender.ts`):
 
 ### Runtime Server (`src/runtime/server/`)
 
-MCP definitions auto-scanned from:
-- `mcp/tools/`: MCP tools (get_page, list_pages)
-- `mcp/resources/`: MCP resources (pages://list, content://all)
-- `mcp/prompts/`: MCP prompts (search-content, explain-concept, find-information)
+MCP definitions auto-scanned via `mcp:definitions:paths` hook:
+- **Dev mode** (`mcp/dev/`): Uses sitemap to fetch routes dynamically
+- **Prod mode** (`mcp/prod/`): Uses prerendered .toon files
 
-Uses `defineMcpTool`, `defineMcpResource`, `defineMcpPrompt` from `#mcp-toolkit/utils`.
+Available MCP definitions:
+- `tools/list-pages`: List all pages with metadata
+- `resources/pages`: Pages resource (prod also has `pages-chunks`)
+
+Uses `defineMcpTool`, `defineMcpResource` from `#mcp-toolkit/utils`.
 
 ### Key Dependencies
 
@@ -84,24 +91,43 @@ Uses `defineMcpTool`, `defineMcpResource`, `defineMcpPrompt` from `#mcp-toolkit/
 - **tokenx**: Token counting for chunk sizing
 - **minimatch**: Pattern matching for route filtering
 
+### TOON Output Schemas
+
+Two TOON files generated during prerender:
+
+**llms.toon** (page-level):
+```
+pages[N]{route,title,description,headings,chunkIds,updatedAt}:
+```
+
+**llms-full.toon** (chunk-level):
+```
+pageChunks[N]{id,route,content}:
+```
+
 ### Type Exports
 
 - `ModuleOptions`: Module configuration interface
-- `BulkDocument`: Page-level data format (route, title, description, markdown, headings, id, chunkIds)
-- `BulkChunk`: Chunk-level data format (id, route, chunkIndex, content, headers, loc, title, description)
+- `BulkDocument`: Page-level data format (route, title, description, markdown, headings, chunkIds)
+- `BulkChunk`: Chunk-level data format (id, route, content)
 
 ## File Structure
 
 ```
 src/
-├── module.ts              # Main module setup
-├── runtime/
-│   ├── types.ts           # Shared types
-│   └── server/
-│       ├── mcp/           # MCP definitions (auto-scanned)
-│       └── utils/         # Server utilities
-├── kit.ts                 # Kit utilities
-└── logger.ts              # Consola logger
+├── module.ts              # Main module setup, hooks registration
+├── prerender.ts           # Build-time TOON generation via nitro hooks
+├── content-hash-manager.ts # Timestamp tracking for sitemap lastmod
+├── kit.ts                 # Kit utilities (license checking)
+├── logger.ts              # Consola logger
+└── runtime/
+    ├── types.ts           # Shared types (ModuleOptions, BulkChunk, etc.)
+    └── server/
+        ├── middleware/    # mdream HTML→markdown middleware
+        ├── mcp/
+        │   ├── dev/       # MCP tools/resources using sitemap (dev mode)
+        │   └── prod/      # MCP tools/resources using .toon files (production)
+        └── plugins/       # Nitro plugins (sitemap-lastmod)
 
 test/
 ├── e2e/                   # E2E tests (require prerender)
@@ -109,7 +135,6 @@ test/
 └── fixtures/basic/        # Test fixture site
 
 playground/                # Development playground
-└── nuxt.config.ts         # Playground config
 ```
 
 ## Testing Patterns
