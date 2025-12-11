@@ -9,6 +9,7 @@ import { open, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
 import { encodeLines } from '@toon-format/toon'
+import { colorize } from 'consola/utils'
 import { createLlmsTxtStream } from 'mdream/llms-txt'
 import { useSiteConfig } from 'nuxt-site-config/kit'
 import { createContentHashManager } from './content-hash-manager'
@@ -53,7 +54,7 @@ export function setupPrerenderHandler(
     let pagesStream: WriteStream | null = null
     let chunksProcessed = 0
     let pageCount = 0
-    const startTime = Date.now()
+    let totalProcessingTime = 0
     const pagesChunksPath = join(nitro.options.output.publicDir, 'llms-full.toon')
     const pagesPath = join(nitro.options.output.publicDir, 'llms.toon')
 
@@ -88,6 +89,8 @@ export function setupPrerenderHandler(
       if (pageRoute === '/index') {
         pageRoute = '/'
       }
+
+      const pageStartTime = Date.now()
 
       // Initialize streams on first page
       if (!writer) {
@@ -243,6 +246,7 @@ export function setupPrerenderHandler(
 
       // Set page content to the markdown
       route.contents = markdown
+      totalProcessingTime += Date.now() - pageStartTime
     })
 
     nitro.hooks.hook('prerender:done', async () => {
@@ -278,9 +282,6 @@ export function setupPrerenderHandler(
         await contentHashManager.saveManifest()
         logger.debug('Saved content hash manifest')
       }
-
-      logger.info(`Wrote llms-full.toon with ${chunksProcessed} chunks`)
-      logger.info(`Wrote llms.toon with ${pageCount} pages`)
 
       // Register generated files with prerender
       const llmsTxtPath = join(nitro.options.output.publicDir, 'llms.txt')
@@ -318,12 +319,14 @@ export function setupPrerenderHandler(
 
       nitro._prerenderedRoutes!.push(...files)
 
-      const elapsed = Date.now() - startTime
-      const llmsKb = (llmsStats.size / 1024).toFixed(2)
-      const llmsFullKb = (llmsFullStats.size / 1024).toFixed(2)
-      const pagesChunksKb = (pagesChunksStats.size / 1024).toFixed(2)
-      const pagesKb = (pagesStats.size / 1024).toFixed(2)
-      logger.info(`Generated llms.txt (${llmsKb}kb), llms-full.txt (${llmsFullKb}kb), llms-full.toon (${pagesChunksKb}kb), and llms.toon (${pagesKb}kb) from ${pageCount} pages (${chunksProcessed} chunks) in ${elapsed}ms`)
+      const elapsed = (totalProcessingTime / 1000).toFixed(1)
+      const kb = (b: number) => (b / 1024).toFixed(1)
+      const totalKb = kb(llmsStats.size + llmsFullStats.size + pagesChunksStats.size + pagesStats.size)
+      const dim = (s: string) => colorize('dim', s)
+      const cyan = (s: string) => colorize('cyan', s)
+      logger.info(`Generated ${cyan(String(pageCount))} pages ${dim(`(${chunksProcessed} chunks)`)} in ${cyan(`${elapsed}s`)} → ${cyan(`${totalKb}kb`)}`)
+      logger.info(dim(`  llms.txt: ${kb(llmsStats.size)}kb, llms-full.txt: ${kb(llmsFullStats.size)}kb`))
+      logger.info(dim(`  llms.toon: ${kb(pagesStats.size)}kb, llms-full.toon: ${kb(pagesChunksStats.size)}kb`))
     })
   })
 }
