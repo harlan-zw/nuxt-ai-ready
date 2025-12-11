@@ -178,6 +178,12 @@ export function setupPrerenderHandler(
       // Process chunks for hook (RAG modules can listen to ai-ready:chunk)
       logger.debug(`Processing ${chunks.length} chunks for route: ${pageRoute}`)
       const chunkIds: string[] = []
+
+      // Pre-compute headings array once (avoid recalculating per chunk)
+      const flatHeadings = Object.entries(headings).flatMap(([tag, texts]) =>
+        texts.map(text => ({ [tag]: text })),
+      )
+
       for (let idx = 0; idx < chunks.length; idx++) {
         const chunk = chunks[idx]
         if (!chunk)
@@ -199,18 +205,17 @@ export function setupPrerenderHandler(
           route: pageRoute,
           title,
           description,
-          headings: Object.entries(headings).flatMap(([tag, texts]) =>
-            texts.map(text => ({ [tag]: text })),
-          ),
+          headings: flatHeadings,
         })
 
         // Stream chunk to TOON file
         if (chunksStream) {
           // Encode single chunk and write (skip schema line)
-          const lines = Array.from(encodeLines({ pageChunks: [bulkChunk] }))
-          // Skip first line (schema), write data line
-          if (lines[1]) {
-            chunksStream.write(`${lines[1]}\n`)
+          const iter = encodeLines({ pageChunks: [bulkChunk] })[Symbol.iterator]()
+          iter.next() // skip schema
+          const line = iter.next().value
+          if (line) {
+            chunksStream.write(`${line}\n`)
           }
         }
 
@@ -237,10 +242,11 @@ export function setupPrerenderHandler(
 
       if (pagesStream) {
         // Encode single page and write (skip schema line)
-        const lines = Array.from(encodeLines({ pages: [pageDoc] }))
-        // Skip first line (schema), write data line
-        if (lines[1]) {
-          pagesStream.write(`${lines[1]}\n`)
+        const iter = encodeLines({ pages: [pageDoc] })[Symbol.iterator]()
+        iter.next() // skip schema
+        const line = iter.next().value
+        if (line) {
+          pagesStream.write(`${line}\n`)
         }
       }
 
@@ -255,21 +261,26 @@ export function setupPrerenderHandler(
       }
 
       await writer.close()
+      writer = null
 
       // Close TOON streams
       if (chunksStream) {
+        const stream = chunksStream
+        chunksStream = null
         await new Promise<void>((resolve, reject) => {
-          chunksStream!.on('error', reject)
-          chunksStream!.on('finish', resolve)
-          chunksStream!.end()
+          stream.on('error', reject)
+          stream.on('finish', resolve)
+          stream.end()
         })
       }
 
       if (pagesStream) {
+        const stream = pagesStream
+        pagesStream = null
         await new Promise<void>((resolve, reject) => {
-          pagesStream!.on('error', reject)
-          pagesStream!.on('finish', resolve)
-          pagesStream!.end()
+          stream.on('error', reject)
+          stream.on('finish', resolve)
+          stream.end()
         })
       }
 
@@ -281,6 +292,8 @@ export function setupPrerenderHandler(
       if (contentHashManager) {
         await contentHashManager.saveManifest()
         logger.debug('Saved content hash manifest')
+        contentHashManager = null
+        previousManifest = null
       }
 
       // Register generated files with prerender
