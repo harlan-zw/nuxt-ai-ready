@@ -1,6 +1,18 @@
+catalogMode: prefer
+
+cleanupUnusedCatalogs: true
+
+shellEmulator: true
+
+trustPolicy: no-downgrade
+
+trustPolicyExclude:
+  - chokidar@4.0.3
+  - eslint-import-resolver-typescript@3.10.1
+  - undici-types@6.21.0
+  - semver
 packages:
   - playground
-
 catalog:
   '@antfu/eslint-config': ^6.6.1
   '@arethetypeswrong/cli': ^0.18.2
@@ -49,10 +61,6 @@ catalog:
   vue-tsc: ^3.1.8
   zod: ^4.1.13
 
-catalogMode: prefer
-
-cleanupUnusedCatalogs: true
-
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
@@ -64,13 +72,3 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
-
-shellEmulator: true
-
-trustPolicy: no-downgrade
-
-trustPolicyExclude:
-  - chokidar@4.0.3
-  - eslint-import-resolver-typescript@3.10.1
-  - undici-types@6.21.0
-  - semver

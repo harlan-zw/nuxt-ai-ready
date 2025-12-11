@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import {buildNuxt, createResolver, loadNuxt} from '@nuxt/kit'
+import { fileURLToPath } from 'node:url'
+import { createResolver } from '@nuxt/kit'
 import { setup } from '@nuxt/test-utils'
 import { describe, expect, it } from 'vitest'
-import {fileURLToPath} from "node:url";
 
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/cloudflare')

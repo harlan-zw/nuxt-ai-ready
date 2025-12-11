@@ -1,6 +1,6 @@
 import type { Nuxt, NuxtPage } from '@nuxt/schema'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { appendFile, access } from 'node:fs/promises'
+import { access, appendFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, extendPages, hasNuxtModule, useNuxt } from '@nuxt/kit'
 import defu from 'defu'
