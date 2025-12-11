@@ -1,5 +1,6 @@
 import type { Nuxt, NuxtPage } from '@nuxt/schema'
 import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import { appendFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, addTypeTemplate, createResolver, defineNuxtModule, extendPages, hasNuxtModule, useNuxt } from '@nuxt/kit'
 import defu from 'defu'
@@ -286,10 +287,28 @@ export {}
       setupPrerenderHandler(mergedLlmsTxt, config.timestamps)
     }
 
-    // Add route rules for static TOON files
+    // Add route rules for static files with proper charset
     nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
+    nuxt.options.nitro.routeRules['/llms.txt'] = { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    nuxt.options.nitro.routeRules['/llms-full.txt'] = { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
     nuxt.options.nitro.routeRules['/llms.toon'] = { headers: { 'Content-Type': 'text/toon; charset=utf-8' } }
     nuxt.options.nitro.routeRules['/llms-full.toon'] = { headers: { 'Content-Type': 'text/toon; charset=utf-8' } }
+
+    // Append charset header for .md files to _headers (Cloudflare Pages)
+    // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
+    nuxt.hooks.hook('nitro:build:before', (nitro) => {
+      nitro.hooks.hook('compiled', async () => {
+        const headersPath = join(nitro.options.output.publicDir, '_headers')
+        const exists = await access(headersPath).then(() => true).catch(() => false)
+        if (exists) {
+          await appendFile(headersPath, `
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+`)
+          logger.debug('Appended .md charset header to _headers')
+        }
+      })
+    })
   },
 })
 
