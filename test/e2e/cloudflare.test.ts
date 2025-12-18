@@ -1,25 +1,22 @@
 import { access, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
+import { setup } from '@nuxt/test-utils'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/cloudflare')
 
-describe('cloudflare pages build output', () => {
-  it('has _headers file with charset headers', async () => {
-    const headersPath = join(fixtureDir, 'dist', '_headers')
-    const headers = await readFile(headersPath, 'utf-8')
-
-    // Cloudflare Pages _headers format uses glob patterns for .md files
-    expect(headers).toContain('/*.md')
-    expect(headers).toContain('Content-Type: text/markdown; charset=utf-8')
+describe('cloudflare pages build output', async () => {
+  await setup({
+    server: false,
+    build: true,
+    fixture: fixtureDir,
   })
 
   it('has expected output structure', async () => {
+    // Check key files exist (cloudflare_pages doesn't create _headers/_redirects by default)
     const files = [
-      'dist/_headers',
-      'dist/_redirects',
       'dist/sitemap.xml',
       'dist/llms.txt',
       'dist/llms-full.txt',
@@ -39,5 +36,9 @@ describe('cloudflare pages build output', () => {
 
     // Should have pages section
     expect(llmsTxt).toContain('## Pages')
+
+    // Should have page titles
+    expect(llmsTxt).toContain('Welcome to Test Site')
+    expect(llmsTxt).toContain('About · Test Site')
   })
 })

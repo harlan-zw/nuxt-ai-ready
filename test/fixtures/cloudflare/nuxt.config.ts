@@ -3,15 +3,19 @@ import { defineNuxtConfig } from 'nuxt/config'
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   nitro: {
-    preset: 'cloudflare-durable',
+    preset: 'cloudflare_pages',
+    output: {
+      publicDir: 'dist',
+    },
     prerender: {
       crawlLinks: true,
       routes: ['/', '/about'],
       failOnError: false,
     },
-    cloudflare: {
-      deployConfig: true,
-      nodeCompat: true,
-    },
+  },
+  site: {
+    url: 'https://test.example.com',
+    name: 'Test Site',
+    description: 'Test site for Nuxt AI Ready',
   },
 })
