@@ -8,7 +8,7 @@ export default defineNuxtPlugin({
     }
     nuxtApp.hooks.hook('app:rendered', (ctx) => {
       let url = ctx.ssrContext?.url || ''
-      if (isPathFile(url)) {
+      if (isPathFile(url) || ctx.ssrContext?.error || ctx.ssrContext?.noSSR) {
         return
       }
       if (url.endsWith('/')) {

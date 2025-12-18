@@ -26,6 +26,14 @@ export default defineEventHandler(async (event) => {
   }
 
   const html = await response.text()
+
+  // Skip error pages that returned 200 (e.g., Vue Router "no match" pages)
+  if (html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')) {
+    return createError({
+      statusCode: 404,
+      message: `Page rendered as error: ${path}`,
+    })
+  }
   const result = convertHtmlToMarkdownMeta(
     html,
     withSiteUrl(event, path),

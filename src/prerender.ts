@@ -235,6 +235,12 @@ export async function crawlSitemapEntries(
     // Handle both absolute URLs and relative paths
     const route = loc.startsWith('http') ? new URL(loc).pathname : loc
 
+    // Skip internal/special files (e.g., _headers, _redirects)
+    if (route.split('/').some(segment => segment.startsWith('_'))) {
+      skipped++
+      continue
+    }
+
     if (state.prerenderedRoutes.has(route)) {
       skipped++
       continue
