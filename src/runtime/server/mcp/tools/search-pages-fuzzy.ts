@@ -8,7 +8,7 @@ const inputSchema = {
   limit: z.number().optional().default(10).describe('Max results'),
 }
 
-export default {
+const tool: McpToolDefinition = {
   name: 'search_pages_fuzzy',
   description: 'Fuzzy search pages by title, description, route.',
   inputSchema,
@@ -24,4 +24,6 @@ export default {
     const items = results.map(r => ({ ...r.item, score: r.score ?? 0 }))
     return { content: [{ type: 'text', text: JSON.stringify(items) }] }
   },
-} satisfies McpToolDefinition
+}
+
+export default tool

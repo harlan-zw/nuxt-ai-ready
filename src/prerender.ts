@@ -1,5 +1,5 @@
 import type { Nuxt } from '@nuxt/schema'
-import type { Nitro, PrerenderRoute } from 'nitropack'
+import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './runtime/types'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -164,7 +164,7 @@ async function processMarkdownRoute(
       updatedAt = parsedDate.toISOString()
   }
 
-  await nuxt.hooks.callHook('ai-ready:page:markdown', { route, markdown, title, description })
+  await nuxt.hooks.callHook('ai-ready:page:markdown', { route, markdown, title, description, headings })
 
   if (state.jsonlInitialized && state.pageDataPath) {
     const pageData = {
@@ -357,6 +357,7 @@ export function setupPrerenderHandler(
         markdown,
         title,
         description,
+        headings,
       })
 
       // Write to JSONL for virtual module

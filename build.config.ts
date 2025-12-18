@@ -4,6 +4,7 @@ import { glob } from 'tinyglobby'
 import { defineBuildConfig } from 'unbuild'
 
 export default defineBuildConfig({
+  failOnWarn: false,
   hooks: {
     'build:done': async ({ options }) => {
       // UPSTREAM BUG: @nuxtjs/mcp-toolkit generates .d.ts files for MCP definitions
@@ -16,5 +17,12 @@ export default defineBuildConfig({
   },
   externals: [
     '@modelcontextprotocol/sdk',
+    'webpack',
+    'webpack-virtual-modules',
+    'postcss',
+    'rollup',
+    'vite',
+    'lightningcss',
+    'nitropack/types',
   ],
 })

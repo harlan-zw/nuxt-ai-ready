@@ -22,7 +22,7 @@ describe('nuxt generate (static build)', async () => {
 
   describe('llms.txt format', () => {
     it('has valid markdown structure', async () => {
-      const llmsTxt = await $fetch<string>('/llms.txt', { responseType: 'text' })
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       // Header with site name
       expect(llmsTxt).toMatch(/^# /)
@@ -35,7 +35,7 @@ describe('nuxt generate (static build)', async () => {
     })
 
     it('includes page titles with links', async () => {
-      const llmsTxt = await $fetch<string>('/llms.txt', { responseType: 'text' })
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       // Pages should have markdown links with titles
       expect(llmsTxt).toMatch(/\[Welcome to Test Site\]\(\/?/)
@@ -43,7 +43,7 @@ describe('nuxt generate (static build)', async () => {
     })
 
     it('includes LLM Resources section', async () => {
-      const llmsTxt = await $fetch<string>('/llms.txt', { responseType: 'text' })
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       expect(llmsTxt).toContain('## LLM Resources')
       expect(llmsTxt).toContain('llms-full.txt')
@@ -52,7 +52,7 @@ describe('nuxt generate (static build)', async () => {
 
   describe('llms-full.txt format', () => {
     it('has valid structure with page sections', async () => {
-      const llmsFullTxt = await $fetch<string>('/llms-full.txt', { responseType: 'text' })
+      const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Header
       expect(llmsFullTxt).toMatch(/^# /)
@@ -65,14 +65,14 @@ describe('nuxt generate (static build)', async () => {
     })
 
     it('includes page source URLs', async () => {
-      const llmsFullTxt = await $fetch<string>('/llms-full.txt', { responseType: 'text' })
+      const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Source URLs for pages
       expect(llmsFullTxt).toMatch(/Source: https?:\/\//)
     })
 
     it('preserves markdown content from pages', async () => {
-      const llmsFullTxt = await $fetch<string>('/llms-full.txt', { responseType: 'text' })
+      const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Content from index page
       expect(llmsFullTxt).toContain('AI-powered semantic search')
@@ -84,8 +84,8 @@ describe('nuxt generate (static build)', async () => {
 
   describe('uTF-8 encoding', () => {
     it('preserves UTF-8 characters in llms.txt files', async () => {
-      const llmsTxt = await $fetch<string>('/llms.txt', { responseType: 'text' })
-      const llmsFullTxt = await $fetch<string>('/llms-full.txt', { responseType: 'text' })
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
+      const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       expect(llmsTxt).toContain('/about')
       expect(llmsFullTxt).toContain('About · Test Site — UTF-8 Support')
@@ -108,7 +108,7 @@ describe('nuxt generate (static build)', async () => {
 
   describe('static .md files', () => {
     it('generates .md files for prerendered pages', async () => {
-      const aboutMd = await $fetch<string>('/about.md', { responseType: 'text' })
+      const aboutMd = await $fetch('/about.md', { responseType: 'text' })
 
       // Valid markdown content
       expect(aboutMd).toContain('About')
@@ -116,7 +116,7 @@ describe('nuxt generate (static build)', async () => {
     })
 
     it('.md files have proper heading structure', async () => {
-      const indexMd = await $fetch<string>('/index.md', { responseType: 'text' })
+      const indexMd = await $fetch('/index.md', { responseType: 'text' })
 
       // h1 and h2 headings converted
       expect(indexMd).toMatch(/^# /m)
