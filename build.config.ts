@@ -11,7 +11,7 @@ export default defineBuildConfig({
       // that reference internal types not exported from the package. These cause
       // type errors when consumers install the module. Remove until fixed upstream.
       // See: https://github.com/nuxt/mcp-toolkit/issues/XXX
-      const dtsFiles = await glob('runtime/server/mcp/{dev,prod}/**/*.d.ts', { cwd: options.outDir })
+      const dtsFiles = await glob('runtime/server/mcp/**/*.d.ts', { cwd: options.outDir })
       await Promise.all(dtsFiles.map(f => unlink(resolve(options.outDir, f))))
     },
   },
