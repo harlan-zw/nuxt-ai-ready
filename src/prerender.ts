@@ -113,7 +113,7 @@ function buildLlmsFullTxtHeader(siteInfo?: SiteInfo, llmsTxtConfig?: LlmsTxtConf
     }
   }
 
-  parts.push('## Pages\n')
+  parts.push('## Pages\n\n')
   return parts.join('\n')
 }
 
@@ -142,10 +142,41 @@ function flattenHeadings(headings: Array<Record<string, string>> | undefined): s
     .join('|')
 }
 
-function formatPageForLlmsFullTxt(route: string, title: string, markdown: string, siteUrl?: string): string {
+function stripFrontmatter(markdown: string): string {
+  // Remove YAML frontmatter (---\n...\n---)
+  return markdown.replace(/^---\n[\s\S]*?\n---\n*/, '')
+}
+
+function normalizeHeadings(markdown: string): string {
+  // Convert headings to plain text with level prefix: # Title -> h1. Title
+  // eslint-disable-next-line regexp/no-super-linear-backtracking
+  return markdown.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
+    const level = hashes.length
+    return `h${level}. ${text}`
+  })
+}
+
+function formatPageForLlmsFullTxt(route: string, title: string, description: string, markdown: string, siteUrl?: string): string {
   const canonicalUrl = siteUrl ? `${siteUrl.replace(/\/$/, '')}${route}` : route
   const heading = title && title !== route ? `### ${title}` : `### ${route}`
-  return `${heading}\n\nSource: ${canonicalUrl}\n\n${markdown}\n\n---\n\n`
+
+  // Clean markdown: strip frontmatter and normalize headings
+  let content = stripFrontmatter(markdown)
+  content = normalizeHeadings(content)
+
+  const parts = [heading, '']
+  parts.push(`Source: ${canonicalUrl}`)
+  if (description)
+    parts.push(`Description: ${description}`)
+  parts.push('')
+  if (content.trim()) {
+    parts.push(content.trim())
+    parts.push('')
+  }
+  parts.push('---')
+  parts.push('') // blank line after separator
+
+  return `${parts.join('\n')}\n`
 }
 
 async function processMarkdownRoute(
@@ -154,6 +185,7 @@ async function processMarkdownRoute(
   route: string,
   parsed: ParsedMarkdownResult,
   lastmod?: string | Date,
+  options?: { skipLlmsFullTxt?: boolean },
 ): Promise<void> {
   const { markdown, title, description, headings, updatedAt: metaUpdatedAt } = parsed
 
@@ -178,9 +210,9 @@ async function processMarkdownRoute(
     await appendFile(state.pageDataPath, `${JSON.stringify(pageData)}\n`, 'utf-8')
   }
 
-  // Stream-append to llms-full.txt
-  if (state.llmsFullTxtPath) {
-    const pageContent = formatPageForLlmsFullTxt(route, title, markdown, state.siteInfo?.url)
+  // Stream-append to llms-full.txt (skip for sitemap-only crawled pages)
+  if (state.llmsFullTxtPath && !options?.skipLlmsFullTxt) {
+    const pageContent = formatPageForLlmsFullTxt(route, title, description, markdown, state.siteInfo?.url)
     await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
   }
 
@@ -223,7 +255,8 @@ export async function crawlSitemapEntries(
       continue
 
     const parsed = JSON.parse(res) as ParsedMarkdownResult
-    await processMarkdownRoute(state, nuxt, route, parsed, lastmod)
+    // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
+    await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
     crawled++
   }
 
@@ -375,7 +408,7 @@ export function setupPrerenderHandler(
 
       // Stream-append to llms-full.txt
       if (state.llmsFullTxtPath) {
-        const pageContent = formatPageForLlmsFullTxt(pageRoute, title, markdown, state.siteInfo?.url)
+        const pageContent = formatPageForLlmsFullTxt(pageRoute, title, description, markdown, state.siteInfo?.url)
         await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
       }
 

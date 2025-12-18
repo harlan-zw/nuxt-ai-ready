@@ -13,10 +13,10 @@ trustPolicyExclude:
   - semver
 packages:
   - playground
-
 overrides:
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
+
 catalog:
   '@antfu/eslint-config': ^6.7.1
   '@arethetypeswrong/cli': ^0.18.2
@@ -46,7 +46,7 @@ catalog:
   happy-dom: ^20.0.11
   mdream: ^0.15.3
   nuxt: ^4.2.2
-  nuxt-site-config: 3.2.11
+  nuxt-site-config: 3.2.14
   ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0

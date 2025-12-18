@@ -76,7 +76,9 @@ During prerender, the module:
 ### Type Exports
 
 - `ModuleOptions`: Module configuration interface
-- `BulkDocument`: Page-level data (route, title, description, markdown, headings)
+- `BulkDocument`: Page-level data (route, title, description, markdown, headings, updatedAt)
+- `PageEntry`: Page metadata without markdown (route, title, description, headings, updatedAt)
+- `PageData`: PageEntry + markdown content
 - `MarkdownContext`: Hook context for markdown processing
 - `LlmsTxtConfig`, `LlmsTxtSection`, `LlmsTxtLink`: llms.txt structure
 
