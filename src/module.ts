@@ -269,13 +269,15 @@ export async function readPageDataFromFilesystem() {
     const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
     const isSPA = nuxt.options.ssr === false
 
-    // Warn about unsupported/limited modes
-    if (isSPA && !hasPrerenderedRoutes) {
-      logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
-      logger.warn('For full functionality, enable SSR or prerender routes.')
-    }
-    else if (!isStatic && !hasPrerenderedRoutes) {
-      logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
+    if (!nuxt.options.dev && !nuxt.options._prepare) {
+      // Warn about unsupported/limited modes
+      if (isSPA && !hasPrerenderedRoutes) {
+        logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
+        logger.warn('For full functionality, enable SSR or prerender routes.')
+      }
+      else if (!isStatic && !hasPrerenderedRoutes) {
+        logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
+      }
     }
 
     if (isStatic || hasPrerenderedRoutes) {
