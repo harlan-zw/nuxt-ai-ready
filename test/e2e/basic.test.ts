@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
-describe('nuxt-mdream e2e', async () => {
+describe('nuxt-ai-ready e2e', async () => {
   await setup({
     rootDir: fileURLToPath(new URL('../fixtures/basic', import.meta.url)),
     dev: true,

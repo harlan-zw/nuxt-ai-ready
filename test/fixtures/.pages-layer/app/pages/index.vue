@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useSeoMeta } from '#imports'
+
 useSeoMeta({
   title: 'Welcome to Test Site',
   description: 'A test site for the Nuxt AI Search module featuring AI-powered semantic search, vector embeddings, and MCP protocol support.',
@@ -38,14 +40,14 @@ useSeoMeta({
           </NuxtLink>
         </li>
         <li>
-          <NuxtLink to="/llms.txt">
+          <a href="/llms.txt">
             /llms.txt
-          </NuxtLink>
+          </a>
         </li>
         <li>
-          <NuxtLink to="/llms-full.txt">
+          <a href="/llms-full.txt">
             /llms-full.txt
-          </NuxtLink>
+          </a>
         </li>
         <li>
           <NuxtLink to="/docs/api">

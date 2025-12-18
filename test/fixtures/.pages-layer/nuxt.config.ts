@@ -12,4 +12,17 @@ export default defineNuxtConfig({
   aiReady: {
     debug: true,
   },
+  sitemap: {
+    sources: [
+      {
+        urls: [
+          '/docs/getting-started',
+          '/docs/configuration',
+          '/docs/usage',
+          '/docs/api',
+          '/docs/faq',
+        ],
+      },
+    ],
+  },
 })

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useSeoMeta } from '#imports'
+
 useSeoMeta({
   title: 'Getting Started - Docs',
   description: 'Learn how to integrate the Nuxt AI Search module into your project with installation instructions, basic configuration, and embedding generation.',

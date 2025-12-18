@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
@@ -58,49 +56,6 @@ describe('mdream hooks e2e', async () => {
       expect(llmsFullTxt).toContain('## Custom Hook Section')
       expect(llmsFullTxt).toContain('This was added by a hook!')
       expect(llmsFullTxt).toContain('Custom Hook Section (Full)')
-    })
-  })
-
-  describe('ai-ready:chunk hook', () => {
-    it('should call hook for each chunk during prerender', async () => {
-      const testChunksPath = resolve(
-        fileURLToPath(new URL('../fixtures/hooks', import.meta.url)),
-        '.output/test-chunks.json',
-      )
-
-      expect(existsSync(testChunksPath)).toBe(true)
-
-      const chunks = JSON.parse(readFileSync(testChunksPath, 'utf-8'))
-      expect(Array.isArray(chunks)).toBe(true)
-      expect(chunks.length).toBeGreaterThan(0)
-
-      // Verify chunk structure
-      const firstChunk = chunks[0]
-      expect(firstChunk).toHaveProperty('id')
-      expect(firstChunk).toHaveProperty('route')
-      expect(firstChunk).toHaveProperty('chunkIndex')
-      expect(firstChunk).toHaveProperty('title')
-      expect(firstChunk).toHaveProperty('contentPreview')
-
-      // Verify we have chunks from different routes
-      const routes = new Set(chunks.map((c: any) => c.route))
-      expect(routes.size).toBeGreaterThan(1)
-    })
-
-    it('should provide correct chunk metadata', async () => {
-      const testChunksPath = resolve(
-        fileURLToPath(new URL('../fixtures/hooks', import.meta.url)),
-        '.output/test-chunks.json',
-      )
-
-      const chunks = JSON.parse(readFileSync(testChunksPath, 'utf-8'))
-
-      // Find a chunk from the home page
-      const homeChunk = chunks.find((c: any) => c.route === '/')
-      expect(homeChunk).toBeTruthy()
-      expect(homeChunk.title).toBe('Welcome to Test Site')
-      expect(homeChunk.chunkIndex).toBeGreaterThanOrEqual(0)
-      expect(homeChunk.id).toMatch(/^[a-f0-9]{8}-\d+$/)
     })
   })
 })

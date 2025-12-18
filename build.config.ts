@@ -14,4 +14,7 @@ export default defineBuildConfig({
       await Promise.all(dtsFiles.map(f => unlink(resolve(options.outDir, f))))
     },
   },
+  externals: [
+    '@modelcontextprotocol/sdk',
+  ],
 })

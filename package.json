@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "0.3.8",
-  "packageManager": "pnpm@10.25.0",
+  "packageManager": "pnpm@10.26.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",
@@ -50,20 +50,21 @@
     "typecheck": "nuxt typecheck",
     "test:attw": "attw --pack"
   },
+  "peerDependencies": {
+    "@nuxtjs/sitemap": "^7.5.0"
+  },
   "dependencies": {
     "@clack/prompts": "catalog:",
     "@nuxt/kit": "catalog:",
-    "@toon-format/toon": "catalog:",
     "consola": "catalog:",
     "defu": "catalog:",
+    "fuse.js": "catalog:",
     "mdream": "catalog:",
-    "minimatch": "catalog:",
     "nuxt-site-config": "catalog:",
     "ofetch": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "std-env": "catalog:",
-    "tokenx": "catalog:",
     "ufo": "catalog:",
     "unstorage": "catalog:"
   },
@@ -101,6 +102,6 @@
     "zod": "catalog:"
   },
   "resolutions": {
-    "nuxt-ai-ready": "wo rkspace:*"
+    "nuxt-ai-ready": "workspace:*"
   }
 }

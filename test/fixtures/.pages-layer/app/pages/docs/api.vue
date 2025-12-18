@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useSeoMeta } from '#imports'
+
 useSeoMeta({
   title: 'API Reference - Docs',
   description: 'Complete API documentation for the Nuxt AI Search module including Ask API, Bulk API, and MCP Server endpoints.',

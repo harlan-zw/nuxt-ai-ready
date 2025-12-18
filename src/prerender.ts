@@ -1,345 +1,433 @@
-import type { ProcessedFile } from 'mdream/llms-txt'
+import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack'
-import type { WriteStream } from 'node:fs'
-import type { ContentHashManifest } from './content-hash-manager'
-import type { BulkChunk, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { createHash } from 'node:crypto'
-import { createWriteStream, mkdirSync } from 'node:fs'
-import { open, stat } from 'node:fs/promises'
+import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './runtime/types'
+import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
-import { encodeLines } from '@toon-format/toon'
+import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
-import { createLlmsTxtStream } from 'mdream/llms-txt'
-import { useSiteConfig } from 'nuxt-site-config/kit'
-import { createContentHashManager } from './content-hash-manager'
+import { withBase } from 'ufo'
 import { logger } from './logger'
 
-function generateVectorId(route: string, chunkIdx: number): string {
-  const hash = createHash('sha256').update(route).digest('hex').substring(0, 8)
-  return `${hash}-${chunkIdx}`
+// Inline normalization functions to avoid runtime deps
+function normalizeLink(link: LlmsTxtLink): string {
+  const parts: string[] = []
+  parts.push(`- [${link.title}](${link.href})`)
+  if (link.description)
+    parts.push(`  ${link.description}`)
+  return parts.join('\n')
 }
 
-async function updateFirstLine(filePath: string, newFirstLine: string) {
-  const fh = await open(filePath, 'r+')
-  try {
-    // Read current first line to get its length
-
-    const buffer = Buffer.alloc(1024)
-    await fh.read(buffer, 0, 1024, 0)
-    const content = buffer.toString('utf-8')
-    const firstLineEnd = content.indexOf('\n')
-    const oldFirstLine = content.substring(0, firstLineEnd)
-
-    // Pad new line to match old length (TOON lines should be similar length anyway)
-    const paddedLine = newFirstLine.padEnd(oldFirstLine.length, ' ')
-
-    // Write new first line
-    await fh.write(paddedLine, 0, 'utf-8')
+function normalizeSection(section: LlmsTxtSection): string {
+  const parts: string[] = []
+  parts.push(`## ${section.title}`)
+  parts.push('')
+  if (section.description) {
+    const descriptions = Array.isArray(section.description) ? section.description : [section.description]
+    parts.push(...descriptions)
+    parts.push('')
   }
-  finally {
-    await fh.close()
+  if (section.links?.length)
+    parts.push(...section.links.map(normalizeLink))
+  return parts.join('\n')
+}
+
+function normalizeLlmsTxtConfig(config: LlmsTxtConfig): string {
+  const parts: string[] = []
+  if (config.sections?.length)
+    parts.push(...config.sections.map(normalizeSection))
+  if (config.notes) {
+    parts.push('## Notes')
+    parts.push('')
+    const notes = Array.isArray(config.notes) ? config.notes : [config.notes]
+    parts.push(...notes)
   }
+  return parts.join('\n\n')
+}
+
+export interface ParsedMarkdownResult {
+  markdown: string
+  title: string
+  description: string
+  headings: Array<Record<string, string>>
+  updatedAt?: string
+}
+
+interface SitemapEntry {
+  loc: string
+  lastmod?: string | Date
+}
+
+export interface SiteInfo {
+  name?: string
+  url?: string
+  description?: string
+}
+
+export interface CrawlerState {
+  prerenderedRoutes: Set<string>
+  totalProcessingTime: number
+  initialized: boolean
+  jsonlInitialized: boolean
+  pageDataPath?: string
+  llmsFullTxtPath?: string
+  siteInfo?: SiteInfo
+  llmsTxtConfig?: LlmsTxtConfig
+}
+
+export function createCrawlerState(
+  pageDataPath?: string,
+  llmsFullTxtPath?: string,
+  siteInfo?: SiteInfo,
+  llmsTxtConfig?: LlmsTxtConfig,
+): CrawlerState {
+  return {
+    prerenderedRoutes: new Set(),
+    totalProcessingTime: 0,
+    initialized: false,
+    jsonlInitialized: false,
+    pageDataPath,
+    llmsFullTxtPath,
+    siteInfo,
+    llmsTxtConfig,
+  }
+}
+
+function buildLlmsFullTxtHeader(siteInfo?: SiteInfo, llmsTxtConfig?: LlmsTxtConfig): string {
+  const parts: string[] = []
+
+  // Header
+  parts.push(`# ${siteInfo?.name || siteInfo?.url || 'Site'}`)
+  if (siteInfo?.description)
+    parts.push(`\n> ${siteInfo.description}`)
+  if (siteInfo?.url)
+    parts.push(`\nCanonical Origin: ${siteInfo.url}`)
+  parts.push('')
+
+  // Sections (LLM Resources, etc)
+  if (llmsTxtConfig) {
+    const normalizedContent = normalizeLlmsTxtConfig(llmsTxtConfig)
+    if (normalizedContent) {
+      parts.push(normalizedContent)
+      parts.push('')
+    }
+  }
+
+  parts.push('## Pages\n')
+  return parts.join('\n')
+}
+
+export async function initCrawler(state: CrawlerState): Promise<void> {
+  if (state.initialized)
+    return
+  if (state.pageDataPath) {
+    await mkdir(dirname(state.pageDataPath), { recursive: true })
+    await writeFile(state.pageDataPath, '', 'utf-8')
+    state.jsonlInitialized = true
+    logger.debug(`Crawler initialized with JSONL at ${state.pageDataPath}`)
+  }
+  // Initialize llms-full.txt with header
+  if (state.llmsFullTxtPath) {
+    await mkdir(dirname(state.llmsFullTxtPath), { recursive: true })
+    const header = buildLlmsFullTxtHeader(state.siteInfo, state.llmsTxtConfig)
+    await writeFile(state.llmsFullTxtPath, header, 'utf-8')
+    logger.debug(`llms-full.txt initialized at ${state.llmsFullTxtPath}`)
+  }
+  state.initialized = true
+}
+
+function flattenHeadings(headings: Array<Record<string, string>> | undefined): string {
+  return (headings || [])
+    .map(h => Object.entries(h).map(([tag, text]) => `${tag}:${text}`).join(''))
+    .join('|')
+}
+
+function formatPageForLlmsFullTxt(route: string, title: string, markdown: string, siteUrl?: string): string {
+  const canonicalUrl = siteUrl ? `${siteUrl.replace(/\/$/, '')}${route}` : route
+  const heading = title && title !== route ? `### ${title}` : `### ${route}`
+  return `${heading}\n\nSource: ${canonicalUrl}\n\n${markdown}\n\n---\n\n`
+}
+
+async function processMarkdownRoute(
+  state: CrawlerState,
+  nuxt: Nuxt,
+  route: string,
+  parsed: ParsedMarkdownResult,
+  lastmod?: string | Date,
+): Promise<void> {
+  const { markdown, title, description, headings, updatedAt: metaUpdatedAt } = parsed
+
+  let updatedAt = (lastmod instanceof Date ? lastmod.toISOString() : lastmod) || new Date().toISOString()
+  if (metaUpdatedAt) {
+    const parsedDate = new Date(metaUpdatedAt)
+    if (!Number.isNaN(parsedDate.getTime()))
+      updatedAt = parsedDate.toISOString()
+  }
+
+  await nuxt.hooks.callHook('ai-ready:page:markdown', { route, markdown, title, description })
+
+  if (state.jsonlInitialized && state.pageDataPath) {
+    const pageData = {
+      route,
+      title,
+      description,
+      headings: flattenHeadings(headings),
+      updatedAt,
+      markdown,
+    }
+    await appendFile(state.pageDataPath, `${JSON.stringify(pageData)}\n`, 'utf-8')
+  }
+
+  // Stream-append to llms-full.txt
+  if (state.llmsFullTxtPath) {
+    const pageContent = formatPageForLlmsFullTxt(route, title, markdown, state.siteInfo?.url)
+    await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
+  }
+
+  state.prerenderedRoutes.add(route)
+}
+
+export async function crawlSitemapEntries(
+  state: CrawlerState,
+  nuxt: Nuxt,
+  nitro: Nitro,
+  entries: Array<string | SitemapEntry>,
+): Promise<number> {
+  logger.debug(`Crawling ${entries.length} sitemap entries`)
+  let crawled = 0
+  let skipped = 0
+
+  for (const entry of entries) {
+    const loc = typeof entry === 'string' ? entry : entry.loc
+    const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
+    // Handle both absolute URLs and relative paths
+    const route = loc.startsWith('http') ? new URL(loc).pathname : loc
+
+    if (state.prerenderedRoutes.has(route)) {
+      skipped++
+      continue
+    }
+
+    const mdRoute = route === '/' ? '/index.md' : `${route}.md`
+    const mdUrl = withBase(mdRoute, nitro.options.baseURL)
+    logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
+
+    const res = await globalThis.$fetch(mdUrl, {
+      headers: { 'x-nitro-prerender': mdRoute },
+    }).catch((err) => {
+      logger.debug(`Failed to fetch ${mdUrl}: ${err.message}`)
+      return null
+    }) as string | null
+
+    if (!res)
+      continue
+
+    const parsed = JSON.parse(res) as ParsedMarkdownResult
+    await processMarkdownRoute(state, nuxt, route, parsed, lastmod)
+    crawled++
+  }
+
+  logger.debug(`Sitemap crawl complete: ${crawled} crawled, ${skipped} skipped (already indexed)`)
+  return crawled
+}
+
+export async function crawlSitemapContent(
+  state: CrawlerState,
+  nuxt: Nuxt,
+  nitro: Nitro,
+  sitemapContent: string,
+): Promise<number> {
+  logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
+  const result = await parseSitemapXml(sitemapContent)
+  const urls = result?.urls || []
+  logger.debug(`Found ${urls.length} URLs in sitemap`)
+  return crawlSitemapEntries(state, nuxt, nitro, urls)
+}
+
+function isNuxtGenerate(): boolean {
+  return process.argv.includes('generate') || process.env.NUXT_GENERATE === 'true' || process.env.prerender === 'true'
+}
+
+function resolveNitroPreset(): string | undefined {
+  return process.env.NITRO_PRESET || process.env.SERVER_PRESET
+}
+
+function includesSitemapRoot(sitemapName: string, routes: string[]): boolean {
+  return routes.some(r => r === `/${sitemapName}` || r.startsWith(`/${sitemapName}/`))
+}
+
+export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitemapHook: boolean, usePrerenderHook: boolean } {
+  const nuxt = useNuxt()
+  const prerenderedRoutes = (nuxt.options.nitro.prerender?.routes || []) as string[]
+
+  // Check if @nuxtjs/sitemap module is installed - it auto-prerenders sitemap.xml
+  const hasSitemapModule = nuxt.options._installedModules?.some(
+    m => m.meta?.name === '@nuxtjs/sitemap',
+  )
+
+  let prerenderSitemap = hasSitemapModule || isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
+
+  if (resolveNitroPreset() === 'vercel-edge')
+    prerenderSitemap = true
+
+  const hasPrerender = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
+  const shouldHookIntoPrerender = prerenderSitemap || hasPrerender
+
+  logger.debug(`Sitemap detection: module=${hasSitemapModule}, generate=${isNuxtGenerate()}, routes=${includesSitemapRoot(sitemapName, prerenderedRoutes)}`)
+
+  // If sitemap prerendering, use sitemap hook as it fires after sitemap is done
+  // Otherwise use prerender:done if any prerendering is happening
+  return {
+    useSitemapHook: prerenderSitemap,
+    usePrerenderHook: shouldHookIntoPrerender && !prerenderSitemap,
+  }
+}
+
+async function prerenderRoute(nitro: Nitro, route: string) {
+  const start = Date.now()
+  const encodedRoute = encodeURI(route)
+  const fetchUrl = withBase(encodedRoute, nitro.options.baseURL)
+
+  const res = await globalThis.$fetch.raw(fetchUrl, {
+    headers: { 'x-nitro-prerender': encodedRoute },
+    retry: nitro.options.prerender.retry,
+    retryDelay: nitro.options.prerender.retryDelay,
+  })
+
+  const filePath = join(nitro.options.output.publicDir, route)
+  await mkdir(dirname(filePath), { recursive: true })
+
+  const data = res._data
+  if (data === undefined)
+    throw new Error(`No data returned from '${fetchUrl}'`)
+
+  await writeFile(filePath, data as string, 'utf8')
+
+  const _route: PrerenderRoute = {
+    route,
+    fileName: filePath,
+    generateTimeMS: Date.now() - start,
+  }
+  nitro._prerenderedRoutes!.push(_route)
+
+  return stat(filePath)
 }
 
 export function setupPrerenderHandler(
-  llmsTxtConfig: LlmsTxtConfig,
-  timestampsConfig?: ModuleOptions['timestamps'],
+  pageDataPath?: string,
+  siteInfo?: SiteInfo,
+  llmsTxtConfig?: LlmsTxtConfig,
 ) {
   const nuxt = useNuxt()
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
-    let writer: WritableStreamDefaultWriter<ProcessedFile> | null = null
-    let chunksStream: WriteStream | null = null
-    let pagesStream: WriteStream | null = null
-    let chunksProcessed = 0
-    let pageCount = 0
-    let totalProcessingTime = 0
-    const pagesChunksPath = join(nitro.options.output.publicDir, 'llms-full.toon')
-    const pagesPath = join(nitro.options.output.publicDir, 'llms.toon')
-
-    let contentHashManager: ReturnType<typeof createContentHashManager> | null = null
-    let previousManifest: ContentHashManifest | null = null
-
-    if (timestampsConfig?.enabled) {
-      const manifestPath = join(
-        nuxt.options.rootDir,
-        timestampsConfig.manifestPath || 'node_modules/.cache/nuxt-seo/ai-index/content-hashes.json',
-      )
-      contentHashManager = createContentHashManager({
-        storagePath: manifestPath,
-        debug: !!nuxt.options.debug,
-      })
-    }
+    // llms-full.txt is streamed directly to public dir
+    const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
+    const state = createCrawlerState(pageDataPath, llmsFullTxtPath, siteInfo, llmsTxtConfig)
+    let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
-      // Save manifest before sitemap.xml is generated so sitemap plugin can read it
-      if (route.route === '/sitemap.xml' && contentHashManager) {
-        await contentHashManager.saveManifest()
-        logger.debug('Saved content hash manifest before sitemap generation')
-      }
-
-      // Process markdown files generated by our middleware
-      if (!route.fileName?.endsWith('.md')) {
+      if (!route.fileName?.endsWith('.md'))
         return
-      }
 
-      // Convert .md route to actual page route (e.g., /index.md -> /, /about.md -> /about)
       let pageRoute = route.route.replace(/\.md$/, '')
-      if (pageRoute === '/index') {
+      if (pageRoute === '/index')
         pageRoute = '/'
-      }
 
       const pageStartTime = Date.now()
 
-      // Initialize streams on first page
-      if (!writer) {
-        const siteConfig = useSiteConfig()
-        const stream = createLlmsTxtStream({
-          siteName: siteConfig.name || siteConfig.url,
-          description: siteConfig.description,
-          origin: siteConfig.url,
-          generateFull: true,
-          outputDir: nitro.options.output.publicDir,
-          sections: llmsTxtConfig.sections,
-          notes: llmsTxtConfig.notes,
-        })
-        writer = stream.getWriter()
+      // Initialize on first page
+      if (!initPromise)
+        initPromise = initCrawler(state)
+      await initPromise
 
-        // Load content hash manifest on first page
-        if (contentHashManager && !previousManifest) {
-          previousManifest = await contentHashManager.getManifest()
-        }
+      const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
+      const { markdown, title, description, headings, updatedAt: metaUpdatedAt } = parsed
 
-        // Initialize TOON streams with placeholder first lines
-        mkdirSync(dirname(pagesChunksPath), { recursive: true })
-        mkdirSync(dirname(pagesPath), { recursive: true })
-
-        chunksStream = createWriteStream(pagesChunksPath, { encoding: 'utf-8' })
-        // Write placeholder - will update with correct count later
-        // Use longest possible format to ensure we can fit the final count
-        chunksStream.write('pageChunks[999999]{id,route,content}:\n')
-
-        pagesStream = createWriteStream(pagesPath, { encoding: 'utf-8' })
-        // Write placeholder - will update with correct count later
-        pagesStream.write('pages[999999]{route,title,description,headings,chunkIds,updatedAt}:\n')
-      }
-
-      const { markdown, chunks, title, description, headings, updatedAt: metaUpdatedAt } = JSON.parse(route.contents || '{}') as {
-        markdown: string
-        chunks: Array<{ content: string, metadata?: { headers?: Record<string, string>, loc?: { lines: { from: number, to: number } } } }>
-        title: string
-        description: string
-        headings: Record<string, string[]>
-        updatedAt?: string
-      }
-
-      // Get timestamp - prioritize meta tag, fall back to content hash
-      let pageTimestamp: { updatedAt: string } = {
-        updatedAt: new Date().toISOString(),
-      }
-      let usedMetaTimestamp = false
-
-      // Check if manual timestamp exists in meta tags
+      // Get timestamp from meta tag or use current time
+      let updatedAt = new Date().toISOString()
       if (metaUpdatedAt) {
         const parsedDate = new Date(metaUpdatedAt)
-        if (!Number.isNaN(parsedDate.getTime())) {
-          // Valid date - use as source of truth
-          pageTimestamp.updatedAt = parsedDate.toISOString()
-          usedMetaTimestamp = true
-          // Sync to manifest
-          if (contentHashManager && previousManifest) {
-            contentHashManager.setPageTimestamp(pageRoute, markdown, pageTimestamp.updatedAt, previousManifest)
-          }
-        }
+        if (!Number.isNaN(parsedDate.getTime()))
+          updatedAt = parsedDate.toISOString()
       }
 
-      // Fall back to content hash if no valid meta timestamp
-      if (!usedMetaTimestamp && contentHashManager && previousManifest) {
-        pageTimestamp = contentHashManager.updatePageHash(
-          pageRoute,
-          markdown,
-          previousManifest,
-        )
-      }
-
-      // Stream page to llms.txt
-      await writer.write({
-        url: pageRoute,
-        title,
-        content: markdown,
-        metadata: {
-          description,
-          title,
-        },
-      })
-      pageCount++
-
-      // Process chunks for hook (RAG modules can listen to ai-ready:chunk)
-      logger.debug(`Processing ${chunks.length} chunks for route: ${pageRoute}`)
-      const chunkIds: string[] = []
-
-      // Pre-compute headings array once (avoid recalculating per chunk)
-      const flatHeadings = Object.entries(headings).flatMap(([tag, texts]) =>
-        texts.map(text => ({ [tag]: text })),
-      )
-
-      for (let idx = 0; idx < chunks.length; idx++) {
-        const chunk = chunks[idx]
-        if (!chunk)
-          continue
-
-        const chunkId = generateVectorId(pageRoute, idx)
-        chunkIds.push(chunkId)
-
-        // Flatten for tabular TOON format (primitives only, drop headers)
-        const bulkChunk: BulkChunk = {
-          id: chunkId,
-          route: pageRoute,
-          content: chunk.content,
-        }
-
-        // Call hook for modules to process chunk (e.g., RAG tooling)
-        await nuxt.hooks.callHook('ai-ready:chunk', {
-          chunk: bulkChunk,
-          route: pageRoute,
-          title,
-          description,
-          headings: flatHeadings,
-        })
-
-        // Stream chunk to TOON file
-        if (chunksStream) {
-          // Encode single chunk and write (skip schema line)
-          const iter = encodeLines({ pageChunks: [bulkChunk] })[Symbol.iterator]()
-          iter.next() // skip schema
-          const line = iter.next().value
-          if (line) {
-            chunksStream.write(`${line}\n`)
-          }
-        }
-
-        chunksProcessed++
-      }
-      logger.debug(`Completed ${chunks.length} chunks for ${pageRoute}`)
-
-      // Stream page-level entry to TOON file
-      // Flatten for tabular format (primitives only)
-      const pageDoc = {
+      await nuxt.hooks.callHook('ai-ready:page:markdown', {
         route: pageRoute,
+        markdown,
         title,
         description,
-        // Convert headings object to readable string format (h1:Title|h2:Subtitle,...)
-        headings: headings && Object.keys(headings).length
-          ? Object.entries(headings).flatMap(([tag, texts]) =>
-              texts.map(text => `${tag}:${text}`),
-            ).join('|')
-          : '',
-        // Join chunkIds array to comma-separated string
-        chunkIds: chunkIds.join(','),
-        updatedAt: pageTimestamp.updatedAt,
-      }
+      })
 
-      if (pagesStream) {
-        // Encode single page and write (skip schema line)
-        const iter = encodeLines({ pages: [pageDoc] })[Symbol.iterator]()
-        iter.next() // skip schema
-        const line = iter.next().value
-        if (line) {
-          pagesStream.write(`${line}\n`)
+      // Write to JSONL for virtual module
+      if (state.jsonlInitialized && state.pageDataPath) {
+        const pageData = {
+          route: pageRoute,
+          title,
+          description,
+          headings: flattenHeadings(headings),
+          updatedAt,
+          markdown,
         }
+        await appendFile(state.pageDataPath, `${JSON.stringify(pageData)}\n`, 'utf-8')
       }
 
-      // Set page content to the markdown
+      // Stream-append to llms-full.txt
+      if (state.llmsFullTxtPath) {
+        const pageContent = formatPageForLlmsFullTxt(pageRoute, title, markdown, state.siteInfo?.url)
+        await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
+      }
+
+      state.prerenderedRoutes.add(pageRoute)
       route.contents = markdown
-      totalProcessingTime += Date.now() - pageStartTime
+      state.totalProcessingTime += Date.now() - pageStartTime
     })
 
-    nitro.hooks.hook('prerender:done', async () => {
-      if (!writer) {
-        return
-      }
+    async function writeLlmsFiles() {
+      // Only prerender llms.txt - llms-full.txt is already streamed
+      const llmsStats = await prerenderRoute(nitro, '/llms.txt')
+      const llmsFullStats = await stat(state.llmsFullTxtPath!)
 
-      await writer.close()
-      writer = null
-
-      // Close TOON streams
-      if (chunksStream) {
-        const stream = chunksStream
-        chunksStream = null
-        await new Promise<void>((resolve, reject) => {
-          stream.on('error', reject)
-          stream.on('finish', resolve)
-          stream.end()
-        })
-      }
-
-      if (pagesStream) {
-        const stream = pagesStream
-        pagesStream = null
-        await new Promise<void>((resolve, reject) => {
-          stream.on('error', reject)
-          stream.on('finish', resolve)
-          stream.end()
-        })
-      }
-
-      // Update first lines with correct counts
-      await updateFirstLine(pagesChunksPath, `pageChunks[${chunksProcessed}]{id,route,content}:`)
-      await updateFirstLine(pagesPath, `pages[${pageCount}]{route,title,description,headings,chunkIds,updatedAt}:`)
-
-      // Save content hash manifest
-      if (contentHashManager) {
-        await contentHashManager.saveManifest()
-        logger.debug('Saved content hash manifest')
-        contentHashManager = null
-        previousManifest = null
-      }
-
-      // Register generated files with prerender
-      const llmsTxtPath = join(nitro.options.output.publicDir, 'llms.txt')
-      const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-
-      const files: PrerenderRoute[] = [
-        {
-          route: '/llms.txt',
-          fileName: llmsTxtPath,
-          generateTimeMS: 0,
-        },
-        {
-          route: '/llms-full.txt',
-          fileName: llmsFullTxtPath,
-          generateTimeMS: 0,
-        },
-        {
-          route: '/llms-full.toon',
-          fileName: pagesChunksPath,
-          generateTimeMS: 0,
-        },
-        {
-          route: '/llms.toon',
-          fileName: pagesPath,
-          generateTimeMS: 0,
-        },
-      ]
-
-      const [llmsStats, llmsFullStats, pagesChunksStats, pagesStats] = await Promise.all([
-        stat(llmsTxtPath),
-        stat(llmsFullTxtPath),
-        stat(pagesChunksPath),
-        stat(pagesPath),
-      ])
-
-      nitro._prerenderedRoutes!.push(...files)
-
-      const elapsed = (totalProcessingTime / 1000).toFixed(1)
       const kb = (b: number) => (b / 1024).toFixed(1)
-      const totalKb = kb(llmsStats.size + llmsFullStats.size + pagesChunksStats.size + pagesStats.size)
+      const totalKb = kb(llmsStats.size + llmsFullStats.size)
       const dim = (s: string) => colorize('dim', s)
       const cyan = (s: string) => colorize('cyan', s)
-      logger.info(`Generated ${cyan(String(pageCount))} pages ${dim(`(${chunksProcessed} chunks)`)} in ${cyan(`${elapsed}s`)} → ${cyan(`${totalKb}kb`)}`)
+      const timeStr = state.totalProcessingTime >= 100 ? ` in ${cyan(`${(state.totalProcessingTime / 1000).toFixed(1)}s`)}` : ''
+      logger.info(`Indexed ${cyan(String(state.prerenderedRoutes.size))} pages for llms.txt${timeStr} → ${cyan(`${totalKb}kb`)}`)
       logger.info(dim(`  llms.txt: ${kb(llmsStats.size)}kb, llms-full.txt: ${kb(llmsFullStats.size)}kb`))
-      logger.info(dim(`  llms.toon: ${kb(pagesStats.size)}kb, llms-full.toon: ${kb(pagesChunksStats.size)}kb`))
-    })
+    }
+
+    const { useSitemapHook, usePrerenderHook } = detectSitemapPrerender()
+    logger.debug(`Prerender hooks: sitemap=${useSitemapHook}, prerender=${usePrerenderHook}`)
+
+    if (useSitemapHook) {
+      // sitemap:prerender:done fires after sitemap.xml is written
+      nuxt.hooks.hook('sitemap:prerender:done', async (ctx) => {
+        if (!state.initialized)
+          return
+
+        for (const sitemap of ctx.sitemaps)
+          await crawlSitemapContent(state, nuxt, nitro, sitemap.content)
+
+        await writeLlmsFiles()
+        state.prerenderedRoutes.clear()
+      })
+    }
+    else if (usePrerenderHook) {
+      nitro.hooks.hook('prerender:done', async () => {
+        if (!state.initialized)
+          return
+
+        const sitemapContent = await globalThis.$fetch('/sitemap.xml', {
+          headers: { 'x-nitro-prerender': '/sitemap.xml' },
+        }).catch(() => null) as string | null
+
+        if (sitemapContent)
+          await crawlSitemapContent(state, nuxt, nitro, sitemapContent)
+
+        await writeLlmsFiles()
+        state.prerenderedRoutes.clear()
+      })
+    }
   })
 }

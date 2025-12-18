@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useSeoMeta } from '#imports'
+
 useSeoMeta({
   title: 'About · Test Site — UTF-8 Support',
   description: 'Learn about this test site demonstrating Nuxt AI Search module capabilities for end-to-end testing across different deployment environments.',

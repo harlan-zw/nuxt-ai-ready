@@ -72,44 +72,20 @@ export interface ModuleOptions {
   mcp?: {
     /** Enable MCP tools (list-pages) @default true */
     tools?: boolean
-    /** Enable MCP resources (pages, pages-chunks) @default true */
+    /** Enable MCP resources (pages) @default true */
     resources?: boolean
   }
 
   /**
-   * Content timestamp tracking configuration
+   * Cache duration for llms.txt in seconds (runtime generation)
+   * Set to 0 to disable caching
+   * @default 600 (10 minutes)
    */
-  timestamps?: {
-    /**
-     * Enable timestamp tracking
-     * @default false
-     */
-    enabled?: boolean
-
-    /**
-     * Path to store content hash manifest
-     * @default 'node_modules/.cache/nuxt-seo/ai-index/content-hashes.json'
-     */
-    manifestPath?: string
-  }
+  cacheMaxAgeSeconds?: number
 }
 
 /**
- * Individual chunk entry in llms-full.toon (one per chunk)
- * Used for RAG, embeddings, and semantic search
- * Optimized for token efficiency - join with llms.toon for title/description
- * Chunk index can be inferred from id suffix (e.g., "hash-0", "hash-1")
- * Tabular TOON format (primitives only)
- */
-export interface BulkChunk {
-  id: string
-  route: string
-  content: string
-}
-
-/**
- * Page-level entry in llms.toon (one per page)
- * Used for page discovery, listing, and metadata queries
+ * Page-level entry for discovery and metadata queries
  */
 export interface BulkDocument {
   /** Page route/path */
@@ -118,12 +94,10 @@ export interface BulkDocument {
   title: string
   /** Page description */
   description: string
-  /** Full markdown content reassembled from chunks */
+  /** Full markdown content */
   markdown: string
   /** Page headings structure (e.g., [{ "h1": "Title" }, { "h2": "Subtitle" }]) */
   headings: Array<Record<string, string>>
-  /** All chunk IDs for this page (first ID can be used as document ID) */
-  chunkIds: string[]
   /** ISO 8601 timestamp of last content update */
   updatedAt?: string
 }
@@ -135,13 +109,13 @@ export interface BulkDocument {
  * You can modify the markdown content before it's returned to the client.
  *
  * @example Modify markdown content
- * nitroApp.hooks.hook('mdream:markdown', async (context) => {
+ * nitroApp.hooks.hook('ai-ready:markdown', async (context) => {
  *   // Add a footer to all markdown
  *   context.markdown += '\n\n---\n*Generated with mdream*'
  * })
  *
  * @example Track conversions and add headers
- * nitroApp.hooks.hook('mdream:markdown', async (context) => {
+ * nitroApp.hooks.hook('ai-ready:markdown', async (context) => {
  *   console.log(`Converted ${context.route} (${context.title})`)
  *
  *   // Add custom headers
@@ -202,33 +176,31 @@ export interface LlmsTxtConfig {
 }
 
 /**
- * Hook context for chunk processing (Nitro build-time hook)
+ * Hook context for page markdown processing (Nuxt build-time hook)
  *
- * Called during prerender for each generated chunk, allowing modules
- * to implement RAG tooling (e.g., vector embeddings, search indexing)
+ * Called once per page during prerender when markdown content has changed.
+ * Allows integrations to process page content (e.g., for embedding generation).
  *
- * @example Process chunks for vector search
- * nitro.hooks.hook('ai-ready:chunk', async (context) => {
- *   const embedding = await generateEmbedding(context.chunk.content)
- *   await vectorDb.insert({
- *     id: context.chunk.id,
- *     embedding,
- *     metadata: {
- *       route: context.route,
- *       title: context.title,
- *     }
- *   })
+ * @example Process page markdown
+ * nuxt.hooks.hook('ai-ready:page:markdown', async (context) => {
+ *   console.log(`Processing ${context.route}: ${context.title}`)
+ *   // Generate embeddings, update search index, etc.
  * })
  */
-export interface ChunkContext {
-  /** The chunk data that will be written to bulk JSONL */
-  chunk: BulkChunk
+export interface PageMarkdownContext {
   /** The route being processed (e.g., '/about') */
   route: string
+  /** The markdown content */
+  markdown: string
   /** Page title extracted from HTML */
   title: string
   /** Page description from meta tags */
   description: string
-  /** Headings extracted from the page */
-  headings: Array<Record<string, string>>
+}
+
+declare module 'nitropack/types' {
+  interface NitroRuntimeHooks {
+    'ai-ready:markdown': (context: MarkdownContext) => void | Promise<void>
+    'ai-ready:mdreamConfig': (config: import('mdream').HTMLToMarkdownOptions) => void | Promise<void>
+  }
 }

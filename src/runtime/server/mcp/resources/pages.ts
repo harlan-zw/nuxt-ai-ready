@@ -1,20 +1,21 @@
 import type { McpResourceDefinition } from '@nuxtjs/mcp-toolkit'
-import { getDevPages } from '../utils'
+import { getPagesList } from '../../utils/pageData'
 
 export default ({
   uri: 'resource://nuxt-ai-ready/pages',
   name: 'All Pages',
-  description: 'Page routes from sitemap/routes. In dev mode, returns JSON (TOON format unavailable until build).',
+  description: 'Page listing as JSON.',
   metadata: {
     mimeType: 'application/json',
   },
+  cache: '1h',
   async handler(uri: URL) {
-    const pages = await getDevPages()
+    const pages = await getPagesList()
     return {
       contents: [{
         uri: uri.toString(),
         mimeType: 'application/json',
-        text: JSON.stringify(pages, null, 2),
+        text: JSON.stringify(pages),
       }],
     }
   },
