@@ -66,6 +66,7 @@ export interface SiteInfo {
 
 export interface CrawlerState {
   prerenderedRoutes: Set<string>
+  errorRoutes: Set<string>
   totalProcessingTime: number
   initialized: boolean
   jsonlInitialized: boolean
@@ -83,6 +84,7 @@ export function createCrawlerState(
 ): CrawlerState {
   return {
     prerenderedRoutes: new Set(),
+    errorRoutes: new Set(),
     totalProcessingTime: 0,
     initialized: false,
     jsonlInitialized: false,
@@ -135,6 +137,7 @@ export async function initCrawler(state: CrawlerState): Promise<void> {
   }
   state.initialized = true
 }
+
 
 function flattenHeadings(headings: Array<Record<string, string>> | undefined): string {
   return (headings || [])
@@ -250,10 +253,11 @@ export async function crawlSitemapEntries(
     const mdUrl = withBase(mdRoute, nitro.options.baseURL)
     logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
+    // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
     const res = await globalThis.$fetch(mdUrl, {
       headers: { 'x-nitro-prerender': mdRoute },
     }).catch((err) => {
-      logger.debug(`Failed to fetch ${mdUrl}: ${err.message}`)
+      logger.debug(`Skipping ${route}: ${err.message}`)
       return null
     }) as string | null
 
@@ -266,7 +270,7 @@ export async function crawlSitemapEntries(
     crawled++
   }
 
-  logger.debug(`Sitemap crawl complete: ${crawled} crawled, ${skipped} skipped (already indexed)`)
+  logger.debug(`Sitemap crawl complete: ${crawled} crawled, ${skipped} skipped`)
   return crawled
 }
 
@@ -366,6 +370,14 @@ export function setupPrerenderHandler(
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
+      // Track error routes for filtering in llms.txt
+      if (route.error) {
+        const pageRoute = route.route.replace(/\.(html|md)$/, '').replace(/\/index$/, '') || '/'
+        state.errorRoutes.add(pageRoute)
+        logger.debug(`Detected error page: ${pageRoute}`)
+        return
+      }
+
       if (!route.fileName?.endsWith('.md'))
         return
 
@@ -424,6 +436,14 @@ export function setupPrerenderHandler(
     })
 
     async function writeLlmsFiles() {
+      // Write error routes to JSONL for runtime filtering
+      if (state.pageDataPath && state.errorRoutes.size > 0) {
+        for (const route of state.errorRoutes) {
+          await appendFile(state.pageDataPath, `${JSON.stringify({ route, _error: true })}\n`, 'utf-8')
+        }
+        logger.debug(`Wrote ${state.errorRoutes.size} error routes to page data`)
+      }
+
       // Only prerender llms.txt - llms-full.txt is already streamed
       const llmsStats = await prerenderRoute(nitro, '/llms.txt')
       const llmsFullStats = await stat(state.llmsFullTxtPath!)

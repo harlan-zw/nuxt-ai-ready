@@ -18,21 +18,27 @@ export async function getPages(): Promise<Map<string, PageEntry>> {
     return new Map()
 
   if (import.meta.prerender) {
-    return readPrerenderedPageData()
+    const data = await readPrerenderedData()
+    return data.pages
   }
 
-  const m = await import('#ai-ready-virtual/page-data.mjs')
+  const m = await import('#ai-ready-virtual/page-data.mjs') as { pages?: PageEntry[] }
   return m.pages?.length ? new Map(m.pages.map((p: PageEntry) => [p.route, p])) : new Map()
 }
 
 /** Get all page data including markdown (prerender only) */
-export async function readPrerenderedPageData(): Promise<Map<string, PageData>> {
+async function readPrerenderedData(): Promise<{ pages: Map<string, PageData>, errorRoutes: Set<string> }> {
   if (!import.meta.prerender)
-    return new Map()
+    return { pages: new Map(), errorRoutes: new Set() }
 
-  const { readPageDataFromFilesystem } = await import('#ai-ready-virtual/read-page-data.mjs')
-  const pages = await readPageDataFromFilesystem()
-  return pages?.length ? new Map(pages.map((p: PageData) => [p.route, p])) : new Map()
+  const m = await import('#ai-ready-virtual/read-page-data.mjs') as unknown as {
+    readPageDataFromFilesystem: () => Promise<{ pages: PageData[], errorRoutes: string[] }>
+  }
+  const data = await m.readPageDataFromFilesystem()
+  return {
+    pages: data.pages?.length ? new Map(data.pages.map((p: PageData) => [p.route, p])) : new Map(),
+    errorRoutes: new Set(data.errorRoutes || []),
+  }
 }
 
 /** Page list item for MCP tools/resources */
@@ -52,4 +58,18 @@ export async function getPagesList(): Promise<PageListItem[]> {
     description: p.description || '',
     headings: p.headings || undefined,
   }))
+}
+
+/** Get error routes detected during prerender */
+export async function getErrorRoutes(): Promise<Set<string>> {
+  if (import.meta.dev)
+    return new Set()
+
+  if (import.meta.prerender) {
+    const data = await readPrerenderedData()
+    return data.errorRoutes
+  }
+
+  const m = await import('#ai-ready-virtual/page-data.mjs') as { errorRoutes?: string[] }
+  return new Set(m.errorRoutes || [])
 }

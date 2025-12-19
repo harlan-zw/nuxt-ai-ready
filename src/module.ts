@@ -215,20 +215,24 @@ export {}
       nitroConfig.virtual = nitroConfig.virtual || {}
 
       // Helper to read JSONL from filesystem during prerender
+      // Entries with _error: true are error routes, others are page data
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = `
 import { readFile } from 'node:fs/promises'
 
 export async function readPageDataFromFilesystem() {
   if (!import.meta.prerender) {
-    return null
+    return { pages: [], errorRoutes: [] }
   }
   const data = await readFile(${JSON.stringify(pageDataPath)}, 'utf-8').catch(() => null)
-  if (!data) return []
-  return data.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line))
+  if (!data) return { pages: [], errorRoutes: [] }
+  const entries = data.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line))
+  const pages = entries.filter(e => !e._error)
+  const errorRoutes = entries.filter(e => e._error).map(e => e.route)
+  return { pages, errorRoutes }
 }
 `
-      // Runtime module exports empty array (prerendered data read from filesystem)
-      nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []`
+      // Runtime module exports empty arrays (prerendered data read from filesystem)
+      nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
     })
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {

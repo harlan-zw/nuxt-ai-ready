@@ -4,6 +4,10 @@ const path = useRoute().path
 const mdPath = computed(() => {
   return `${path}.md`
 })
+
+useSeMeta({
+  title: `Docs - ${path}`,
+})
 </script>
 
 <template>

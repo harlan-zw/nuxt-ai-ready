@@ -42,6 +42,14 @@ describe('nuxt generate (static build)', async () => {
       expect(llmsTxt).toMatch(/\[About · Test Site — UTF-8 Support\]\(\/about\)/)
     })
 
+    it('includes page descriptions', async () => {
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
+
+      // Pages should have descriptions after the link: [Title](/path): Description
+      expect(llmsTxt).toContain('): A test site for the Nuxt AI Search module')
+      expect(llmsTxt).toContain('): Learn about this test site')
+    })
+
     it('includes LLM Resources section', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
@@ -121,6 +129,23 @@ describe('nuxt generate (static build)', async () => {
       // h1 and h2 headings converted
       expect(indexMd).toMatch(/^# /m)
       expect(indexMd).toContain('## Features')
+    })
+  })
+
+  describe('error page filtering', () => {
+    it('excludes error pages from llms.txt', async () => {
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
+
+      // The /missing link from index.vue should not appear in llms.txt
+      // because it renders as an error page
+      expect(llmsTxt).not.toContain('/missing')
+    })
+
+    it('excludes error pages from llms-full.txt', async () => {
+      const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
+
+      // Error pages should not be in the full content
+      expect(llmsFullTxt).not.toContain('Source: https://example.com/missing')
     })
   })
 })
