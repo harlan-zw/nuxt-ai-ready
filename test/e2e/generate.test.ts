@@ -30,8 +30,8 @@ describe('nuxt generate (static build)', async () => {
       // Canonical Origin section
       expect(llmsTxt).toContain('Canonical Origin:')
 
-      // Pages section
-      expect(llmsTxt).toContain('## Pages')
+      // Pages section (either "## Pages" or "## Prerendered Pages" when both types exist)
+      expect(llmsTxt).toMatch(/## (Prerendered )?Pages/)
     })
 
     it('includes page titles with links', async () => {

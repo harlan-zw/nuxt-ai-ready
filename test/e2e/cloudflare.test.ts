@@ -35,7 +35,7 @@ describe('cloudflare pages build output', async () => {
     expect(llmsTxt).toMatch(/^# /)
 
     // Should have pages section
-    expect(llmsTxt).toContain('## Pages')
+    expect(llmsTxt).toMatch(/## (Prerendered )?Pages/)
 
     // Should have page titles
     expect(llmsTxt).toContain('Welcome to Test Site')
