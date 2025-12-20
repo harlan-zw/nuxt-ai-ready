@@ -2,7 +2,8 @@ import type { H3Event } from 'h3'
 import type { HTMLToMarkdownOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../module'
 import type { MarkdownContext } from '../types'
-import { getHeader } from 'h3'
+import { getHeader, getHeaders } from 'h3'
+import { getBotInfo } from '@nuxtjs/robots/util'
 import { htmlToMarkdown } from 'mdream'
 import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
@@ -56,26 +57,33 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { p
   return { path, isExplicit }
 }
 
-// Detect if client prefers markdown based on Accept header
-// Clients like Claude Code, Bun, and other API clients typically don't include text/html
+// Detect if client prefers markdown based on Accept header or AI bot detection
 export function clientPrefersMarkdown(event: H3Event): boolean {
   const accept = getHeader(event, 'accept') || ''
   const secFetchDest = getHeader(event, 'sec-fetch-dest') || ''
 
   // Browsers send sec-fetch-dest header - if it's 'document', it's a browser navigation
-  // We should NOT serve markdown in that case
   if (secFetchDest === 'document') {
     return false
   }
 
-  // Must NOT include text/html (excludes browsers)
+  // If client accepts text/html, serve HTML (browser behavior)
   if (accept.includes('text/html')) {
     return false
   }
 
-  // Must explicitly opt-in with either */* or text/markdown
-  // This catches API clients like Claude Code (axios with application/json, text/plain, */*)
-  return accept.includes('*/*') || accept.includes('text/markdown')
+  // Explicit text/markdown request
+  if (accept.includes('text/markdown')) {
+    return true
+  }
+
+  // Check if it's an AI bot via nuxt/robots
+  const botInfo = getBotInfo(getHeaders(event))
+  if (botInfo?.category === 'ai') {
+    return true
+  }
+
+  return false
 }
 
 // Convert HTML to Markdown (runtime version with hooks)
