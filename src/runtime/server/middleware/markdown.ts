@@ -1,11 +1,17 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { withSiteUrl } from '#site-config/server/composables/utils'
-import { createError, defineEventHandler, setHeader } from 'h3'
+import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
 
+const INTERNAL_HEADER = 'x-ai-ready-internal'
+
 export default defineEventHandler(async (event) => {
+  // Skip internal requests to prevent infinite loop
+  if (getHeader(event, INTERNAL_HEADER))
+    return
+
   const renderInfo = getMarkdownRenderInfo(event)
   if (!renderInfo)
     return
@@ -13,8 +19,10 @@ export default defineEventHandler(async (event) => {
   const { path, isExplicit } = renderInfo
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
-  // Runtime: fetch HTML
-  const response = await event.fetch(path).catch((e) => {
+  // Runtime: fetch HTML with internal marker to prevent recursion
+  const response = await event.fetch(path, {
+    headers: { [INTERNAL_HEADER]: '1' },
+  }).catch((e) => {
     logger.error(`Failed to fetch HTML for ${path}`, e)
     return null
   })
