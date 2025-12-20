@@ -62,7 +62,8 @@ describe('accept header content negotiation', async () => {
     it('serves markdown for API clients with */*, no text/html', async () => {
       const response = await fetch(url('/about'), {
         headers: {
-          Accept: 'application/json, text/plain, */*',
+          'Accept': 'application/json, text/plain, */*',
+          'User-Agent': 'ClaudeCode',
         },
       })
 

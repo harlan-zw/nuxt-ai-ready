@@ -138,7 +138,6 @@ export async function initCrawler(state: CrawlerState): Promise<void> {
   state.initialized = true
 }
 
-
 function flattenHeadings(headings: Array<Record<string, string>> | undefined): string {
   return (headings || [])
     .map(h => Object.entries(h).map(([tag, text]) => `${tag}:${text}`).join(''))
