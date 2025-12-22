@@ -263,7 +263,17 @@ export async function crawlSitemapEntries(
     if (!res)
       continue
 
-    const parsed = JSON.parse(res) as ParsedMarkdownResult
+    // Check if response is JSON before parsing
+    let parsed: ParsedMarkdownResult
+    try {
+      parsed = JSON.parse(res) as ParsedMarkdownResult
+    }
+    catch (err) {
+      // Response is not JSON - likely HTML was returned instead of markdown
+      logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`)
+      continue
+    }
+
     // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
     await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
     crawled++
