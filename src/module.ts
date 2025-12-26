@@ -215,6 +215,11 @@ export {}
 
     // Virtual module for page data - different behavior for prerender vs runtime
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
+      // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
+      // This enables access to H3Event and Cloudflare bindings from any async context
+      nitroConfig.experimental = nitroConfig.experimental || {}
+      nitroConfig.experimental.asyncContext = true
+
       nitroConfig.virtual = nitroConfig.virtual || {}
 
       // Helper to read JSONL from filesystem during prerender

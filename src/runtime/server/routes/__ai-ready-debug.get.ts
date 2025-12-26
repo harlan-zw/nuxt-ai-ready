@@ -69,9 +69,9 @@ export default eventHandler(async (event) => {
   }
 
   // Get page data
-  const pages = await getPages()
-  const pagesList = await getPagesList()
-  const errorRoutes = await getErrorRoutes()
+  const pages = await getPages(event)
+  const pagesList = await getPagesList(event)
+  const errorRoutes = await getErrorRoutes(event)
 
   // Determine data source
   let source: string
@@ -113,13 +113,35 @@ export default eventHandler(async (event) => {
   }
 
   // Check if page data is accessible via public directory
-  const publicData = await globalThis.$fetch('/__ai-ready/pages.json', {
-    baseURL: '/',
-  }).catch(() => null) as { pages?: unknown[] } | null
+  let publicData: { pages?: unknown[] } | null = null
+  let jsonFileSource = 'fetch(\'/__ai-ready/pages.json\')'
+
+  // Try Cloudflare ASSETS binding first
+  const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
+  if (cfEnv?.ASSETS?.fetch) {
+    try {
+      const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.json'))
+      if (response.ok) {
+        publicData = await response.json()
+        jsonFileSource = 'env.ASSETS.fetch(\'/__ai-ready/pages.json\')'
+      }
+    }
+    catch {
+      // Fall through to regular fetch
+    }
+  }
+
+  // Fall back to regular fetch
+  if (!publicData) {
+    publicData = await globalThis.$fetch('/__ai-ready/pages.json', {
+      baseURL: '/',
+    }).catch(() => null) as { pages?: unknown[] } | null
+  }
+
   const jsonFileStatus = {
     available: !!publicData,
     pageCount: publicData?.pages?.length ?? 0,
-    source: 'fetch(\'/__ai-ready/pages.json\')',
+    source: jsonFileSource,
   }
 
   // Build diagnostics
