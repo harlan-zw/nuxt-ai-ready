@@ -279,6 +279,11 @@ export async function readPageDataFromFilesystem() {
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
 
+    // Debug endpoint (only accessible when debug: true)
+    if (config.debug) {
+      addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get') })
+    }
+
     // Setup prerendering hooks for static generation
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
