@@ -125,14 +125,17 @@ declare module 'nitropack/types' {
 }
 
 declare module '#ai-ready-virtual/read-page-data.mjs' {
-  export function readPageDataFromFilesystem(): Promise<Array<{
-    route: string
-    title: string
-    description: string
-    headings: string
-    updatedAt: string
-    markdown: string
-  }> | null>
+  export function readPageDataFromFilesystem(): Promise<{
+    pages: Array<{
+      route: string
+      title: string
+      description: string
+      headings: string
+      updatedAt: string
+      markdown: string
+    }>
+    errorRoutes: string[]
+  }>
 }
 
 declare module '#ai-ready-virtual/page-data.mjs' {
@@ -233,6 +236,15 @@ export async function readPageDataFromFilesystem() {
 `
       // Runtime module exports empty arrays (prerendered data read from filesystem)
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
+
+      // Configure server assets for page data
+      // Data is written during prerender to the raw chunks directory
+      // Accessible via useStorage('assets:ai-ready-data')
+      nitroConfig.serverAssets = nitroConfig.serverAssets || []
+      nitroConfig.serverAssets.push({
+        baseName: 'ai-ready-data',
+        dir: './.nitro/ai-ready-data', // Placeholder, actual data written during prerender
+      })
     })
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {

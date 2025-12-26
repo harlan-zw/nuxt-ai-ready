@@ -1,7 +1,7 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './runtime/types'
-import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
@@ -270,7 +270,7 @@ export async function crawlSitemapEntries(
     }
     catch (err) {
       // Response is not JSON - likely HTML was returned instead of markdown
-      logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`)
+      logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`, err)
       continue
     }
 
@@ -451,6 +451,33 @@ export function setupPrerenderHandler(
           await appendFile(state.pageDataPath, `${JSON.stringify({ route, _error: true })}\n`, 'utf-8')
         }
         logger.debug(`Wrote ${state.errorRoutes.size} error routes to page data`)
+      }
+
+      // Write page data JSON for runtime access
+      // This enables MCP tools (list_pages, search_pages_fuzzy) in production
+      if (state.pageDataPath) {
+        const jsonlContent = await readFile(state.pageDataPath, 'utf-8').catch(() => '')
+        if (jsonlContent) {
+          const entries = jsonlContent.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
+          const pages = entries.filter((e: { _error?: boolean }) => !e._error).map((p: { route: string, title: string, description: string, headings: string, updatedAt: string }) => ({
+            route: p.route,
+            title: p.title,
+            description: p.description,
+            headings: p.headings,
+            updatedAt: p.updatedAt,
+          }))
+          const errorRoutes = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route)
+          const jsonContent = JSON.stringify({ pages, errorRoutes })
+
+          // Write to server assets raw directory for useStorage('assets:ai-ready-data')
+          // This location is where Nitro places bundled server assets
+          const serverAssetsDir = join(nitro.options.output.serverDir, 'chunks/raw/ai-ready-data')
+          await mkdir(serverAssetsDir, { recursive: true })
+          const serverAssetsJsonPath = join(serverAssetsDir, 'pages.json')
+          await writeFile(serverAssetsJsonPath, jsonContent, 'utf-8')
+
+          logger.debug(`Wrote ${pages.length} pages to server assets`)
+        }
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed

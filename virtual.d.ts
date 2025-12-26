@@ -4,15 +4,18 @@ interface PageDataEntry {
   title: string
   description: string
   headings: string
-  chunkIds: string
   updatedAt: string
   markdown: string
 }
 
 declare module '#ai-ready-virtual/read-page-data.mjs' {
-  export function readPageDataFromFilesystem(): Promise<PageDataEntry[] | null>
+  export function readPageDataFromFilesystem(): Promise<{
+    pages: PageDataEntry[]
+    errorRoutes: string[]
+  }>
 }
 
 declare module '#ai-ready-virtual/page-data.mjs' {
   export const pages: PageDataEntry[]
+  export const errorRoutes: string[]
 }
