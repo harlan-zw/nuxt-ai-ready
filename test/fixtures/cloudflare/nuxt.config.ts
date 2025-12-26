@@ -12,6 +12,9 @@ export default defineNuxtConfig({
       routes: ['/', '/about'],
       failOnError: false,
     },
+    externals: {
+      external: ['@cloudflare/puppeteer', 'agents', 'agents/mcp'],
+    },
   },
   site: {
     url: 'https://test.example.com',
