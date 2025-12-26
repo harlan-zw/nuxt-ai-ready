@@ -1,5 +1,5 @@
 import { createError, eventHandler, setHeader } from 'h3'
-import { useRuntimeConfig, useStorage } from 'nitropack/runtime'
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { getErrorRoutes, getPages, getPagesList } from '../utils/pageData'
 
 interface DebugInfo {
@@ -82,7 +82,7 @@ export default eventHandler(async (event) => {
     source = '#ai-ready-virtual/read-page-data.mjs (reads from filesystem)'
   }
   else {
-    source = 'useStorage(\'assets:ai-ready-data\') (server assets)'
+    source = 'fetch(\'/__ai-ready/pages.json\') (public directory)'
   }
 
   // Check virtual module states
@@ -112,13 +112,14 @@ export default eventHandler(async (event) => {
     readPageDataModuleInfo = { available: false, note: 'Module not available' }
   }
 
-  // Check if page data is accessible via server assets storage
-  const storage = useStorage('assets:ai-ready-data')
-  const storageData = await storage.getItem('pages.json') as { pages?: unknown[] } | null
+  // Check if page data is accessible via public directory
+  const publicData = await globalThis.$fetch('/__ai-ready/pages.json', {
+    baseURL: '/',
+  }).catch(() => null) as { pages?: unknown[] } | null
   const jsonFileStatus = {
-    available: !!storageData,
-    pageCount: storageData?.pages?.length ?? 0,
-    source: 'useStorage(\'assets:ai-ready-data\')',
+    available: !!publicData,
+    pageCount: publicData?.pages?.length ?? 0,
+    source: 'fetch(\'/__ai-ready/pages.json\')',
   }
 
   // Build diagnostics
@@ -131,11 +132,11 @@ export default eventHandler(async (event) => {
   }
   else if (mode === 'production' && pages.size === 0) {
     if (!jsonFileStatus.available) {
-      issues.push('Production mode with no page data - server assets not found')
+      issues.push('Production mode with no page data - /__ai-ready/pages.json not found')
       suggestions.push('Run `nuxi generate` or `nuxi build --prerender` to generate the page data')
     }
     else {
-      issues.push('Server assets exist but returned empty page data')
+      issues.push('pages.json exists but returned empty page data')
       suggestions.push('Check if pages were prerendered correctly')
     }
   }

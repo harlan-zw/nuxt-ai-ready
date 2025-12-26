@@ -469,14 +469,14 @@ export function setupPrerenderHandler(
           const errorRoutes = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route)
           const jsonContent = JSON.stringify({ pages, errorRoutes })
 
-          // Write to server assets raw directory for useStorage('assets:ai-ready-data')
-          // This location is where Nitro places bundled server assets
-          const serverAssetsDir = join(nitro.options.output.serverDir, 'chunks/raw/ai-ready-data')
-          await mkdir(serverAssetsDir, { recursive: true })
-          const serverAssetsJsonPath = join(serverAssetsDir, 'pages.json')
-          await writeFile(serverAssetsJsonPath, jsonContent, 'utf-8')
+          // Write to public directory for runtime fetch access
+          // This works on all platforms (Node.js, Cloudflare, Vercel, etc.)
+          const publicDataDir = join(nitro.options.output.publicDir, '__ai-ready')
+          await mkdir(publicDataDir, { recursive: true })
+          const publicJsonPath = join(publicDataDir, 'pages.json')
+          await writeFile(publicJsonPath, jsonContent, 'utf-8')
 
-          logger.debug(`Wrote ${pages.length} pages to server assets`)
+          logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
         }
       }
 

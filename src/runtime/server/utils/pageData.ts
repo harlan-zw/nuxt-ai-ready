@@ -1,5 +1,3 @@
-import { useStorage } from 'nitropack/runtime'
-
 /** Page entry from virtual module */
 export interface PageEntry {
   route: string
@@ -55,10 +53,12 @@ export async function getPagesList(): Promise<PageListItem[]> {
   }))
 }
 
-/** Read page data from server assets storage */
+/** Read page data from public directory via fetch */
 async function readServerAssets(): Promise<{ pages: Map<string, PageEntry>, errorRoutes: Set<string> }> {
-  const storage = useStorage('assets:ai-ready-data')
-  const data = await storage.getItem('pages.json') as { pages?: PageEntry[], errorRoutes?: string[] } | null
+  // Fetch from public directory - works on all platforms
+  const data = await globalThis.$fetch('/__ai-ready/pages.json', {
+    baseURL: '/',
+  }).catch(() => null) as { pages?: PageEntry[], errorRoutes?: string[] } | null
 
   if (!data)
     return { pages: new Map(), errorRoutes: new Set() }
