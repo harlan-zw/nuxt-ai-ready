@@ -1,21 +1,5 @@
-catalogMode: prefer
-
-cleanupUnusedCatalogs: true
-
-shellEmulator: true
-
-trustPolicy: no-downgrade
-
-trustPolicyExclude:
-  - chokidar@4.0.3
-  - eslint-import-resolver-typescript@3.10.1
-  - undici-types@6.21.0
-  - semver
 packages:
   - playground
-overrides:
-  rollup-plugin-visualizer>open: ^10.0.0
-  schema-utils>ajv: 8.14.0
 
 catalog:
   '@antfu/eslint-config': ^6.7.3
@@ -37,6 +21,7 @@ catalog:
   '@vitest/coverage-v8': ^4.0.16
   '@vueuse/nuxt': ^14.1.0
   agents: ^0.3.0
+  ai: ^6.0.3
   better-sqlite3: ^12.5.0
   bumpp: ^10.3.2
   consola: ^3.4.2
@@ -63,6 +48,11 @@ catalog:
   vue-router: ^4.6.4
   vue-tsc: ^3.2.1
   zod: ^4.2.1
+
+catalogMode: prefer
+
+cleanupUnusedCatalogs: true
+
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
@@ -74,3 +64,17 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
+
+overrides:
+  rollup-plugin-visualizer>open: ^10.0.0
+  schema-utils>ajv: 8.14.0
+
+shellEmulator: true
+
+trustPolicy: no-downgrade
+
+trustPolicyExclude:
+  - chokidar@4.0.3
+  - eslint-import-resolver-typescript@3.10.1
+  - undici-types@6.21.0
+  - semver
