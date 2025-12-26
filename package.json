@@ -104,5 +104,10 @@
   },
   "resolutions": {
     "nuxt-ai-ready": "workspace:*"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@nuxtjs/mcp-toolkit": "patches/@nuxtjs__mcp-toolkit.patch"
+    }
   }
 }

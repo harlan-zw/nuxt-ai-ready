@@ -145,6 +145,11 @@ catalogs:
 overrides:
   nuxt-ai-ready: workspace:*
 
+patchedDependencies:
+  '@nuxtjs/mcp-toolkit':
+    hash: a40485ec470760d8b0bd1ab91d4f4119b8028c2130df3a0302ca315b2ed2e317
+    path: patches/@nuxtjs__mcp-toolkit.patch
+
 importers:
 
   .:
@@ -221,7 +226,7 @@ importers:
         version: 10.2.1(@vue/compiler-dom@3.5.26)(db0@0.3.4(better-sqlite3@12.5.0))(eslint@9.39.2(jiti@2.6.1))(ioredis@5.8.2)(magicast@0.5.1)(rollup@4.53.5)(vue@3.5.26(typescript@5.9.3))
       '@nuxtjs/mcp-toolkit':
         specifier: 'catalog:'
-        version: 0.6.0(@cfworker/json-schema@4.1.1)(agents@0.3.0(@cloudflare/workers-types@4.20251225.0)(react@19.2.3)(typescript@5.9.3)(zod@4.2.1))(hono@4.11.1)(magicast@0.5.1)(zod@4.2.1)
+        version: 0.6.0(patch_hash=a40485ec470760d8b0bd1ab91d4f4119b8028c2130df3a0302ca315b2ed2e317)(@cfworker/json-schema@4.1.1)(agents@0.3.0(@cloudflare/workers-types@4.20251225.0)(react@19.2.3)(typescript@5.9.3)(zod@4.2.1))(hono@4.11.1)(magicast@0.5.1)(zod@4.2.1)
       '@nuxtjs/robots':
         specifier: 'catalog:'
         version: 5.6.7(h3@1.15.4)(magicast@0.5.1)(vue@3.5.26(typescript@5.9.3))(zod@4.2.1)
@@ -10140,7 +10145,7 @@ snapshots:
       - uploadthing
       - vue
 
-  '@nuxtjs/mcp-toolkit@0.6.0(@cfworker/json-schema@4.1.1)(agents@0.3.0(@cloudflare/workers-types@4.20251225.0)(react@19.2.3)(typescript@5.9.3)(zod@4.2.1))(hono@4.11.1)(magicast@0.5.1)(zod@4.2.1)':
+  '@nuxtjs/mcp-toolkit@0.6.0(patch_hash=a40485ec470760d8b0bd1ab91d4f4119b8028c2130df3a0302ca315b2ed2e317)(@cfworker/json-schema@4.1.1)(agents@0.3.0(@cloudflare/workers-types@4.20251225.0)(react@19.2.3)(typescript@5.9.3)(zod@4.2.1))(hono@4.11.1)(magicast@0.5.1)(zod@4.2.1)':
     dependencies:
       '@clack/prompts': 0.11.0
       '@modelcontextprotocol/sdk': 1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.1)
