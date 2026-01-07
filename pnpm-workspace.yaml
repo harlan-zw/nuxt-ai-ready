@@ -10,18 +10,18 @@ catalog:
   '@nuxt/devtools-ui-kit': ^3.1.1
   '@nuxt/kit': 4.2.2
   '@nuxt/module-builder': ^1.0.2
-  '@nuxt/test-utils': ^3.21.0
+  '@nuxt/test-utils': ^3.23.0
   '@nuxt/ui': ^4.3.0
   '@nuxtjs/color-mode': ^4.0.0
   '@nuxtjs/eslint-config-typescript': ^12.1.0
   '@nuxtjs/i18n': ^10.2.1
-  '@nuxtjs/mcp-toolkit': ^0.6.0
+  '@nuxtjs/mcp-toolkit': ^0.6.1
   '@nuxtjs/robots': ^5.6.7
   '@nuxtjs/sitemap': 7.5.0
   '@vitest/coverage-v8': ^4.0.16
   '@vueuse/nuxt': ^14.1.0
-  agents: ^0.3.0
-  ai: ^6.0.3
+  agents: ^0.3.3
+  ai: ^6.0.14
   better-sqlite3: ^12.5.0
   bumpp: ^10.3.2
   consola: ^3.4.2
@@ -38,16 +38,16 @@ catalog:
   pkg-types: ^2.3.0
   playwright: ^1.57.0
   playwright-core: ^1.57.0
-  postgres: ^3.4.7
+  postgres: ^3.4.8
   std-env: 3.10.0
   typescript: ^5.9.3
-  ufo: ^1.6.1
+  ufo: ^1.6.2
   unstorage: ^1.17.3
   vitest: ^4.0.16
   vue: ^3.5.26
   vue-router: ^4.6.4
-  vue-tsc: ^3.2.1
-  zod: ^4.2.1
+  vue-tsc: ^3.2.2
+  zod: ^4.3.5
 
 catalogMode: prefer
 
@@ -78,3 +78,5 @@ trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1
   - undici-types@6.21.0
   - semver
+patchedDependencies:
+  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch

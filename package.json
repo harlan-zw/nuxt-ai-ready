@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "0.5.2",
-  "packageManager": "pnpm@10.26.1",
+  "packageManager": "pnpm@10.27.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",
@@ -26,6 +26,12 @@
     ".": {
       "types": "./dist/types.d.mts",
       "import": "./dist/module.mjs"
+    },
+    "./mcp-tools": {
+      "import": "./dist/runtime/server/mcp/tools/index.js"
+    },
+    "./mcp-resources": {
+      "import": "./dist/runtime/server/mcp/resources/index.js"
     }
   },
   "main": "./dist/module.mjs",
@@ -105,10 +111,5 @@
   },
   "resolutions": {
     "nuxt-ai-ready": "workspace:*"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "@nuxtjs/mcp-toolkit": "patches/@nuxtjs__mcp-toolkit.patch"
-    }
   }
 }
