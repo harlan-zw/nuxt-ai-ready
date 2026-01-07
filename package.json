@@ -27,16 +27,15 @@
       "types": "./dist/types.d.mts",
       "import": "./dist/module.mjs"
     },
-    "./mcp-tools": {
-      "import": "./dist/runtime/server/mcp/tools/index.js"
-    },
-    "./mcp-resources": {
-      "import": "./dist/runtime/server/mcp/resources/index.js"
+    "./mcp": {
+      "types": "./mcp.d.ts",
+      "import": "./dist/runtime/server/mcp/index.js"
     }
   },
   "main": "./dist/module.mjs",
   "files": [
-    "dist"
+    "dist",
+    "mcp.d.ts"
   ],
   "scripts": {
     "lint": "eslint . --fix",
