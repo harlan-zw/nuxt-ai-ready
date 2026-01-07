@@ -45,6 +45,12 @@ jobs:
       - name: Test package types
         run: pnpm run test:attw
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Browser Test Setup
         run: pnpm exec playwright install --with-deps
 
