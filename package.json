@@ -29,7 +29,7 @@
     },
     "./mcp": {
       "types": "./mcp.d.ts",
-      "import": "./dist/runtime/server/mcp/index.js"
+      "import": "./dist/runtime/mcp.js"
     }
   },
   "main": "./dist/module.mjs",
