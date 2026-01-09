@@ -137,6 +137,7 @@ declare module '#ai-ready-virtual/read-page-data.mjs' {
       title: string
       description: string
       headings: string
+      keywords: string[]
       updatedAt: string
       markdown: string
     }>
@@ -269,6 +270,7 @@ export async function readPageDataFromFilesystem() {
       llmsTxt: mergedLlmsTxt,
       cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
       prerenderCacheDir,
+      runtimeIndexing,
     } as any
 
     // Register runtime indexing plugins when enabled

@@ -50,6 +50,7 @@ export interface ParsedMarkdownResult {
   title: string
   description: string
   headings: Array<Record<string, string>>
+  keywords?: string[]
   updatedAt?: string
 }
 
@@ -189,7 +190,7 @@ async function processMarkdownRoute(
   lastmod?: string | Date,
   options?: { skipLlmsFullTxt?: boolean },
 ): Promise<void> {
-  const { markdown, title, description, headings, updatedAt: metaUpdatedAt } = parsed
+  const { markdown, title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
 
   let updatedAt = (lastmod instanceof Date ? lastmod.toISOString() : lastmod) || new Date().toISOString()
   if (metaUpdatedAt) {
@@ -206,6 +207,7 @@ async function processMarkdownRoute(
       title,
       description,
       headings: flattenHeadings(headings),
+      keywords: keywords || [],
       updatedAt,
       markdown,
     }
@@ -402,7 +404,7 @@ export function setupPrerenderHandler(
       await initPromise
 
       const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
-      const { markdown, title, description, headings, updatedAt: metaUpdatedAt } = parsed
+      const { markdown, title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
 
       // Get timestamp from meta tag or use current time
       let updatedAt = new Date().toISOString()
@@ -427,6 +429,7 @@ export function setupPrerenderHandler(
           title,
           description,
           headings: flattenHeadings(headings),
+          keywords: keywords || [],
           updatedAt,
           markdown,
         }
@@ -459,11 +462,12 @@ export function setupPrerenderHandler(
         const jsonlContent = await readFile(state.pageDataPath, 'utf-8').catch(() => '')
         if (jsonlContent) {
           const entries = jsonlContent.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
-          const pages = entries.filter((e: { _error?: boolean }) => !e._error).map((p: { route: string, title: string, description: string, headings: string, updatedAt: string }) => ({
+          const pages = entries.filter((e: { _error?: boolean }) => !e._error).map((p: { route: string, title: string, description: string, headings: string, keywords?: string[], updatedAt: string }) => ({
             route: p.route,
             title: p.title,
             description: p.description,
             headings: p.headings,
+            keywords: p.keywords || [],
             updatedAt: p.updatedAt,
           }))
           const errorRoutes = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route)

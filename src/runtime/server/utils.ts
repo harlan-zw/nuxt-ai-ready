@@ -92,6 +92,7 @@ export async function convertHtmlToMarkdown(html: string, url: string, config: M
 
   let title = ''
   let description = ''
+  let metaKeywords = ''
   const headings: Array<Record<string, string>> = []
 
   // Create extraction plugin first - must run before isolateMainPlugin
@@ -101,6 +102,9 @@ export async function convertHtmlToMarkdown(html: string, url: string, config: M
     },
     'meta[name="description"]': (el) => {
       description = el.attributes.content || ''
+    },
+    'meta[name="keywords"]': (el) => {
+      metaKeywords = el.attributes.content || ''
     },
     'h1, h2, h3, h4, h5, h6': (el) => {
       const text = el.textContent?.trim()
@@ -142,13 +146,15 @@ export async function convertHtmlToMarkdown(html: string, url: string, config: M
   // Call Nitro runtime hook if available
   await nitroApp.hooks.callHook('ai-ready:markdown', context)
   markdown = normalizeWhitespace(context.markdown) // Use potentially modified markdown
-  return { markdown, title: normalizeWhitespace(title), description: normalizeWhitespace(description), headings }
+
+  return { markdown, title: normalizeWhitespace(title), description: normalizeWhitespace(description), headings, metaKeywords }
 }
 
 // Convert HTML to Markdown with metadata extraction (prerender version, no hooks)
-export function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
+export async function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
   let title = ''
   let description = ''
+  let metaKeywords = ''
   let updatedAt: string | undefined
   const headings: Array<Record<string, string>> = []
 
@@ -158,6 +164,9 @@ export function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptio
     },
     'meta[name="description"]': (el) => {
       description = el.attributes.content || ''
+    },
+    'meta[name="keywords"]': (el) => {
+      metaKeywords = el.attributes.content || ''
     },
     'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
       if (!updatedAt && el.attributes.content) {
@@ -193,6 +202,7 @@ export function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptio
     title: normalizeWhitespace(title),
     description: normalizeWhitespace(description),
     headings,
+    metaKeywords,
     ...(updatedAt && { updatedAt }),
   }
 }

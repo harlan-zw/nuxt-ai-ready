@@ -8,6 +8,7 @@ export interface PageEntry {
   title: string
   description: string
   headings: string
+  keywords?: string[]
   updatedAt: string
 }
 
@@ -22,6 +23,7 @@ export interface PageListItem {
   title: string
   description: string
   headings?: string
+  keywords?: string[]
 }
 
 /** Stored page entry with indexedAt timestamp */
@@ -85,6 +87,7 @@ export async function getPagesList(event?: H3Event): Promise<PageListItem[]> {
     title: p.title || p.route,
     description: p.description || '',
     headings: p.headings || undefined,
+    keywords: p.keywords?.length ? p.keywords : undefined,
   }))
 }
 

@@ -10,13 +10,13 @@ const inputSchema = {
 
 const tool: McpToolDefinition = {
   name: 'search_pages_fuzzy',
-  description: 'Fuzzy search pages by title, description, route, and headings.',
+  description: 'Fuzzy search pages by title, description, route, headings, and keywords.',
   inputSchema,
   cache: '5m',
   async handler({ query, limit }) {
     const pages = await getPagesList()
     const fuse = new Fuse(pages, {
-      keys: ['title', 'description', 'route', 'headings'],
+      keys: ['title', 'description', 'route', 'headings', 'keywords'],
       threshold: 0.4,
       includeScore: true,
     })

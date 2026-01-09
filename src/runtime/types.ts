@@ -121,6 +121,8 @@ export interface BulkDocument {
   markdown: string
   /** Page headings structure (e.g., [{ "h1": "Title" }, { "h2": "Subtitle" }]) */
   headings: Array<Record<string, string>>
+  /** Top keywords for search (from meta keywords or extracted from content) */
+  keywords?: string[]
   /** ISO 8601 timestamp of last content update */
   updatedAt?: string
 }
