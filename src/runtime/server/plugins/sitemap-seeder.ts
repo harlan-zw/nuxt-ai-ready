@@ -28,7 +28,7 @@ async function seedFromSitemap(event: H3Event): Promise<void> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const sitemapTtl = config.sitemapTtl ?? 3600 // Default 1 hour
 
-  const db = await useDatabase()
+  const db = await useDatabase(event)
 
   // Check if sitemap was recently seeded
   const seededAt = await getSitemapSeededAt(db)
