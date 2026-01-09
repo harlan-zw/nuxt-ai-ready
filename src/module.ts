@@ -32,6 +32,7 @@ export interface ModulePublicRuntimeConfig {
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   ttl: number
+  sitemapTtl: number
   database: {
     type: 'sqlite' | 'd1' | 'libsql'
     filename?: string
@@ -282,6 +283,7 @@ export async function readPageDataFromFilesystem() {
       cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
       prerenderCacheDir,
       ttl: config.ttl ?? 0,
+      sitemapTtl: config.sitemapTtl ?? 3600,
       database,
     } as any
 
@@ -289,7 +291,9 @@ export async function readPageDataFromFilesystem() {
     nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
     // db-restore: loads compressed dump on cold start for serverless
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/db-restore'))
-    // page-indexer: indexes pages on visit via afterResponse hook
+    // sitemap-seeder: seeds routes from sitemap on first request
+    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
+    // page-indexer: indexes unindexed pages in background via afterResponse hook
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/page-indexer'))
 
     addServerHandler({
@@ -315,6 +319,10 @@ export async function readPageDataFromFilesystem() {
     if (config.debug) {
       addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get') })
     }
+
+    // Indexing control endpoints
+    addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
+    addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
 
     // Setup prerendering hooks for static generation
     // @ts-expect-error untyped

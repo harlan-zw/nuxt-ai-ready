@@ -64,11 +64,31 @@ SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_re
 
 ### Runtime Plugins (`src/runtime/server/plugins/`)
 
-Pages are automatically indexed on-demand as they're visited:
+Pages are indexed via sitemap-driven background processing:
 - **db-restore.ts**: Restores prerendered data from compressed dump on cold start
-- **page-indexer.ts**: Uses `afterResponse` + `event.waitUntil` to index visited pages
+- **sitemap-seeder.ts**: Seeds routes from sitemap into DB on first request (with TTL)
+- **page-indexer.ts**: Picks one unindexed route per request, fetches internally, indexes it
+
+### Runtime Indexing Flow
+
+```
+Request → sitemap-seeder seeds routes (once per TTL)
+        → afterResponse triggers page-indexer
+        → fetches one unindexed route internally (no auth cookies)
+        → indexes it in background
+```
+
+This ensures only public pages (those in sitemap) are indexed, avoiding auth-gated content.
+
+### Indexing Control Endpoints
+
+- `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
+- `POST /__ai-ready/poll?limit=N` - Process up to N pages (max 50), returns `{ indexed, remaining, errors }`
+
+### Utils
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
 - **utils/pageData.ts**: Unified read from database
+- **utils/sitemap.ts**: Fetch and parse sitemap URLs
 
 ### Key Dependencies
 
@@ -116,6 +136,7 @@ Config key: `aiReady` in nuxt.config.ts
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
   ttl: 0, // re-index TTL in seconds (0 = never)
+  sitemapTtl: 3600, // sitemap refresh TTL in seconds (default 1 hour)
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
 }
 ```

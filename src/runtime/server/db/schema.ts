@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 'v1.1.0'
+export const SCHEMA_VERSION = 'v1.2.0'
 
 const DROP_TABLES_SQL = [
   'DROP TABLE IF EXISTS ai_ready_pages_fts',
@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS ai_ready_pages (
   keywords TEXT NOT NULL DEFAULT '[]',
   updated_at TEXT NOT NULL,
   indexed_at INTEGER NOT NULL,
-  is_error INTEGER NOT NULL DEFAULT 0
+  is_error INTEGER NOT NULL DEFAULT 0,
+  indexed INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route);
@@ -51,6 +52,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS _ai_ready_info (
   id TEXT PRIMARY KEY,
+  value TEXT,
   version TEXT,
   checksum TEXT,
   ready INTEGER DEFAULT 0
@@ -87,11 +89,13 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
       keywords TEXT NOT NULL DEFAULT '[]',
       updated_at TEXT NOT NULL,
       indexed_at INTEGER NOT NULL,
-      is_error INTEGER NOT NULL DEFAULT 0
+      is_error INTEGER NOT NULL DEFAULT 0,
+      indexed INTEGER NOT NULL DEFAULT 0
     )`,
     // Indexes
     `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)`,
     `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_is_error ON ai_ready_pages(is_error)`,
+    `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_indexed ON ai_ready_pages(indexed)`,
     // FTS5 virtual table
     `CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
       route, title, description, markdown, headings, keywords,
@@ -112,9 +116,10 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
       VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
     END`,
-    // Info table
+    // Info table - generic key-value store for metadata
     `CREATE TABLE IF NOT EXISTS _ai_ready_info (
       id TEXT PRIMARY KEY,
+      value TEXT,
       version TEXT,
       checksum TEXT,
       ready INTEGER DEFAULT 0

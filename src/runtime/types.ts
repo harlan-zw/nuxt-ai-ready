@@ -92,6 +92,13 @@ export interface ModuleOptions {
   ttl?: number
 
   /**
+   * TTL for re-reading sitemap in seconds at runtime
+   * Controls how often to refresh the list of known routes from sitemap
+   * @default 3600 (1 hour)
+   */
+  sitemapTtl?: number
+
+  /**
    * Database configuration for page storage
    * Uses db0 for cross-platform SQLite support
    */
