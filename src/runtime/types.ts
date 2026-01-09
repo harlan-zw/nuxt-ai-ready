@@ -84,26 +84,41 @@ export interface ModuleOptions {
   cacheMaxAgeSeconds?: number
 
   /**
-   * Runtime indexing configuration
-   * When enabled, pages are indexed on-demand as they are visited (no prerendering required)
-   * Uses unstorage for persistence - configure storage drivers for serverless/edge
+   * TTL for re-indexing pages in seconds
+   * Pages are automatically indexed on visit; this controls how often to refresh
+   * 0 = never re-index (rely on prerendered data)
+   * @default 0
    */
-  runtimeIndexing?: {
+  ttl?: number
+
+  /**
+   * Database configuration for page storage
+   * Uses db0 for cross-platform SQLite support
+   */
+  database?: {
     /**
-     * Enable runtime page indexing
-     * @default false
+     * Database type - auto-detected if not specified
+     * @default 'sqlite' (auto-detects best connector)
      */
-    enabled?: boolean
+    type?: 'sqlite' | 'd1' | 'libsql'
     /**
-     * Storage mount point prefix for page data
-     * @default 'ai-ready'
+     * SQLite filename (relative to rootDir or absolute)
+     * @default '.data/ai-ready/pages.db'
      */
-    storage?: string
+    filename?: string
     /**
-     * TTL for indexed pages in seconds (0 = no expiry)
-     * @default 0
+     * D1 binding name for Cloudflare Workers/Pages
+     * @default 'AI_READY_DB'
      */
-    ttl?: number
+    bindingName?: string
+    /**
+     * LibSQL/Turso URL
+     */
+    url?: string
+    /**
+     * LibSQL/Turso auth token
+     */
+    authToken?: string
   }
 }
 
@@ -250,7 +265,7 @@ declare module 'nitropack/types' {
     'ai-ready:markdown': (context: MarkdownContext) => void | Promise<void>
     'ai-ready:mdreamConfig': (config: import('mdream').HTMLToMarkdownOptions) => void | Promise<void>
     /**
-     * Called when a page is indexed at runtime (via runtimeIndexing)
+     * Called when a page is indexed at runtime
      * Use this to sync with external systems (embeddings, search, etc)
      */
     'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>

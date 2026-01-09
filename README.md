@@ -20,7 +20,8 @@ Nuxt AI Ready implements both. It converts your pages to markdown, generates llm
 - 🚀 **On-Demand Markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`), automatically served to AI crawlers
 - 📡 **Content Signals**: Configure AI training/search/input permissions via [Nuxt Robots](https://nuxtseo.com/robots)
 - 🌐 **Sitemap Integration**: Index AI-allowed pages via [Nuxt Sitemap](https://nuxtseo.com/sitemap)
-- ⚡ **MCP Server**: `list_pages` and `search_pages_fuzzy` tools for AI agents to query your site
+- ⚡ **MCP Server**: `list_pages` and `search_pages` tools with FTS5 full-text search
+- 🗄️ **Runtime Indexing**: Index pages on-demand without prerendering, with SQLite/D1/LibSQL support
 - 🧠 **[RAG Ready](https://nuxtseo.com/ai-ready/advanced/rag-example)**: Markdown output optimized for vectorizing and semantic search
 
 ## Installation

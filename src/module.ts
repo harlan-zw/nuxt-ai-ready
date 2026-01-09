@@ -9,6 +9,7 @@ import { readPackageJSON } from 'pkg-types'
 import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
+import { refineDatabaseConfig, resolveDatabaseAdapter } from './utils/database'
 
 export interface ModuleHooks {
   /**
@@ -30,10 +31,13 @@ export interface ModulePublicRuntimeConfig {
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
-  runtimeIndexing?: {
-    enabled: boolean
-    storage: string
-    ttl: number
+  ttl: number
+  database: {
+    type: 'sqlite' | 'd1' | 'libsql'
+    filename?: string
+    bindingName?: string
+    url?: string
+    authToken?: string
   }
 }
 
@@ -93,6 +97,13 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
 
+    // Resolve database adapter alias at build time
+    const resolverOpts = { resolver: createResolver(import.meta.url) }
+    const dbType = config.database?.type || 'sqlite'
+    const adapterPath = await resolveDatabaseAdapter(dbType, resolverOpts)
+    nuxt.options.alias['#ai-ready/adapter'] = adapterPath
+    nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath
+
     // set default MCP name
     if (!nuxt.options.mcp?.name) {
       nuxt.options.mcp = nuxt.options.mcp || {}
@@ -147,6 +158,12 @@ declare module '#ai-ready-virtual/read-page-data.mjs' {
 
 declare module '#ai-ready-virtual/page-data.mjs' {
   export const pages: never[]
+}
+
+declare module '#ai-ready/adapter' {
+  import type { Connector } from 'db0'
+  const connector: (config: unknown) => Connector
+  export default connector
 }
 
 export {}
@@ -250,14 +267,8 @@ export async function readPageDataFromFilesystem() {
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
     })
 
-    // Resolve runtime indexing config
-    const runtimeIndexing = config.runtimeIndexing?.enabled
-      ? {
-          enabled: true,
-          storage: config.runtimeIndexing.storage || 'ai-ready',
-          ttl: config.runtimeIndexing.ttl || 0,
-        }
-      : undefined
+    // Resolve database config
+    const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
@@ -270,25 +281,16 @@ export async function readPageDataFromFilesystem() {
       llmsTxt: mergedLlmsTxt,
       cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
       prerenderCacheDir,
-      runtimeIndexing,
+      ttl: config.ttl ?? 0,
+      database,
     } as any
 
-    // Register runtime indexing plugins when enabled
-    if (runtimeIndexing) {
-      nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
-      // storage-init loads prerendered data into storage on server start
-      nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/storage-init'))
-      // page-indexer adds new pages to storage as they're visited
-      nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/page-indexer'))
-
-      // Configure storage mount if not already configured
-      nuxt.options.nitro.storage = nuxt.options.nitro.storage || {}
-      if (!nuxt.options.nitro.storage[runtimeIndexing.storage]) {
-        // Default to memory storage (user should configure for production)
-        nuxt.options.nitro.storage[runtimeIndexing.storage] = { driver: 'memory' }
-        logger.info(`Runtime indexing enabled with memory storage. Configure nitro.storage.${runtimeIndexing.storage} for production.`)
-      }
-    }
+    // Register plugins
+    nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
+    // db-restore: loads compressed dump on cold start for serverless
+    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/db-restore'))
+    // page-indexer: indexes pages on visit via afterResponse hook
+    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/page-indexer'))
 
     addServerHandler({
       middleware: true,

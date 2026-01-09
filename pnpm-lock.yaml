@@ -75,6 +75,9 @@ catalogs:
     consola:
       specifier: ^3.4.2
       version: 3.4.2
+    db0:
+      specifier: ^0.3.4
+      version: 0.3.4
     defu:
       specifier: ^6.1.4
       version: 6.1.4
@@ -84,9 +87,6 @@ catalogs:
     execa:
       specifier: ^9.6.1
       version: 9.6.1
-    fuse.js:
-      specifier: ^7.1.0
-      version: 7.1.0
     happy-dom:
       specifier: ^20.1.0
       version: 20.1.0
@@ -126,9 +126,6 @@ catalogs:
     ufo:
       specifier: ^1.6.2
       version: 1.6.2
-    unstorage:
-      specifier: ^1.17.3
-      version: 1.17.3
     vitest:
       specifier: ^4.0.16
       version: 4.0.16
@@ -166,12 +163,12 @@ importers:
       consola:
         specifier: 'catalog:'
         version: 3.4.2
+      db0:
+        specifier: 'catalog:'
+        version: 0.3.4(better-sqlite3@12.5.0)
       defu:
         specifier: 'catalog:'
         version: 6.1.4
-      fuse.js:
-        specifier: 'catalog:'
-        version: 7.1.0
       mdream:
         specifier: 'catalog:'
         version: 0.15.3
@@ -193,9 +190,6 @@ importers:
       ufo:
         specifier: 'catalog:'
         version: 1.6.2
-      unstorage:
-        specifier: 'catalog:'
-        version: 1.17.3(db0@0.3.4(better-sqlite3@12.5.0))(ioredis@5.9.0)
     devDependencies:
       '@antfu/eslint-config':
         specifier: 'catalog:'

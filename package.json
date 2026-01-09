@@ -55,23 +55,28 @@
     "typecheck": "nuxt typecheck",
     "test:attw": "attw --pack"
   },
-  "peerDependencies": {
-    "@nuxtjs/sitemap": "catalog:"
-  },
   "dependencies": {
     "@clack/prompts": "catalog:",
     "@nuxt/kit": "catalog:",
     "consola": "catalog:",
+    "db0": "catalog:",
     "defu": "catalog:",
-    "fuse.js": "catalog:",
     "mdream": "catalog:",
     "nuxt-site-config": "catalog:",
     "ofetch": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "std-env": "catalog:",
-    "ufo": "catalog:",
-    "unstorage": "catalog:"
+    "ufo": "catalog:"
+  },
+  "peerDependencies": {
+    "@nuxtjs/sitemap": "catalog:",
+    "better-sqlite3": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:",
