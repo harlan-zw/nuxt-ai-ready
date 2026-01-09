@@ -6,4 +6,5 @@ export type {
   LlmsTxtSection,
   MarkdownContext,
   ModuleOptions,
+  PageIndexedContext,
 } from './runtime/types'

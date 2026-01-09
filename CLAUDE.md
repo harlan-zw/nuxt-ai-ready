@@ -54,6 +54,14 @@ During prerender, the module:
   - `tools/search-pages-fuzzy.ts`: Fuzzy search using Fuse.js
   - `resources/pages.ts`: Pages resource
 
+### Runtime Indexing (`src/runtime/server/plugins/`)
+
+When `runtimeIndexing.enabled`, pages are indexed on-demand without prerendering:
+- **storage-init.ts**: Loads prerendered `pages.json` into unstorage on startup
+- **page-indexer.ts**: Uses `afterResponse` + `event.waitUntil` to index visited pages
+- **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
+- **utils/pageData.ts**: Unified read from storage (prerendered + runtime-indexed)
+
 ### Key Dependencies
 
 - **mdream**: HTML → markdown conversion
@@ -71,6 +79,7 @@ During prerender, the module:
 // Nitro hooks (runtime)
 'ai-ready:markdown': (context) => void     // Modify markdown output
 'ai-ready:mdreamConfig': (config) => void  // Customize mdream options
+'ai-ready:page:indexed': (context) => void // Called when page indexed at runtime
 ```
 
 ### Type Exports
@@ -80,6 +89,7 @@ During prerender, the module:
 - `PageEntry`: Page metadata without markdown (route, title, description, headings, updatedAt)
 - `PageData`: PageEntry + markdown content
 - `MarkdownContext`: Hook context for markdown processing
+- `PageIndexedContext`: Hook context for runtime page indexing
 - `LlmsTxtConfig`, `LlmsTxtSection`, `LlmsTxtLink`: llms.txt structure
 
 ## Module Configuration
@@ -96,6 +106,7 @@ Config key: `aiReady` in nuxt.config.ts
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
+  runtimeIndexing: { enabled: false, storage: 'ai-ready', ttl: 0 },
 }
 ```
 

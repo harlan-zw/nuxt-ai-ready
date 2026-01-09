@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
-import { useEvent } from 'nitropack/runtime'
+import type { ModulePublicRuntimeConfig } from '../../../module'
+import { useEvent, useRuntimeConfig, useStorage } from 'nitropack/runtime'
 
 /** Page entry from virtual module */
 export interface PageEntry {
@@ -23,6 +24,12 @@ export interface PageListItem {
   headings?: string
 }
 
+/** Stored page entry with indexedAt timestamp */
+interface StoredPageEntry extends PageEntry {
+  markdown: string
+  indexedAt: number
+}
+
 /** Try to get the current H3Event from context or use provided event */
 function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
   if (providedEvent)
@@ -44,6 +51,12 @@ export async function getPages(event?: H3Event): Promise<Map<string, PageEntry>>
   if (import.meta.prerender)
     return (await readPrerenderedData()).pages
 
+  // When runtime indexing is enabled, read from storage (includes prerendered + runtime-indexed)
+  const storageData = await readFromStorage()
+  if (storageData.pages.size > 0)
+    return storageData.pages
+
+  // Fall back to static prerendered data
   return (await readServerAssets(getEventFromContext(event))).pages
 }
 
@@ -55,6 +68,12 @@ export async function getErrorRoutes(event?: H3Event): Promise<Set<string>> {
   if (import.meta.prerender)
     return (await readPrerenderedData()).errorRoutes
 
+  // When runtime indexing is enabled, read from storage
+  const storageData = await readFromStorage()
+  if (storageData.errorRoutes.size > 0)
+    return storageData.errorRoutes
+
+  // Fall back to static prerendered data
   return (await readServerAssets(getEventFromContext(event))).errorRoutes
 }
 
@@ -114,5 +133,51 @@ async function readPrerenderedData(): Promise<{ pages: Map<string, PageData>, er
   return {
     pages: new Map(data.pages?.map(p => [p.route, p]) || []),
     errorRoutes: new Set(data.errorRoutes || []),
+  }
+}
+
+/** Read page data from runtime storage (when runtime indexing is enabled) */
+async function readFromStorage(): Promise<{ pages: Map<string, PageEntry>, errorRoutes: Set<string> }> {
+  const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig & {
+    runtimeIndexing?: { enabled?: boolean, storage?: string }
+  }
+
+  if (!config.runtimeIndexing?.enabled)
+    return { pages: new Map(), errorRoutes: new Set() }
+
+  const storagePrefix = config.runtimeIndexing.storage || 'ai-ready'
+  const storage = useStorage(storagePrefix)
+
+  const [pageKeys, errorKeys] = await Promise.all([
+    storage.getKeys('pages:'),
+    storage.getKeys('errors:'),
+  ])
+
+  const pageEntries = await Promise.all(
+    pageKeys.map(async (key) => {
+      const data = await storage.getItem<StoredPageEntry>(key)
+      if (!data)
+        return null
+      return {
+        route: data.route,
+        title: data.title,
+        description: data.description,
+        headings: data.headings,
+        keywords: data.keywords || [],
+        updatedAt: data.updatedAt,
+      } as PageEntry
+    }),
+  )
+
+  const errorEntries = await Promise.all(
+    errorKeys.map(async (key) => {
+      const data = await storage.getItem<{ route: string }>(key)
+      return data?.route
+    }),
+  )
+
+  return {
+    pages: new Map(pageEntries.filter(Boolean).map(p => [p!.route, p!])),
+    errorRoutes: new Set(errorEntries.filter(Boolean) as string[]),
   }
 }

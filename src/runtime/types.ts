@@ -82,6 +82,29 @@ export interface ModuleOptions {
    * @default 600 (10 minutes)
    */
   cacheMaxAgeSeconds?: number
+
+  /**
+   * Runtime indexing configuration
+   * When enabled, pages are indexed on-demand as they are visited (no prerendering required)
+   * Uses unstorage for persistence - configure storage drivers for serverless/edge
+   */
+  runtimeIndexing?: {
+    /**
+     * Enable runtime page indexing
+     * @default false
+     */
+    enabled?: boolean
+    /**
+     * Storage mount point prefix for page data
+     * @default 'ai-ready'
+     */
+    storage?: string
+    /**
+     * TTL for indexed pages in seconds (0 = no expiry)
+     * @default 0
+     */
+    ttl?: number
+  }
 }
 
 /**
@@ -198,9 +221,36 @@ export interface PageMarkdownContext {
   description: string
 }
 
+/**
+ * Context for runtime page indexing hook
+ */
+export interface PageIndexedContext {
+  /** The route that was indexed */
+  route: string
+  /** Page title */
+  title: string
+  /** Page description */
+  description: string
+  /** Page headings as JSON string */
+  headings: string
+  /** Top keywords for search */
+  keywords: string[]
+  /** Full markdown content */
+  markdown: string
+  /** ISO timestamp */
+  updatedAt: string
+  /** Whether this is a new page or an update */
+  isUpdate: boolean
+}
+
 declare module 'nitropack/types' {
   interface NitroRuntimeHooks {
     'ai-ready:markdown': (context: MarkdownContext) => void | Promise<void>
     'ai-ready:mdreamConfig': (config: import('mdream').HTMLToMarkdownOptions) => void | Promise<void>
+    /**
+     * Called when a page is indexed at runtime (via runtimeIndexing)
+     * Use this to sync with external systems (embeddings, search, etc)
+     */
+    'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>
   }
 }
