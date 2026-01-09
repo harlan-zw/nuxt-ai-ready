@@ -8,6 +8,10 @@ import { convertHtmlToMarkdownMeta } from '../utils'
 import { extractKeywords, stripMarkdown } from '../utils/keywords'
 
 export default defineNitroPlugin((nitro) => {
+  // Skip runtime indexing during prerender - handled by prerender.ts via JSONL
+  if (import.meta.prerender)
+    return
+
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const ttl = config.ttl ?? 0
 
