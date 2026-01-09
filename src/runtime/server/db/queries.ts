@@ -60,7 +60,7 @@ function rowToEntry(row: PageRow): PageEntry {
  * Get all non-error pages
  */
 export async function getAllPages(db: DatabaseAdapter): Promise<PageEntry[]> {
-  const rows = await db.all<PageRow>('SELECT * FROM pages WHERE is_error = 0')
+  const rows = await db.all<PageRow>('SELECT * FROM ai_ready_pages WHERE is_error = 0')
   return rows.map(rowToEntry)
 }
 
@@ -68,7 +68,7 @@ export async function getAllPages(db: DatabaseAdapter): Promise<PageEntry[]> {
  * Get a single page by route
  */
 export async function getPage(db: DatabaseAdapter, route: string): Promise<PageEntry | undefined> {
-  const row = await db.first<PageRow>('SELECT * FROM pages WHERE route = ?', [route])
+  const row = await db.first<PageRow>('SELECT * FROM ai_ready_pages WHERE route = ?', [route])
   return row ? rowToEntry(row) : undefined
 }
 
@@ -76,7 +76,7 @@ export async function getPage(db: DatabaseAdapter, route: string): Promise<PageE
  * Get a page with markdown content
  */
 export async function getPageWithMarkdown(db: DatabaseAdapter, route: string): Promise<PageData | undefined> {
-  const row = await db.first<PageRow>('SELECT * FROM pages WHERE route = ?', [route])
+  const row = await db.first<PageRow>('SELECT * FROM ai_ready_pages WHERE route = ?', [route])
   return row ? { ...rowToEntry(row), markdown: row.markdown } : undefined
 }
 
@@ -101,10 +101,10 @@ export async function searchPages(
 
   // BM25 weights: route, title, description, markdown, headings, keywords
   return db.all<SearchResult>(`
-    SELECT p.route, p.title, p.description, bm25(pages_fts, 5.0, 3.0, 1.0, 0.5, 2.0, 2.0) as score
-    FROM pages_fts
-    JOIN pages p ON pages_fts.rowid = p.id
-    WHERE pages_fts MATCH ?
+    SELECT p.route, p.title, p.description, bm25(ai_ready_pages_fts, 5.0, 3.0, 1.0, 0.5, 2.0, 2.0) as score
+    FROM ai_ready_pages_fts
+    JOIN ai_ready_pages p ON ai_ready_pages_fts.rowid = p.id
+    WHERE ai_ready_pages_fts MATCH ?
     ORDER BY score
     LIMIT ?
   `, [terms, limit])
@@ -128,7 +128,7 @@ export async function upsertPage(db: DatabaseAdapter, page: {
   const indexedAt = Date.now()
 
   await db.exec(`
-    INSERT INTO pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
+    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
@@ -146,7 +146,7 @@ export async function upsertPage(db: DatabaseAdapter, page: {
  * Get all error routes
  */
 export async function getErrorRoutes(db: DatabaseAdapter): Promise<string[]> {
-  const rows = await db.all<{ route: string }>('SELECT route FROM pages WHERE is_error = 1')
+  const rows = await db.all<{ route: string }>('SELECT route FROM ai_ready_pages WHERE is_error = 1')
   return rows.map(r => r.route)
 }
 
@@ -155,7 +155,7 @@ export async function getErrorRoutes(db: DatabaseAdapter): Promise<string[]> {
  */
 export async function isPageFresh(db: DatabaseAdapter, route: string, ttlSeconds: number): Promise<boolean> {
   if (ttlSeconds <= 0) return false
-  const row = await db.first<{ indexed_at: number }>('SELECT indexed_at FROM pages WHERE route = ?', [route])
+  const row = await db.first<{ indexed_at: number }>('SELECT indexed_at FROM ai_ready_pages WHERE route = ?', [route])
   if (!row) return false
   const age = (Date.now() - row.indexed_at) / 1000
   return age < ttlSeconds
@@ -165,14 +165,14 @@ export async function isPageFresh(db: DatabaseAdapter, route: string, ttlSeconds
  * Delete a page by route
  */
 export async function deletePage(db: DatabaseAdapter, route: string): Promise<void> {
-  await db.exec('DELETE FROM pages WHERE route = ?', [route])
+  await db.exec('DELETE FROM ai_ready_pages WHERE route = ?', [route])
 }
 
 /**
  * Get page count
  */
 export async function getPageCount(db: DatabaseAdapter): Promise<number> {
-  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM pages WHERE is_error = 0')
+  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_pages WHERE is_error = 0')
   return row?.count || 0
 }
 

@@ -1,13 +1,16 @@
-export const SCHEMA_VERSION = 'v1.0.0'
+export const SCHEMA_VERSION = 'v1.1.0'
 
 const DROP_TABLES_SQL = [
+  'DROP TABLE IF EXISTS ai_ready_pages_fts',
+  'DROP TABLE IF EXISTS ai_ready_pages',
+  'DROP TABLE IF EXISTS _ai_ready_info',
+  // Legacy unprefixed tables (migration from v1.0.0)
   'DROP TABLE IF EXISTS pages_fts',
   'DROP TABLE IF EXISTS pages',
-  'DROP TABLE IF EXISTS _ai_ready_info',
 ]
 
 export const createTablesSQL = `
-CREATE TABLE IF NOT EXISTS pages (
+CREATE TABLE IF NOT EXISTS ai_ready_pages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   route TEXT UNIQUE NOT NULL,
   route_key TEXT UNIQUE NOT NULL,
@@ -21,28 +24,28 @@ CREATE TABLE IF NOT EXISTS pages (
   is_error INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_pages_route ON pages(route);
-CREATE INDEX IF NOT EXISTS idx_pages_is_error ON pages(is_error);
+CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route);
+CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_is_error ON ai_ready_pages(is_error);
 
-CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
   route, title, description, markdown, headings, keywords,
-  content=pages, content_rowid=id
+  content=ai_ready_pages, content_rowid=id
 );
 
-CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-  INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
+  INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
   VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
 END;
 
-CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-  INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ad AFTER DELETE ON ai_ready_pages BEGIN
+  INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
   VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
 END;
 
-CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-  INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages BEGIN
+  INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
   VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
-  INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+  INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
   VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
 END;
 
@@ -73,7 +76,7 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
   // Execute each statement separately - split carefully to avoid breaking triggers
   const statements = [
     // Main table
-    `CREATE TABLE IF NOT EXISTS pages (
+    `CREATE TABLE IF NOT EXISTS ai_ready_pages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       route TEXT UNIQUE NOT NULL,
       route_key TEXT UNIQUE NOT NULL,
@@ -87,26 +90,26 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
       is_error INTEGER NOT NULL DEFAULT 0
     )`,
     // Indexes
-    `CREATE INDEX IF NOT EXISTS idx_pages_route ON pages(route)`,
-    `CREATE INDEX IF NOT EXISTS idx_pages_is_error ON pages(is_error)`,
+    `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)`,
+    `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_is_error ON ai_ready_pages(is_error)`,
     // FTS5 virtual table
-    `CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+    `CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
       route, title, description, markdown, headings, keywords,
-      content=pages, content_rowid=id
+      content=ai_ready_pages, content_rowid=id
     )`,
     // Triggers for FTS sync
-    `CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
-      INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+    `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
+      INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
       VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
     END`,
-    `CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
-      INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+    `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ad AFTER DELETE ON ai_ready_pages BEGIN
+      INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
     END`,
-    `CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
-      INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+    `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages BEGIN
+      INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
-      INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+      INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
       VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
     END`,
     // Info table

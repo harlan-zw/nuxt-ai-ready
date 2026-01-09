@@ -19,7 +19,7 @@ export interface DumpRow {
 export async function exportDump(db: DatabaseAdapter): Promise<DumpRow[]> {
   return db.all<DumpRow>(`
     SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error
-    FROM pages
+    FROM ai_ready_pages
   `)
 }
 
@@ -52,7 +52,7 @@ export async function decompressDump(base64: string): Promise<DumpRow[]> {
 export async function importDump(db: DatabaseAdapter, rows: DumpRow[]): Promise<void> {
   for (const row of rows) {
     await db.exec(`
-      INSERT OR REPLACE INTO pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
+      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.updated_at, row.indexed_at, row.is_error])
   }
