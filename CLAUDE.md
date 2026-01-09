@@ -25,9 +25,9 @@ pnpm test                     # Run all tests (unit + e2e) - runs prepare:fixtur
 pnpm test:unit                # Run unit tests only (no fixture prep)
 pnpm test:e2e                 # Run e2e tests only (includes prepare:fixtures)
 
-# Run single test file
-pnpm vitest run path/to/test.ts --project=unit
-pnpm vitest run path/to/test.ts --project=e2e
+# Run single test file (unit tests also in src/**/*.test.ts)
+pnpm vitest run test/unit/example.test.ts --project=unit
+pnpm vitest run test/e2e/basic.test.ts --project=e2e
 
 # Code Quality
 pnpm lint                     # ESLint with auto-fix
@@ -56,8 +56,8 @@ During prerender, the module:
 
 ### Database Layer (`src/runtime/server/db/`)
 
-SQLite database via db0 for page storage and FTS5 search:
-- **schema.ts**: Table definitions with FTS5 triggers, schema versioning
+SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_ready_`):
+- **schema.ts**: Table definitions (`ai_ready_pages`, `ai_ready_pages_fts`) with FTS5 triggers
 - **index.ts**: Database singleton (`useDatabase()`)
 - **queries.ts**: Query functions (`getAllPages`, `searchPages`, `upsertPage`, etc.)
 - **dump.ts**: Compressed dump export/import for serverless cold starts

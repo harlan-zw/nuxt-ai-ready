@@ -39,9 +39,9 @@ MCP Server (via @nuxtjs/mcp-toolkit):
 • search_pages tool     - FTS5 full-text search
 • pages resource        - returns page listing as JSON
 
-Database (SQLite via db0):
+Database (SQLite via db0, tables prefixed `ai_ready_`):
 • Pages indexed on visit via afterResponse hook
-• FTS5 full-text search for MCP tools
+• FTS5 full-text search for MCP tools (`ai_ready_pages_fts`)
 • Compressed dump for serverless cold start restore
 ```
 
@@ -73,7 +73,7 @@ src/
         │
         ├── db/
         │   ├── index.ts       # useDatabase() singleton
-        │   ├── schema.ts      # SQLite schema with FTS5
+        │   ├── schema.ts      # SQLite schema (ai_ready_pages, ai_ready_pages_fts)
         │   ├── queries.ts     # getAllPages, searchPages, upsertPage, etc
         │   └── dump.ts        # Export/import compressed dumps
         │
@@ -128,6 +128,7 @@ Setup sequence:
 ```typescript
 'ai-ready:markdown' // Modify markdown output at runtime
 'ai-ready:mdreamConfig' // Modify mdream options per-request
+'ai-ready:page:indexed' // Called when page indexed at runtime (route, title, description, markdown)
 ```
 
 ## Prerender Pipeline (`prerender.ts`)
@@ -320,7 +321,7 @@ cache: '1h'
 ```typescript
 name: 'search_pages'
 inputSchema: { query: string, limit?: number }
-handler: FTS5 full-text search across title/description/route/headings/keywords/content
+handler: FTS5 full-text search via ai_ready_pages_fts (title/description/route/headings/keywords/markdown)
 cache: '5m'
 ```
 
@@ -346,6 +347,14 @@ interface ModuleOptions {
   contentSignal?: false | { aiTrain?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
   cacheMaxAgeSeconds?: number
+  ttl?: number // Re-index TTL in seconds (0 = never re-index)
+  database?: {
+    type?: 'sqlite' | 'd1' | 'libsql'
+    filename?: string // SQLite file path
+    bindingName?: string // D1 binding name
+    url?: string // LibSQL URL
+    authToken?: string // LibSQL auth token
+  }
 }
 ```
 
@@ -358,6 +367,7 @@ interface BulkDocument {
   description: string
   markdown: string
   headings: Array<Record<string, string>>
+  keywords?: string[]
   updatedAt?: string
 }
 ```
@@ -370,6 +380,7 @@ interface PageEntry {
   title: string
   description: string
   headings: string // Pipe-delimited "h1:Title|h2:Subtitle"
+  keywords: string[]
   updatedAt: string
 }
 
@@ -389,6 +400,20 @@ interface MarkdownContext {
   description: string
   isPrerender: boolean
   event: H3Event
+}
+```
+
+### PageIndexedContext (runtime hook)
+
+```typescript
+interface PageIndexedContext {
+  route: string
+  title: string
+  description: string
+  markdown: string
+  headings: string
+  keywords: string[]
+  updatedAt: string
 }
 ```
 
