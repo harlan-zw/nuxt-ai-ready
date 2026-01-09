@@ -8,6 +8,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
+import { refineDatabaseConfig } from './utils/database'
 
 // Inline normalization functions to avoid runtime deps
 function normalizeLink(link: LlmsTxtLink): string {
@@ -337,6 +338,141 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   }
 }
 
+interface PageDataEntry {
+  route: string
+  title: string
+  description: string
+  headings: string
+  keywords: string[]
+  updatedAt: string
+  markdown: string
+}
+
+/**
+ * Create SQLite database dump from page entries
+ * Uses better-sqlite3 directly at build time
+ */
+async function createDatabaseDump(
+  entries: PageDataEntry[],
+  errorRoutes: string[],
+  dbConfig: { filename?: string },
+): Promise<string> {
+  // Dynamic import better-sqlite3 (build-time only)
+  // @ts-expect-error - better-sqlite3 types not installed, only used at build time
+  const Database = (await import('better-sqlite3')).default
+  const dbPath = dbConfig.filename || '.data/ai-ready/pages.db'
+
+  // Ensure directory exists
+  await mkdir(dirname(dbPath), { recursive: true })
+
+  const db = new Database(dbPath)
+
+  // Initialize schema
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      route TEXT UNIQUE NOT NULL,
+      route_key TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      markdown TEXT NOT NULL DEFAULT '',
+      headings TEXT NOT NULL DEFAULT '[]',
+      keywords TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL,
+      indexed_at INTEGER NOT NULL,
+      is_error INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_pages_route ON pages(route);
+    CREATE INDEX IF NOT EXISTS idx_pages_is_error ON pages(is_error);
+    CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+      route, title, description, markdown, headings, keywords,
+      content=pages, content_rowid=id
+    );
+    CREATE TRIGGER IF NOT EXISTS pages_ai AFTER INSERT ON pages BEGIN
+      INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+      VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
+    END;
+    CREATE TRIGGER IF NOT EXISTS pages_ad AFTER DELETE ON pages BEGIN
+      INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+      VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
+    END;
+    CREATE TRIGGER IF NOT EXISTS pages_au AFTER UPDATE ON pages BEGIN
+      INSERT INTO pages_fts(pages_fts, rowid, route, title, description, markdown, headings, keywords)
+      VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
+      INSERT INTO pages_fts(rowid, route, title, description, markdown, headings, keywords)
+      VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
+    END;
+  `)
+
+  // Insert pages
+  const insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  const normalizeRouteKey = (route: string) => route.replace(/^\//, '').replace(/\//g, ':') || 'index'
+  const now = Date.now()
+
+  for (const entry of entries) {
+    insertStmt.run(
+      entry.route,
+      normalizeRouteKey(entry.route),
+      entry.title,
+      entry.description,
+      entry.markdown,
+      entry.headings,
+      JSON.stringify(entry.keywords),
+      entry.updatedAt,
+      now,
+      0,
+    )
+  }
+
+  // Insert error routes
+  for (const route of errorRoutes) {
+    insertStmt.run(
+      route,
+      normalizeRouteKey(route),
+      '',
+      '',
+      '',
+      '[]',
+      '[]',
+      new Date().toISOString(),
+      now,
+      1,
+    )
+  }
+
+  // Export dump
+  const rows = db.prepare(`
+    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error
+    FROM pages
+  `).all() as Array<{
+    route: string
+    route_key: string
+    title: string
+    description: string
+    markdown: string
+    headings: string
+    keywords: string
+    updated_at: string
+    indexed_at: number
+    is_error: number
+  }>
+
+  db.close()
+
+  // Compress dump to base64 gzip
+  const json = JSON.stringify(rows)
+  const encoder = new TextEncoder()
+  const stream = new Blob([encoder.encode(json)]).stream()
+  const compressed = stream.pipeThrough(new CompressionStream('gzip'))
+  const buffer = await new Response(compressed).arrayBuffer()
+
+  return Buffer.from(buffer).toString('base64')
+}
+
 async function prerenderRoute(nitro: Nitro, route: string) {
   const start = Date.now()
   const encodedRoute = encodeURI(route)
@@ -373,6 +509,7 @@ export function setupPrerenderHandler(
   llmsTxtConfig?: LlmsTxtConfig,
 ) {
   const nuxt = useNuxt()
+  const dbConfig = refineDatabaseConfig({}, nuxt.options.rootDir)
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
@@ -457,30 +594,38 @@ export function setupPrerenderHandler(
       }
 
       // Write page data JSON for runtime access
-      // This enables MCP tools (list_pages, search_pages_fuzzy) in production
+      // This enables MCP tools (list_pages, search_pages) in production
+      const publicDataDir = join(nitro.options.output.publicDir, '__ai-ready')
+      await mkdir(publicDataDir, { recursive: true })
+
       if (state.pageDataPath) {
         const jsonlContent = await readFile(state.pageDataPath, 'utf-8').catch(() => '')
         if (jsonlContent) {
           const entries = jsonlContent.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
-          const pages = entries.filter((e: { _error?: boolean }) => !e._error).map((p: { route: string, title: string, description: string, headings: string, keywords?: string[], updatedAt: string }) => ({
-            route: p.route,
-            title: p.title,
-            description: p.description,
-            headings: p.headings,
-            keywords: p.keywords || [],
-            updatedAt: p.updatedAt,
-          }))
-          const errorRoutes = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route)
-          const jsonContent = JSON.stringify({ pages, errorRoutes })
+          const pages = entries.filter((e: { _error?: boolean }) => !e._error) as PageDataEntry[]
+          const errorRoutesList = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route) as string[]
 
-          // Write to public directory for runtime fetch access
-          // This works on all platforms (Node.js, Cloudflare, Vercel, etc.)
-          const publicDataDir = join(nitro.options.output.publicDir, '__ai-ready')
-          await mkdir(publicDataDir, { recursive: true })
+          // Write JSON for backwards compatibility
+          const jsonContent = JSON.stringify({
+            pages: pages.map(p => ({
+              route: p.route,
+              title: p.title,
+              description: p.description,
+              headings: p.headings,
+              keywords: p.keywords || [],
+              updatedAt: p.updatedAt,
+            })),
+            errorRoutes: errorRoutesList,
+          })
           const publicJsonPath = join(publicDataDir, 'pages.json')
           await writeFile(publicJsonPath, jsonContent, 'utf-8')
-
           logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
+
+          // Create SQLite database and dump for serverless restore
+          const dumpData = await createDatabaseDump(pages, errorRoutesList, dbConfig)
+          const dumpPath = join(publicDataDir, 'pages.dump')
+          await writeFile(dumpPath, dumpData, 'utf-8')
+          logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
         }
       }
 

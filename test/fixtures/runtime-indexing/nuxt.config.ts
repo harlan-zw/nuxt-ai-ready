@@ -8,17 +8,6 @@ export default defineNuxtConfig({
   },
 
   aiReady: {
-    runtimeIndexing: {
-      enabled: true,
-      storage: 'ai-ready',
-      ttl: 0, // No TTL for testing
-    },
-  },
-
-  // Use memory storage for tests
-  nitro: {
-    storage: {
-      'ai-ready': { driver: 'memory' },
-    },
+    ttl: 0, // No TTL for testing
   },
 })

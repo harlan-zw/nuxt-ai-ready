@@ -44,4 +44,49 @@ describe('runtime indexing', async () => {
     expect(llmsTxt).toContain('Runtime Indexing Test')
     expect(typeof llmsTxt).toBe('string')
   })
+
+  // Database provider tests
+  it('database: initializes with schema and counts pages', async () => {
+    const { count } = await $fetch<{ count: number }>('/api/__db-test?action=count')
+    expect(count).toBeGreaterThanOrEqual(0)
+  })
+
+  it('database: lists indexed pages', async () => {
+    const { pages } = await $fetch<{ pages: Array<{ route: string, title: string }> }>('/api/__db-test?action=list')
+    expect(pages).toBeDefined()
+    expect(Array.isArray(pages)).toBe(true)
+  })
+
+  it('database: retrieves page by route', async () => {
+    const { page } = await $fetch<{ page: { route: string } | undefined }>('/api/__db-test?action=get&route=/')
+    expect(page).toBeDefined()
+    expect(page?.route).toBe('/')
+  })
+
+  it('database: supports upsert operations', async () => {
+    await $fetch('/api/__db-test?action=upsert', {
+      method: 'POST',
+      body: {
+        route: '/test-page',
+        title: 'Test Page',
+        description: 'A test page',
+        markdown: '# Test',
+        headings: '[]',
+        keywords: ['test'],
+        updatedAt: new Date().toISOString(),
+      },
+    })
+    const { page } = await $fetch<{ page: { title: string } | undefined }>('/api/__db-test?action=get&route=/test-page')
+    expect(page?.title).toBe('Test Page')
+  })
+
+  it('database: performs FTS5 full-text search', async () => {
+    const { results } = await $fetch<{ results: Array<{ route: string }> }>('/api/__db-test?action=search&q=test')
+    expect(Array.isArray(results)).toBe(true)
+  })
+
+  it('database: returns empty for non-matching search', async () => {
+    const { results } = await $fetch<{ results: Array<{ route: string }> }>('/api/__db-test?action=search&q=zzznomatchzzz')
+    expect(results).toEqual([])
+  })
 })

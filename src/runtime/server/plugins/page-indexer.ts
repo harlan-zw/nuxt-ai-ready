@@ -1,20 +1,15 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
-import { defineNitroPlugin, useRuntimeConfig, useStorage } from 'nitropack/runtime'
+import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
+import { useDatabase } from '../db'
+import { getPage, isPageFresh, upsertPage } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdownMeta } from '../utils'
 import { extractKeywords, stripMarkdown } from '../utils/keywords'
 
 export default defineNitroPlugin((nitro) => {
-  const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig & {
-    runtimeIndexing?: { enabled?: boolean, storage?: string, ttl?: number }
-  }
-
-  if (!config.runtimeIndexing?.enabled)
-    return
-
-  const storagePrefix = config.runtimeIndexing.storage || 'ai-ready'
-  const ttl = config.runtimeIndexing.ttl || 0
+  const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const ttl = config.ttl ?? 0
 
   nitro.hooks.hook('afterResponse', (event, response) => {
     const body = response?.body
@@ -41,7 +36,6 @@ export default defineNitroPlugin((nitro) => {
       return
 
     event.waitUntil((async () => {
-      const storage = useStorage(storagePrefix)
       const html = typeof body === 'string' ? body : null
 
       if (!html) {
@@ -49,64 +43,54 @@ export default defineNitroPlugin((nitro) => {
         return
       }
 
-      // Check if page is already indexed and fresh
-      const routeKey = normalizeRouteKey(path)
-      const existing = await storage.getItem<{ indexedAt: number }>(`pages:${routeKey}`)
-      const isUpdate = !!existing
-      if (existing && ttl > 0) {
-        const age = (Date.now() - existing.indexedAt) / 1000
-        if (age < ttl) {
-          logger.debug(`[runtime-indexing] Skipping ${path} - still fresh (${Math.round(age)}s old)`)
-          return
-        }
-      }
+      const db = await useDatabase(event)
 
-      // Skip error pages
-      if (html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')) {
-        await storage.setItem(`errors:${routeKey}`, { route: path, indexedAt: Date.now() })
-        logger.debug(`[runtime-indexing] Indexed error route: ${path}`)
+      // Check if page is already indexed and fresh
+      if (ttl > 0 && await isPageFresh(db, path, ttl)) {
+        logger.debug(`[runtime-indexing] Skipping ${path} - still fresh`)
         return
       }
 
-      const result = await convertHtmlToMarkdownMeta(html, path, config.mdreamOptions)
+      const existing = await getPage(db, path)
+      const isUpdate = !!existing
 
+      // Skip error pages
+      const isError = html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')
+
+      const result = await convertHtmlToMarkdownMeta(html, path, config.mdreamOptions)
       const updatedAt = result.updatedAt || new Date().toISOString()
       const headings = JSON.stringify(result.headings)
       const keywords = extractKeywords(stripMarkdown(result.markdown), result.metaKeywords)
 
-      const pageData = {
+      await upsertPage(db, {
         route: path,
         title: result.title,
         description: result.description,
+        markdown: result.markdown,
         headings,
         keywords,
-        markdown: result.markdown,
         updatedAt,
-        indexedAt: Date.now(),
-      }
+        isError,
+      })
 
-      await storage.setItem(`pages:${routeKey}`, pageData)
       logger.debug(`[runtime-indexing] Indexed: ${path} "${result.title}"`)
 
       // Call hook for external integrations (embeddings, search, etc)
-      const hookContext: PageIndexedContext = {
-        route: path,
-        title: result.title,
-        description: result.description,
-        headings,
-        keywords,
-        markdown: result.markdown,
-        updatedAt,
-        isUpdate,
+      if (!isError) {
+        const hookContext: PageIndexedContext = {
+          route: path,
+          title: result.title,
+          description: result.description,
+          headings,
+          keywords,
+          markdown: result.markdown,
+          updatedAt,
+          isUpdate,
+        }
+        await nitro.hooks.callHook('ai-ready:page:indexed', hookContext)
       }
-      await nitro.hooks.callHook('ai-ready:page:indexed', hookContext)
     })().catch((err) => {
       logger.error(`[runtime-indexing] Failed to index ${path}:`, err)
     }))
   })
 })
-
-function normalizeRouteKey(path: string): string {
-  // Convert /about/team -> about:team for storage key
-  return path.replace(/^\//, '').replace(/\//g, ':') || 'index'
-}

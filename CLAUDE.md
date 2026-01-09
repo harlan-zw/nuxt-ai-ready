@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Key features:
 - **llms.txt generation**: Auto-generate `llms.txt` and `llms-full.txt` at build time
 - **On-demand markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`)
-- **MCP server**: `list_pages` and `search_pages_fuzzy` tools for AI agents
+- **MCP server**: `list_pages` and `search_pages` tools for AI agents
 - **Content signals**: Configure AI training/search permissions via Nuxt Robots
 
 ## Development Commands
@@ -51,20 +51,29 @@ During prerender, the module:
 - **Routes**: `/llms.txt`, `/llms-full.txt` handlers (replaced with static files after prerender)
 - **MCP** (`src/runtime/server/mcp/`): Tools and resources for AI agent integration
   - `tools/list-pages.ts`: List all pages with metadata
-  - `tools/search-pages-fuzzy.ts`: Fuzzy search using Fuse.js
+  - `tools/search-pages.ts`: FTS5 full-text search
   - `resources/pages.ts`: Pages resource
 
-### Runtime Indexing (`src/runtime/server/plugins/`)
+### Database Layer (`src/runtime/server/db/`)
 
-When `runtimeIndexing.enabled`, pages are indexed on-demand without prerendering:
-- **storage-init.ts**: Loads prerendered `pages.json` into unstorage on startup
+SQLite database via db0 for page storage and FTS5 search:
+- **schema.ts**: Table definitions with FTS5 triggers, schema versioning
+- **index.ts**: Database singleton (`useDatabase()`)
+- **queries.ts**: Query functions (`getAllPages`, `searchPages`, `upsertPage`, etc.)
+- **dump.ts**: Compressed dump export/import for serverless cold starts
+
+### Runtime Plugins (`src/runtime/server/plugins/`)
+
+Pages are automatically indexed on-demand as they're visited:
+- **db-restore.ts**: Restores prerendered data from compressed dump on cold start
 - **page-indexer.ts**: Uses `afterResponse` + `event.waitUntil` to index visited pages
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
-- **utils/pageData.ts**: Unified read from storage (prerendered + runtime-indexed)
+- **utils/pageData.ts**: Unified read from database
 
 ### Key Dependencies
 
 - **mdream**: HTML → markdown conversion
+- **db0**: Universal database layer (SQLite, D1, LibSQL)
 - **@nuxtjs/mcp-toolkit**: MCP server (optional, enables MCP features)
 - **nuxt-site-config**: Site metadata (peer dependency)
 - **@nuxtjs/robots**, **@nuxtjs/sitemap**: Required module dependencies
@@ -106,7 +115,8 @@ Config key: `aiReady` in nuxt.config.ts
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
-  runtimeIndexing: { enabled: false, storage: 'ai-ready', ttl: 0 },
+  ttl: 0, // re-index TTL in seconds (0 = never)
+  database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
 }
 ```
 
