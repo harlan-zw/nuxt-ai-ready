@@ -1,5 +1,24 @@
+catalogMode: prefer
+
+cleanupUnusedCatalogs: true
+
+shellEmulator: true
+
+trustPolicy: no-downgrade
+
+trustPolicyExclude:
+  - chokidar@4.0.3
+  - eslint-import-resolver-typescript@3.10.1
+  - undici-types@6.21.0
+  - semver
 packages:
   - playground
+overrides:
+  rollup-plugin-visualizer>open: ^10.0.0
+  schema-utils>ajv: 8.14.0
+
+patchedDependencies:
+  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch
 
 catalog:
   '@antfu/eslint-config': ^6.7.3
@@ -47,11 +66,6 @@ catalog:
   vue-router: ^4.6.4
   vue-tsc: ^3.2.2
   zod: ^4.3.5
-
-catalogMode: prefer
-
-cleanupUnusedCatalogs: true
-
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
@@ -63,20 +77,3 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
-
-overrides:
-  rollup-plugin-visualizer>open: ^10.0.0
-  schema-utils>ajv: 8.14.0
-
-patchedDependencies:
-  '@nuxtjs/mcp-toolkit': patches/@nuxtjs__mcp-toolkit.patch
-
-shellEmulator: true
-
-trustPolicy: no-downgrade
-
-trustPolicyExclude:
-  - chokidar@4.0.3
-  - eslint-import-resolver-typescript@3.10.1
-  - undici-types@6.21.0
-  - semver

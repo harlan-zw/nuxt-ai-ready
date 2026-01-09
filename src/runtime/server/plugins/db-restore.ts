@@ -1,15 +1,17 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { useDatabase } from '../db'
-import { hasPages } from '../db/queries'
 import { decompressDump, importDump } from '../db/dump'
+import { hasPages } from '../db/queries'
 import { logger } from '../logger'
 
 export default defineNitroPlugin(async () => {
   // Skip during prerender - data is written directly to DB
-  if (import.meta.prerender) return
+  if (import.meta.prerender)
+    return
 
   // Skip in development - no dump available
-  if (import.meta.dev) return
+  if (import.meta.dev)
+    return
 
   const db = await useDatabase()
 
