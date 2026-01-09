@@ -28,7 +28,8 @@ export interface PageListItem {
 
 /** Try to get the current H3Event from context or use provided event */
 function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
-  if (providedEvent) return providedEvent
+  if (providedEvent)
+    return providedEvent
   // Dynamic import to avoid circular dependencies
   const { useEvent } = require('nitropack/runtime')
   return useEvent().catch(() => undefined)
@@ -36,7 +37,8 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
 
 /** Read page data - returns page data indexed by route */
 export async function getPages(event?: H3Event): Promise<Map<string, PageEntry>> {
-  if (import.meta.dev) return new Map()
+  if (import.meta.dev)
+    return new Map()
 
   if (import.meta.prerender) {
     return (await readPrerenderedData()).pages
@@ -50,7 +52,8 @@ export async function getPages(event?: H3Event): Promise<Map<string, PageEntry>>
 
 /** Get error routes detected during prerender */
 export async function getErrorRoutes(event?: H3Event): Promise<Set<string>> {
-  if (import.meta.dev) return new Set()
+  if (import.meta.dev)
+    return new Set()
 
   if (import.meta.prerender) {
     return (await readPrerenderedData()).errorRoutes

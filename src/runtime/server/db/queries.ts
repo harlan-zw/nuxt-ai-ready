@@ -94,7 +94,8 @@ export async function searchPages(
 
   // Sanitize and prepare query for FTS5
   const sanitized = query.replace(/[*:^"()]/g, ' ').trim()
-  if (!sanitized) return []
+  if (!sanitized)
+    return []
 
   // Add prefix matching for partial words
   const terms = sanitized.split(/\s+/).map(t => `${t}*`).join(' ')
@@ -154,9 +155,11 @@ export async function getErrorRoutes(db: DatabaseAdapter): Promise<string[]> {
  * Check if a page is fresh (within TTL)
  */
 export async function isPageFresh(db: DatabaseAdapter, route: string, ttlSeconds: number): Promise<boolean> {
-  if (ttlSeconds <= 0) return false
+  if (ttlSeconds <= 0)
+    return false
   const row = await db.first<{ indexed_at: number }>('SELECT indexed_at FROM ai_ready_pages WHERE route = ?', [route])
-  if (!row) return false
+  if (!row)
+    return false
   const age = (Date.now() - row.indexed_at) / 1000
   return age < ttlSeconds
 }

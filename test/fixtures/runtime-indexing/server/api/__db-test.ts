@@ -1,5 +1,5 @@
-import { defineEventHandler, getQuery, readBody } from 'h3'
 import { getAllPages, getPage, getPageCount, searchPages, upsertPage, useDatabase } from '#ai-ready'
+import { defineEventHandler, getQuery, readBody } from 'h3'
 
 export default defineEventHandler(async (event) => {
   const { action, ...params } = getQuery(event) as { action: string, [k: string]: unknown }

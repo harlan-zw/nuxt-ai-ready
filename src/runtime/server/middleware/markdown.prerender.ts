@@ -1,8 +1,8 @@
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { extractKeywords, stripMarkdown } from '../utils/keywords'
 import { convertHtmlToMarkdownMeta, getMarkdownRenderInfo } from '../utils'
+import { extractKeywords, stripMarkdown } from '../utils/keywords'
 
 export default defineEventHandler(async (event) => {
   // Only run during prerender

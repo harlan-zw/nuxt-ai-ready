@@ -1,12 +1,12 @@
 import type { Connector } from 'db0'
 import type { H3Event } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
-import { mkdir } from 'node:fs/promises'
-import { dirname } from 'pathe'
-import { initSchema } from './schema'
 import type { DatabaseAdapter } from './schema'
+import { mkdir } from 'node:fs/promises'
 // @ts-expect-error - resolved at build time via module alias
 import adapter from '#ai-ready/adapter'
+import { useRuntimeConfig } from 'nitropack/runtime'
+import { dirname } from 'pathe'
+import { initSchema } from './schema'
 
 let _db: Connector | null = null
 let _initPromise: Promise<DatabaseAdapter> | null = null
