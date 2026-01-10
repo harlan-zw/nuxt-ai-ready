@@ -127,6 +127,37 @@ export interface ModuleOptions {
      */
     authToken?: string
   }
+
+  /**
+   * Indexing configuration for runtime page indexing
+   */
+  indexing?: {
+    /**
+     * Secret token for authenticating poll endpoint requests
+     * When set, poll endpoint requires ?secret=<token> query param
+     */
+    pollSecret?: string
+    /**
+     * Nitro scheduled task configuration
+     * Enables automatic background indexing via cron
+     */
+    scheduled?: {
+      /**
+       * Enable scheduled task
+       * @default false
+       */
+      enabled?: boolean
+      /**
+       * Cron expression for scheduling (e.g., every 5 minutes)
+       */
+      cron?: string
+      /**
+       * Pages to index per scheduled run
+       * @default 20
+       */
+      batchSize?: number
+    }
+  }
 }
 
 /**
