@@ -8,6 +8,9 @@ import { logger } from '../logger'
 import { convertHtmlToMarkdownMeta } from '../utils'
 import { extractKeywords, stripMarkdown } from './keywords'
 
+// Header to identify internal indexing requests
+export const INDEXING_HEADER = 'x-ai-ready-indexing'
+
 export interface IndexPageOptions {
   /** Skip if page was indexed within TTL (uses config ttl if not specified) */
   ttl?: number
@@ -15,6 +18,8 @@ export interface IndexPageOptions {
   force?: boolean
   /** Skip calling the ai-ready:page:indexed hook */
   skipHook?: boolean
+  /** Mark failed fetches as errors in DB to prevent retry loops */
+  markFailedAsError?: boolean
 }
 
 export interface IndexPageResult {
@@ -45,10 +50,11 @@ export async function indexPage(
   route: string,
   html: string,
   options: IndexPageOptions = {},
+  event?: H3Event,
 ): Promise<IndexPageResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
-  const db = await useDatabase()
+  const db = await useDatabase(event)
   const ttl = options.ttl ?? config.ttl ?? 0
 
   // Check if already indexed and fresh (unless force)
@@ -118,25 +124,33 @@ export async function indexPage(
  */
 export async function indexPageByRoute(
   route: string,
-  event?: H3Event,
+  event: H3Event,
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
-  const fetchFn = event?.fetch || globalThis.$fetch
-
-  const html = await fetchFn(route, {
-    headers: { 'x-ai-ready-internal': '1' },
+  const html = await event.$fetch(route, {
+    headers: { [INDEXING_HEADER]: '1' },
   }).catch((err: Error) => {
-    logger.error(`[indexPageByRoute] Failed to fetch ${route}:`, err)
+    logger.warn(`[indexPageByRoute] Failed to fetch ${route}:`, err.message)
     return null
   }) as string | null
 
-  if (!html) {
+  if (!html || typeof html !== 'string') {
+    // Mark as error in DB to prevent retry loops
+    if (options.markFailedAsError) {
+      const db = await useDatabase(event)
+      await upsertPage(db, {
+        route,
+        title: '',
+        description: '',
+        markdown: '',
+        headings: '[]',
+        keywords: [],
+        updatedAt: new Date().toISOString(),
+        isError: true,
+      })
+    }
     return { success: false, error: `Failed to fetch HTML for ${route}` }
   }
 
-  if (typeof html !== 'string') {
-    return { success: false, error: `Response for ${route} is not HTML` }
-  }
-
-  return indexPage(route, html, options)
+  return indexPage(route, html, options, event)
 }

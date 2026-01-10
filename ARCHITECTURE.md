@@ -40,9 +40,15 @@ MCP Server (via @nuxtjs/mcp-toolkit):
 • pages resource        - returns page listing as JSON
 
 Database (SQLite via db0, tables prefixed `ai_ready_`):
-• Pages indexed on visit via afterResponse hook
+• Routes seeded from sitemap on first request (sitemap-seeder plugin)
+• Pages indexed in background via afterResponse hook (page-indexer plugin)
+• Internal fetch ensures only public content indexed (no auth cookies)
 • FTS5 full-text search for MCP tools (`ai_ready_pages_fts`)
 • Compressed dump for serverless cold start restore
+
+Indexing Control Endpoints:
+• GET /__ai-ready/status  - { total, indexed, pending }
+• POST /__ai-ready/poll   - Process multiple pages (cron/bulk indexing)
 ```
 
 ## Directory Structure
@@ -69,22 +75,27 @@ src/
         │
         ├── routes/
         │   ├── llms.txt.get.ts        # Route handler calling buildLlmsTxt
-        │   └── llms-full.txt.get.ts   # Placeholder (static file at runtime)
+        │   ├── llms-full.txt.get.ts   # Placeholder (static file at runtime)
+        │   └── __ai-ready/
+        │       ├── status.get.ts      # GET indexing status
+        │       └── poll.post.ts       # POST bulk indexing trigger
         │
         ├── db/
         │   ├── index.ts       # useDatabase() singleton
         │   ├── schema.ts      # SQLite schema (ai_ready_pages, ai_ready_pages_fts)
-        │   ├── queries.ts     # getAllPages, searchPages, upsertPage, etc
+        │   ├── queries.ts     # getAllPages, searchPages, upsertPage, seedRoutes, etc
         │   └── dump.ts        # Export/import compressed dumps
         │
         ├── plugins/
-        │   ├── db-restore.ts  # Restore dump on cold start
-        │   └── page-indexer.ts # Index pages via afterResponse
+        │   ├── db-restore.ts      # Restore dump on cold start
+        │   ├── sitemap-seeder.ts  # Seed routes from sitemap (with TTL)
+        │   └── page-indexer.ts    # Index unindexed pages via afterResponse
         │
         ├── utils/
         │   ├── pageData.ts    # getPages/getPagesList - read from database
         │   ├── indexPage.ts   # Manual indexing utilities
-        │   └── sitemap.ts     # fetchSitemapUrls - parse /sitemap.xml
+        │   ├── sitemap.ts     # fetchSitemapUrls - parse /sitemap.xml
+        │   └── keywords.ts    # extractKeywords, stripMarkdown
         │
         ├── utils.ts           # convertHtmlToMarkdown, getMarkdownRenderInfo
         ├── logger.ts          # Runtime logger (consola)
@@ -187,6 +198,75 @@ Runs during `nuxi generate` to queue `.md` routes:
    - `/about/` → `/about/index.md`
    - `/blog` → `/blog.md`
 3. markdown.prerender middleware then runs for each queued route
+
+## Runtime Indexing Architecture
+
+The module uses a sitemap-driven approach to index pages at runtime, ensuring only public pages are indexed.
+
+### Sitemap Seeder Plugin (`sitemap-seeder.ts`)
+
+On first request (once per process):
+1. Checks if sitemap was recently seeded (TTL from `sitemapTtl` config, default 1 hour)
+2. If stale/missing, fetches `/sitemap.xml` and parses URLs
+3. Seeds routes into database with `indexed=0` (route known, content pending)
+4. Stores seed timestamp for TTL tracking
+
+### Page Indexer Plugin (`page-indexer.ts`)
+
+On every request (via `afterResponse` + `waitUntil`):
+1. Skips if request has `x-ai-ready-indexing` header (internal fetch)
+2. Gets one unindexed route from database (`indexed=0`)
+3. Fetches page internally with special header (no user cookies = public version)
+4. Converts HTML to markdown, extracts metadata
+5. Upserts page with `indexed=1`
+6. Calls `ai-ready:page:indexed` hook
+
+### Security Model
+
+The internal fetch approach ensures:
+- Only pages in sitemap are indexed (sitemap = public pages)
+- Fetch happens server-side without user's auth cookies
+- Auth-gated content never gets indexed
+- No risk of exposing private content via search/MCP
+
+### Indexing Control Endpoints
+
+For bulk indexing (cron jobs, post-deploy):
+
+```bash
+# Check progress
+GET /__ai-ready/status
+# Returns: { total: 50, indexed: 45, pending: 5 }
+
+# Process batch
+POST /__ai-ready/poll?limit=20
+# Returns: { indexed: 20, remaining: 25, errors: [] }
+```
+
+### Database Schema (v1.2.0)
+
+```sql
+CREATE TABLE ai_ready_pages (
+  id INTEGER PRIMARY KEY,
+  route TEXT UNIQUE NOT NULL,
+  route_key TEXT UNIQUE NOT NULL,
+  title TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  markdown TEXT DEFAULT '',
+  headings TEXT DEFAULT '[]',
+  keywords TEXT DEFAULT '[]',
+  updated_at TEXT NOT NULL,
+  indexed_at INTEGER NOT NULL,
+  is_error INTEGER DEFAULT 0,
+  indexed INTEGER DEFAULT 0  -- 0=seeded, 1=fully indexed
+);
+
+CREATE TABLE _ai_ready_info (
+  id TEXT PRIMARY KEY,
+  value TEXT,  -- Generic key-value storage
+  ...
+);
+```
 
 ## Markdown Middleware
 
@@ -348,6 +428,7 @@ interface ModuleOptions {
   mcp?: { tools?: boolean, resources?: boolean }
   cacheMaxAgeSeconds?: number
   ttl?: number // Re-index TTL in seconds (0 = never re-index)
+  sitemapTtl?: number // Sitemap refresh TTL in seconds (default 3600)
   database?: {
     type?: 'sqlite' | 'd1' | 'libsql'
     filename?: string // SQLite file path

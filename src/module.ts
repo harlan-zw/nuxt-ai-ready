@@ -32,12 +32,17 @@ export interface ModulePublicRuntimeConfig {
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   ttl: number
+  sitemapTtl: number
   database: {
     type: 'sqlite' | 'd1' | 'libsql'
     filename?: string
     bindingName?: string
     url?: string
     authToken?: string
+  }
+  indexing: {
+    pollSecret?: string
+    scheduledBatchSize: number
   }
 }
 
@@ -244,6 +249,20 @@ export {}
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
+      // Register scheduled task for indexing if enabled
+      const scheduledConfig = config.indexing?.scheduled
+      if (scheduledConfig?.enabled) {
+        nitroConfig.tasks = nitroConfig.tasks || {}
+        nitroConfig.tasks['ai-ready:index'] = {
+          handler: resolve('./runtime/server/tasks/ai-ready-index'),
+        }
+
+        nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
+        const cron = scheduledConfig.cron || '*/5 * * * *'
+        nitroConfig.scheduledTasks[cron] = nitroConfig.scheduledTasks[cron] || []
+        ;(nitroConfig.scheduledTasks[cron] as string[]).push('ai-ready:index')
+      }
+
       nitroConfig.virtual = nitroConfig.virtual || {}
 
       // Helper to read JSONL from filesystem during prerender
@@ -282,15 +301,20 @@ export async function readPageDataFromFilesystem() {
       cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
       prerenderCacheDir,
       ttl: config.ttl ?? 0,
+      sitemapTtl: config.sitemapTtl ?? 3600,
       database,
+      indexing: {
+        pollSecret: config.indexing?.pollSecret,
+        scheduledBatchSize: config.indexing?.scheduled?.batchSize ?? 20,
+      },
     } as any
 
     // Register plugins
     nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
     // db-restore: loads compressed dump on cold start for serverless
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/db-restore'))
-    // page-indexer: indexes pages on visit via afterResponse hook
-    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/page-indexer'))
+    // sitemap-seeder: seeds routes from sitemap on first request
+    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
 
     addServerHandler({
       middleware: true,
@@ -315,6 +339,10 @@ export async function readPageDataFromFilesystem() {
     if (config.debug) {
       addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get') })
     }
+
+    // Indexing control endpoints
+    addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
+    addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
 
     // Setup prerendering hooks for static generation
     // @ts-expect-error untyped

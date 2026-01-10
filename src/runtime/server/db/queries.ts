@@ -12,6 +12,7 @@ export interface PageRow {
   updated_at: string
   indexed_at: number
   is_error: number
+  indexed: number
 }
 
 export interface PageEntry {
@@ -129,8 +130,8 @@ export async function upsertPage(db: DatabaseAdapter, page: {
   const indexedAt = Date.now()
 
   await db.exec(`
-    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
@@ -139,7 +140,8 @@ export async function upsertPage(db: DatabaseAdapter, page: {
       keywords = excluded.keywords,
       updated_at = excluded.updated_at,
       indexed_at = excluded.indexed_at,
-      is_error = excluded.is_error
+      is_error = excluded.is_error,
+      indexed = 1
   `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.updatedAt, indexedAt, page.isError ? 1 : 0])
 }
 
@@ -185,4 +187,52 @@ export async function getPageCount(db: DatabaseAdapter): Promise<number> {
 export async function hasPages(db: DatabaseAdapter): Promise<boolean> {
   const count = await getPageCount(db)
   return count > 0
+}
+
+/**
+ * Seed routes from sitemap (insert with indexed=0 if not exists)
+ */
+export async function seedRoutes(db: DatabaseAdapter, routes: string[]): Promise<number> {
+  const now = new Date().toISOString()
+  for (const route of routes) {
+    const routeKey = normalizeRouteKey(route)
+    // Only insert if doesn't exist - don't overwrite existing indexed pages
+    await db.exec(`
+      INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed)
+      VALUES (?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0)
+      ON CONFLICT(route) DO NOTHING
+    `, [route, routeKey, now])
+  }
+  return routes.length
+}
+
+/**
+ * Get one unindexed route for background indexing
+ */
+export async function getNextUnindexedRoute(db: DatabaseAdapter): Promise<string | undefined> {
+  const row = await db.first<{ route: string }>('SELECT route FROM ai_ready_pages WHERE indexed = 0 LIMIT 1')
+  return row?.route
+}
+
+/**
+ * Get count of unindexed pages
+ */
+export async function getUnindexedCount(db: DatabaseAdapter): Promise<number> {
+  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 0')
+  return row?.count || 0
+}
+
+/**
+ * Get sitemap seeded timestamp from _ai_ready_info
+ */
+export async function getSitemapSeededAt(db: DatabaseAdapter): Promise<number | undefined> {
+  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['sitemap_seeded_at'])
+  return row ? Number.parseInt(row.value, 10) : undefined
+}
+
+/**
+ * Set sitemap seeded timestamp
+ */
+export async function setSitemapSeededAt(db: DatabaseAdapter, timestamp: number): Promise<void> {
+  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['sitemap_seeded_at', String(timestamp)])
 }
