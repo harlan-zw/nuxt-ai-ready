@@ -64,18 +64,17 @@ SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_re
 
 ### Runtime Plugins (`src/runtime/server/plugins/`)
 
-Pages are indexed via sitemap-driven background processing:
 - **db-restore.ts**: Restores prerendered data from compressed dump on cold start
 - **sitemap-seeder.ts**: Seeds routes from sitemap into DB on first request (with TTL)
-- **page-indexer.ts**: Picks one unindexed route per request, fetches internally, indexes it
 
 ### Runtime Indexing Flow
 
+Indexing uses explicit polling triggers (no waitUntil piggybacking):
+
 ```
-Request → sitemap-seeder seeds routes (once per TTL)
-        → afterResponse triggers page-indexer
-        → fetches one unindexed route internally (no auth cookies)
-        → indexes it in background
+sitemap-seeder → seeds routes on first request (once per TTL)
+poll endpoint  → indexes pages on-demand via external cron/CI
+scheduled task → auto-indexes via Nitro cron (Cloudflare/native)
 ```
 
 This ensures only public pages (those in sitemap) are indexed, avoiding auth-gated content.
@@ -83,10 +82,32 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 ### Indexing Control Endpoints
 
 - `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
-- `POST /__ai-ready/poll?limit=N` - Process up to N pages (max 50), returns `{ indexed, remaining, errors }`
+- `POST /__ai-ready/poll` - Process pending pages with configurable params:
+  - `?limit=N` - Max pages per batch (default: 10, max: 50)
+  - `?all=true` - Process until complete (ignores limit)
+  - `?timeout=30000` - Max ms to run for `all` mode (default: 30s)
+  - `?secret=<token>` - Required if `indexing.pollSecret` configured
+  - Returns: `{ indexed, remaining, errors, duration, complete }`
+
+### Scheduled Task (`src/runtime/server/tasks/ai-ready-index.ts`)
+
+Nitro scheduled task for automatic background indexing. Enable via config:
+
+```ts
+aiReady: {
+  indexing: {
+    scheduled: {
+      enabled: true,
+      cron: '*/5 * * * *', // every 5 min
+      batchSize: 20
+    }
+  }
+}
+```
 
 ### Utils
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
+- **utils/batchIndex.ts**: Shared batch indexing logic for poll endpoint and scheduled task
 - **utils/pageData.ts**: Unified read from database
 - **utils/sitemap.ts**: Fetch and parse sitemap URLs
 
@@ -138,6 +159,14 @@ Config key: `aiReady` in nuxt.config.ts
   ttl: 0, // re-index TTL in seconds (0 = never)
   sitemapTtl: 3600, // sitemap refresh TTL in seconds (default 1 hour)
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
+  indexing: {
+    pollSecret: 'secret-token', // optional auth for poll endpoint
+    scheduled: {
+      enabled: false,
+      cron: '*/5 * * * *',
+      batchSize: 20,
+    },
+  },
 }
 ```
 

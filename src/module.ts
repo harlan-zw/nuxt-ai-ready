@@ -40,6 +40,10 @@ export interface ModulePublicRuntimeConfig {
     url?: string
     authToken?: string
   }
+  indexing: {
+    pollSecret?: string
+    scheduledBatchSize: number
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -245,6 +249,20 @@ export {}
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
+      // Register scheduled task for indexing if enabled
+      const scheduledConfig = config.indexing?.scheduled
+      if (scheduledConfig?.enabled) {
+        nitroConfig.tasks = nitroConfig.tasks || {}
+        nitroConfig.tasks['ai-ready:index'] = {
+          handler: resolve('./runtime/server/tasks/ai-ready-index'),
+        }
+
+        nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
+        const cron = scheduledConfig.cron || '*/5 * * * *'
+        nitroConfig.scheduledTasks[cron] = nitroConfig.scheduledTasks[cron] || []
+        ;(nitroConfig.scheduledTasks[cron] as string[]).push('ai-ready:index')
+      }
+
       nitroConfig.virtual = nitroConfig.virtual || {}
 
       // Helper to read JSONL from filesystem during prerender
@@ -285,6 +303,10 @@ export async function readPageDataFromFilesystem() {
       ttl: config.ttl ?? 0,
       sitemapTtl: config.sitemapTtl ?? 3600,
       database,
+      indexing: {
+        pollSecret: config.indexing?.pollSecret,
+        scheduledBatchSize: config.indexing?.scheduled?.batchSize ?? 20,
+      },
     } as any
 
     // Register plugins
@@ -293,8 +315,6 @@ export async function readPageDataFromFilesystem() {
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/db-restore'))
     // sitemap-seeder: seeds routes from sitemap on first request
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
-    // page-indexer: indexes unindexed pages in background via afterResponse hook
-    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/page-indexer'))
 
     addServerHandler({
       middleware: true,
