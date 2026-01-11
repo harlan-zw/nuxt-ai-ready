@@ -138,8 +138,8 @@ aiReady: {
 ### Type Exports
 
 - `ModuleOptions`: Module configuration interface
-- `BulkDocument`: Page-level data (route, title, description, markdown, headings, updatedAt)
-- `PageEntry`: Page metadata without markdown (route, title, description, headings, updatedAt)
+- `BulkDocument`: Page-level data (route, title, description, markdown, headings, keywords, updatedAt)
+- `PageEntry`: Page metadata without markdown (route, title, description, headings, keywords, updatedAt)
 - `PageData`: PageEntry + markdown content
 - `MarkdownContext`: Hook context for markdown processing
 - `PageIndexedContext`: Hook context for runtime page indexing

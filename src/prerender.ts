@@ -8,6 +8,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
+import { ALL_SCHEMA_SQL, INFO_TABLE_SQL, SCHEMA_VERSION } from './shared/schema'
 import { refineDatabaseConfig } from './utils/database'
 
 // Inline normalization functions to avoid runtime deps
@@ -366,47 +367,19 @@ async function createDatabaseDump(
 
   const db = new Database(dbPath)
 
-  // Initialize schema (matches runtime ai_ready_pages table)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ai_ready_pages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      route TEXT UNIQUE NOT NULL,
-      route_key TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL DEFAULT '',
-      description TEXT NOT NULL DEFAULT '',
-      markdown TEXT NOT NULL DEFAULT '',
-      headings TEXT NOT NULL DEFAULT '[]',
-      keywords TEXT NOT NULL DEFAULT '[]',
-      updated_at TEXT NOT NULL,
-      indexed_at INTEGER NOT NULL,
-      is_error INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route);
-    CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_is_error ON ai_ready_pages(is_error);
-    CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
-      route, title, description, markdown, headings, keywords,
-      content=ai_ready_pages, content_rowid=id
-    );
-    CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
-      INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
-      VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
-    END;
-    CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ad AFTER DELETE ON ai_ready_pages BEGIN
-      INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
-      VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
-    END;
-    CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages BEGIN
-      INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
-      VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
-      INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
-      VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
-    END;
-  `)
+  // Initialize schema using shared definitions
+  for (const sql of ALL_SCHEMA_SQL) {
+    db.exec(sql)
+  }
+
+  // Store schema version
+  db.exec(INFO_TABLE_SQL)
+  db.prepare('INSERT OR REPLACE INTO _ai_ready_info (id, version) VALUES (?, ?)').run('schema', SCHEMA_VERSION)
 
   // Insert pages
   const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const normalizeRouteKey = (route: string) => route.replace(/^\//, '').replace(/\//g, ':') || 'index'
@@ -423,7 +396,10 @@ async function createDatabaseDump(
       JSON.stringify(entry.keywords),
       entry.updatedAt,
       now,
-      0,
+      0, // is_error
+      1, // indexed (prerendered pages are indexed)
+      'prerender', // source
+      now, // last_seen_at
     )
   }
 
@@ -439,13 +415,16 @@ async function createDatabaseDump(
       '[]',
       new Date().toISOString(),
       now,
-      1,
+      1, // is_error
+      0, // indexed
+      'prerender', // source
+      now, // last_seen_at
     )
   }
 
   // Export dump
   const rows = db.prepare(`
-    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error
+    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at
     FROM ai_ready_pages
   `).all() as Array<{
     route: string
@@ -458,6 +437,9 @@ async function createDatabaseDump(
     updated_at: string
     indexed_at: number
     is_error: number
+    indexed: number
+    source: string
+    last_seen_at: number
   }>
 
   db.close()

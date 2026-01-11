@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import type { PageData, PageEntry } from '../db/queries'
+import { useEvent } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import { queryPages } from '../db/queries'
 
@@ -13,13 +14,15 @@ export interface PageListItem {
 }
 
 /** Try to get the current H3Event from context or use provided event */
-async function getEventFromContext(providedEvent?: H3Event): Promise<H3Event | undefined> {
+function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
   if (providedEvent)
     return providedEvent
-  // Dynamic import to avoid circular dependencies
-  const { useEvent } = await import('nitropack/runtime')
-  // Wrap synchronous throw in promise for .catch() handling
-  return Promise.resolve().then(() => useEvent()).catch(() => undefined)
+  try {
+    return useEvent()
+  }
+  catch {
+    return undefined
+  }
 }
 
 let devWarningShown = false
@@ -39,7 +42,7 @@ export async function getPages(event?: H3Event): Promise<Map<string, PageEntry>>
   }
 
   // Use database for runtime
-  const db = await useDatabase(await getEventFromContext(event))
+  const db = await useDatabase(getEventFromContext(event))
   const pages = await queryPages(db) as PageEntry[]
   return new Map(pages.map(p => [p.route, p]))
 }
@@ -54,7 +57,7 @@ export async function getErrorRoutes(event?: H3Event): Promise<Set<string>> {
   }
 
   // Use database for runtime
-  const db = await useDatabase(await getEventFromContext(event))
+  const db = await useDatabase(getEventFromContext(event))
   const pages = await queryPages(db, { where: { hasError: true } }) as PageEntry[]
   return new Set(pages.map(p => p.route))
 }

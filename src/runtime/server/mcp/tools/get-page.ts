@@ -1,4 +1,5 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
+import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
 import { useDatabase } from '../../db'
 import { queryPages } from '../../db/queries'
@@ -13,7 +14,11 @@ const tool: McpToolDefinition = {
   inputSchema,
   cache: '1h',
   async handler({ route }) {
-    const db = await useDatabase()
+    // Try to get event from context for D1 compatibility
+    let event
+    try { event = useEvent() }
+    catch { /* no event context */ }
+    const db = await useDatabase(event)
     const page = await queryPages(db, { route: route as string, includeMarkdown: true })
     if (!page) {
       return { content: [{ type: 'text', text: JSON.stringify({ error: 'Page not found' }) }] }
