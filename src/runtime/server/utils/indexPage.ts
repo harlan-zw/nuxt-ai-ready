@@ -3,7 +3,7 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
-import { getPage, isPageFresh, upsertPage } from '../db/queries'
+import { isPageFresh, queryPages, upsertPage } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdownMeta } from '../utils'
 import { extractKeywords, stripMarkdown } from './keywords'
@@ -55,7 +55,7 @@ export async function indexPage(
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
   const db = await useDatabase(event)
-  const ttl = options.ttl ?? config.ttl ?? 0
+  const ttl = options.ttl ?? config.runtimeSync.ttl
 
   // Check if already indexed and fresh (unless force)
   if (!options.force && await isPageFresh(db, route, ttl)) {
@@ -63,7 +63,7 @@ export async function indexPage(
     return { success: true, skipped: true, isUpdate: true }
   }
 
-  const existing = await getPage(db, route)
+  const existing = await queryPages(db, { route })
   const isUpdate = !!existing
 
   // Check for error pages

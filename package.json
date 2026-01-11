@@ -92,6 +92,7 @@
     "@nuxtjs/mcp-toolkit": "catalog:",
     "@nuxtjs/robots": "catalog:",
     "@nuxtjs/sitemap": "catalog:",
+    "@types/better-sqlite3": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@vueuse/nuxt": "catalog:",
     "agents": "catalog:",
@@ -111,6 +112,7 @@
     "vue": "catalog:",
     "vue-router": "catalog:",
     "vue-tsc": "catalog:",
+    "wrangler": "catalog:",
     "zod": "catalog:"
   },
   "resolutions": {

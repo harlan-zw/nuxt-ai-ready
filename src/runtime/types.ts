@@ -84,21 +84,6 @@ export interface ModuleOptions {
   cacheMaxAgeSeconds?: number
 
   /**
-   * TTL for re-indexing pages in seconds
-   * Pages are automatically indexed on visit; this controls how often to refresh
-   * 0 = never re-index (rely on prerendered data)
-   * @default 0
-   */
-  ttl?: number
-
-  /**
-   * TTL for re-reading sitemap in seconds at runtime
-   * Controls how often to refresh the list of known routes from sitemap
-   * @default 3600 (1 hour)
-   */
-  sitemapTtl?: number
-
-  /**
    * Database configuration for page storage
    * Uses db0 for cross-platform SQLite support
    */
@@ -129,35 +114,47 @@ export interface ModuleOptions {
   }
 
   /**
-   * Indexing configuration for runtime page indexing
+   * Runtime sync configuration (opt-in for dynamic content sites)
+   * When enabled, pages are re-indexed at runtime from sitemap
+   * @default disabled - prerendered data is used
    */
-  indexing?: {
+  runtimeSync?: {
     /**
-     * Secret token for authenticating poll endpoint requests
-     * When set, poll endpoint requires ?secret=<token> query param
+     * Enable runtime sync
+     * When false (default), runtime uses prerendered data only
+     * @default false
      */
-    pollSecret?: string
+    enabled?: boolean
     /**
-     * Nitro scheduled task configuration
-     * Enables automatic background indexing via cron
+     * TTL for refresh in seconds (sitemap + page re-indexing)
+     * Controls how often to refresh sitemap routes and re-index stale pages
+     * @default 3600 (1 hour)
      */
-    scheduled?: {
-      /**
-       * Enable scheduled task
-       * @default false
-       */
-      enabled?: boolean
-      /**
-       * Cron expression for scheduling (e.g., every 5 minutes)
-       */
-      cron?: string
-      /**
-       * Pages to index per scheduled run
-       * @default 20
-       */
-      batchSize?: number
-    }
+    ttl?: number
+    /**
+     * Pages to index per batch
+     * @default 20
+     */
+    batchSize?: number
+    /**
+     * Cron expression for scheduled indexing (e.g. every 5 minutes)
+     * When set, enables automatic background indexing via Nitro task
+     */
+    cron?: string
+    /**
+     * Secret token for authenticating index-now endpoint
+     * When set, requires ?secret=<token> query param
+     */
+    secret?: string
+    /**
+     * TTL for pruning stale routes in seconds
+     * Routes not seen in sitemap for longer than this are deleted
+     * 0 = never prune (default)
+     * @default 0
+     */
+    pruneTtl?: number
   }
+
 }
 
 /**

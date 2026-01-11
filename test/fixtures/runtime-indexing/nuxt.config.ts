@@ -8,6 +8,11 @@ export default defineNuxtConfig({
   },
 
   aiReady: {
-    ttl: 0, // No TTL for testing
+    runtimeSync: {
+      enabled: true,
+      ttl: 0, // No TTL for testing
+      batchSize: 5,
+      cron: '0 0 * * *', // Daily at midnight (won't actually run in tests)
+    },
   },
 })

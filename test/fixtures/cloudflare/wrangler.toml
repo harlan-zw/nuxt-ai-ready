@@ -1,0 +1,12 @@
+name = "nuxt-ai-ready-test"
+main = ".output/server/index.mjs"
+compatibility_date = "2024-12-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+[assets]
+directory = ".output/public"
+
+[[d1_databases]]
+binding = "AI_READY_DB"
+database_name = "ai-ready-test"
+database_id = "local-test-db"

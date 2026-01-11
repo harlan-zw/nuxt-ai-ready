@@ -16,6 +16,8 @@ export default defineNuxtConfig({
     sources: [
       {
         urls: [
+          '/',
+          '/about',
           '/docs/getting-started',
           '/docs/configuration',
           '/docs/usage',

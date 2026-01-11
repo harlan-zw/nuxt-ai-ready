@@ -31,8 +31,6 @@ export interface ModulePublicRuntimeConfig {
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
-  ttl: number
-  sitemapTtl: number
   database: {
     type: 'sqlite' | 'd1' | 'libsql'
     filename?: string
@@ -40,9 +38,12 @@ export interface ModulePublicRuntimeConfig {
     url?: string
     authToken?: string
   }
-  indexing: {
-    pollSecret?: string
-    scheduledBatchSize: number
+  runtimeSync: {
+    enabled: boolean
+    ttl: number
+    batchSize: number
+    secret?: string
+    pruneTtl: number
   }
 }
 
@@ -249,16 +250,16 @@ export {}
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
-      // Register scheduled task for indexing if enabled
-      const scheduledConfig = config.indexing?.scheduled
-      if (scheduledConfig?.enabled) {
+      // Register scheduled task for indexing if runtimeSync enabled with cron
+      const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
+      const cron = config.runtimeSync?.cron
+      if (runtimeSyncEnabled && cron) {
         nitroConfig.tasks = nitroConfig.tasks || {}
         nitroConfig.tasks['ai-ready:index'] = {
           handler: resolve('./runtime/server/tasks/ai-ready-index'),
         }
 
         nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
-        const cron = scheduledConfig.cron || '*/5 * * * *'
         nitroConfig.scheduledTasks[cron] = nitroConfig.scheduledTasks[cron] || []
         ;(nitroConfig.scheduledTasks[cron] as string[]).push('ai-ready:index')
       }
@@ -288,6 +289,7 @@ export async function readPageDataFromFilesystem() {
 
     // Resolve database config
     const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
+    const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
@@ -300,12 +302,13 @@ export async function readPageDataFromFilesystem() {
       llmsTxt: mergedLlmsTxt,
       cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
       prerenderCacheDir,
-      ttl: config.ttl ?? 0,
-      sitemapTtl: config.sitemapTtl ?? 3600,
       database,
-      indexing: {
-        pollSecret: config.indexing?.pollSecret,
-        scheduledBatchSize: config.indexing?.scheduled?.batchSize ?? 20,
+      runtimeSync: {
+        enabled: runtimeSyncEnabled,
+        ttl: config.runtimeSync?.ttl ?? 3600,
+        batchSize: config.runtimeSync?.batchSize ?? 20,
+        secret: config.runtimeSync?.secret,
+        pruneTtl: config.runtimeSync?.pruneTtl ?? 0,
       },
     } as any
 
@@ -313,8 +316,9 @@ export async function readPageDataFromFilesystem() {
     nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
     // db-restore: loads compressed dump on cold start for serverless
     nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/db-restore'))
-    // sitemap-seeder: seeds routes from sitemap on first request
-    nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
+    // sitemap-seeder: seeds routes from sitemap on first request (only if runtimeSync enabled)
+    if (runtimeSyncEnabled)
+      nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
 
     addServerHandler({
       middleware: true,
@@ -340,9 +344,12 @@ export async function readPageDataFromFilesystem() {
       addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get') })
     }
 
-    // Indexing control endpoints
-    addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
-    addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
+    // Indexing control endpoints (only if runtimeSync enabled)
+    if (runtimeSyncEnabled) {
+      addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
+      addServerHandler({ route: '/__ai-ready/index-now', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/index-now.post') })
+      addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
+    }
 
     // Setup prerendering hooks for static generation
     // @ts-expect-error untyped
