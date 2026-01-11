@@ -14,6 +14,46 @@ export function normalizeWhitespace(text: string): string {
   return text.replace(/\u00A0/g, ' ')
 }
 
+interface ExtractedMeta {
+  title: string
+  description: string
+  metaKeywords: string
+  headings: Array<Record<string, string>>
+  updatedAt?: string
+}
+
+// Build mdream options with extraction plugin
+function buildMdreamOptions(
+  url: string,
+  mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions'],
+  meta: ExtractedMeta,
+  extractUpdatedAt = false,
+): HTMLToMarkdownOptions {
+  const extractPlugin = extractionPlugin({
+    'title': (el) => { meta.title = el.textContent },
+    'meta[name="description"]': (el) => { meta.description = el.attributes.content || '' },
+    'meta[name="keywords"]': (el) => { meta.metaKeywords = el.attributes.content || '' },
+    'h1, h2, h3, h4, h5, h6': (el) => {
+      const text = el.textContent?.trim()
+      if (text)
+        meta.headings.push({ [el.name.toLowerCase()]: text })
+    },
+    ...(extractUpdatedAt && {
+      'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
+        if (!meta.updatedAt && el.attributes.content)
+          meta.updatedAt = el.attributes.content
+      },
+    }),
+  })
+
+  let options: HTMLToMarkdownOptions = { origin: url, ...mdreamOptions }
+  if (mdreamOptions?.preset === 'minimal') {
+    options = withMinimalPreset(options)
+  }
+  options.plugins = [extractPlugin, ...(options.plugins || [])]
+  return options
+}
+
 // Check if request should be rendered as markdown
 // Returns normalized path and whether it's explicit (.md) or implicit (Accept header)
 // Use explicitOnly=true for prerender (only .md extension, no Accept header check)
@@ -89,120 +129,43 @@ export function clientPrefersMarkdown(event: H3Event): boolean {
 // Convert HTML to Markdown (runtime version with hooks)
 export async function convertHtmlToMarkdown(html: string, url: string, config: ModulePublicRuntimeConfig, route: string, event: H3Event) {
   const nitroApp = useNitroApp()
+  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [] }
 
-  let title = ''
-  let description = ''
-  let metaKeywords = ''
-  const headings: Array<Record<string, string>> = []
-
-  // Create extraction plugin first - must run before isolateMainPlugin
-  const extractPlugin = extractionPlugin({
-    title(el) {
-      title = el.textContent
-    },
-    'meta[name="description"]': (el) => {
-      description = el.attributes.content || ''
-    },
-    'meta[name="keywords"]': (el) => {
-      metaKeywords = el.attributes.content || ''
-    },
-    'h1, h2, h3, h4, h5, h6': (el) => {
-      const text = el.textContent?.trim()
-      const level = el.name.toLowerCase()
-      if (text)
-        headings.push({ [level]: text })
-    },
-  })
-
-  let options: HTMLToMarkdownOptions = {
-    origin: url,
-    ...config.mdreamOptions,
-  }
-
-  // Apply preset if specified
-  if (config.mdreamOptions?.preset === 'minimal') {
-    options = withMinimalPreset(options)
-    // Manually insert extraction plugin at the beginning, before all preset plugins
-    options.plugins = [extractPlugin, ...(options.plugins || [])]
-  }
-  else {
-    // For non-preset mode, just add extraction plugin to existing plugins
-    options.plugins = [extractPlugin, ...(options.plugins || [])]
-  }
-
+  const options = buildMdreamOptions(url, config.mdreamOptions, meta)
   await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
-  let markdown = htmlToMarkdown(html, options)
 
   const context: MarkdownContext = {
     html,
-    markdown,
+    markdown: htmlToMarkdown(html, options),
     route,
-    title,
-    description,
+    title: meta.title,
+    description: meta.description,
     isPrerender: false,
     event,
   }
 
-  // Call Nitro runtime hook if available
   await nitroApp.hooks.callHook('ai-ready:markdown', context)
-  markdown = normalizeWhitespace(context.markdown) // Use potentially modified markdown
 
-  return { markdown, title: normalizeWhitespace(title), description: normalizeWhitespace(description), headings, metaKeywords }
+  return {
+    markdown: normalizeWhitespace(context.markdown),
+    title: normalizeWhitespace(meta.title),
+    description: normalizeWhitespace(meta.description),
+    headings: meta.headings,
+    metaKeywords: meta.metaKeywords,
+  }
 }
 
 // Convert HTML to Markdown with metadata extraction (prerender version, no hooks)
-export async function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
-  let title = ''
-  let description = ''
-  let metaKeywords = ''
-  let updatedAt: string | undefined
-  const headings: Array<Record<string, string>> = []
-
-  const extractPlugin = extractionPlugin({
-    title(el) {
-      title = el.textContent
-    },
-    'meta[name="description"]': (el) => {
-      description = el.attributes.content || ''
-    },
-    'meta[name="keywords"]': (el) => {
-      metaKeywords = el.attributes.content || ''
-    },
-    'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
-      if (!updatedAt && el.attributes.content) {
-        updatedAt = el.attributes.content
-      }
-    },
-    'h1, h2, h3, h4, h5, h6': (el) => {
-      const text = el.textContent?.trim()
-      const level = el.name.toLowerCase()
-      if (text)
-        headings.push({ [level]: text })
-    },
-  })
-
-  let options: HTMLToMarkdownOptions = {
-    origin: url,
-    ...mdreamOptions,
-  }
-
-  if (mdreamOptions?.preset === 'minimal') {
-    options = withMinimalPreset(options)
-    options.plugins = [extractPlugin, ...(options.plugins || [])]
-  }
-  else {
-    options.plugins = [extractPlugin, ...(options.plugins || [])]
-  }
-
-  const rawMarkdown = htmlToMarkdown(html, options)
-  const markdown = normalizeWhitespace(rawMarkdown)
+export function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
+  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [] }
+  const options = buildMdreamOptions(url, mdreamOptions, meta, true)
 
   return {
-    markdown,
-    title: normalizeWhitespace(title),
-    description: normalizeWhitespace(description),
-    headings,
-    metaKeywords,
-    ...(updatedAt && { updatedAt }),
+    markdown: normalizeWhitespace(htmlToMarkdown(html, options)),
+    title: normalizeWhitespace(meta.title),
+    description: normalizeWhitespace(meta.description),
+    headings: meta.headings,
+    metaKeywords: meta.metaKeywords,
+    ...(meta.updatedAt && { updatedAt: meta.updatedAt }),
   }
 }

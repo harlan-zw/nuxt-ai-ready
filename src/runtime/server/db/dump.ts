@@ -11,6 +11,7 @@ export interface DumpRow {
   updated_at: string
   indexed_at: number
   is_error: number
+  source?: 'prerender' | 'runtime'
 }
 
 /**
@@ -18,7 +19,7 @@ export interface DumpRow {
  */
 export async function exportDump(db: DatabaseAdapter): Promise<DumpRow[]> {
   return db.all<DumpRow>(`
-    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error
+    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, source
     FROM ai_ready_pages
   `)
 }
@@ -48,12 +49,14 @@ export async function decompressDump(base64: string): Promise<DumpRow[]> {
 
 /**
  * Import dump into database
+ * Prerendered dumps default to source='prerender', last_seen_at=NULL
  */
 export async function importDump(db: DatabaseAdapter, rows: DumpRow[]): Promise<void> {
   for (const row of rows) {
+    const source = row.source || 'prerender' // Default for legacy dumps
     await db.exec(`
-      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.updated_at, row.indexed_at, row.is_error])
+      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL)
+    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.updated_at, row.indexed_at, row.is_error, source])
   }
 }

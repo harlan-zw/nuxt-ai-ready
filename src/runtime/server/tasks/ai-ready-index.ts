@@ -11,18 +11,13 @@ export default defineTask({
   async run({ payload }) {
     const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
     const db = await useDatabase()
-    const limit = (payload?.limit as number) ?? config.indexing.scheduledBatchSize
+    const limit = (payload?.limit as number) ?? config.runtimeSync.batchSize
 
     // Create a minimal mock event for internal fetch
-    // The task uses $fetch directly which doesn't need full H3Event
-    const mockEvent = {
-      $fetch: globalThis.$fetch,
-    } as Parameters<typeof batchIndexPages>[1]
+    // Only $fetch is used from the event in indexPageByRoute
+    const mockEvent = { $fetch: globalThis.$fetch } as any
 
-    const result = await batchIndexPages(db, mockEvent, {
-      limit,
-      all: false,
-    })
+    const result = await batchIndexPages(db, mockEvent, limit)
 
     return {
       result: {

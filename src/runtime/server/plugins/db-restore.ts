@@ -1,7 +1,7 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import { decompressDump, importDump } from '../db/dump'
-import { hasPages } from '../db/queries'
+import { countPages } from '../db/queries'
 import { logger } from '../logger'
 
 export default defineNitroPlugin(async () => {
@@ -16,7 +16,7 @@ export default defineNitroPlugin(async () => {
   const db = await useDatabase()
 
   // Check if database already has data
-  if (await hasPages(db)) {
+  if (await countPages(db) > 0) {
     logger.debug('[db-restore] Database already has data, skipping restore')
     return
   }

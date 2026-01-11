@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
-import { getSitemapSeededAt, seedRoutes, setSitemapSeededAt } from '../db/queries'
+import { getSitemapSeededAt, pruneStaleRoutes, seedRoutes, setSitemapSeededAt } from '../db/queries'
 import { logger } from '../logger'
 import { fetchSitemapUrls } from '../utils/sitemap'
 
@@ -26,15 +26,15 @@ export default defineNitroPlugin((nitro) => {
 
 async function seedFromSitemap(event: H3Event): Promise<void> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  const sitemapTtl = config.sitemapTtl ?? 3600 // Default 1 hour
+  const { ttl, pruneTtl } = config.runtimeSync
 
   const db = await useDatabase(event)
 
   // Check if sitemap was recently seeded
   const seededAt = await getSitemapSeededAt(db)
-  if (seededAt && sitemapTtl > 0) {
+  if (seededAt && ttl > 0) {
     const age = (Date.now() - seededAt) / 1000
-    if (age < sitemapTtl) {
+    if (age < ttl) {
       logger.debug(`[sitemap-seeder] Sitemap fresh (${Math.round(age)}s old), skipping`)
       return
     }
@@ -43,7 +43,7 @@ async function seedFromSitemap(event: H3Event): Promise<void> {
   // Fetch sitemap
   const urls = await fetchSitemapUrls(event)
   if (urls.length === 0) {
-    logger.debug('[sitemap-seeder] No URLs in sitemap')
+    // Warning already logged by fetchSitemapUrls
     return
   }
 
@@ -53,9 +53,16 @@ async function seedFromSitemap(event: H3Event): Promise<void> {
     return url.pathname
   }).filter(route => !route.includes('.')) // Skip file extensions
 
-  // Seed routes into database
+  // Seed routes into database (updates last_seen_at for existing routes)
   await seedRoutes(db, routes)
   await setSitemapSeededAt(db, Date.now())
 
   logger.info(`[sitemap-seeder] Seeded ${routes.length} routes from sitemap`)
+
+  // Prune stale routes if configured
+  if (pruneTtl > 0) {
+    const pruned = await pruneStaleRoutes(db, pruneTtl)
+    if (pruned > 0)
+      logger.info(`[sitemap-seeder] Pruned ${pruned} stale routes`)
+  }
 }

@@ -37,6 +37,7 @@ catalog:
   '@nuxtjs/mcp-toolkit': ^0.6.1
   '@nuxtjs/robots': ^5.6.7
   '@nuxtjs/sitemap': ^7.5.2
+  '@types/better-sqlite3': ^7.6.13
   '@vitest/coverage-v8': ^4.0.16
   '@vueuse/nuxt': ^14.1.0
   agents: ^0.3.3
@@ -65,6 +66,7 @@ catalog:
   vue: ^3.5.26
   vue-router: ^4.6.4
   vue-tsc: ^3.2.2
+  wrangler: ^4.58.0
   zod: ^4.3.5
 onlyBuiltDependencies:
   - '@firebase/util'

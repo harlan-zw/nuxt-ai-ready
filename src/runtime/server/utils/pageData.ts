@@ -1,21 +1,7 @@
 import type { H3Event } from 'h3'
+import type { PageData, PageEntry } from '../db/queries'
 import { useDatabase } from '../db'
-import { getAllPages as dbGetAllPages, getErrorRoutes as dbGetErrorRoutes } from '../db/queries'
-
-/** Page entry from database */
-export interface PageEntry {
-  route: string
-  title: string
-  description: string
-  headings: string
-  keywords: string[]
-  updatedAt: string
-}
-
-/** Page data includes markdown content */
-export interface PageData extends PageEntry {
-  markdown: string
-}
+import { queryPages } from '../db/queries'
 
 /** Page list item for MCP tools/resources */
 export interface PageListItem {
@@ -27,26 +13,34 @@ export interface PageListItem {
 }
 
 /** Try to get the current H3Event from context or use provided event */
-function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
+async function getEventFromContext(providedEvent?: H3Event): Promise<H3Event | undefined> {
   if (providedEvent)
     return providedEvent
   // Dynamic import to avoid circular dependencies
-  const { useEvent } = require('nitropack/runtime')
-  return useEvent().catch(() => undefined)
+  const { useEvent } = await import('nitropack/runtime')
+  // Wrap synchronous throw in promise for .catch() handling
+  return Promise.resolve().then(() => useEvent()).catch(() => undefined)
 }
+
+let devWarningShown = false
 
 /** Read page data - returns page data indexed by route */
 export async function getPages(event?: H3Event): Promise<Map<string, PageEntry>> {
-  if (import.meta.dev)
+  if (import.meta.dev) {
+    if (!devWarningShown) {
+      console.warn('[nuxt-ai-ready] Page data unavailable in dev. Run `nuxi generate` for full metadata.')
+      devWarningShown = true
+    }
     return new Map()
+  }
 
   if (import.meta.prerender) {
     return (await readPrerenderedData()).pages
   }
 
   // Use database for runtime
-  const db = await useDatabase(getEventFromContext(event))
-  const pages = await dbGetAllPages(db)
+  const db = await useDatabase(await getEventFromContext(event))
+  const pages = await queryPages(db) as PageEntry[]
   return new Map(pages.map(p => [p.route, p]))
 }
 
@@ -60,9 +54,9 @@ export async function getErrorRoutes(event?: H3Event): Promise<Set<string>> {
   }
 
   // Use database for runtime
-  const db = await useDatabase(getEventFromContext(event))
-  const routes = await dbGetErrorRoutes(db)
-  return new Set(routes)
+  const db = await useDatabase(await getEventFromContext(event))
+  const pages = await queryPages(db, { where: { hasError: true } }) as PageEntry[]
+  return new Set(pages.map(p => p.route))
 }
 
 /** Get pages as flat list for MCP consumption */

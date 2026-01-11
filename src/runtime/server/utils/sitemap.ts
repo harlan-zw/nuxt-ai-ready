@@ -10,18 +10,18 @@ export interface SitemapUrl {
 export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
   const sitemapRes = await event.$fetch('/sitemap.xml', { responseType: 'text' }).catch(() => null)
   if (!sitemapRes) {
-    logger.warn('Sitemap not found at /sitemap.xml - llms.txt will have no pages listed')
+    logger.warn('Sitemap not found at /sitemap.xml - ensure @nuxtjs/sitemap is installed and configured')
     return []
   }
 
   const result = await parseSitemapXml(sitemapRes).catch((e) => {
-    logger.warn('Failed to parse sitemap.xml:', e)
+    logger.warn(`Failed to parse sitemap.xml: ${e instanceof Error ? e.message : e}`)
     return { urls: [] }
   })
   const urls = result?.urls || []
 
   if (urls.length === 0) {
-    logger.warn('Sitemap is empty - llms.txt will have no pages listed')
+    logger.warn('Sitemap is empty - add routes to sitemap or configure sitemap.sources in nuxt.config')
   }
 
   return urls.map((entry) => {
