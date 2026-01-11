@@ -142,7 +142,7 @@ export interface ModuleOptions {
      */
     cron?: string
     /**
-     * Secret token for authenticating index-now endpoint
+     * Secret token for authenticating poll endpoint
      * When set, requires ?secret=<token> query param
      */
     secret?: string

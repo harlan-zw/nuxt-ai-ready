@@ -117,25 +117,6 @@ function rowToData(row: PageRow): PageData {
 
 /**
  * Unified page query function
- *
- * @example
- * // Get single page without markdown
- * queryPages(db, { route: '/about' })
- *
- * // Get single page with markdown
- * queryPages(db, { route: '/about', includeMarkdown: true })
- *
- * // Get all pages (default excludes errors)
- * queryPages(db)
- *
- * // Get pending (unindexed) pages
- * queryPages(db, { where: { pending: true } })
- *
- * // Get error pages only
- * queryPages(db, { where: { hasError: true } })
- *
- * // Get pages with pagination
- * queryPages(db, { limit: 10, offset: 20 })
  */
 export async function queryPages(db: DatabaseAdapter, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
 export async function queryPages(db: DatabaseAdapter, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
@@ -298,6 +279,22 @@ export async function seedRoutes(db: DatabaseAdapter, routes: string[]): Promise
     `, [route, routeKey, now, nowMs])
   }
   return routes.length
+}
+
+/**
+ * Get one unindexed route for background indexing
+ */
+export async function getNextUnindexedRoute(db: DatabaseAdapter): Promise<string | undefined> {
+  const row = await db.first<{ route: string }>('SELECT route FROM ai_ready_pages WHERE indexed = 0 LIMIT 1')
+  return row?.route
+}
+
+/**
+ * Get count of unindexed pages
+ */
+export async function getUnindexedCount(db: DatabaseAdapter): Promise<number> {
+  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 0')
+  return row?.count || 0
 }
 
 /**

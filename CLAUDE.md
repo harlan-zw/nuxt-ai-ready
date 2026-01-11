@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Key features:
 - **llms.txt generation**: Auto-generate `llms.txt` and `llms-full.txt` at build time
 - **On-demand markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`)
-- **MCP server**: `list_pages`, `get_page`, and `search_pages` tools for AI agents
+- **MCP server**: `list_pages` and `search_pages` tools for AI agents
 - **Content signals**: Configure AI training/search permissions via Nuxt Robots
 
 ## Development Commands
@@ -50,8 +50,7 @@ During prerender, the module:
 - **Middleware** (`src/runtime/server/middleware/`): HTML→markdown conversion for `.md` requests
 - **Routes**: `/llms.txt`, `/llms-full.txt` handlers (replaced with static files after prerender)
 - **MCP** (`src/runtime/server/mcp/`): Tools and resources for AI agent integration
-  - `tools/list-pages.ts`: List all pages with metadata (paginated)
-  - `tools/get-page.ts`: Get single page with markdown content
+  - `tools/list-pages.ts`: List all pages with metadata
   - `tools/search-pages.ts`: FTS5 full-text search
   - `resources/pages.ts`: Pages resource
 
@@ -60,57 +59,55 @@ During prerender, the module:
 SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_ready_`):
 - **schema.ts**: Table definitions (`ai_ready_pages`, `ai_ready_pages_fts`) with FTS5 triggers
 - **index.ts**: Database singleton (`useDatabase()`)
-- **queries.ts**: Unified query API (`queryPages`, `countPages`, `searchPages`, `upsertPage`)
+- **queries.ts**: Query functions (`getAllPages`, `searchPages`, `upsertPage`, etc.)
 - **dump.ts**: Compressed dump export/import for serverless cold starts
 
 ### Runtime Plugins (`src/runtime/server/plugins/`)
 
 - **db-restore.ts**: Restores prerendered data from compressed dump on cold start
-- **sitemap-seeder.ts**: Seeds routes from sitemap (only when `runtimeSync.enabled`)
+- **sitemap-seeder.ts**: Seeds routes from sitemap into DB on first request (with TTL)
 
-### Runtime Architecture
+### Runtime Indexing Flow
 
-**Default (prerender is source of truth):**
-```
-Build: prerender → crawl sitemap → create DB dump
-Runtime: restore dump → llms.txt works immediately!
-```
+Indexing uses explicit polling triggers (no waitUntil piggybacking):
 
-**Opt-in Runtime Sync (for dynamic content):**
 ```
-Runtime: restore dump → sitemap seeder → index-now/cron → fresh data
+sitemap-seeder → seeds routes on first request (once per TTL)
+poll endpoint  → indexes pages on-demand via external cron/CI
+scheduled task → auto-indexes via Nitro cron (Cloudflare/native)
 ```
 
-Runtime sync is disabled by default. Enable it for sites with frequently changing content.
+This ensures only public pages (those in sitemap) are indexed, avoiding auth-gated content.
 
-### Runtime Sync Endpoints (only when `runtimeSync.enabled`)
+### Indexing Control Endpoints
 
 - `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
-- `POST /__ai-ready/index-now` - Trigger indexing
-  - `?secret=<token>` - Required if `runtimeSync.secret` configured
-  - `?route=/path` - Force reindex single route (optional)
-  - Returns: `{ indexed, remaining, errors, duration, complete }` or `{ success, title, isUpdate }`
-- `POST /__ai-ready/prune` - Prune stale routes from database
-  - `?dry=true` - Preview without deleting (no auth required)
-  - `?ttl=<seconds>` - Override `pruneTtl` threshold
+- `POST /__ai-ready/poll` - Process pending pages with configurable params:
+  - `?limit=N` - Max pages per batch (default: 10, max: 50)
+  - `?all=true` - Process until complete (ignores limit)
+  - `?timeout=30000` - Max ms to run for `all` mode (default: 30s)
+  - `?secret=<token>` - Required if `indexing.pollSecret` configured
+  - Returns: `{ indexed, remaining, errors, duration, complete }`
 
 ### Scheduled Task (`src/runtime/server/tasks/ai-ready-index.ts`)
 
-Nitro scheduled task for automatic background indexing. Only registered when `runtimeSync.enabled` and `runtimeSync.cron` is set:
+Nitro scheduled task for automatic background indexing. Enable via config:
 
 ```ts
 aiReady: {
-  runtimeSync: {
-    enabled: true,
-    cron: '*/5 * * * *', // enables scheduled indexing every 5 min
-    batchSize: 20
+  indexing: {
+    scheduled: {
+      enabled: true,
+      cron: '*/5 * * * *', // every 5 min
+      batchSize: 20
+    }
   }
 }
 ```
 
 ### Utils
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
-- **utils/batchIndex.ts**: Shared batch indexing logic for index-now and scheduled task
+- **utils/batchIndex.ts**: Shared batch indexing logic for poll endpoint and scheduled task
 - **utils/pageData.ts**: Unified read from database
 - **utils/sitemap.ts**: Fetch and parse sitemap URLs
 
@@ -138,8 +135,8 @@ aiReady: {
 ### Type Exports
 
 - `ModuleOptions`: Module configuration interface
-- `BulkDocument`: Page-level data (route, title, description, markdown, headings, keywords, updatedAt)
-- `PageEntry`: Page metadata without markdown (route, title, description, headings, keywords, updatedAt)
+- `BulkDocument`: Page-level data (route, title, description, markdown, headings, updatedAt)
+- `PageEntry`: Page metadata without markdown (route, title, description, headings, updatedAt)
 - `PageData`: PageEntry + markdown content
 - `MarkdownContext`: Hook context for markdown processing
 - `PageIndexedContext`: Hook context for runtime page indexing
@@ -159,15 +156,16 @@ Config key: `aiReady` in nuxt.config.ts
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
+  ttl: 0, // re-index TTL in seconds (0 = never)
+  sitemapTtl: 3600, // sitemap refresh TTL in seconds (default 1 hour)
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
-  // Opt-in runtime sync for dynamic content sites
-  runtimeSync: {
-    enabled: false, // default OFF - prerendered data is used
-    ttl: 3600, // refresh TTL for sitemap + page re-indexing (seconds)
-    batchSize: 20, // pages per sync batch
-    cron: '*/5 * * * *', // enables scheduled sync (optional)
-    secret: '', // auth for index-now endpoint
-    pruneTtl: 0, // prune stale routes TTL (0 = never, 604800 = 7 days)
+  indexing: {
+    pollSecret: 'secret-token', // optional auth for poll endpoint
+    scheduled: {
+      enabled: false,
+      cron: '*/5 * * * *',
+      batchSize: 20,
+    },
   },
 }
 ```

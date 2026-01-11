@@ -347,7 +347,7 @@ export async function readPageDataFromFilesystem() {
     // Indexing control endpoints (only if runtimeSync enabled)
     if (runtimeSyncEnabled) {
       addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
-      addServerHandler({ route: '/__ai-ready/index-now', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/index-now.post') })
+      addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
       addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
     }
 

@@ -5,6 +5,15 @@ import { countPages, queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { indexPageByRoute } from './indexPage'
 
+export interface BatchIndexOptions {
+  /** Max pages per batch (default: 10, max: 50) */
+  limit?: number
+  /** Process until complete (ignores limit) */
+  all?: boolean
+  /** Max ms to run (for all mode, default: 30000) */
+  timeout?: number
+}
+
 export interface BatchIndexResult {
   /** Number of pages indexed */
   indexed: number
@@ -20,14 +29,16 @@ export interface BatchIndexResult {
 
 /**
  * Batch index pending pages (max 50 per batch)
+ * Shared logic used by poll endpoint and scheduled task
  */
 export async function batchIndexPages(
   db: DatabaseAdapter,
   event: H3Event,
-  limit = 10,
+  options: BatchIndexOptions = {},
 ): Promise<BatchIndexResult> {
   const startTime = Date.now()
-  const batchSize = Math.min(limit, 50)
+  const limit = Math.min(options.limit ?? 10, 50)
+  const timeout = options.timeout ?? 30000
 
   const beforeCount = await countPages(db, { where: { pending: true } })
   if (beforeCount === 0) {
@@ -42,12 +53,26 @@ export async function batchIndexPages(
 
   let indexed = 0
   const errors: string[] = []
+  let iteration = 0
 
-  for (let i = 0; i < batchSize; i++) {
+  while (true) {
+    // Check timeout for 'all' mode
+    if (options.all && (Date.now() - startTime) >= timeout) {
+      logger.debug(`[batchIndex] Timeout reached after ${Date.now() - startTime}ms`)
+      break
+    }
+
+    // Check limit for non-all mode
+    if (!options.all && iteration >= limit) {
+      break
+    }
+
     const pages = await queryPages(db, { where: { pending: true }, limit: 1 }) as PageEntry[]
     const route = pages[0]?.route
     if (!route)
       break
+
+    iteration++
 
     const result = await indexPageByRoute(route, event, {
       markFailedAsError: true,

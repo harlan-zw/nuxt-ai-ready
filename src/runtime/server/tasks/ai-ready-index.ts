@@ -14,10 +14,15 @@ export default defineTask({
     const limit = (payload?.limit as number) ?? config.runtimeSync.batchSize
 
     // Create a minimal mock event for internal fetch
-    // Only $fetch is used from the event in indexPageByRoute
-    const mockEvent = { $fetch: globalThis.$fetch } as any
+    // The task uses $fetch directly which doesn't need full H3Event
+    const mockEvent = {
+      $fetch: globalThis.$fetch,
+    } as Parameters<typeof batchIndexPages>[1]
 
-    const result = await batchIndexPages(db, mockEvent, limit)
+    const result = await batchIndexPages(db, mockEvent, {
+      limit,
+      all: false,
+    })
 
     return {
       result: {

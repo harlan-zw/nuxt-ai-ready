@@ -98,9 +98,9 @@ describe('runtime indexing', async () => {
     expect(results).toEqual([])
   })
 
-  // Index-now endpoint tests
-  it('index-now: returns status with correct shape', async () => {
-    const result = (await $fetch('/__ai-ready/index-now', { method: 'POST' })) as {
+  // Poll endpoint tests
+  it('poll: returns status with correct shape', async () => {
+    const result = (await $fetch('/__ai-ready/poll', { method: 'POST' })) as {
       indexed: number
       remaining: number
       duration: number
@@ -114,10 +114,21 @@ describe('runtime indexing', async () => {
     expect(typeof result.complete).toBe('boolean')
   })
 
-  it('index-now: respects batchSize config', async () => {
-    // The fixture has batchSize: 5, so should process at most 5 pages
-    const result = (await $fetch('/__ai-ready/index-now', { method: 'POST' })) as { indexed: number }
-    expect(result.indexed).toBeLessThanOrEqual(5)
+  it('poll: respects limit parameter', async () => {
+    const result = (await $fetch('/__ai-ready/poll?limit=1', { method: 'POST' })) as { indexed: number }
+    expect(result.indexed).toBeLessThanOrEqual(1)
+  })
+
+  it('poll: caps limit at 50', async () => {
+    // Even with limit=100, should process at most 50
+    const result = (await $fetch('/__ai-ready/poll?limit=100', { method: 'POST' })) as { indexed: number }
+    expect(result.indexed).toBeLessThanOrEqual(50)
+  })
+
+  it('poll: all=true processes multiple pages', async () => {
+    const result = (await $fetch('/__ai-ready/poll?all=true&timeout=5000', { method: 'POST' })) as { indexed: number, complete: boolean }
+    expect(typeof result.indexed).toBe('number')
+    expect(typeof result.complete).toBe('boolean')
   })
 
   it('status: returns indexing status', async () => {
@@ -286,13 +297,6 @@ describe('runtime indexing', async () => {
     // Verify stale routes are gone (dry run should return 0)
     const after = (await $fetch('/__ai-ready/prune?ttl=604800&dry=true', { method: 'POST' })) as { count: number }
     expect(after.count).toBe(0)
-  })
-
-  // Single route reindex via index-now
-  it('index-now: reindexes a single route with ?route param', async () => {
-    const result = (await $fetch('/__ai-ready/index-now?route=/', { method: 'POST' })) as { success: boolean, title?: string, isUpdate?: boolean, error?: string }
-    expect(result.success).toBe(true)
-    expect(typeof result.title).toBe('string')
   })
 
   // Scheduled task tests
