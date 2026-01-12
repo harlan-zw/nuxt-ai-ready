@@ -8,7 +8,7 @@ const fetch = (url: string, opts?: Parameters<typeof $fetch>[1]) => $fetch(url a
 describe('runtime indexing', async () => {
   await setup({
     rootDir: fileURLToPath(new URL('../fixtures/runtime-indexing', import.meta.url)),
-    dev: true,
+    dev: false,
     server: true,
   })
 
