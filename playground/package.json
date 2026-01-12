@@ -10,6 +10,6 @@
     "preview": "nuxi preview"
   },
   "devDependencies": {
-    "@nuxt/ui": "catalog:"
+    "@nuxt/ui": "catalog:nuxt"
   }
 }

@@ -18,53 +18,60 @@ overrides:
   schema-utils>ajv: 8.14.0
 
 catalog:
-  '@antfu/eslint-config': ^6.7.3
-  '@arethetypeswrong/cli': ^0.18.2
   '@clack/prompts': ^0.11.0
-  '@headlessui/vue': ^1.7.23
-  '@nuxt/content': ^3.10.0
-  '@nuxt/devtools-ui-kit': ^3.1.1
-  '@nuxt/kit': 4.2.2
-  '@nuxt/module-builder': ^1.0.2
-  '@nuxt/test-utils': ^3.23.0
-  '@nuxt/ui': ^4.3.0
-  '@nuxtjs/color-mode': ^4.0.0
-  '@nuxtjs/eslint-config-typescript': ^12.1.0
-  '@nuxtjs/i18n': ^10.2.1
-  '@nuxtjs/mcp-toolkit': ^0.6.2
-  '@nuxtjs/robots': ^5.6.7
-  '@nuxtjs/sitemap': ^7.5.2
   '@types/better-sqlite3': ^7.6.13
-  '@vitest/coverage-v8': ^4.0.16
-  '@vueuse/nuxt': ^14.1.0
   agents: ^0.3.4
   ai: ^6.0.27
   better-sqlite3: ^12.6.0
-  bumpp: ^10.3.2
   consola: ^3.4.2
   db0: ^0.3.4
   defu: ^6.1.4
-  eslint: ^9.39.2
   execa: ^9.6.1
-  happy-dom: ^20.1.0
   mdream: ^0.15.3
-  nuxt: ^4.2.2
-  nuxt-site-config: ^3.2.17
   ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0
-  playwright: ^1.57.0
-  playwright-core: ^1.57.0
   postgres: ^3.4.8
   std-env: 3.10.0
-  typescript: ^5.9.3
   ufo: ^1.6.2
-  vitest: ^4.0.16
-  vue: ^3.5.26
-  vue-router: ^4.6.4
-  vue-tsc: ^3.2.2
   wrangler: ^4.58.0
   zod: ^4.3.5
+catalogs:
+  dev-build:
+    '@arethetypeswrong/cli': ^0.18.2
+    bumpp: ^10.3.2
+    typescript: ^5.9.3
+    vue-tsc: ^3.2.2
+  dev-lint:
+    '@antfu/eslint-config': ^6.7.3
+    '@nuxtjs/eslint-config-typescript': ^12.1.0
+    eslint: ^9.39.2
+  dev-test:
+    '@nuxt/test-utils': ^3.23.0
+    '@vitest/coverage-v8': ^4.0.16
+    '@vue/test-utils': ^2.4.6
+    happy-dom: ^20.1.0
+    playwright: ^1.57.0
+    playwright-core: ^1.57.0
+    vitest: ^4.0.16
+  nuxt:
+    '@nuxt/content': ^3.10.0
+    '@nuxt/devtools-ui-kit': ^3.1.1
+    '@nuxt/kit': ^4.2.2
+    '@nuxt/module-builder': ^1.0.2
+    '@nuxt/ui': ^4.3.0
+    '@nuxtjs/color-mode': ^4.0.0
+    '@nuxtjs/i18n': ^10.2.1
+    '@nuxtjs/mcp-toolkit': ^0.6.2
+    '@nuxtjs/robots': ^5.6.7
+    '@nuxtjs/sitemap': ^7.5.2
+    '@vueuse/nuxt': ^14.1.0
+    nuxt: ^4.2.2
+    nuxt-site-config: ^3.2.17
+  vue:
+    '@headlessui/vue': ^1.7.23
+    vue: ^3.5.26
+    vue-router: ^4.6.4
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
