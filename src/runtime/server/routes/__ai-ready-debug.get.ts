@@ -1,7 +1,20 @@
 import type { PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { queryPages } from '../db/queries'
+import { countPages, countPagesNeedingIndexNowSync, getIndexNowStats, getRecentCronRuns, getSitemapSeededAt, queryPages } from '../db/queries'
+
+interface CronRunInfo {
+  id: number
+  startedAt: string
+  finishedAt: string | null
+  durationMs: number | null
+  status: string
+  pagesIndexed: number
+  pagesRemaining: number
+  indexNowSubmitted: number
+  indexNowRemaining: number
+  errors: string[]
+}
 
 interface DebugInfo {
   version: string
@@ -15,6 +28,19 @@ interface DebugInfo {
     cacheMaxAgeSeconds: number
     mdreamOptions: unknown
   }
+  runtimeSync?: {
+    total: number
+    indexed: number
+    pending: number
+    sitemapSeededAt: string | null
+  }
+  indexNow?: {
+    pending: number
+    totalSubmitted: number
+    lastSubmittedAt: string | null
+    lastError: string | null
+  }
+  cronRuns?: CronRunInfo[]
   pageData: {
     source: string
     pageCount: number
@@ -167,6 +193,56 @@ export default eventHandler(async (event) => {
     suggestions.push('Check if pages.db exists in .data/ai-ready/')
   }
 
+  // Fetch runtime sync stats (only in production)
+  let runtimeSyncInfo: DebugInfo['runtimeSync']
+  let indexNowInfo: DebugInfo['indexNow']
+  let cronRunsInfo: CronRunInfo[] | undefined
+
+  if (!isDev && !isPrerender) {
+    const [total, pending, sitemapSeededAt, cronRuns] = await Promise.all([
+      countPages(event),
+      countPages(event, { where: { pending: true } }),
+      getSitemapSeededAt(event),
+      getRecentCronRuns(event, 20),
+    ])
+
+    runtimeSyncInfo = {
+      total,
+      indexed: total - pending,
+      pending,
+      sitemapSeededAt: sitemapSeededAt ? new Date(sitemapSeededAt).toISOString() : null,
+    }
+
+    cronRunsInfo = cronRuns.map(run => ({
+      id: run.id,
+      startedAt: new Date(run.startedAt).toISOString(),
+      finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
+      durationMs: run.durationMs,
+      status: run.status,
+      pagesIndexed: run.pagesIndexed,
+      pagesRemaining: run.pagesRemaining,
+      indexNowSubmitted: run.indexNowSubmitted,
+      indexNowRemaining: run.indexNowRemaining,
+      errors: run.errors,
+    }))
+
+    // IndexNow stats if configured
+    if (runtimeConfig.indexNowKey) {
+      const [indexNowPending, indexNowStats] = await Promise.all([
+        countPagesNeedingIndexNowSync(event),
+        getIndexNowStats(event),
+      ])
+      indexNowInfo = {
+        pending: indexNowPending,
+        totalSubmitted: indexNowStats.totalSubmitted,
+        lastSubmittedAt: indexNowStats.lastSubmittedAt
+          ? new Date(indexNowStats.lastSubmittedAt).toISOString()
+          : null,
+        lastError: indexNowStats.lastError,
+      }
+    }
+  }
+
   const debugInfo: DebugInfo = {
     version: runtimeConfig.version || 'unknown',
     environment: {
@@ -179,6 +255,9 @@ export default eventHandler(async (event) => {
       cacheMaxAgeSeconds: runtimeConfig.cacheMaxAgeSeconds,
       mdreamOptions: runtimeConfig.mdreamOptions,
     },
+    runtimeSync: runtimeSyncInfo,
+    indexNow: indexNowInfo,
+    cronRuns: cronRunsInfo,
     pageData: {
       source,
       pageCount: pages.length,

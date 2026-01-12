@@ -659,3 +659,151 @@ export async function getIndexNowStats(
     lastError: stats.indexnow_last_error || null,
   }
 }
+
+// ============================================================================
+// Cron Run Logging
+// ============================================================================
+
+export interface CronRunRow {
+  id: number
+  started_at: number
+  finished_at: number | null
+  duration_ms: number | null
+  pages_indexed: number
+  pages_remaining: number
+  indexnow_submitted: number
+  indexnow_remaining: number
+  errors: string
+  status: 'running' | 'success' | 'partial' | 'error'
+}
+
+export interface CronRun {
+  id: number
+  startedAt: number
+  finishedAt: number | null
+  durationMs: number | null
+  pagesIndexed: number
+  pagesRemaining: number
+  indexNowSubmitted: number
+  indexNowRemaining: number
+  errors: string[]
+  status: 'running' | 'success' | 'partial' | 'error'
+}
+
+function rowToCronRun(row: CronRunRow): CronRun {
+  return {
+    id: row.id,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    durationMs: row.duration_ms,
+    pagesIndexed: row.pages_indexed,
+    pagesRemaining: row.pages_remaining,
+    indexNowSubmitted: row.indexnow_submitted,
+    indexNowRemaining: row.indexnow_remaining,
+    errors: JSON.parse(row.errors || '[]'),
+    status: row.status,
+  }
+}
+
+/**
+ * Start a cron run and return its ID
+ */
+export async function startCronRun(event: H3Event | undefined): Promise<number | null> {
+  const db = await getDb(event)
+  if (!db)
+    return null
+
+  const now = Date.now()
+  await db.exec(
+    'INSERT INTO ai_ready_cron_runs (started_at, status) VALUES (?, ?)',
+    [now, 'running'],
+  )
+
+  const row = await db.first<{ id: number }>('SELECT last_insert_rowid() as id')
+  return row?.id || null
+}
+
+/**
+ * Complete a cron run with results
+ */
+export async function completeCronRun(
+  event: H3Event | undefined,
+  runId: number,
+  result: {
+    pagesIndexed: number
+    pagesRemaining: number
+    indexNowSubmitted: number
+    indexNowRemaining: number
+    errors: string[]
+  },
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  const now = Date.now()
+  const row = await db.first<{ started_at: number }>('SELECT started_at FROM ai_ready_cron_runs WHERE id = ?', [runId])
+  const durationMs = row ? now - row.started_at : null
+
+  const status = result.errors.length > 0
+    ? (result.pagesIndexed > 0 ? 'partial' : 'error')
+    : 'success'
+
+  await db.exec(`
+    UPDATE ai_ready_cron_runs SET
+      finished_at = ?,
+      duration_ms = ?,
+      pages_indexed = ?,
+      pages_remaining = ?,
+      indexnow_submitted = ?,
+      indexnow_remaining = ?,
+      errors = ?,
+      status = ?
+    WHERE id = ?
+  `, [now, durationMs, result.pagesIndexed, result.pagesRemaining, result.indexNowSubmitted, result.indexNowRemaining, JSON.stringify(result.errors), status, runId])
+}
+
+/**
+ * Get recent cron runs
+ */
+export async function getRecentCronRuns(
+  event: H3Event | undefined,
+  limit = 10,
+): Promise<CronRun[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  const rows = await db.all<CronRunRow>(
+    'SELECT * FROM ai_ready_cron_runs ORDER BY started_at DESC LIMIT ?',
+    [limit],
+  )
+  return rows.map(rowToCronRun)
+}
+
+/**
+ * Clean up old cron runs (keep last N)
+ */
+export async function cleanupOldCronRuns(
+  event: H3Event | undefined,
+  keepCount = 50,
+): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
+  const countRow = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_cron_runs')
+  const total = countRow?.count || 0
+
+  if (total <= keepCount)
+    return 0
+
+  const deleteCount = total - keepCount
+  await db.exec(`
+    DELETE FROM ai_ready_cron_runs WHERE id IN (
+      SELECT id FROM ai_ready_cron_runs ORDER BY started_at ASC LIMIT ?
+    )
+  `, [deleteCount])
+
+  return deleteCount
+}

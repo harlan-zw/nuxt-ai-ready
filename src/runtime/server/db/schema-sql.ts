@@ -1,7 +1,7 @@
 // Schema SQL definitions for database initialization
 // Used by both prerender (better-sqlite3) and runtime (db0)
 
-export const SCHEMA_VERSION = 'v1.6.0'
+export const SCHEMA_VERSION = 'v1.7.0'
 
 const PAGES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS ai_ready_pages (
@@ -63,9 +63,26 @@ CREATE TABLE IF NOT EXISTS _ai_ready_info (
   ready INTEGER DEFAULT 0
 )`
 
+const CRON_RUNS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS ai_ready_cron_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER,
+  duration_ms INTEGER,
+  pages_indexed INTEGER DEFAULT 0,
+  pages_remaining INTEGER DEFAULT 0,
+  indexnow_submitted INTEGER DEFAULT 0,
+  indexnow_remaining INTEGER DEFAULT 0,
+  errors TEXT DEFAULT '[]',
+  status TEXT DEFAULT 'running'
+)`
+
+const CRON_RUNS_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS idx_ai_ready_cron_runs_started ON ai_ready_cron_runs(started_at DESC)'
+
 export const DROP_TABLES_SQL = [
   'DROP TABLE IF EXISTS ai_ready_pages_fts',
   'DROP TABLE IF EXISTS ai_ready_pages',
+  'DROP TABLE IF EXISTS ai_ready_cron_runs',
   'DROP TABLE IF EXISTS _ai_ready_info',
   // Legacy unprefixed tables (migration from v1.0.0)
   'DROP TABLE IF EXISTS pages_fts',
@@ -79,4 +96,6 @@ export const ALL_SCHEMA_SQL = [
   FTS_TABLE_SQL,
   ...FTS_TRIGGERS_SQL,
   INFO_TABLE_SQL,
+  CRON_RUNS_TABLE_SQL,
+  CRON_RUNS_INDEX_SQL,
 ]
