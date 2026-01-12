@@ -1,7 +1,6 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
 import { getSitemapSeededAt, pruneStaleRoutes, seedRoutes, setSitemapSeededAt } from '../db/queries'
 import { logger } from '../logger'
 import { fetchSitemapUrls } from '../utils/sitemap'
@@ -28,10 +27,8 @@ async function seedFromSitemap(event: H3Event): Promise<void> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const { ttl, pruneTtl } = config.runtimeSync
 
-  const db = await useDatabase(event)
-
   // Check if sitemap was recently seeded
-  const seededAt = await getSitemapSeededAt(db)
+  const seededAt = await getSitemapSeededAt(event)
   if (seededAt && ttl > 0) {
     const age = (Date.now() - seededAt) / 1000
     if (age < ttl) {
@@ -54,14 +51,14 @@ async function seedFromSitemap(event: H3Event): Promise<void> {
   }).filter(route => !route.includes('.')) // Skip file extensions
 
   // Seed routes into database (updates last_seen_at for existing routes)
-  await seedRoutes(db, routes)
-  await setSitemapSeededAt(db, Date.now())
+  await seedRoutes(event, routes)
+  await setSitemapSeededAt(event, Date.now())
 
   logger.info(`[sitemap-seeder] Seeded ${routes.length} routes from sitemap`)
 
   // Prune stale routes if configured
   if (pruneTtl > 0) {
-    const pruned = await pruneStaleRoutes(db, pruneTtl)
+    const pruned = await pruneStaleRoutes(event, pruneTtl)
     if (pruned > 0)
       logger.info(`[sitemap-seeder] Pruned ${pruned} stale routes`)
   }

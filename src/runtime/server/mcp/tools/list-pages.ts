@@ -1,6 +1,8 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
+import type { PageEntry } from '../../db/queries'
+import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
-import { getPagesList } from '../../utils/pageData'
+import { countPages, queryPages } from '../../db/queries'
 
 const inputSchema = {
   limit: z.number().optional().default(100).describe('Max pages to return (default: 100)'),
@@ -13,18 +15,25 @@ const tool: McpToolDefinition = {
   inputSchema,
   cache: '1h',
   async handler({ limit, offset }) {
-    const pages = await getPagesList()
-    const total = pages.length
-    const paginated = pages.slice(offset as number, (offset as number) + (limit as number))
+    const event = useEvent()
+    const pages = await queryPages(event, { limit: limit as number, offset: offset as number }) as PageEntry[]
+    const total = await countPages(event)
+
     return {
       content: [{
         type: 'text',
         text: JSON.stringify({
-          pages: paginated,
+          pages: pages.map(p => ({
+            route: p.route,
+            title: p.title || p.route,
+            description: p.description || '',
+            headings: p.headings || undefined,
+            keywords: p.keywords?.length ? p.keywords : undefined,
+          })),
           total,
           limit,
           offset,
-          hasMore: (offset as number) + paginated.length < total,
+          hasMore: (offset as number) + pages.length < total,
         }),
       }],
     }

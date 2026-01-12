@@ -303,19 +303,3 @@ export function extractKeywords(text: string, metaKeywords?: string, max = 10): 
     .slice(0, max)
     .map(([word]) => word)
 }
-
-/**
- * Strip markdown formatting to get plain text
- */
-export function stripMarkdown(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, '') // code blocks
-    .replace(/`[^`]+`/g, '') // inline code
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '') // images
-    .replace(/^#{1,6}\s+/gm, '') // headings
-    .replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1') // emphasis
-    .replace(/<[^>]+>/g, '') // html
-    .replace(/\s+/g, ' ')
-    .trim()
-}

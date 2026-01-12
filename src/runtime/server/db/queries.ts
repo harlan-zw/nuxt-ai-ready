@@ -1,4 +1,108 @@
-import type { DatabaseAdapter } from './schema'
+import type { H3Event } from 'h3'
+import type { DatabaseAdapter } from './shared'
+import { useEvent } from 'nitropack/runtime'
+import { useDatabase } from './index'
+import { normalizeRouteKey } from './shared'
+
+/** Try to get the current H3Event from context or use provided event */
+function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
+  if (providedEvent)
+    return providedEvent
+  try {
+    return useEvent()
+  }
+  catch {
+    return undefined
+  }
+}
+
+let devWarningShown = false
+
+/** Get database, with dev mode warning and prerender handling */
+async function getDb(event?: H3Event): Promise<DatabaseAdapter | null> {
+  if (import.meta.dev) {
+    if (!devWarningShown) {
+      console.warn('[nuxt-ai-ready] Page data unavailable in dev. Run `nuxi generate` for full metadata.')
+      devWarningShown = true
+    }
+    return null
+  }
+
+  // During prerender, read from build-time SQLite via virtual module
+  if (import.meta.prerender) {
+    return getPrerenderDb()
+  }
+
+  // Runtime: use database via db0
+  return useDatabase(getEventFromContext(event))
+}
+
+/** Get prerender database adapter (reads from build-time SQLite) */
+async function getPrerenderDb(): Promise<DatabaseAdapter> {
+  const m = await import('#ai-ready-virtual/read-page-data.mjs')
+  const data = await (m as unknown as {
+    readPageDataFromFilesystem: () => Promise<{ pages: PageData[], errorRoutes: string[] }>
+  }).readPageDataFromFilesystem()
+
+  // Create a minimal adapter that returns the cached data
+  const pages = data.pages || []
+  const errorRoutes = new Set(data.errorRoutes || [])
+
+  return {
+    all: async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
+      // Parse basic queries
+      const isErrorQuery = sql.includes('is_error = 1') || (params.includes(1) && sql.includes('is_error'))
+      const excludeErrors = sql.includes('is_error = 0')
+
+      if (isErrorQuery) {
+        return pages.filter(p => errorRoutes.has(p.route)).map(p => ({
+          ...p,
+          headings: p.headings,
+          keywords: JSON.stringify(p.keywords),
+          updated_at: p.updatedAt,
+          is_error: 1,
+          indexed: 0,
+        })) as T[]
+      }
+
+      const filtered = excludeErrors ? pages.filter(p => !errorRoutes.has(p.route)) : pages
+      return filtered.map(p => ({
+        route: p.route,
+        title: p.title,
+        description: p.description,
+        markdown: p.markdown,
+        headings: p.headings,
+        keywords: JSON.stringify(p.keywords),
+        updated_at: p.updatedAt,
+        is_error: errorRoutes.has(p.route) ? 1 : 0,
+        indexed: 1,
+      })) as T[]
+    },
+    first: async <T>(sql: string, params: unknown[] = []): Promise<T | undefined> => {
+      if (sql.includes('WHERE route = ?')) {
+        const route = params[0] as string
+        const page = pages.find(p => p.route === route)
+        if (!page)
+          return undefined
+        return {
+          route: page.route,
+          title: page.title,
+          description: page.description,
+          markdown: page.markdown,
+          headings: page.headings,
+          keywords: JSON.stringify(page.keywords),
+          updated_at: page.updatedAt,
+          is_error: errorRoutes.has(page.route) ? 1 : 0,
+          indexed: 1,
+        } as T
+      }
+      return undefined
+    },
+    exec: async (): Promise<void> => {
+      // No-op for prerender (read-only)
+    },
+  }
+}
 
 export interface PageRow {
   id: number
@@ -9,6 +113,7 @@ export interface PageRow {
   markdown: string
   headings: string
   keywords: string
+  content_hash: string | null
   updated_at: string
   indexed_at: number
   is_error: number
@@ -37,14 +142,6 @@ export interface SearchResult {
   score: number
 }
 
-/**
- * Normalize route to storage key format
- * e.g., '/about/team' -> 'about:team', '/' -> 'index'
- */
-export function normalizeRouteKey(route: string): string {
-  return route.replace(/^\//, '').replace(/\//g, ':') || 'index'
-}
-
 // ============================================================================
 // Unified Query Interface
 // ============================================================================
@@ -59,14 +156,6 @@ export interface QueryPagesOptions {
   }
   limit?: number
   offset?: number
-}
-
-export interface CountPagesOptions {
-  where?: {
-    pending?: boolean
-    hasError?: boolean
-    source?: 'prerender' | 'runtime'
-  }
 }
 
 function buildWhereClause(where?: QueryPagesOptions['where']): { sql: string, params: unknown[] } {
@@ -117,16 +206,22 @@ function rowToData(row: PageRow): PageData {
 
 /**
  * Unified page query function
+ * @param event - H3Event (optional, used for db context)
+ * @param options - Query options
  */
-export async function queryPages(db: DatabaseAdapter, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
-export async function queryPages(db: DatabaseAdapter, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
-export async function queryPages(db: DatabaseAdapter, options: QueryPagesOptions & { route: string, includeMarkdown: true }): Promise<PageData | undefined>
-export async function queryPages(db: DatabaseAdapter, options: QueryPagesOptions & { includeMarkdown: true }): Promise<PageData[]>
+export async function queryPages(event?: H3Event, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
+export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
+export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string, includeMarkdown: true }): Promise<PageData | undefined>
+export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { includeMarkdown: true }): Promise<PageData[]>
 export async function queryPages(
-  db: DatabaseAdapter,
+  event?: H3Event,
   options: QueryPagesOptions = {},
 ): Promise<PageEntry | PageData | PageEntry[] | PageData[] | undefined> {
   const { route, includeMarkdown, where, limit, offset } = options
+
+  const db = await getDb(event)
+  if (!db)
+    return route ? undefined : []
 
   // Single page lookup
   if (route) {
@@ -153,10 +248,61 @@ export async function queryPages(
   return includeMarkdown ? rows.map(rowToData) : rows.map(rowToEntry)
 }
 
+export interface StreamPagesOptions {
+  batchSize?: number
+}
+
+/**
+ * Stream pages using cursor-based pagination
+ * Yields pages one batch at a time to avoid loading all into memory
+ */
+export async function* streamPages(
+  event?: H3Event,
+  options: StreamPagesOptions = {},
+): AsyncGenerator<PageData, void, unknown> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  const batchSize = options.batchSize || 50
+  let offset = 0
+
+  while (true) {
+    const rows = await db.all<PageRow>(
+      `SELECT * FROM ai_ready_pages WHERE is_error = 0 ORDER BY route LIMIT ? OFFSET ?`,
+      [batchSize, offset],
+    )
+
+    if (rows.length === 0)
+      break
+
+    for (const row of rows) {
+      yield rowToData(row)
+    }
+
+    if (rows.length < batchSize)
+      break
+
+    offset += batchSize
+  }
+}
+
+export interface CountPagesOptions {
+  where?: {
+    pending?: boolean
+    hasError?: boolean
+    source?: 'prerender' | 'runtime'
+  }
+}
+
 /**
  * Count pages matching criteria
  */
-export async function countPages(db: DatabaseAdapter, options: CountPagesOptions = {}): Promise<number> {
+export async function countPages(event?: H3Event, options: CountPagesOptions = {}): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
   const { sql: whereClause, params } = buildWhereClause(options.where)
   const row = await db.first<{ count: number }>(
     `SELECT COUNT(*) as count FROM ai_ready_pages ${whereClause}`,
@@ -169,15 +315,28 @@ export async function countPages(db: DatabaseAdapter, options: CountPagesOptions
 // Full-text Search
 // ============================================================================
 
+export interface SearchPagesOptions {
+  limit?: number
+}
+
 /**
  * Full-text search using FTS5
+ * Note: FTS is only available at runtime, not during prerender
  */
 export async function searchPages(
-  db: DatabaseAdapter,
+  event: H3Event | undefined,
   query: string,
-  opts: { limit?: number } = {},
+  options: SearchPagesOptions = {},
 ): Promise<SearchResult[]> {
-  const { limit = 10 } = opts
+  // FTS not available in dev or prerender
+  if (import.meta.dev || import.meta.prerender)
+    return []
+
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  const { limit = 10 } = options
 
   // Sanitize and prepare query for FTS5
   const sanitized = query.replace(/[*:^"()]/g, ' ').trim()
@@ -202,20 +361,27 @@ export async function searchPages(
 // Write Operations
 // ============================================================================
 
-/**
- * Insert or update a page
- */
-export async function upsertPage(db: DatabaseAdapter, page: {
+export interface UpsertPageInput {
   route: string
   title: string
   description: string
   markdown: string
   headings: string
   keywords: string[]
+  contentHash?: string
   updatedAt: string
   isError?: boolean
   source?: 'prerender' | 'runtime'
-}): Promise<void> {
+}
+
+/**
+ * Insert or update a page
+ */
+export async function upsertPage(event: H3Event | undefined, page: UpsertPageInput): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
   const routeKey = normalizeRouteKey(page.route)
   const keywordsJson = JSON.stringify(page.keywords)
   const indexedAt = Date.now()
@@ -223,41 +389,53 @@ export async function upsertPage(db: DatabaseAdapter, page: {
   const lastSeenAt = source === 'runtime' ? indexedAt : null
 
   await db.exec(`
-    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
       markdown = excluded.markdown,
       headings = excluded.headings,
       keywords = excluded.keywords,
+      content_hash = excluded.content_hash,
       updated_at = excluded.updated_at,
       indexed_at = excluded.indexed_at,
       is_error = excluded.is_error,
       indexed = 1,
       source = excluded.source,
       last_seen_at = excluded.last_seen_at
-  `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt])
-}
-
-/**
- * Delete a page by route
- */
-export async function deletePage(db: DatabaseAdapter, route: string): Promise<void> {
-  await db.exec('DELETE FROM ai_ready_pages WHERE route = ?', [route])
+  `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt])
 }
 
 /**
  * Check if a page is fresh (within TTL)
  */
-export async function isPageFresh(db: DatabaseAdapter, route: string, ttlSeconds: number): Promise<boolean> {
+export async function isPageFresh(event: H3Event | undefined, route: string, ttlSeconds: number): Promise<boolean> {
   if (ttlSeconds <= 0)
     return false
+
+  const db = await getDb(event)
+  if (!db)
+    return false
+
   const row = await db.first<{ indexed_at: number }>('SELECT indexed_at FROM ai_ready_pages WHERE route = ?', [route])
   if (!row)
     return false
   const age = (Date.now() - row.indexed_at) / 1000
   return age < ttlSeconds
+}
+
+/**
+ * Get existing content hash for a page (for change detection)
+ * @internal
+ */
+export async function getPageHash(event: H3Event | undefined, route: string): Promise<string | null> {
+  const db = await getDb(event)
+  if (!db)
+    return null
+
+  const row = await db.first<{ content_hash: string | null }>('SELECT content_hash FROM ai_ready_pages WHERE route = ?', [route])
+  return row?.content_hash || null
 }
 
 // ============================================================================
@@ -267,7 +445,11 @@ export async function isPageFresh(db: DatabaseAdapter, route: string, ttlSeconds
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(db: DatabaseAdapter, routes: string[]): Promise<number> {
+export async function seedRoutes(event: H3Event | undefined, routes: string[]): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
   const now = new Date().toISOString()
   const nowMs = Date.now()
   for (const route of routes) {
@@ -282,25 +464,13 @@ export async function seedRoutes(db: DatabaseAdapter, routes: string[]): Promise
 }
 
 /**
- * Get one unindexed route for background indexing
- */
-export async function getNextUnindexedRoute(db: DatabaseAdapter): Promise<string | undefined> {
-  const row = await db.first<{ route: string }>('SELECT route FROM ai_ready_pages WHERE indexed = 0 LIMIT 1')
-  return row?.route
-}
-
-/**
- * Get count of unindexed pages
- */
-export async function getUnindexedCount(db: DatabaseAdapter): Promise<number> {
-  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 0')
-  return row?.count || 0
-}
-
-/**
  * Get sitemap seeded timestamp from _ai_ready_info
  */
-export async function getSitemapSeededAt(db: DatabaseAdapter): Promise<number | undefined> {
+export async function getSitemapSeededAt(event: H3Event | undefined): Promise<number | undefined> {
+  const db = await getDb(event)
+  if (!db)
+    return undefined
+
   const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['sitemap_seeded_at'])
   return row ? Number.parseInt(row.value, 10) : undefined
 }
@@ -308,7 +478,11 @@ export async function getSitemapSeededAt(db: DatabaseAdapter): Promise<number | 
 /**
  * Set sitemap seeded timestamp
  */
-export async function setSitemapSeededAt(db: DatabaseAdapter, timestamp: number): Promise<void> {
+export async function setSitemapSeededAt(event: H3Event | undefined, timestamp: number): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
   await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['sitemap_seeded_at', String(timestamp)])
 }
 
@@ -316,7 +490,11 @@ export async function setSitemapSeededAt(db: DatabaseAdapter, timestamp: number)
  * Prune routes not seen in sitemap for longer than threshold
  * Only prunes routes with source='runtime' (never prerendered pages)
  */
-export async function pruneStaleRoutes(db: DatabaseAdapter, staleThresholdSeconds: number): Promise<number> {
+export async function pruneStaleRoutes(event: H3Event | undefined, staleThresholdSeconds: number): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
   const threshold = Date.now() - (staleThresholdSeconds * 1000)
 
   const countRow = await db.first<{ count: number }>(
@@ -334,7 +512,11 @@ export async function pruneStaleRoutes(db: DatabaseAdapter, staleThresholdSecond
 /**
  * Get stale routes that would be pruned (for preview)
  */
-export async function getStaleRoutes(db: DatabaseAdapter, staleThresholdSeconds: number): Promise<string[]> {
+export async function getStaleRoutes(event: H3Event | undefined, staleThresholdSeconds: number): Promise<string[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
   const threshold = Date.now() - (staleThresholdSeconds * 1000)
   const rows = await db.all<{ route: string }>(
     'SELECT route FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',

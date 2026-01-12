@@ -10,7 +10,7 @@ import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp } from 'nitropack/runtime'
 
 // Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
-export function normalizeWhitespace(text: string): string {
+function normalizeWhitespace(text: string): string {
   return text.replace(/\u00A0/g, ' ')
 }
 
@@ -20,6 +20,7 @@ interface ExtractedMeta {
   metaKeywords: string
   headings: Array<Record<string, string>>
   updatedAt?: string
+  textContent: string[]
 }
 
 // Build mdream options with extraction plugin
@@ -37,6 +38,11 @@ function buildMdreamOptions(
       const text = el.textContent?.trim()
       if (text)
         meta.headings.push({ [el.name.toLowerCase()]: text })
+    },
+    'p, li, td, th, blockquote, figcaption': (el) => {
+      const text = el.textContent?.trim()
+      if (text)
+        meta.textContent.push(text)
     },
     ...(extractUpdatedAt && {
       'meta[property="article:modified_time"], meta[name="last-modified"], meta[name="updated"], meta[property="og:updated_time"], meta[name="lastmod"]': (el) => {
@@ -98,7 +104,7 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { p
 }
 
 // Detect if client prefers markdown based on Accept header or AI bot detection
-export function clientPrefersMarkdown(event: H3Event): boolean {
+function clientPrefersMarkdown(event: H3Event): boolean {
   const accept = getHeader(event, 'accept') || ''
   const secFetchDest = getHeader(event, 'sec-fetch-dest') || ''
 
@@ -126,46 +132,51 @@ export function clientPrefersMarkdown(event: H3Event): boolean {
   return false
 }
 
-// Convert HTML to Markdown (runtime version with hooks)
-export async function convertHtmlToMarkdown(html: string, url: string, config: ModulePublicRuntimeConfig, route: string, event: H3Event) {
-  const nitroApp = useNitroApp()
-  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [] }
-
-  const options = buildMdreamOptions(url, config.mdreamOptions, meta)
-  await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
-
-  const context: MarkdownContext = {
-    html,
-    markdown: htmlToMarkdown(html, options),
-    route,
-    title: meta.title,
-    description: meta.description,
-    isPrerender: false,
-    event,
-  }
-
-  await nitroApp.hooks.callHook('ai-ready:markdown', context)
-
-  return {
-    markdown: normalizeWhitespace(context.markdown),
-    title: normalizeWhitespace(meta.title),
-    description: normalizeWhitespace(meta.description),
-    headings: meta.headings,
-    metaKeywords: meta.metaKeywords,
-  }
+interface ConvertHtmlOptions {
+  /** Extract updatedAt from meta tags */
+  extractUpdatedAt?: boolean
+  /** Call runtime hooks (ai-ready:mdreamConfig, ai-ready:markdown) */
+  hooks?: { route: string, event: H3Event }
 }
 
-// Convert HTML to Markdown with metadata extraction (prerender version, no hooks)
-export function convertHtmlToMarkdownMeta(html: string, url: string, mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions']) {
-  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [] }
-  const options = buildMdreamOptions(url, mdreamOptions, meta, true)
+// Convert HTML to Markdown with optional hooks and updatedAt extraction
+export async function convertHtmlToMarkdown(
+  html: string,
+  url: string,
+  mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions'],
+  opts: ConvertHtmlOptions = {},
+) {
+  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [] }
+  const options = buildMdreamOptions(url, mdreamOptions, meta, opts.extractUpdatedAt)
+
+  let markdown: string
+  if (opts.hooks) {
+    const nitroApp = useNitroApp()
+    await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
+
+    const context: MarkdownContext = {
+      html,
+      markdown: htmlToMarkdown(html, options),
+      route: opts.hooks.route,
+      title: meta.title,
+      description: meta.description,
+      isPrerender: false,
+      event: opts.hooks.event,
+    }
+    await nitroApp.hooks.callHook('ai-ready:markdown', context)
+    markdown = context.markdown
+  }
+  else {
+    markdown = htmlToMarkdown(html, options)
+  }
 
   return {
-    markdown: normalizeWhitespace(htmlToMarkdown(html, options)),
+    markdown: normalizeWhitespace(markdown),
     title: normalizeWhitespace(meta.title),
     description: normalizeWhitespace(meta.description),
     headings: meta.headings,
     metaKeywords: meta.metaKeywords,
+    textContent: meta.textContent.join(' '),
     ...(meta.updatedAt && { updatedAt: meta.updatedAt }),
   }
 }

@@ -1,9 +1,9 @@
-// Shared schema definitions for build-time and runtime
-// Used by both better-sqlite3 (prerender) and db0 (runtime)
+// Schema SQL definitions for database initialization
+// Used by both prerender (better-sqlite3) and runtime (db0)
 
-export const SCHEMA_VERSION = 'v1.4.0'
+export const SCHEMA_VERSION = 'v1.5.0'
 
-export const PAGES_TABLE_SQL = `
+const PAGES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS ai_ready_pages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   route TEXT UNIQUE NOT NULL,
@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS ai_ready_pages (
   markdown TEXT NOT NULL DEFAULT '',
   headings TEXT NOT NULL DEFAULT '[]',
   keywords TEXT NOT NULL DEFAULT '[]',
+  content_hash TEXT,
   updated_at TEXT NOT NULL,
   indexed_at INTEGER NOT NULL,
   is_error INTEGER NOT NULL DEFAULT 0,
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ai_ready_pages (
   last_seen_at INTEGER
 )`
 
-export const PAGES_INDEXES_SQL = [
+const PAGES_INDEXES_SQL = [
   'CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)',
   'CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_is_error ON ai_ready_pages(is_error)',
   'CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_indexed ON ai_ready_pages(indexed)',
@@ -29,13 +30,13 @@ export const PAGES_INDEXES_SQL = [
   'CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_last_seen ON ai_ready_pages(last_seen_at)',
 ]
 
-export const FTS_TABLE_SQL = `
+const FTS_TABLE_SQL = `
 CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
   route, title, description, markdown, headings, keywords,
   content=ai_ready_pages, content_rowid=id
 )`
 
-export const FTS_TRIGGERS_SQL = [
+const FTS_TRIGGERS_SQL = [
   `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
     INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
     VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
@@ -52,7 +53,7 @@ export const FTS_TRIGGERS_SQL = [
   END`,
 ]
 
-export const INFO_TABLE_SQL = `
+const INFO_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS _ai_ready_info (
   id TEXT PRIMARY KEY,
   value TEXT,

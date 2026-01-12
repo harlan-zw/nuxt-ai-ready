@@ -1,51 +1,17 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
-import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './runtime/types'
-import { appendFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import type { DatabaseAdapter } from './runtime/server/db/shared'
+import type { SiteInfo } from './runtime/server/utils/llms-full'
+import type { LlmsTxtConfig } from './runtime/types'
+import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
-import { ALL_SCHEMA_SQL, INFO_TABLE_SQL, SCHEMA_VERSION } from './shared/schema'
-import { refineDatabaseConfig } from './utils/database'
-
-// Inline normalization functions to avoid runtime deps
-function normalizeLink(link: LlmsTxtLink): string {
-  const parts: string[] = []
-  parts.push(`- [${link.title}](${link.href})`)
-  if (link.description)
-    parts.push(`  ${link.description}`)
-  return parts.join('\n')
-}
-
-function normalizeSection(section: LlmsTxtSection): string {
-  const parts: string[] = []
-  parts.push(`## ${section.title}`)
-  parts.push('')
-  if (section.description) {
-    const descriptions = Array.isArray(section.description) ? section.description : [section.description]
-    parts.push(...descriptions)
-    parts.push('')
-  }
-  if (section.links?.length)
-    parts.push(...section.links.map(normalizeLink))
-  return parts.join('\n')
-}
-
-function normalizeLlmsTxtConfig(config: LlmsTxtConfig): string {
-  const parts: string[] = []
-  if (config.sections?.length)
-    parts.push(...config.sections.map(normalizeSection))
-  if (config.notes) {
-    parts.push('## Notes')
-    parts.push('')
-    const notes = Array.isArray(config.notes) ? config.notes : [config.notes]
-    parts.push(...notes)
-  }
-  return parts.join('\n\n')
-}
+import { computeContentHash, createAdapter, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
+import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 
 export interface ParsedMarkdownResult {
   markdown: string
@@ -61,26 +27,20 @@ interface SitemapEntry {
   lastmod?: string | Date
 }
 
-export interface SiteInfo {
-  name?: string
-  url?: string
-  description?: string
-}
-
 export interface CrawlerState {
   prerenderedRoutes: Set<string>
   errorRoutes: Set<string>
   totalProcessingTime: number
   initialized: boolean
-  jsonlInitialized: boolean
-  pageDataPath?: string
+  dbPath?: string
+  db?: DatabaseAdapter
   llmsFullTxtPath?: string
   siteInfo?: SiteInfo
   llmsTxtConfig?: LlmsTxtConfig
 }
 
-export function createCrawlerState(
-  pageDataPath?: string,
+function createCrawlerState(
+  dbPath?: string,
   llmsFullTxtPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
@@ -90,47 +50,27 @@ export function createCrawlerState(
     errorRoutes: new Set(),
     totalProcessingTime: 0,
     initialized: false,
-    jsonlInitialized: false,
-    pageDataPath,
+    dbPath,
     llmsFullTxtPath,
     siteInfo,
     llmsTxtConfig,
   }
 }
 
-function buildLlmsFullTxtHeader(siteInfo?: SiteInfo, llmsTxtConfig?: LlmsTxtConfig): string {
-  const parts: string[] = []
-
-  // Header
-  parts.push(`# ${siteInfo?.name || siteInfo?.url || 'Site'}`)
-  if (siteInfo?.description)
-    parts.push(`\n> ${siteInfo.description}`)
-  if (siteInfo?.url)
-    parts.push(`\nCanonical Origin: ${siteInfo.url}`)
-  parts.push('')
-
-  // Sections (LLM Resources, etc)
-  if (llmsTxtConfig) {
-    const normalizedContent = normalizeLlmsTxtConfig(llmsTxtConfig)
-    if (normalizedContent) {
-      parts.push(normalizedContent)
-      parts.push('')
-    }
-  }
-
-  parts.push('## Pages\n\n')
-  return parts.join('\n')
-}
-
-export async function initCrawler(state: CrawlerState): Promise<void> {
+async function initCrawler(state: CrawlerState): Promise<void> {
   if (state.initialized)
     return
-  if (state.pageDataPath) {
-    await mkdir(dirname(state.pageDataPath), { recursive: true })
-    await writeFile(state.pageDataPath, '', 'utf-8')
-    state.jsonlInitialized = true
-    logger.debug(`Crawler initialized with JSONL at ${state.pageDataPath}`)
+
+  // Initialize SQLite database for page data
+  if (state.dbPath) {
+    await mkdir(dirname(state.dbPath), { recursive: true })
+    const { default: betterSqlite3 } = await import('db0/connectors/better-sqlite3')
+    const connector = betterSqlite3({ path: state.dbPath })
+    state.db = createAdapter(connector)
+    await initSchema(state.db)
+    logger.debug(`Crawler initialized with SQLite at ${state.dbPath}`)
   }
+
   // Initialize llms-full.txt with header
   if (state.llmsFullTxtPath) {
     await mkdir(dirname(state.llmsFullTxtPath), { recursive: true })
@@ -138,6 +78,7 @@ export async function initCrawler(state: CrawlerState): Promise<void> {
     await writeFile(state.llmsFullTxtPath, header, 'utf-8')
     logger.debug(`llms-full.txt initialized at ${state.llmsFullTxtPath}`)
   }
+
   state.initialized = true
 }
 
@@ -145,43 +86,6 @@ function flattenHeadings(headings: Array<Record<string, string>> | undefined): s
   return (headings || [])
     .map(h => Object.entries(h).map(([tag, text]) => `${tag}:${text}`).join(''))
     .join('|')
-}
-
-function stripFrontmatter(markdown: string): string {
-  // Remove YAML frontmatter (---\n...\n---)
-  return markdown.replace(/^---\n[\s\S]*?\n---\n*/, '')
-}
-
-function normalizeHeadings(markdown: string): string {
-  // Convert headings to plain text with level prefix: # Title -> h1. Title
-  // eslint-disable-next-line regexp/no-super-linear-backtracking
-  return markdown.replace(/^(#{1,6})\s+(.+)$/gm, (_, hashes, text) => {
-    const level = hashes.length
-    return `h${level}. ${text}`
-  })
-}
-
-function formatPageForLlmsFullTxt(route: string, title: string, description: string, markdown: string, siteUrl?: string): string {
-  const canonicalUrl = siteUrl ? `${siteUrl.replace(/\/$/, '')}${route}` : route
-  const heading = title && title !== route ? `### ${title}` : `### ${route}`
-
-  // Clean markdown: strip frontmatter and normalize headings
-  let content = stripFrontmatter(markdown)
-  content = normalizeHeadings(content)
-
-  const parts = [heading, '']
-  parts.push(`Source: ${canonicalUrl}`)
-  if (description)
-    parts.push(`Description: ${description}`)
-  parts.push('')
-  if (content.trim()) {
-    parts.push(content.trim())
-    parts.push('')
-  }
-  parts.push('---')
-  parts.push('') // blank line after separator
-
-  return `${parts.join('\n')}\n`
 }
 
 async function processMarkdownRoute(
@@ -203,17 +107,19 @@ async function processMarkdownRoute(
 
   await nuxt.hooks.callHook('ai-ready:page:markdown', { route, markdown, title, description, headings })
 
-  if (state.jsonlInitialized && state.pageDataPath) {
-    const pageData = {
+  // Insert into SQLite database
+  if (state.db) {
+    const contentHash = await computeContentHash(markdown)
+    await insertPage(state.db, {
       route,
       title,
       description,
+      markdown,
       headings: flattenHeadings(headings),
       keywords: keywords || [],
+      contentHash,
       updatedAt,
-      markdown,
-    }
-    await appendFile(state.pageDataPath, `${JSON.stringify(pageData)}\n`, 'utf-8')
+    })
   }
 
   // Stream-append to llms-full.txt (skip for sitemap-only crawled pages)
@@ -225,7 +131,7 @@ async function processMarkdownRoute(
   state.prerenderedRoutes.add(route)
 }
 
-export async function crawlSitemapEntries(
+async function crawlSitemapEntries(
   state: CrawlerState,
   nuxt: Nuxt,
   nitro: Nitro,
@@ -287,7 +193,7 @@ export async function crawlSitemapEntries(
   return crawled
 }
 
-export async function crawlSitemapContent(
+async function crawlSitemapContent(
   state: CrawlerState,
   nuxt: Nuxt,
   nitro: Nitro,
@@ -339,121 +245,6 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   }
 }
 
-interface PageDataEntry {
-  route: string
-  title: string
-  description: string
-  headings: string
-  keywords: string[]
-  updatedAt: string
-  markdown: string
-}
-
-/**
- * Create SQLite database dump from page entries
- * Uses better-sqlite3 directly at build time
- */
-async function createDatabaseDump(
-  entries: PageDataEntry[],
-  errorRoutes: string[],
-  dbConfig: { filename?: string },
-): Promise<string> {
-  // Dynamic import better-sqlite3 (build-time only)
-  const Database = (await import('better-sqlite3')).default
-  const dbPath = dbConfig.filename || '.data/ai-ready/pages.db'
-
-  // Ensure directory exists
-  await mkdir(dirname(dbPath), { recursive: true })
-
-  const db = new Database(dbPath)
-
-  // Initialize schema using shared definitions
-  for (const sql of ALL_SCHEMA_SQL) {
-    db.exec(sql)
-  }
-
-  // Store schema version
-  db.exec(INFO_TABLE_SQL)
-  db.prepare('INSERT OR REPLACE INTO _ai_ready_info (id, version) VALUES (?, ?)').run('schema', SCHEMA_VERSION)
-
-  // Insert pages
-  const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-
-  const normalizeRouteKey = (route: string) => route.replace(/^\//, '').replace(/\//g, ':') || 'index'
-  const now = Date.now()
-
-  for (const entry of entries) {
-    insertStmt.run(
-      entry.route,
-      normalizeRouteKey(entry.route),
-      entry.title,
-      entry.description,
-      entry.markdown,
-      entry.headings,
-      JSON.stringify(entry.keywords),
-      entry.updatedAt,
-      now,
-      0, // is_error
-      1, // indexed (prerendered pages are indexed)
-      'prerender', // source
-      now, // last_seen_at
-    )
-  }
-
-  // Insert error routes
-  for (const route of errorRoutes) {
-    insertStmt.run(
-      route,
-      normalizeRouteKey(route),
-      '',
-      '',
-      '',
-      '[]',
-      '[]',
-      new Date().toISOString(),
-      now,
-      1, // is_error
-      0, // indexed
-      'prerender', // source
-      now, // last_seen_at
-    )
-  }
-
-  // Export dump
-  const rows = db.prepare(`
-    SELECT route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at
-    FROM ai_ready_pages
-  `).all() as Array<{
-    route: string
-    route_key: string
-    title: string
-    description: string
-    markdown: string
-    headings: string
-    keywords: string
-    updated_at: string
-    indexed_at: number
-    is_error: number
-    indexed: number
-    source: string
-    last_seen_at: number
-  }>
-
-  db.close()
-
-  // Compress dump to base64 gzip
-  const json = JSON.stringify(rows)
-  const encoder = new TextEncoder()
-  const stream = new Blob([encoder.encode(json)]).stream()
-  const compressed = stream.pipeThrough(new CompressionStream('gzip'))
-  const buffer = await new Response(compressed).arrayBuffer()
-
-  return Buffer.from(buffer).toString('base64')
-}
-
 async function prerenderRoute(nitro: Nitro, route: string) {
   const start = Date.now()
   const encodedRoute = encodeURI(route)
@@ -485,17 +276,16 @@ async function prerenderRoute(nitro: Nitro, route: string) {
 }
 
 export function setupPrerenderHandler(
-  pageDataPath?: string,
+  dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
 ) {
   const nuxt = useNuxt()
-  const dbConfig = refineDatabaseConfig({}, nuxt.options.rootDir)
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
     const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-    const state = createCrawlerState(pageDataPath, llmsFullTxtPath, siteInfo, llmsTxtConfig)
+    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig)
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
@@ -522,92 +312,62 @@ export function setupPrerenderHandler(
       await initPromise
 
       const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
-      const { markdown, title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
+      await processMarkdownRoute(state, nuxt, pageRoute, parsed)
 
-      // Get timestamp from meta tag or use current time
-      let updatedAt = new Date().toISOString()
-      if (metaUpdatedAt) {
-        const parsedDate = new Date(metaUpdatedAt)
-        if (!Number.isNaN(parsedDate.getTime()))
-          updatedAt = parsedDate.toISOString()
-      }
-
-      await nuxt.hooks.callHook('ai-ready:page:markdown', {
-        route: pageRoute,
-        markdown,
-        title,
-        description,
-        headings,
-      })
-
-      // Write to JSONL for virtual module
-      if (state.jsonlInitialized && state.pageDataPath) {
-        const pageData = {
-          route: pageRoute,
-          title,
-          description,
-          headings: flattenHeadings(headings),
-          keywords: keywords || [],
-          updatedAt,
-          markdown,
-        }
-        await appendFile(state.pageDataPath, `${JSON.stringify(pageData)}\n`, 'utf-8')
-      }
-
-      // Stream-append to llms-full.txt
-      if (state.llmsFullTxtPath) {
-        const pageContent = formatPageForLlmsFullTxt(pageRoute, title, description, markdown, state.siteInfo?.url)
-        await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
-      }
-
-      state.prerenderedRoutes.add(pageRoute)
-      route.contents = markdown
+      route.contents = parsed.markdown
       state.totalProcessingTime += Date.now() - pageStartTime
     })
 
     async function writeLlmsFiles() {
-      // Write error routes to JSONL for runtime filtering
-      if (state.pageDataPath && state.errorRoutes.size > 0) {
+      // Insert error routes into database
+      if (state.db && state.errorRoutes.size > 0) {
         for (const route of state.errorRoutes) {
-          await appendFile(state.pageDataPath, `${JSON.stringify({ route, _error: true })}\n`, 'utf-8')
+          await insertPage(state.db, {
+            route,
+            title: '',
+            description: '',
+            markdown: '',
+            headings: '',
+            keywords: [],
+            updatedAt: new Date().toISOString(),
+            isError: true,
+          })
         }
-        logger.debug(`Wrote ${state.errorRoutes.size} error routes to page data`)
+        logger.debug(`Wrote ${state.errorRoutes.size} error routes to database`)
       }
 
       // Write page data JSON for runtime access
-      // This enables MCP tools (list_pages, search_pages) in production
       const publicDataDir = join(nitro.options.output.publicDir, '__ai-ready')
       await mkdir(publicDataDir, { recursive: true })
 
-      if (state.pageDataPath) {
-        const jsonlContent = await readFile(state.pageDataPath, 'utf-8').catch(() => '')
-        if (jsonlContent) {
-          const entries = jsonlContent.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
-          const pages = entries.filter((e: { _error?: boolean }) => !e._error) as PageDataEntry[]
-          const errorRoutesList = entries.filter((e: { _error?: boolean }) => e._error).map((e: { route: string }) => e.route) as string[]
+      if (state.db) {
+        // Query pages from SQLite
+        const pages = await queryAllPages(state.db)
+        const errorRoutesList = (await queryAllPages(state.db, { includeErrors: true }))
+          .filter(p => p.isError)
+          .map(p => p.route)
 
-          // Write JSON for backwards compatibility
-          const jsonContent = JSON.stringify({
-            pages: pages.map(p => ({
-              route: p.route,
-              title: p.title,
-              description: p.description,
-              headings: p.headings,
-              keywords: p.keywords || [],
-              updatedAt: p.updatedAt,
-            })),
-            errorRoutes: errorRoutesList,
-          })
-          const publicJsonPath = join(publicDataDir, 'pages.json')
-          await writeFile(publicJsonPath, jsonContent, 'utf-8')
-          logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
+        // Write JSON for backwards compatibility
+        const jsonContent = JSON.stringify({
+          pages: pages.map(p => ({
+            route: p.route,
+            title: p.title,
+            description: p.description,
+            headings: p.headings,
+            keywords: p.keywords || [],
+            updatedAt: p.updatedAt,
+          })),
+          errorRoutes: errorRoutesList,
+        })
+        const publicJsonPath = join(publicDataDir, 'pages.json')
+        await writeFile(publicJsonPath, jsonContent, 'utf-8')
+        logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
 
-          // Create SQLite database and dump for serverless restore
-          const dumpData = await createDatabaseDump(pages, errorRoutesList, dbConfig)
-          const dumpPath = join(publicDataDir, 'pages.dump')
-          await writeFile(dumpPath, dumpData, 'utf-8')
-          logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
-        }
+        // Export database dump for serverless restore
+        const dumpData = await exportDbDump(state.db)
+        const dumpPath = join(publicDataDir, 'pages.dump')
+        await writeFile(dumpPath, dumpData, 'utf-8')
+        logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed

@@ -1,7 +1,6 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import { createError, eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../../db'
 import { getStaleRoutes, pruneStaleRoutes } from '../../db/queries'
 
 export default eventHandler(async (event) => {
@@ -18,15 +17,14 @@ export default eventHandler(async (event) => {
   }
 
   const ttl = query.ttl ? Number(query.ttl) : config.runtimeSync.pruneTtl
-  const db = await useDatabase(event)
 
   // Dry run: preview stale routes without deleting
   if (dry) {
-    const routes = await getStaleRoutes(db, ttl)
+    const routes = await getStaleRoutes(event, ttl)
     return { routes, count: routes.length, ttl, dry: true }
   }
 
   // Execute prune
-  const pruned = await pruneStaleRoutes(db, ttl)
+  const pruned = await pruneStaleRoutes(event, ttl)
   return { pruned, ttl, dry: false }
 })

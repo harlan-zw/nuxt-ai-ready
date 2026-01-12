@@ -104,9 +104,8 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
 
     // Resolve database adapter alias at build time
-    const resolverOpts = { resolver: createResolver(import.meta.url) }
     const dbType = config.database?.type || 'sqlite'
-    const adapterPath = await resolveDatabaseAdapter(dbType, resolverOpts)
+    const adapterPath = await resolveDatabaseAdapter(dbType)
     nuxt.options.alias['#ai-ready/adapter'] = adapterPath
     nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath
 
@@ -241,9 +240,10 @@ export {}
     mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
 
     const prerenderCacheDir = join(nuxt.options.rootDir, 'node_modules/.cache/nuxt-seo/ai-ready/routes')
-    const pageDataPath = join(nuxt.options.buildDir, '.data/ai-ready/page-data.jsonl')
+    // Build-time database path (separate from runtime DB which may be D1/LibSQL)
+    const buildDbPath = join(nuxt.options.buildDir, '.data/ai-ready/build.db')
 
-    // Virtual module for page data - different behavior for prerender vs runtime
+    // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
       // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
       // This enables access to H3Event and Cloudflare bindings from any async context
@@ -266,24 +266,44 @@ export {}
 
       nitroConfig.virtual = nitroConfig.virtual || {}
 
-      // Helper to read JSONL from filesystem during prerender
-      // Entries with _error: true are error routes, others are page data
+      // Helper to read from SQLite database during prerender
+      // Uses better-sqlite3 directly since we're in Node.js context
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = `
-import { readFile } from 'node:fs/promises'
-
 export async function readPageDataFromFilesystem() {
   if (!import.meta.prerender) {
     return { pages: [], errorRoutes: [] }
   }
-  const data = await readFile(${JSON.stringify(pageDataPath)}, 'utf-8').catch(() => null)
-  if (!data) return { pages: [], errorRoutes: [] }
-  const entries = data.trim().split('\\n').filter(Boolean).map(line => JSON.parse(line))
-  const pages = entries.filter(e => !e._error)
-  const errorRoutes = entries.filter(e => e._error).map(e => e.route)
+
+  const dbPath = ${JSON.stringify(buildDbPath)}
+
+  // Check if database file exists
+  const { existsSync } = await import('node:fs')
+  if (!existsSync(dbPath)) {
+    return { pages: [], errorRoutes: [] }
+  }
+
+  // Use better-sqlite3 to read pages
+  const Database = (await import('better-sqlite3')).default
+  const db = new Database(dbPath, { readonly: true })
+
+  const rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
+  db.close()
+
+  const pages = rows.filter(r => !r.is_error).map(r => ({
+    route: r.route,
+    title: r.title,
+    description: r.description,
+    markdown: r.markdown,
+    headings: r.headings,
+    keywords: JSON.parse(r.keywords || '[]'),
+    updatedAt: r.updated_at,
+  }))
+  const errorRoutes = rows.filter(r => r.is_error).map(r => r.route)
+
   return { pages, errorRoutes }
 }
 `
-      // Runtime module exports empty arrays (prerendered data read from filesystem)
+      // Runtime module exports empty arrays (pages read from database at runtime)
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
     })
 
@@ -370,7 +390,7 @@ export async function readPageDataFromFilesystem() {
 
     if (isStatic || hasPrerenderedRoutes) {
       const siteConfig = useSiteConfig()
-      setupPrerenderHandler(pageDataPath, {
+      setupPrerenderHandler(buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url,
         description: siteConfig.description,

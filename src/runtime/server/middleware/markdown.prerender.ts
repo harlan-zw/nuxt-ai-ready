@@ -1,8 +1,8 @@
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { convertHtmlToMarkdownMeta, getMarkdownRenderInfo } from '../utils'
-import { extractKeywords, stripMarkdown } from '../utils/keywords'
+import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
+import { extractKeywords } from '../utils/keywords'
 
 export default defineEventHandler(async (event) => {
   // Only run during prerender
@@ -35,14 +35,15 @@ export default defineEventHandler(async (event) => {
       message: `Page rendered as error: ${path}`,
     })
   }
-  const result = await convertHtmlToMarkdownMeta(
+  const result = await convertHtmlToMarkdown(
     html,
     withSiteUrl(event, path),
     runtimeConfig.mdreamOptions,
+    { extractUpdatedAt: true },
   )
 
   // Extract keywords from content
-  const keywords = extractKeywords(stripMarkdown(result.markdown), result.metaKeywords)
+  const keywords = extractKeywords(result.textContent, result.metaKeywords)
 
   return JSON.stringify({
     markdown: result.markdown,

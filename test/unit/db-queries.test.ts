@@ -214,4 +214,91 @@ describe('db-queries: stale route functions', () => {
       expect(normalizeRouteKey('/a/b/c/d')).toBe('a:b:c:d')
     })
   })
+
+  describe('streamPages', () => {
+    // Inline streamPages for testing
+    async function* streamPages(
+      db: TestDatabaseAdapter,
+      options: { batchSize?: number } = {},
+    ) {
+      const batchSize = options.batchSize || 50
+      let offset = 0
+
+      while (true) {
+        const rows = await db.all<{ route: string, title: string, description: string, markdown: string, headings: string, keywords: string, updated_at: string }>(
+          `SELECT route, title, description, markdown, headings, keywords, updated_at FROM ai_ready_pages WHERE is_error = 0 ORDER BY route LIMIT ? OFFSET ?`,
+          [batchSize, offset],
+        )
+
+        if (rows.length === 0)
+          break
+
+        for (const row of rows) {
+          yield {
+            route: row.route,
+            title: row.title,
+            description: row.description,
+            markdown: row.markdown,
+            headings: row.headings,
+            keywords: JSON.parse(row.keywords || '[]'),
+            updatedAt: row.updated_at,
+          }
+        }
+
+        if (rows.length < batchSize)
+          break
+
+        offset += batchSize
+      }
+    }
+
+    it('yields pages in batches', async () => {
+      // Insert 5 pages
+      for (let i = 1; i <= 5; i++) {
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, ?, '', '# Content', '[]', '[]', ?, 0, 0, 1, 0)
+        `, [`/page-${i}`, `page-${i}`, `Page ${i}`, new Date().toISOString()])
+      }
+
+      // Stream with batch size of 2
+      const pages = []
+      for await (const page of streamPages(db, { batchSize: 2 })) {
+        pages.push(page)
+      }
+
+      expect(pages).toHaveLength(5)
+      expect(pages.map(p => p.route)).toEqual(['/page-1', '/page-2', '/page-3', '/page-4', '/page-5'])
+    })
+
+    it('skips error pages', async () => {
+      // Insert normal page
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/good', 'good', 'Good', '', '# Content', '[]', '[]', ?, 0, 0, 1, 0)
+      `, [new Date().toISOString()])
+
+      // Insert error page
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/error', 'error', '', '', '', '[]', '[]', ?, 0, 1, 0, 0)
+      `, [new Date().toISOString()])
+
+      const pages = []
+      for await (const page of streamPages(db)) {
+        pages.push(page)
+      }
+
+      expect(pages).toHaveLength(1)
+      expect(pages[0]?.route).toBe('/good')
+    })
+
+    it('returns empty when no pages', async () => {
+      const pages = []
+      for await (const page of streamPages(db)) {
+        pages.push(page)
+      }
+      expect(pages).toHaveLength(0)
+    })
+  })
 })

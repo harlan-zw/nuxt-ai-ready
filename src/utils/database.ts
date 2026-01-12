@@ -1,7 +1,4 @@
-import type { Resolver } from '@nuxt/kit'
 import { isAbsolute, join } from 'pathe'
-
-export const databaseVersion = 'v1.0.0'
 
 export interface DatabaseConfig {
   type?: 'sqlite' | 'd1' | 'libsql'
@@ -24,7 +21,6 @@ export interface RefinedDatabaseConfig {
  */
 export async function resolveDatabaseAdapter(
   type: 'sqlite' | 'd1' | 'libsql' | undefined,
-  _opts: { resolver: Resolver },
 ): Promise<string> {
   const connectors: Record<string, string> = {
     d1: 'db0/connectors/cloudflare-d1',

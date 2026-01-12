@@ -1,7 +1,6 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import { createError, eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../../db'
 import { batchIndexPages } from '../../utils/batchIndex'
 
 export default eventHandler(async (event) => {
@@ -16,9 +15,7 @@ export default eventHandler(async (event) => {
     }
   }
 
-  const db = await useDatabase(event)
-
-  const result = await batchIndexPages(db, event, {
+  const result = await batchIndexPages(event, {
     limit: query.limit ? Number(query.limit) : undefined,
     all: query.all === 'true' || query.all === '1',
     timeout: query.timeout ? Number(query.timeout) : undefined,

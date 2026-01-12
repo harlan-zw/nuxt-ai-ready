@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3'
 import type { PageEntry } from '../db/queries'
-import type { DatabaseAdapter } from '../db/schema'
 import { countPages, queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { indexPageByRoute } from './indexPage'
@@ -32,7 +31,6 @@ export interface BatchIndexResult {
  * Shared logic used by poll endpoint and scheduled task
  */
 export async function batchIndexPages(
-  db: DatabaseAdapter,
   event: H3Event,
   options: BatchIndexOptions = {},
 ): Promise<BatchIndexResult> {
@@ -40,7 +38,7 @@ export async function batchIndexPages(
   const limit = Math.min(options.limit ?? 10, 50)
   const timeout = options.timeout ?? 30000
 
-  const beforeCount = await countPages(db, { where: { pending: true } })
+  const beforeCount = await countPages(event, { where: { pending: true } })
   if (beforeCount === 0) {
     return {
       indexed: 0,
@@ -67,7 +65,7 @@ export async function batchIndexPages(
       break
     }
 
-    const pages = await queryPages(db, { where: { pending: true }, limit: 1 }) as PageEntry[]
+    const pages = await queryPages(event, { where: { pending: true }, limit: 1 }) as PageEntry[]
     const route = pages[0]?.route
     if (!route)
       break
@@ -88,7 +86,7 @@ export async function batchIndexPages(
     }
   }
 
-  const remaining = await countPages(db, { where: { pending: true } })
+  const remaining = await countPages(event, { where: { pending: true } })
 
   return {
     indexed,

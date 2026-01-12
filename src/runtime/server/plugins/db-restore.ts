@@ -1,7 +1,8 @@
+import type { DumpRow } from '../db/shared'
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { useDatabase } from '../db'
-import { decompressDump, importDump } from '../db/dump'
 import { countPages } from '../db/queries'
+import { decompressFromBase64, importDbDump } from '../db/shared'
 import { logger } from '../logger'
 
 export default defineNitroPlugin(async () => {
@@ -13,10 +14,8 @@ export default defineNitroPlugin(async () => {
   if (import.meta.dev)
     return
 
-  const db = await useDatabase()
-
   // Check if database already has data
-  if (await countPages(db) > 0) {
+  if (await countPages() > 0) {
     logger.debug('[db-restore] Database already has data, skipping restore')
     return
   }
@@ -31,7 +30,8 @@ export default defineNitroPlugin(async () => {
     return
   }
 
-  const rows = await decompressDump(dumpData)
-  await importDump(db, rows)
+  const db = await useDatabase()
+  const rows = await decompressFromBase64<DumpRow[]>(dumpData)
+  await importDbDump(db, rows)
   logger.info(`[db-restore] Restored ${rows.length} pages from dump`)
 })

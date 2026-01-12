@@ -26,27 +26,22 @@
     ".": {
       "types": "./dist/types.d.mts",
       "import": "./dist/module.mjs"
-    },
-    "./mcp": {
-      "types": "./mcp.d.ts",
-      "import": "./dist/runtime/mcp.js"
     }
   },
   "main": "./dist/module.mjs",
   "files": [
-    "dist",
-    "mcp.d.ts"
+    "dist"
   ],
   "scripts": {
     "lint": "eslint . --fix",
     "build": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build",
-    "dev": "nuxi dev playground",
-    "dev:minimal": "nuxi dev playground",
-    "prepare:fixtures": "nuxi prepare playground && nuxi prepare playground && nuxi prepare test/fixtures/basic",
-    "dev:build": "nuxi build playground",
-    "dev:build:minimal": "nuxi build playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxi prepare playground",
-    "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxi prepare playground",
+    "dev": "nuxt dev playground",
+    "dev:minimal": "nuxt dev playground",
+    "prepare:fixtures": "nuxt prepare playground && nuxt prepare playground && nuxt prepare test/fixtures/basic",
+    "dev:build": "nuxt build playground",
+    "dev:build:minimal": "nuxt build playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
+    "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",
     "test": "pnpm run prepare:fixtures && vitest",

@@ -1,6 +1,7 @@
+import type { PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { getErrorRoutes, getPages, getPagesList } from '../utils/pageData'
+import { queryPages } from '../db/queries'
 
 interface DebugInfo {
   version: string
@@ -69,20 +70,19 @@ export default eventHandler(async (event) => {
   }
 
   // Get page data
-  const pages = await getPages(event)
-  const pagesList = await getPagesList(event)
-  const errorRoutes = await getErrorRoutes(event)
+  const pages = await queryPages(event) as PageEntry[]
+  const errorRoutes = await queryPages(event, { where: { hasError: true } }) as PageEntry[]
 
   // Determine data source
   let source: string
   if (isDev) {
-    source = 'empty (dev mode returns empty Map)'
+    source = 'empty (dev mode returns empty array)'
   }
   else if (isPrerender) {
     source = '#ai-ready-virtual/read-page-data.mjs (reads from filesystem)'
   }
   else {
-    source = 'fetch(\'/__ai-ready/pages.json\') (public directory)'
+    source = 'database (db0 adapter)'
   }
 
   // Check virtual module states
@@ -152,19 +152,19 @@ export default eventHandler(async (event) => {
     issues.push('Development mode: page data is intentionally empty')
     suggestions.push('Run `nuxi generate` or `nuxi build --prerender` to generate page data')
   }
-  else if (mode === 'production' && pages.size === 0) {
+  else if (mode === 'production' && pages.length === 0) {
     if (!jsonFileStatus.available) {
-      issues.push('Production mode with no page data - /__ai-ready/pages.json not found')
+      issues.push('Production mode with no page data - database may be empty')
       suggestions.push('Run `nuxi generate` or `nuxi build --prerender` to generate the page data')
     }
     else {
-      issues.push('pages.json exists but returned empty page data')
+      issues.push('Database exists but returned empty page data')
       suggestions.push('Check if pages were prerendered correctly')
     }
   }
-  else if (mode === 'prerender' && pages.size === 0) {
+  else if (mode === 'prerender' && pages.length === 0) {
     issues.push('Prerender mode but no pages found')
-    suggestions.push('Check if page-data.jsonl exists in .nuxt/.data/ai-ready/')
+    suggestions.push('Check if pages.db exists in .data/ai-ready/')
   }
 
   const debugInfo: DebugInfo = {
@@ -181,14 +181,14 @@ export default eventHandler(async (event) => {
     },
     pageData: {
       source,
-      pageCount: pages.size,
-      pages: pagesList.map(p => ({
+      pageCount: pages.length,
+      pages: pages.map(p => ({
         route: p.route,
         title: p.title,
         hasDescription: !!p.description,
         hasHeadings: !!p.headings,
       })),
-      errorRoutes: Array.from(errorRoutes),
+      errorRoutes: errorRoutes.map(e => e.route),
     },
     jsonFile: jsonFileStatus,
     virtualModules: {

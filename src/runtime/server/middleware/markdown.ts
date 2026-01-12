@@ -63,13 +63,12 @@ export default defineEventHandler(async (event) => {
 
   const html = await response.text()
 
-  // Runtime: convert to markdown
+  // Runtime: convert to markdown with hooks
   const result = await convertHtmlToMarkdown(
     html,
     withSiteUrl(event, path),
-    config,
-    path,
-    event,
+    config.mdreamOptions,
+    { hooks: { route: path, event } },
   )
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
 

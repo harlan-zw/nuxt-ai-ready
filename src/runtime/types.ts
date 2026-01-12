@@ -251,29 +251,6 @@ export interface LlmsTxtConfig {
 }
 
 /**
- * Hook context for page markdown processing (Nuxt build-time hook)
- *
- * Called once per page during prerender when markdown content has changed.
- * Allows integrations to process page content (e.g., for embedding generation).
- *
- * @example Process page markdown
- * nuxt.hooks.hook('ai-ready:page:markdown', async (context) => {
- *   console.log(`Processing ${context.route}: ${context.title}`)
- *   // Generate embeddings, update search index, etc.
- * })
- */
-export interface PageMarkdownContext {
-  /** The route being processed (e.g., '/about') */
-  route: string
-  /** The markdown content */
-  markdown: string
-  /** Page title extracted from HTML */
-  title: string
-  /** Page description from meta tags */
-  description: string
-}
-
-/**
  * Context for runtime page indexing hook
  */
 export interface PageIndexedContext {
@@ -293,16 +270,4 @@ export interface PageIndexedContext {
   updatedAt: string
   /** Whether this is a new page or an update */
   isUpdate: boolean
-}
-
-declare module 'nitropack/types' {
-  interface NitroRuntimeHooks {
-    'ai-ready:markdown': (context: MarkdownContext) => void | Promise<void>
-    'ai-ready:mdreamConfig': (config: import('mdream').HTMLToMarkdownOptions) => void | Promise<void>
-    /**
-     * Called when a page is indexed at runtime
-     * Use this to sync with external systems (embeddings, search, etc)
-     */
-    'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>
-  }
 }

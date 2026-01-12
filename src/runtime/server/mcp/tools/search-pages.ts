@@ -1,7 +1,6 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
 import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
-import { useDatabase } from '../../db'
 import { searchPages } from '../../db/queries'
 
 const inputSchema = {
@@ -15,10 +14,8 @@ const tool: McpToolDefinition = {
   inputSchema,
   cache: '5m',
   async handler({ query, limit }) {
-    // Try to get event from context for D1 compatibility
     const event = useEvent()
-    const db = await useDatabase(event)
-    const results = await searchPages(db, query as string, { limit: limit as number })
+    const results = await searchPages(event, query as string, { limit: limit as number })
     return { content: [{ type: 'text', text: JSON.stringify(results) }] }
   },
 }

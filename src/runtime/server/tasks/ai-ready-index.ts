@@ -1,6 +1,6 @@
+import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { defineTask, useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
 import { batchIndexPages } from '../utils/batchIndex'
 
 export default defineTask({
@@ -10,16 +10,15 @@ export default defineTask({
   },
   async run({ payload }) {
     const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-    const db = await useDatabase()
     const limit = (payload?.limit as number) ?? config.runtimeSync.batchSize
 
     // Create a minimal mock event for internal fetch
-    // The task uses $fetch directly which doesn't need full H3Event
+    // Tasks don't have H3Event, but batchIndexPages uses $fetch for fetching pages
     const mockEvent = {
       $fetch: globalThis.$fetch,
-    } as Parameters<typeof batchIndexPages>[1]
+    } as unknown as H3Event
 
-    const result = await batchIndexPages(db, mockEvent, {
+    const result = await batchIndexPages(mockEvent, {
       limit,
       all: false,
     })

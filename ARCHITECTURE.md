@@ -17,12 +17,12 @@ BUILD TIME (Prerender)
 3. prerender:generate hook processes each .md file:
    ├─► Parse JSON (markdown, title, description, headings, updatedAt)
    ├─► Call ai-ready:page:markdown hook
-   ├─► Append to page-data.jsonl
+   ├─► Write to SQLite database
    ├─► Stream-append to llms-full.txt
    └─► Replace route.contents with raw markdown
 
 4. prerender:done or sitemap:prerender:done:
-   └─► Prerender /llms.txt via route handler (reads JSONL)
+   └─► Prerender /llms.txt via route handler (reads from database)
 
 RUNTIME
 ──────────────────────────────────────────────────────────────────────────
@@ -41,14 +41,15 @@ MCP Server (via @nuxtjs/mcp-toolkit):
 
 Database (SQLite via db0, tables prefixed `ai_ready_`):
 • Routes seeded from sitemap on first request (sitemap-seeder plugin)
-• Pages indexed in background via afterResponse hook (page-indexer plugin)
+• Pages indexed via poll endpoint or scheduled task (batchIndex utility)
 • Internal fetch ensures only public content indexed (no auth cookies)
 • FTS5 full-text search for MCP tools (`ai_ready_pages_fts`)
 • Compressed dump for serverless cold start restore
 
 Indexing Control Endpoints:
-• GET /__ai-ready/status  - { total, indexed, pending }
-• POST /__ai-ready/poll   - Process multiple pages (cron/bulk indexing)
+• GET /__ai-ready/status     - { total, indexed, pending }
+• POST /__ai-ready/poll      - Process batch of pages
+• POST /__ai-ready/prune     - Remove stale routes
 ```
 
 ## Directory Structure
@@ -60,10 +61,15 @@ src/
 ├── kit.ts                    # License verification, preset detection
 ├── logger.ts                 # Build-time logger (@nuxt/kit)
 ├── types.ts                  # Re-exports runtime types
+└── utils/
+    ├── database.ts           # Build-time database utilities
+    └── prerender-db.ts       # Prerender database adapter
 
 └── runtime/
     ├── types.ts              # Public types (ModuleOptions, BulkDocument, etc)
-    ├── llms-txt-utils.ts     # buildLlmsTxt, normalizeLlmsTxtConfig
+    ├── llms-txt-utils.ts     # buildLlmsTxt, page sorting/grouping
+    ├── llms-txt-format.ts    # normalizeLlmsTxtConfig (pure formatting)
+    ├── index.ts              # Runtime entry - exports database, queries, indexing utils
 
     ├── nuxt/plugins/
     │   └── md-hints.prerender.ts  # Queues .md routes during app:rendered
@@ -75,27 +81,32 @@ src/
         │
         ├── routes/
         │   ├── llms.txt.get.ts        # Route handler calling buildLlmsTxt
-        │   ├── llms-full.txt.get.ts   # Placeholder (static file at runtime)
+        │   ├── llms-full.txt.get.ts   # Streams pages from DB at runtime
+        │   ├── __ai-ready-debug.get.ts # Debug endpoint
         │   └── __ai-ready/
         │       ├── status.get.ts      # GET indexing status
-        │       └── poll.post.ts       # POST bulk indexing trigger
+        │       ├── poll.post.ts       # POST bulk indexing trigger
+        │       └── prune.post.ts      # POST prune stale routes
         │
         ├── db/
         │   ├── index.ts       # useDatabase() singleton
-        │   ├── schema.ts      # SQLite schema (ai_ready_pages, ai_ready_pages_fts)
-        │   ├── queries.ts     # getAllPages, searchPages, upsertPage, seedRoutes, etc
-        │   └── dump.ts        # Export/import compressed dumps
+        │   ├── schema-sql.ts  # SQL table definitions, version constant
+        │   ├── shared.ts      # DatabaseAdapter, initSchema, insertPage, computeContentHash, exportDbDump, importDbDump
+        │   └── queries.ts     # queryPages, searchPages, countPages, streamPages, upsertPage
         │
         ├── plugins/
         │   ├── db-restore.ts      # Restore dump on cold start
-        │   ├── sitemap-seeder.ts  # Seed routes from sitemap (with TTL)
-        │   └── page-indexer.ts    # Index unindexed pages via afterResponse
+        │   └── sitemap-seeder.ts  # Seed routes from sitemap (with TTL)
+        │
+        ├── tasks/
+        │   └── ai-ready-index.ts  # Nitro scheduled task for background indexing
         │
         ├── utils/
-        │   ├── pageData.ts    # getPages/getPagesList - read from database
         │   ├── indexPage.ts   # Manual indexing utilities
+        │   ├── batchIndex.ts  # Shared batch indexing logic
         │   ├── sitemap.ts     # fetchSitemapUrls - parse /sitemap.xml
-        │   └── keywords.ts    # extractKeywords, stripMarkdown
+        │   ├── keywords.ts    # extractKeywords
+        │   └── llms-full.ts   # formatPageForLlmsFullTxt, buildLlmsFullTxtHeader
         │
         ├── utils.ts           # convertHtmlToMarkdown, getMarkdownRenderInfo
         ├── logger.ts          # Runtime logger (consola)
@@ -151,7 +162,7 @@ Called via `nitro:init` hook when building static sites.
 ```
 1. nitro:init
    └─► Sets up prerender:generate, prerender:done, sitemap:prerender:done hooks
-   └─► Creates crawler state with paths for page-data.jsonl and llms-full.txt
+   └─► Initializes SQLite database and llms-full.txt stream
 
 2. app:rendered (Nuxt plugin)
    └─► Queues .md route for each page (e.g., /about → /about.md)
@@ -165,12 +176,13 @@ Called via `nitro:init` hook when building static sites.
 4. prerender:generate (per .md file)
    ├─► Parse JSON from route.contents
    ├─► Call ai-ready:page:markdown hook
-   ├─► Append page data to JSONL file
+   ├─► Write page to SQLite database
    ├─► Stream-append to llms-full.txt
    └─► Replace contents with raw markdown
 
 5. prerender:done OR sitemap:prerender:done
    ├─► Crawl sitemap for SSR pages not prerendered
+   ├─► Export database dump for serverless restore
    └─► Prerender /llms.txt → static file
 ```
 
@@ -201,24 +213,25 @@ Runs during `nuxi generate` to queue `.md` routes:
 
 ## Runtime Indexing Architecture
 
-The module uses a sitemap-driven approach to index pages at runtime, ensuring only public pages are indexed.
+The module uses a sitemap-driven approach to index pages at runtime, ensuring only public pages are indexed. Runtime sync is opt-in via `runtimeSync.enabled`.
 
 ### Sitemap Seeder Plugin (`sitemap-seeder.ts`)
 
-On first request (once per process):
-1. Checks if sitemap was recently seeded (TTL from `sitemapTtl` config, default 1 hour)
+On first request (once per TTL):
+1. Checks if sitemap was recently seeded (TTL from `runtimeSync.ttl` config, default 1 hour)
 2. If stale/missing, fetches `/sitemap.xml` and parses URLs
 3. Seeds routes into database with `indexed=0` (route known, content pending)
-4. Stores seed timestamp for TTL tracking
+4. Updates `last_seen_at` for existing routes (for stale detection)
+5. Stores seed timestamp for TTL tracking
 
-### Page Indexer Plugin (`page-indexer.ts`)
+### Indexing Flow
 
-On every request (via `afterResponse` + `waitUntil`):
-1. Skips if request has `x-ai-ready-indexing` header (internal fetch)
-2. Gets one unindexed route from database (`indexed=0`)
-3. Fetches page internally with special header (no user cookies = public version)
+Pages are indexed via explicit triggers (poll endpoint or scheduled task):
+1. Poll endpoint or scheduled task calls `batchIndexPages()`
+2. Gets unindexed routes from database (`indexed=0`)
+3. Fetches each page internally with `x-ai-ready-indexing` header (no user cookies)
 4. Converts HTML to markdown, extracts metadata
-5. Upserts page with `indexed=1`
+5. Upserts page with `indexed=1` and `source='runtime'`
 6. Calls `ai-ready:page:indexed` hook
 
 ### Security Model
@@ -231,42 +244,74 @@ The internal fetch approach ensures:
 
 ### Indexing Control Endpoints
 
-For bulk indexing (cron jobs, post-deploy):
-
 ```bash
 # Check progress
 GET /__ai-ready/status
 # Returns: { total: 50, indexed: 45, pending: 5 }
 
-# Process batch
+# Process batch (bulk indexing)
 POST /__ai-ready/poll?limit=20
-# Returns: { indexed: 20, remaining: 25, errors: [] }
+# Returns: { indexed: 20, remaining: 25, errors: [], duration: 1234, complete: false }
+
+# Prune stale routes (dry run)
+POST /__ai-ready/prune?dry=true
+# Returns: { routes: ["/old-page"], count: 1, ttl: 86400, dry: true }
+
+# Prune stale routes (execute)
+POST /__ai-ready/prune?secret=<token>
+# Returns: { pruned: 1, ttl: 86400, dry: false }
 ```
 
-### Database Schema (v1.2.0)
+### Database Schema (v1.5.0)
 
 ```sql
 CREATE TABLE ai_ready_pages (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   route TEXT UNIQUE NOT NULL,
   route_key TEXT UNIQUE NOT NULL,
-  title TEXT DEFAULT '',
-  description TEXT DEFAULT '',
-  markdown TEXT DEFAULT '',
-  headings TEXT DEFAULT '[]',
-  keywords TEXT DEFAULT '[]',
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  markdown TEXT NOT NULL DEFAULT '',
+  headings TEXT NOT NULL DEFAULT '[]',
+  keywords TEXT NOT NULL DEFAULT '[]',
+  content_hash TEXT,              -- SHA-256 hash (16 chars) for change detection
   updated_at TEXT NOT NULL,
   indexed_at INTEGER NOT NULL,
-  is_error INTEGER DEFAULT 0,
-  indexed INTEGER DEFAULT 0  -- 0=seeded, 1=fully indexed
+  is_error INTEGER NOT NULL DEFAULT 0,
+  indexed INTEGER NOT NULL DEFAULT 0,  -- 0=seeded, 1=fully indexed
+  source TEXT NOT NULL DEFAULT 'prerender',  -- 'prerender' or 'runtime'
+  last_seen_at INTEGER  -- for stale route detection
 );
 
 CREATE TABLE _ai_ready_info (
   id TEXT PRIMARY KEY,
-  value TEXT,  -- Generic key-value storage
-  ...
+  value TEXT,
+  version TEXT,
+  checksum TEXT,
+  ready INTEGER DEFAULT 0
 );
 ```
+
+### Content Hash for Change Detection
+
+Pages store a `content_hash` (first 16 chars of SHA-256 of markdown) to detect actual content changes:
+
+```typescript
+// Check if content changed
+import { getPageHash } from './db/queries'
+
+// Compute hash
+import { computeContentHash } from './db/shared'
+// "a1b2c3d4e5f6g7h8"
+const hash = await computeContentHash(markdown)
+const existingHash = await getPageHash(event, route)
+const contentChanged = existingHash !== newHash
+```
+
+This enables:
+- **IndexNow integration**: Only notify search engines when content actually changes
+- **Skip unchanged pages**: Avoid unnecessary processing during re-indexing
+- **TTL revalidation**: Re-fetch page, compare hash, skip upsert if unchanged
 
 ## Markdown Middleware
 
@@ -311,30 +356,85 @@ Uses mdream's `extractionPlugin` to capture:
 
 ### Key Files
 
-**`src/runtime/llms-txt-utils.ts`** - Core build functions:
+**`src/runtime/llms-txt-format.ts`** - Pure formatting functions:
 - `normalizeLlmsTxtConfig()`: Converts `LlmsTxtConfig` to markdown string
+
+**`src/runtime/llms-txt-utils.ts`** - Core build functions:
 - `buildLlmsTxt()`: Assembles full llms.txt from site config + pages + sitemap
+- `sortPagesByPath()`: Hierarchical sorting by URL path
+- `formatPagesWithGroups()`: Format pages with group separators
 
-**`src/runtime/server/utils/pageData.ts`**:
-- `getPages()`: Returns page entries (route, title, description, headings, updatedAt)
-- `getPagesList()`: Returns page list for MCP tools/resources
+**`src/runtime/server/db/shared.ts`** - Shared database utilities (build + runtime):
+- `DatabaseAdapter`: Interface for db0 connector abstraction
+- `createAdapter()`: Create adapter from db0 Connector
+- `initSchema()`: Initialize schema with version checking
+- `computeContentHash()`: SHA-256 hash (16 chars) for change detection
+- `normalizeRouteKey()`: Convert route to storage key format
+- `insertPage()`, `queryAllPages()`: Core page operations
+- `exportDbDump()`, `importDbDump()`: Compressed dump operations
+- `compressToBase64()`, `decompressFromBase64()`: Gzip compression utils
 
-### getPages() Behavior by Environment
+**`src/runtime/server/utils/llms-full.ts`** - llms-full.txt formatting:
+- `stripFrontmatter()`: Remove YAML frontmatter from markdown
+- `normalizeHeadings()`: Convert `#` headings to `h1.` style for LLM readability
+- `formatPageForLlmsFullTxt()`: Format single page entry
+- `buildLlmsFullTxtHeader()`: Generate file header with site info
+
+**`src/runtime/server/db/queries.ts`** - Unified query interface:
+- `queryPages(event?, options)`: Query pages with filters, pagination
+- `searchPages(event, query, options)`: FTS5 full-text search
+- `countPages(event?, options)`: Count pages matching criteria
+- `streamPages(event?, options)`: Stream pages for large datasets
+
+### Query Functions
+
+All query functions follow event-first pattern with optional db override:
 
 ```typescript
-// Dev: always empty (no page data exists)
-if (import.meta.dev)
-  return new Map()
+// Basic query - all pages
+const pages = await queryPages(event)
 
-// Prerender: read from JSONL file via virtual module
-if (import.meta.prerender) {
-  const { readPageDataFromFilesystem } = await import('#ai-ready-virtual/read-page-data.mjs')
-  return readPageDataFromFilesystem()
+// Single page lookup
+const page = await queryPages(event, { route: '/about' })
+
+// With markdown content
+const page = await queryPages(event, { route: '/about', includeMarkdown: true })
+
+// Filter by status
+const pending = await queryPages(event, { where: { pending: true } })
+
+// Pagination
+const batch = await queryPages(event, { limit: 10, offset: 20 })
+
+// Full-text search (runtime only)
+const results = await searchPages(event, 'nuxt config', { limit: 10 })
+
+// Count pages
+const total = await countPages(event)
+const pending = await countPages(event, { where: { pending: true } })
+
+// Stream for large datasets
+for await (const page of streamPages(event, { batchSize: 50 })) {
+  // process page
 }
 
-// Production: read from virtual module (empty - pages in static files)
-const m = await import('#ai-ready-virtual/page-data.mjs')
-return m.pages
+// With explicit db (when already have db instance)
+const pages = await queryPages(event, { db, limit: 10 })
+```
+
+### Environment Behavior
+
+```typescript
+// Dev: returns empty array with console warning
+if (import.meta.dev)
+  return []
+
+// Prerender: reads from build-time SQLite via virtual module adapter
+if (import.meta.prerender)
+  return getPrerenderDb()
+
+// Production: reads from database via db0
+return useDatabase(event)
 ```
 
 ### llms.txt.get.ts
@@ -345,24 +445,22 @@ Runtime route handler that builds llms.txt:
 2. Sections from `llmsTxtConfig` (LLM Resources, MCP, etc)
 3. Adds sitemap and robots.txt links to LLM Resources section
 4. Pages section:
-   - Gets prerendered pages from `getPages()` (with titles)
+   - Gets pages from `queryPages()` (with titles)
    - Gets sitemap URLs for SSR pages
    - Splits into "Prerendered Pages" vs "Other Pages" if mixed
 
 ### llms-full.txt.get.ts
 
-Placeholder handler for non-prerendered requests. Actual content is streamed to static file during prerender.
+At runtime, streams pages from database using `streamPages()` and formats via `formatPageForLlmsFullTxt()`. During prerender, returns placeholder (static file generated directly to public dir).
 
 ### Virtual Modules
 
-Two virtual modules handle page data:
-
 **`#ai-ready-virtual/read-page-data.mjs`**:
-- Reads JSONL file from filesystem during prerender
-- Returns array of page data objects
+- Reads from build-time SQLite during prerender
+- Returns pages array for prerender adapter
 
 **`#ai-ready-virtual/page-data.mjs`**:
-- Exports empty array (runtime uses static files)
+- Exports empty arrays (runtime uses database)
 
 ## Content Signal Directives
 
@@ -427,14 +525,20 @@ interface ModuleOptions {
   contentSignal?: false | { aiTrain?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
   cacheMaxAgeSeconds?: number
-  ttl?: number // Re-index TTL in seconds (0 = never re-index)
-  sitemapTtl?: number // Sitemap refresh TTL in seconds (default 3600)
   database?: {
     type?: 'sqlite' | 'd1' | 'libsql'
-    filename?: string // SQLite file path
-    bindingName?: string // D1 binding name
-    url?: string // LibSQL URL
-    authToken?: string // LibSQL auth token
+    filename?: string
+    bindingName?: string
+    url?: string
+    authToken?: string
+  }
+  runtimeSync?: {
+    enabled?: boolean
+    ttl?: number
+    batchSize?: number
+    cron?: string
+    secret?: string
+    pruneTtl?: number
   }
 }
 ```
@@ -495,6 +599,29 @@ interface PageIndexedContext {
   headings: string
   keywords: string[]
   updatedAt: string
+  isUpdate: boolean // true if updating existing page
+}
+```
+
+### IndexPageResult (indexPage utility)
+
+```typescript
+interface IndexPageResult {
+  success: boolean
+  skipped?: boolean // true if page was fresh and skipped
+  isUpdate?: boolean // true if updating existing page
+  contentChanged?: boolean // true if content hash differs from previous
+  data?: {
+    route: string
+    title: string
+    description: string
+    headings: string
+    keywords: string[]
+    markdown: string
+    contentHash: string // 16-char SHA-256 hash
+    updatedAt: string
+  }
+  error?: string
 }
 ```
 
@@ -521,6 +648,7 @@ interface PageIndexedContext {
 |---------|---------|
 | mdream | HTML→markdown conversion |
 | db0 | Universal database layer (SQLite, D1, LibSQL) |
+| uncrypto | Cross-platform Web Crypto API for content hashing |
 | nuxt-site-config | Site metadata access |
 | @nuxtjs/sitemap | Sitemap integration |
 | @nuxtjs/mcp-toolkit | MCP server (optional) |
@@ -565,12 +693,233 @@ Module warns and provides minimal functionality:
 
 **Workaround**: Enable `nitro.prerender.routes` for specific pages.
 
+## Deployment Guides
+
+### Node.js / Self-Hosted (Default)
+
+Default SQLite storage, works out of the box:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  aiReady: {
+    database: {
+      type: 'sqlite',
+      filename: '.data/ai-ready/pages.db', // default
+    },
+  },
+})
+```
+
+Build and run:
+```bash
+nuxi generate  # or nuxi build --prerender
+node .output/server/index.mjs
+```
+
+SQLite file persists between restarts. For ephemeral environments (Docker, serverless), use dump restore (see below).
+
+### Cloudflare Workers + D1
+
+Requires D1 database binding and `cloudflare-pages` or `cloudflare-module` preset.
+
+1. Create D1 database:
+```bash
+wrangler d1 create ai-ready-db
+```
+
+2. Configure wrangler.toml:
+```toml
+[[d1_databases]]
+binding = "AI_READY_DB"
+database_name = "ai-ready-db"
+database_id = "<your-database-id>"
+```
+
+3. Configure nuxt.config.ts:
+```ts
+export default defineNuxtConfig({
+  nitro: {
+    preset: 'cloudflare-pages', // or 'cloudflare-module'
+  },
+  aiReady: {
+    database: {
+      type: 'd1',
+      bindingName: 'AI_READY_DB',
+    },
+  },
+})
+```
+
+4. Build and deploy:
+```bash
+nuxi generate
+wrangler pages deploy dist  # or wrangler deploy for module preset
+```
+
+**Cold start behavior**: On first request, `db-restore` plugin fetches `/__ai-ready/pages.dump` and imports prerendered data into D1.
+
+### Netlify
+
+Uses SQLite with automatic `_headers` generation for markdown Content-Type:
+
+```ts
+export default defineNuxtConfig({
+  nitro: {
+    preset: 'netlify',
+  },
+  // SQLite default works - persisted in Netlify Functions storage
+})
+```
+
+Build outputs `dist/_headers` with:
+```
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+```
+
+### Vercel
+
+Uses SQLite with serverless function storage:
+
+```ts
+export default defineNuxtConfig({
+  nitro: {
+    preset: 'vercel',
+  },
+  aiReady: {
+    database: {
+      type: 'sqlite',
+      filename: '/tmp/ai-ready/pages.db', // Vercel tmp storage
+    },
+  },
+})
+```
+
+**Note**: `/tmp` is ephemeral per function instance. Cold starts restore from dump automatically.
+
+### Turso (LibSQL)
+
+For persistent edge database across all platforms:
+
+```ts
+export default defineNuxtConfig({
+  aiReady: {
+    database: {
+      type: 'libsql',
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    },
+  },
+})
+```
+
+### Dump Restore Flow (Serverless)
+
+For ephemeral storage (D1, Vercel, Docker):
+
+1. **Build time**: `prerender:done` exports `/__ai-ready/pages.dump` (gzip base64)
+2. **Cold start**: `db-restore` plugin checks if DB empty
+3. **If empty**: Fetches dump, decompresses, imports all rows
+4. **Result**: Full page data available without re-indexing
+
+This ensures MCP tools and llms.txt work immediately on first request.
+
+## Database Migrations
+
+### Schema Versioning
+
+Schema version tracked in `_ai_ready_info` table:
+
+```sql
+SELECT version FROM _ai_ready_info WHERE id = 'schema'
+-- Returns: 'v1.5.0'
+```
+
+Current version: `v1.5.0` (defined in `src/runtime/server/db/schema-sql.ts`)
+
+### Migration Strategy
+
+The module uses **drop-and-recreate** strategy for schema changes:
+
+```typescript
+// src/runtime/server/db/shared.ts
+async function initSchema(db: DatabaseAdapter): Promise<void> {
+  const needsRebuild = await checkSchemaVersion(db)
+
+  if (needsRebuild) {
+    // Drop all tables (including legacy unprefixed tables)
+    for (const sql of DROP_TABLES_SQL) {
+      await db.exec(sql)
+    }
+  }
+
+  // Create all tables fresh
+  for (const sql of ALL_SCHEMA_SQL) {
+    await db.exec(sql)
+  }
+
+  // Store current version
+  await db.exec(
+    'INSERT OR REPLACE INTO _ai_ready_info (id, version) VALUES (?, ?)',
+    ['schema', SCHEMA_VERSION]
+  )
+}
+```
+
+### When Migrations Run
+
+1. **Build time**: Schema initialized when prerender writes first page
+2. **Runtime cold start**: Schema checked on `useDatabase()` first call
+3. **Version mismatch**: All tables dropped, recreated with new schema
+
+### Data Preservation
+
+Since migrations drop tables, data is preserved via:
+
+1. **Prerendered sites**: Data re-generated each build (pages.dump)
+2. **Runtime indexing**: Re-seeds from sitemap, re-indexes pages
+3. **Upgrade path**: Run `nuxi generate` after module upgrade to rebuild
+
+### Version History
+
+| Version | Changes |
+|---------|---------|
+| v1.5.0 | Added `content_hash`, `last_seen_at`, `source` columns |
+| v1.4.0 | Added `indexed` column for runtime indexing status |
+| v1.3.0 | Added `route_key` column, prefixed tables with `ai_ready_` |
+| v1.2.0 | Added FTS5 triggers for automatic index sync |
+| v1.1.0 | Added `keywords` column |
+| v1.0.0 | Initial schema (unprefixed `pages` table) |
+
+### Legacy Table Migration
+
+v1.3.0 renamed tables from `pages`/`pages_fts` to `ai_ready_pages`/`ai_ready_pages_fts`. Old tables are dropped automatically:
+
+```typescript
+// DROP_TABLES_SQL includes:
+'DROP TABLE IF EXISTS pages_fts',  // Legacy
+'DROP TABLE IF EXISTS pages',       // Legacy
+```
+
+### Manual Schema Reset
+
+Force schema rebuild by deleting info row:
+
+```sql
+DELETE FROM _ai_ready_info WHERE id = 'schema';
+```
+
+Next request will drop and recreate all tables.
+
 ## Known Limitations
 
 ### Dev Mode
 
 In development:
-- Page data unavailable (returns empty Map)
+- Page data unavailable (returns empty array with console warning)
 - llms.txt shows notice about missing data
 - Runtime markdown conversion still works
 

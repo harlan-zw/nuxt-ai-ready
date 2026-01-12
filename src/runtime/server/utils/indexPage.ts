@@ -2,11 +2,11 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
 import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
-import { isPageFresh, queryPages, upsertPage } from '../db/queries'
+import { getPageHash, isPageFresh, queryPages, upsertPage } from '../db/queries'
+import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
-import { convertHtmlToMarkdownMeta } from '../utils'
-import { extractKeywords, stripMarkdown } from './keywords'
+import { convertHtmlToMarkdown } from '../utils'
+import { extractKeywords } from './keywords'
 
 // Header to identify internal indexing requests
 export const INDEXING_HEADER = 'x-ai-ready-indexing'
@@ -28,6 +28,8 @@ export interface IndexPageResult {
   skipped?: boolean
   /** True if this was an update vs new index */
   isUpdate?: boolean
+  /** True if content actually changed (hash differs from previous) */
+  contentChanged?: boolean
   /** Page data if successful */
   data?: {
     route: string
@@ -36,6 +38,7 @@ export interface IndexPageResult {
     headings: string
     keywords: string[]
     markdown: string
+    contentHash: string
     updatedAt: string
   }
   /** Error message if failed */
@@ -53,39 +56,43 @@ export async function indexPage(
   event?: H3Event,
 ): Promise<IndexPageResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-
-  const db = await useDatabase(event)
   const ttl = options.ttl ?? config.runtimeSync.ttl
 
   // Check if already indexed and fresh (unless force)
-  if (!options.force && await isPageFresh(db, route, ttl)) {
+  if (!options.force && await isPageFresh(event, route, ttl)) {
     logger.debug(`[indexPage] Skipping ${route} - still fresh`)
     return { success: true, skipped: true, isUpdate: true }
   }
 
-  const existing = await queryPages(db, { route })
+  const existing = await queryPages(event, { route })
   const isUpdate = !!existing
 
   // Check for error pages
   const isError = html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')
 
-  const result = await convertHtmlToMarkdownMeta(html, route, config.mdreamOptions)
+  const result = await convertHtmlToMarkdown(html, route, config.mdreamOptions, { extractUpdatedAt: true })
   const updatedAt = result.updatedAt || new Date().toISOString()
   const headings = JSON.stringify(result.headings)
-  const keywords = extractKeywords(stripMarkdown(result.markdown), result.metaKeywords)
+  const keywords = extractKeywords(result.textContent, result.metaKeywords)
 
-  await upsertPage(db, {
+  // Compute content hash and check for changes
+  const contentHash = await computeContentHash(result.markdown)
+  const existingHash = await getPageHash(event, route)
+  const contentChanged = existingHash !== contentHash
+
+  await upsertPage(event, {
     route,
     title: result.title,
     description: result.description,
     markdown: result.markdown,
     headings,
     keywords,
+    contentHash,
     updatedAt,
     isError,
   })
 
-  logger.debug(`[indexPage] Indexed: ${route} "${result.title}"`)
+  logger.debug(`[indexPage] Indexed: ${route} "${result.title}" (changed=${contentChanged})`)
 
   // Call hook unless skipped
   if (!options.skipHook) {
@@ -106,6 +113,7 @@ export async function indexPage(
   return {
     success: true,
     isUpdate,
+    contentChanged,
     data: {
       route,
       title: result.title,
@@ -113,6 +121,7 @@ export async function indexPage(
       headings,
       keywords,
       markdown: result.markdown,
+      contentHash,
       updatedAt,
     },
   }
@@ -137,8 +146,7 @@ export async function indexPageByRoute(
   if (!html || typeof html !== 'string') {
     // Mark as error in DB to prevent retry loops
     if (options.markFailedAsError) {
-      const db = await useDatabase(event)
-      await upsertPage(db, {
+      await upsertPage(event, {
         route,
         title: '',
         description: '',
