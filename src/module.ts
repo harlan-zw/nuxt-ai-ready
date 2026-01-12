@@ -219,6 +219,9 @@ export default defineNuxtModule<ModuleOptions>({
       const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
       const cron = config.runtimeSync?.cron
       if (runtimeSyncEnabled && cron) {
+        // Enable experimental tasks API (required for scheduled tasks)
+        nitroConfig.experimental.tasks = true
+
         nitroConfig.tasks = nitroConfig.tasks || {}
         nitroConfig.tasks['ai-ready:index'] = {
           handler: resolve('./runtime/server/tasks/ai-ready-index'),
