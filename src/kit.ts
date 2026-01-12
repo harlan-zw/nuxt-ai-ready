@@ -11,7 +11,8 @@ export function hookNuxtSeoProLicense() {
   // @ts-expect-error untyped
   if (isBuild && !nuxt._isNuxtSeoProVerifying) {
     const license = nuxt.options.runtimeConfig.seoProKey || process.env.NUXT_SEO_PRO_KEY
-    if (isTest) {
+    // std-env isTest + explicit VITEST check for @nuxt/test-utils compatibility
+    if (isTest || process.env.VITEST) {
       return
     }
     if (!isCI && !license) {
