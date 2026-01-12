@@ -26,11 +26,16 @@
     ".": {
       "types": "./dist/types.d.mts",
       "import": "./dist/module.mjs"
+    },
+    "./mcp": {
+      "types": "./mcp.d.ts",
+      "import": "./dist/runtime/mcp.js"
     }
   },
   "main": "./dist/module.mjs",
   "files": [
-    "dist"
+    "dist",
+    "mcp.d.ts"
   ],
   "scripts": {
     "lint": "eslint .",
