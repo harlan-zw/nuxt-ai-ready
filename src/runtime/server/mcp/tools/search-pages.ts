@@ -16,9 +16,7 @@ const tool: McpToolDefinition = {
   cache: '5m',
   async handler({ query, limit }) {
     // Try to get event from context for D1 compatibility
-    let event
-    try { event = useEvent() }
-    catch { /* no event context */ }
+    const event = useEvent()
     const db = await useDatabase(event)
     const results = await searchPages(db, query as string, { limit: limit as number })
     return { content: [{ type: 'text', text: JSON.stringify(results) }] }
