@@ -63,6 +63,38 @@ async function getStaleRoutes(db: TestDatabaseAdapter, staleThresholdSeconds: nu
   return rows.map(r => r.route)
 }
 
+// IndexNow query functions
+async function getPagesNeedingIndexNowSync(db: TestDatabaseAdapter, limit = 100): Promise<{ route: string }[]> {
+  return db.all<{ route: string }>(`
+    SELECT route FROM ai_ready_pages
+    WHERE indexed = 1
+      AND is_error = 0
+      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
+    LIMIT ?
+  `, [limit])
+}
+
+async function countPagesNeedingIndexNowSync(db: TestDatabaseAdapter): Promise<number> {
+  const row = await db.first<{ count: number }>(`
+    SELECT COUNT(*) as count FROM ai_ready_pages
+    WHERE indexed = 1
+      AND is_error = 0
+      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
+  `)
+  return row?.count || 0
+}
+
+async function markIndexNowSynced(db: TestDatabaseAdapter, routes: string[]): Promise<void> {
+  if (routes.length === 0)
+    return
+  const now = Date.now()
+  const placeholders = routes.map(() => '?').join(',')
+  await db.exec(
+    `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+    [now, ...routes],
+  )
+}
+
 describe('db-queries: stale route functions', () => {
   let sqliteDb: Database.Database
   let db: TestDatabaseAdapter
@@ -86,7 +118,8 @@ describe('db-queries: stale route functions', () => {
         indexed_at INTEGER NOT NULL,
         is_error INTEGER NOT NULL DEFAULT 0,
         indexed INTEGER NOT NULL DEFAULT 0,
-        last_seen_at INTEGER NOT NULL DEFAULT 0
+        last_seen_at INTEGER NOT NULL DEFAULT 0,
+        indexnow_synced_at INTEGER
       )
     `)
   })
@@ -299,6 +332,131 @@ describe('db-queries: stale route functions', () => {
         pages.push(page)
       }
       expect(pages).toHaveLength(0)
+    })
+  })
+
+  describe('indexNow sync functions', () => {
+    it('getPagesNeedingIndexNowSync returns pages not yet synced', async () => {
+      const now = Date.now()
+      // Insert indexed page without indexnow_synced_at
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/page1', 'page1', 'Page 1', '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+      `, [new Date().toISOString(), now])
+
+      const pages = await getPagesNeedingIndexNowSync(db)
+      expect(pages).toHaveLength(1)
+      expect(pages[0]?.route).toBe('/page1')
+    })
+
+    it('getPagesNeedingIndexNowSync returns pages with stale indexnow_synced_at', async () => {
+      const oldSync = Date.now() - 10000
+      const newIndex = Date.now()
+      // Insert page that was synced but then re-indexed
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at, indexnow_synced_at)
+        VALUES ('/page1', 'page1', 'Page 1', '', '# Content', '[]', '[]', ?, ?, 0, 1, 0, ?)
+      `, [new Date().toISOString(), newIndex, oldSync])
+
+      const pages = await getPagesNeedingIndexNowSync(db)
+      expect(pages).toHaveLength(1)
+    })
+
+    it('getPagesNeedingIndexNowSync excludes synced pages', async () => {
+      const now = Date.now()
+      // Insert page that is up-to-date
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at, indexnow_synced_at)
+        VALUES ('/page1', 'page1', 'Page 1', '', '# Content', '[]', '[]', ?, ?, 0, 1, 0, ?)
+      `, [new Date().toISOString(), now, now + 1]) // synced_at > indexed_at
+
+      const pages = await getPagesNeedingIndexNowSync(db)
+      expect(pages).toHaveLength(0)
+    })
+
+    it('getPagesNeedingIndexNowSync excludes error pages', async () => {
+      const now = Date.now()
+      // Insert error page
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/error', 'error', '', '', '', '[]', '[]', ?, ?, 1, 1, 0)
+      `, [new Date().toISOString(), now])
+
+      const pages = await getPagesNeedingIndexNowSync(db)
+      expect(pages).toHaveLength(0)
+    })
+
+    it('getPagesNeedingIndexNowSync excludes pending pages', async () => {
+      const now = Date.now()
+      // Insert unindexed page
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/pending', 'pending', '', '', '', '[]', '[]', ?, ?, 0, 0, 0)
+      `, [new Date().toISOString(), now])
+
+      const pages = await getPagesNeedingIndexNowSync(db)
+      expect(pages).toHaveLength(0)
+    })
+
+    it('countPagesNeedingIndexNowSync returns correct count', async () => {
+      const now = Date.now()
+      // Insert 3 pages needing sync
+      for (let i = 1; i <= 3; i++) {
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, ?, '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+        `, [`/page${i}`, `page${i}`, `Page ${i}`, new Date().toISOString(), now])
+      }
+
+      const count = await countPagesNeedingIndexNowSync(db)
+      expect(count).toBe(3)
+    })
+
+    it('markIndexNowSynced updates indexnow_synced_at', async () => {
+      const now = Date.now()
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/page1', 'page1', 'Page 1', '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+      `, [new Date().toISOString(), now])
+
+      await markIndexNowSynced(db, ['/page1'])
+
+      const row = await db.first<{ indexnow_synced_at: number }>('SELECT indexnow_synced_at FROM ai_ready_pages WHERE route = ?', ['/page1'])
+      expect(row?.indexnow_synced_at).toBeGreaterThanOrEqual(now)
+    })
+
+    it('markIndexNowSynced handles multiple routes', async () => {
+      const now = Date.now()
+      for (let i = 1; i <= 3; i++) {
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, ?, '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+        `, [`/page${i}`, `page${i}`, `Page ${i}`, new Date().toISOString(), now])
+      }
+
+      await markIndexNowSynced(db, ['/page1', '/page2'])
+
+      // page1 and page2 should be synced
+      const count = await countPagesNeedingIndexNowSync(db)
+      expect(count).toBe(1) // only page3 needs sync
+    })
+
+    it('markIndexNowSynced handles empty array', async () => {
+      // Should not throw
+      await markIndexNowSynced(db, [])
+    })
+
+    it('respects limit in getPagesNeedingIndexNowSync', async () => {
+      const now = Date.now()
+      for (let i = 1; i <= 10; i++) {
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, ?, '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+        `, [`/page${i}`, `page${i}`, `Page ${i}`, new Date().toISOString(), now])
+      }
+
+      const pages = await getPagesNeedingIndexNowSync(db, 5)
+      expect(pages).toHaveLength(5)
     })
   })
 })

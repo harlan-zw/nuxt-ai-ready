@@ -106,6 +106,7 @@ export async function indexPage(
       markdown: result.markdown,
       updatedAt,
       isUpdate,
+      contentChanged,
     }
     await nitro.hooks.callHook('ai-ready:page:indexed', hookContext)
   }
