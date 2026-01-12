@@ -16,13 +16,28 @@ export default defineBuildConfig({
     },
   },
   externals: [
+    // Nuxt core
+    'nuxt',
+    'nuxt/schema',
+    '@nuxt/kit',
+    '@nuxt/schema',
+    'nitropack',
+    'nitropack/types',
+    'h3',
+    // Vue
+    'vue',
+    'vue-router',
+    '@vue/runtime-core',
+    // Auto-imports
+    '#imports',
+    // MCP
     '@modelcontextprotocol/sdk',
+    // Build tools (should never be bundled)
     'webpack',
     'webpack-virtual-modules',
     'postcss',
     'rollup',
     'vite',
     'lightningcss',
-    'nitropack/types',
   ],
 })
