@@ -43,14 +43,10 @@ export interface ModulePublicRuntimeConfig {
     enabled: boolean
     ttl: number
     batchSize: number
-    secret?: string
     pruneTtl: number
   }
-  indexNow?: {
-    enabled: boolean
-    key?: string
-    host?: string
-  }
+  runtimeSyncSecret?: string
+  indexNowKey?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -215,21 +211,34 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
-      // Register scheduled task for indexing if runtimeSync enabled with cron
-      const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
-      const cron = config.runtimeSync?.cron
-      if (runtimeSyncEnabled && cron) {
-        // Enable experimental tasks API (required for scheduled tasks)
-        nitroConfig.experimental.tasks = true
+      // Register scheduled task if cron is enabled (runs every minute)
+      if (config.cron) {
+        const cronSchedule = '* * * * *'
+        const isVercel = nitroConfig.preset === 'vercel' || nitroConfig.preset === 'vercel-edge'
 
-        nitroConfig.tasks = nitroConfig.tasks || {}
-        nitroConfig.tasks['ai-ready:index'] = {
-          handler: resolve('./runtime/server/tasks/ai-ready-index'),
+        if (isVercel) {
+          // Vercel uses HTTP-based crons - configure vercel.json to hit our endpoint
+          nitroConfig.vercel = nitroConfig.vercel || {}
+          nitroConfig.vercel.config = nitroConfig.vercel.config || {}
+          nitroConfig.vercel.config.crons = nitroConfig.vercel.config.crons || []
+          nitroConfig.vercel.config.crons.push({
+            schedule: cronSchedule,
+            path: '/__ai-ready/cron',
+          })
         }
+        else {
+          // Native Nitro scheduled tasks (Cloudflare, etc.)
+          nitroConfig.experimental.tasks = true
 
-        nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
-        nitroConfig.scheduledTasks[cron] = nitroConfig.scheduledTasks[cron] || []
-        ;(nitroConfig.scheduledTasks[cron] as string[]).push('ai-ready:index')
+          nitroConfig.tasks = nitroConfig.tasks || {}
+          nitroConfig.tasks['ai-ready:cron'] = {
+            handler: resolve('./runtime/server/tasks/ai-ready-cron'),
+          }
+
+          nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
+          nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
+          ;(nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
+        }
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
@@ -277,11 +286,14 @@ export async function readPageDataFromFilesystem() {
 
     // Resolve database config
     const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
-    const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
+
+    // Resolve runtimeSync - can be boolean or object
+    // Auto-enabled when cron is true
+    const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
+    const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
     // IndexNow: auto-read key from env if not configured
-    const indexNowKey = config.indexNow?.key || process.env.NUXT_AI_READY_INDEXNOW_KEY
-    const indexNowEnabled = !!(config.indexNow?.enabled !== false && indexNowKey)
+    const indexNowKey = config.indexNowKey || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
@@ -297,18 +309,12 @@ export async function readPageDataFromFilesystem() {
       database,
       runtimeSync: {
         enabled: runtimeSyncEnabled,
-        ttl: config.runtimeSync?.ttl ?? 3600,
-        batchSize: config.runtimeSync?.batchSize ?? 20,
-        secret: config.runtimeSync?.secret,
-        pruneTtl: config.runtimeSync?.pruneTtl ?? 0,
+        ttl: runtimeSyncConfig.ttl ?? 3600,
+        batchSize: runtimeSyncConfig.batchSize ?? 20,
+        pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
-      indexNow: indexNowEnabled
-        ? {
-            enabled: true,
-            key: indexNowKey,
-            host: config.indexNow?.host || 'api.indexnow.org',
-          }
-        : undefined,
+      runtimeSyncSecret: config.runtimeSyncSecret,
+      indexNowKey,
     } as any
 
     // Register plugins
@@ -350,8 +356,8 @@ export async function readPageDataFromFilesystem() {
       addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
     }
 
-    // IndexNow endpoints (only if enabled with key)
-    if (indexNowEnabled && indexNowKey) {
+    // IndexNow endpoints (only if key is configured)
+    if (indexNowKey) {
       // Key verification route: /{key}.txt
       addServerHandler({ route: `/${indexNowKey}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
       // Sync endpoint
@@ -360,6 +366,11 @@ export async function readPageDataFromFilesystem() {
       if (!runtimeSyncEnabled) {
         addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
       }
+    }
+
+    // Cron endpoint (for Vercel and other HTTP-based cron systems)
+    if (config.cron) {
+      addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get') })
     }
 
     // Setup prerendering hooks for static generation

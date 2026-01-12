@@ -7,10 +7,10 @@ export default eventHandler(async (event) => {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const query = getQuery(event)
 
-  // Check poll secret if configured
-  if (config.runtimeSync.secret) {
+  // Check secret if configured
+  if (config.runtimeSyncSecret) {
     const secret = query.secret as string
-    if (secret !== config.runtimeSync.secret) {
+    if (secret !== config.runtimeSyncSecret) {
       throw createError({ statusCode: 401, message: 'Unauthorized' })
     }
   }

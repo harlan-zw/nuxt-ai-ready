@@ -4,18 +4,18 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { syncToIndexNow } from '../../utils/indexnow'
 
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig & { indexNow?: { enabled?: boolean, key?: string } }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
-  if (!config.indexNow?.enabled) {
-    throw createError({ statusCode: 400, message: 'IndexNow not enabled' })
+  if (!config.indexNowKey) {
+    throw createError({ statusCode: 400, message: 'IndexNow not configured' })
   }
 
   const query = getQuery(event)
 
-  // Check poll secret if configured (reuses runtimeSync secret)
-  if (config.runtimeSync?.secret) {
+  // Check secret if configured
+  if (config.runtimeSyncSecret) {
     const secret = query.secret as string
-    if (secret !== config.runtimeSync.secret) {
+    if (secret !== config.runtimeSyncSecret) {
       throw createError({ statusCode: 401, message: 'Unauthorized' })
     }
   }

@@ -114,17 +114,33 @@ export interface ModuleOptions {
   }
 
   /**
+   * Enable scheduled cron task (runs every minute)
+   * When true, automatically enables runtimeSync for background indexing
+   * Also runs IndexNow sync if indexNowKey is configured
+   */
+  cron?: boolean
+
+  /**
+   * IndexNow API key for instant search engine notifications
+   * When set, enables IndexNow submissions to Bing, Yandex, Naver, Seznam
+   * Get one from https://www.bing.com/indexnow
+   * Can also be set via NUXT_AI_READY_INDEX_NOW_KEY env var
+   */
+  indexNowKey?: string
+
+  /**
+   * Secret token for authenticating runtime sync endpoints
+   * When set, requires ?secret=<token> query param for poll/prune/indexnow endpoints
+   */
+  runtimeSyncSecret?: string
+
+  /**
    * Runtime sync configuration (opt-in for dynamic content sites)
    * When enabled, pages are re-indexed at runtime from sitemap
-   * @default disabled - prerendered data is used
+   * Set to `true` for defaults or object to customize
+   * @default false - prerendered data is used
    */
-  runtimeSync?: {
-    /**
-     * Enable runtime sync
-     * When false (default), runtime uses prerendered data only
-     * @default false
-     */
-    enabled?: boolean
+  runtimeSync?: boolean | {
     /**
      * TTL for refresh in seconds (sitemap + page re-indexing)
      * Controls how often to refresh sitemap routes and re-index stale pages
@@ -137,44 +153,12 @@ export interface ModuleOptions {
      */
     batchSize?: number
     /**
-     * Cron expression for scheduled indexing (e.g. every 5 minutes)
-     * When set, enables automatic background indexing via Nitro task
-     */
-    cron?: string
-    /**
-     * Secret token for authenticating poll endpoint
-     * When set, requires ?secret=<token> query param
-     */
-    secret?: string
-    /**
      * TTL for pruning stale routes in seconds
      * Routes not seen in sitemap for longer than this are deleted
      * 0 = never prune (default)
      * @default 0
      */
     pruneTtl?: number
-  }
-
-  /**
-   * IndexNow configuration for instant search engine notifications
-   * Submits changed URLs to Bing, Yandex, Naver, Seznam via IndexNow protocol
-   */
-  indexNow?: {
-    /**
-     * Enable IndexNow submissions
-     * @default false
-     */
-    enabled?: boolean
-    /**
-     * Your IndexNow API key
-     * Get one from https://www.bing.com/indexnow
-     */
-    key?: string
-    /**
-     * IndexNow endpoint host
-     * @default 'api.indexnow.org'
-     */
-    host?: string
   }
 }
 

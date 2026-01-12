@@ -79,37 +79,50 @@ scheduled task → auto-indexes via Nitro cron (Cloudflare/native)
 
 This ensures only public pages (those in sitemap) are indexed, avoiding auth-gated content.
 
-### Indexing Control Endpoints
+### Indexing Control Endpoints (when `runtimeSync: true`)
 
-- `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
-- `POST /__ai-ready/poll` - Process pending pages with configurable params:
+- `GET /__ai-ready/status` - Returns `{ total, indexed, pending, indexNow? }`
+- `POST /__ai-ready/poll` - Process pending pages:
   - `?limit=N` - Max pages per batch (default: 10, max: 50)
-  - `?all=true` - Process until complete (ignores limit)
-  - `?timeout=30000` - Max ms to run for `all` mode (default: 30s)
-  - `?secret=<token>` - Required if `indexing.pollSecret` configured
+  - `?all=true` - Process until complete
+  - `?timeout=30000` - Max ms for `all` mode (default: 30s)
+  - `?secret=<token>` - Required if `runtimeSyncSecret` configured
   - Returns: `{ indexed, remaining, errors, duration, complete }`
+- `POST /__ai-ready/prune` - Remove stale routes:
+  - `?dry=true` - Preview without deleting
+  - `?ttl=N` - Override pruneTtl config
+  - `?secret=<token>` - Required unless dry run
 
-### Scheduled Task (`src/runtime/server/tasks/ai-ready-index.ts`)
+### IndexNow Endpoints (when `indexNowKey` configured)
 
-Nitro scheduled task for automatic background indexing. Enable via config:
+- `GET /{key}.txt` - Key verification endpoint
+- `POST /__ai-ready/indexnow` - Manual sync trigger:
+  - `?limit=N` - Max URLs to submit (default: 100)
+  - `?secret=<token>` - Required if `runtimeSyncSecret` configured
+  - Returns: `{ success, submitted, remaining, error? }`
+
+### Scheduled Task (`src/runtime/server/tasks/ai-ready-cron.ts`)
+
+Cron task runs every minute when enabled. `cron: true` auto-enables `runtimeSync`.
 
 ```ts
 aiReady: {
-  indexing: {
-    scheduled: {
-      enabled: true,
-      cron: '*/5 * * * *', // every 5 min
-      batchSize: 20
-    }
-  }
+  cron: true,          // every minute, auto-enables runtimeSync
+  indexNowKey: 'key',  // optional IndexNow sync
 }
 ```
+
+**Platform support:**
+- **Cloudflare/Native**: Uses Nitro's `scheduledTasks` API
+- **Vercel**: Auto-configures `vercel.json` crons to call `GET /__ai-ready/cron`
+- **Other**: Use external cron to call `GET /__ai-ready/cron`
 
 ### Utils
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
 - **utils/batchIndex.ts**: Shared batch indexing logic for poll endpoint and scheduled task
 - **utils/pageData.ts**: Unified read from database
 - **utils/sitemap.ts**: Fetch and parse sitemap URLs
+- **utils/indexnow.ts**: IndexNow submission utilities (`submitToIndexNow`, `syncToIndexNow`)
 
 ### Key Dependencies
 
@@ -156,17 +169,11 @@ Config key: `aiReady` in nuxt.config.ts
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
-  ttl: 0, // re-index TTL in seconds (0 = never)
-  sitemapTtl: 3600, // sitemap refresh TTL in seconds (default 1 hour)
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
-  indexing: {
-    pollSecret: 'secret-token', // optional auth for poll endpoint
-    scheduled: {
-      enabled: false,
-      cron: '*/5 * * * *',
-      batchSize: 20,
-    },
-  },
+  cron: true, // every minute, auto-enables runtimeSync
+  indexNowKey: 'your-key', // or NUXT_AI_READY_INDEX_NOW_KEY env
+  runtimeSyncSecret: 'token', // auth for poll/prune/indexnow endpoints
+  runtimeSync: { ttl: 3600, batchSize: 20, pruneTtl: 0 }, // optional overrides
 }
 ```
 
@@ -174,6 +181,7 @@ Config key: `aiReady` in nuxt.config.ts
 
 - Requires Nuxt ≥4.0.0
 - Uses `#ai-ready` alias for runtime imports
+- Enables `nitro.experimental.asyncContext` automatically (allows `useEvent()` in nested functions)
 - MCP paths registered via `mcp:definitions:paths` hook (from @nuxtjs/mcp-toolkit)
 - Prerendering required for `llms-full.txt` generation (`nuxi generate` or `nuxi build --prerender`)
 - SPA mode without prerendering has limited functionality

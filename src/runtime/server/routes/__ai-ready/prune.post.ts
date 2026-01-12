@@ -9,9 +9,9 @@ export default eventHandler(async (event) => {
 
   // Check secret if configured (skip for dry runs)
   const dry = query.dry === 'true' || query.dry === '1'
-  if (!dry && config.runtimeSync.secret) {
+  if (!dry && config.runtimeSyncSecret) {
     const secret = query.secret as string
-    if (secret !== config.runtimeSync.secret) {
+    if (secret !== config.runtimeSyncSecret) {
       throw createError({ statusCode: 401, message: 'Unauthorized' })
     }
   }

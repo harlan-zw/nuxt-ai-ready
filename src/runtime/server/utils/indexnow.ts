@@ -16,12 +16,6 @@ export interface IndexNowResult {
   error?: string
 }
 
-export interface IndexNowConfig {
-  enabled?: boolean
-  key?: string
-  host?: string
-}
-
 /**
  * Submit URLs to IndexNow API
  */
@@ -74,10 +68,10 @@ export async function syncToIndexNow(
   event: H3Event,
   limit = 100,
 ): Promise<IndexNowResult> {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNow?: IndexNowConfig }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string }
   const siteConfig = useSiteConfig()
 
-  if (!config.indexNow?.enabled || !config.indexNow?.key) {
+  if (!config.indexNowKey) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }
   }
 
@@ -93,8 +87,8 @@ export async function syncToIndexNow(
 
   const routes = pages.map(p => p.route)
 
-  // Submit to IndexNow
-  const result = await submitToIndexNow(routes, config.indexNow as { key: string, host?: string }, siteConfig.url)
+  // Submit to IndexNow (host always defaults to api.indexnow.org)
+  const result = await submitToIndexNow(routes, { key: config.indexNowKey }, siteConfig.url)
 
   if (result.success) {
     // Mark as synced and update stats

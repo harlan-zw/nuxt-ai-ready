@@ -4,7 +4,7 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowStats } from '../../db/queries'
 
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig & { indexNow?: { enabled?: boolean } }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
   const [total, pending] = await Promise.all([
     countPages(event),
@@ -17,8 +17,8 @@ export default eventHandler(async (event) => {
     pending,
   }
 
-  // Include IndexNow stats if enabled
-  if (config.indexNow?.enabled) {
+  // Include IndexNow stats if key is configured
+  if (config.indexNowKey) {
     const [indexNowPending, indexNowStats] = await Promise.all([
       countPagesNeedingIndexNowSync(event),
       getIndexNowStats(event),

@@ -86,7 +86,9 @@ src/
         │   └── __ai-ready/
         │       ├── status.get.ts      # GET indexing status
         │       ├── poll.post.ts       # POST bulk indexing trigger
-        │       └── prune.post.ts      # POST prune stale routes
+        │       ├── prune.post.ts      # POST prune stale routes
+        │       ├── cron.get.ts        # GET cron trigger (Vercel, external)
+        │       └── indexnow.post.ts   # POST IndexNow sync trigger
         │
         ├── db/
         │   ├── index.ts       # useDatabase() singleton
@@ -99,11 +101,12 @@ src/
         │   └── sitemap-seeder.ts  # Seed routes from sitemap (with TTL)
         │
         ├── tasks/
-        │   └── ai-ready-index.ts  # Nitro scheduled task for background indexing
+        │   └── ai-ready-cron.ts   # Nitro scheduled task (every minute)
         │
         ├── utils/
         │   ├── indexPage.ts   # Manual indexing utilities
         │   ├── batchIndex.ts  # Shared batch indexing logic
+        │   ├── runCron.ts     # Shared cron logic (task + endpoint)
         │   ├── sitemap.ts     # fetchSitemapUrls - parse /sitemap.xml
         │   ├── keywords.ts    # extractKeywords
         │   └── llms-full.ts   # formatPageForLlmsFullTxt, buildLlmsFullTxtHeader
@@ -213,7 +216,7 @@ Runs during `nuxi generate` to queue `.md` routes:
 
 ## Runtime Indexing Architecture
 
-The module uses a sitemap-driven approach to index pages at runtime, ensuring only public pages are indexed. Runtime sync is opt-in via `runtimeSync.enabled`.
+The module uses a sitemap-driven approach to index pages at runtime, ensuring only public pages are indexed. Runtime sync is enabled via `cron: true` (auto-enables runtimeSync) or explicitly via `runtimeSync: true`.
 
 ### Sitemap Seeder Plugin (`sitemap-seeder.ts`)
 
@@ -260,7 +263,36 @@ POST /__ai-ready/prune?dry=true
 # Prune stale routes (execute)
 POST /__ai-ready/prune?secret=<token>
 # Returns: { pruned: 1, ttl: 86400, dry: false }
+
+# Cron trigger (Vercel, external cron)
+GET /__ai-ready/cron
+# Returns: { index: { indexed, remaining, complete }, indexNow?: { submitted, remaining } }
+
+# IndexNow manual sync
+POST /__ai-ready/indexnow?secret=<token>
+# Returns: { success, submitted, remaining, error? }
 ```
+
+### Scheduled Task
+
+The cron task runs every minute when `cron: true` is set. It auto-enables `runtimeSync`.
+
+```ts
+// nuxt.config.ts
+aiReady: {
+  cron: true,          // every minute, auto-enables runtimeSync
+  indexNowKey: 'key',  // optional IndexNow sync
+}
+```
+
+**Platform-specific behavior:**
+- **Cloudflare/Native**: Uses Nitro's `scheduledTasks` API with native cron
+- **Vercel**: Auto-configures `vercel.json` crons to call `GET /__ai-ready/cron`
+- **Other platforms**: Use external cron service to call `GET /__ai-ready/cron`
+
+The task runs `runCron()` utility which:
+1. Batch indexes pending pages (if runtimeSync enabled)
+2. Submits changed URLs to IndexNow (if indexNowKey configured)
 
 ### Database Schema (v1.5.0)
 
@@ -532,12 +564,12 @@ interface ModuleOptions {
     url?: string
     authToken?: string
   }
-  runtimeSync?: {
-    enabled?: boolean
+  cron?: boolean // Every minute, auto-enables runtimeSync
+  indexNowKey?: string // IndexNow API key
+  runtimeSyncSecret?: string // Auth for endpoints
+  runtimeSync?: boolean | { // true or config object
     ttl?: number
     batchSize?: number
-    cron?: string
-    secret?: string
     pruneTtl?: number
   }
 }
@@ -782,7 +814,7 @@ Build outputs `dist/_headers` with:
 
 ### Vercel
 
-Uses SQLite with serverless function storage:
+Uses SQLite with serverless function storage. Cron auto-configures `vercel.json`:
 
 ```ts
 export default defineNuxtConfig({
@@ -790,6 +822,7 @@ export default defineNuxtConfig({
     preset: 'vercel',
   },
   aiReady: {
+    cron: true, // Auto-adds to vercel.json crons
     database: {
       type: 'sqlite',
       filename: '/tmp/ai-ready/pages.db', // Vercel tmp storage
@@ -797,6 +830,8 @@ export default defineNuxtConfig({
   },
 })
 ```
+
+When `cron: true`, the module auto-configures Vercel crons to call `GET /__ai-ready/cron` every minute.
 
 **Note**: `/tmp` is ephemeral per function instance. Cold starts restore from dump automatically.
 
