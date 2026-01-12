@@ -120,6 +120,7 @@ export interface PageRow {
   indexed: number
   source: 'prerender' | 'runtime'
   last_seen_at: number | null
+  indexnow_synced_at: number | null
 }
 
 export interface PageEntry {
@@ -523,4 +524,138 @@ export async function getStaleRoutes(event: H3Event | undefined, staleThresholdS
     ['runtime', threshold],
   )
   return rows.map(r => r.route)
+}
+
+// ============================================================================
+// IndexNow Sync
+// ============================================================================
+
+/**
+ * Get pages needing IndexNow sync (content changed since last sync)
+ */
+export async function getPagesNeedingIndexNowSync(
+  event: H3Event | undefined,
+  limit = 100,
+): Promise<{ route: string }[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  return db.all<{ route: string }>(`
+    SELECT route FROM ai_ready_pages
+    WHERE indexed = 1
+      AND is_error = 0
+      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
+    LIMIT ?
+  `, [limit])
+}
+
+/**
+ * Count pages needing IndexNow sync
+ */
+export async function countPagesNeedingIndexNowSync(
+  event: H3Event | undefined,
+): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
+  const row = await db.first<{ count: number }>(`
+    SELECT COUNT(*) as count FROM ai_ready_pages
+    WHERE indexed = 1
+      AND is_error = 0
+      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
+  `)
+  return row?.count || 0
+}
+
+/**
+ * Mark pages as synced to IndexNow
+ */
+export async function markIndexNowSynced(
+  event: H3Event | undefined,
+  routes: string[],
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db || routes.length === 0)
+    return
+
+  const now = Date.now()
+  const placeholders = routes.map(() => '?').join(',')
+  await db.exec(
+    `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+    [now, ...routes],
+  )
+}
+
+/**
+ * Update IndexNow stats after submission
+ * Uses atomic SQL to handle concurrent updates safely
+ */
+export async function updateIndexNowStats(
+  event: H3Event | undefined,
+  submitted: number,
+  error?: string,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  const now = Date.now()
+
+  if (error) {
+    await db.exec(
+      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
+      ['indexnow_last_error', error],
+    )
+  }
+  else {
+    // Atomic increment of total submitted count
+    await db.exec(`
+      INSERT INTO _ai_ready_info (id, value) VALUES (?, ?)
+      ON CONFLICT(id) DO UPDATE SET value = CAST((CAST(value AS INTEGER) + ?) AS TEXT)
+    `, ['indexnow_total_submitted', String(submitted), submitted])
+
+    await db.exec(
+      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
+      ['indexnow_last_submitted_at', String(now)],
+    )
+    await db.exec(
+      'DELETE FROM _ai_ready_info WHERE id = ?',
+      ['indexnow_last_error'],
+    )
+  }
+}
+
+export interface IndexNowStats {
+  totalSubmitted: number
+  lastSubmittedAt: number | null
+  lastError: string | null
+}
+
+/**
+ * Get IndexNow stats
+ */
+export async function getIndexNowStats(
+  event: H3Event | undefined,
+): Promise<IndexNowStats> {
+  const db = await getDb(event)
+  if (!db)
+    return { totalSubmitted: 0, lastSubmittedAt: null, lastError: null }
+
+  const rows = await db.all<{ id: string, value: string }>(
+    'SELECT id, value FROM _ai_ready_info WHERE id LIKE ?',
+    ['indexnow_%'],
+  )
+
+  const stats: Record<string, string> = {}
+  for (const row of rows) {
+    stats[row.id] = row.value
+  }
+
+  return {
+    totalSubmitted: Number.parseInt(stats.indexnow_total_submitted || '0', 10) || 0,
+    lastSubmittedAt: stats.indexnow_last_submitted_at ? Number.parseInt(stats.indexnow_last_submitted_at, 10) : null,
+    lastError: stats.indexnow_last_error || null,
+  }
 }

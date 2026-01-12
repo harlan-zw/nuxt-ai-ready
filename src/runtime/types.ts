@@ -155,6 +155,27 @@ export interface ModuleOptions {
     pruneTtl?: number
   }
 
+  /**
+   * IndexNow configuration for instant search engine notifications
+   * Submits changed URLs to Bing, Yandex, Naver, Seznam via IndexNow protocol
+   */
+  indexNow?: {
+    /**
+     * Enable IndexNow submissions
+     * @default false
+     */
+    enabled?: boolean
+    /**
+     * Your IndexNow API key
+     * Get one from https://www.bing.com/indexnow
+     */
+    key?: string
+    /**
+     * IndexNow endpoint host
+     * @default 'api.indexnow.org'
+     */
+    host?: string
+  }
 }
 
 /**

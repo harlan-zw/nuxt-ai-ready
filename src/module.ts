@@ -45,6 +45,11 @@ export interface ModulePublicRuntimeConfig {
     secret?: string
     pruneTtl: number
   }
+  indexNow?: {
+    enabled: boolean
+    key?: string
+    host?: string
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -311,6 +316,8 @@ export async function readPageDataFromFilesystem() {
     const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
     const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
 
+    const indexNowEnabled = !!(config.indexNow?.enabled && config.indexNow?.key)
+
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
@@ -330,6 +337,13 @@ export async function readPageDataFromFilesystem() {
         secret: config.runtimeSync?.secret,
         pruneTtl: config.runtimeSync?.pruneTtl ?? 0,
       },
+      indexNow: indexNowEnabled
+        ? {
+            enabled: true,
+            key: config.indexNow!.key,
+            host: config.indexNow!.host || 'api.indexnow.org',
+          }
+        : undefined,
     } as any
 
     // Register plugins
@@ -369,6 +383,18 @@ export async function readPageDataFromFilesystem() {
       addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
       addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
       addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
+    }
+
+    // IndexNow endpoints (only if enabled with key)
+    if (indexNowEnabled) {
+      // Key verification route: /{key}.txt
+      addServerHandler({ route: `/${config.indexNow!.key}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
+      // Sync endpoint
+      addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post') })
+      // Status endpoint needed for IndexNow stats (may not have runtimeSync)
+      if (!runtimeSyncEnabled) {
+        addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
+      }
     }
 
     // Setup prerendering hooks for static generation

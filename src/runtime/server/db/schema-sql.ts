@@ -1,7 +1,7 @@
 // Schema SQL definitions for database initialization
 // Used by both prerender (better-sqlite3) and runtime (db0)
 
-export const SCHEMA_VERSION = 'v1.5.0'
+export const SCHEMA_VERSION = 'v1.6.0'
 
 const PAGES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS ai_ready_pages (
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS ai_ready_pages (
   is_error INTEGER NOT NULL DEFAULT 0,
   indexed INTEGER NOT NULL DEFAULT 0,
   source TEXT NOT NULL DEFAULT 'prerender',
-  last_seen_at INTEGER
+  last_seen_at INTEGER,
+  indexnow_synced_at INTEGER
 )`
 
 const PAGES_INDEXES_SQL = [
