@@ -21,6 +21,8 @@ dist
 # Nuxt
 .nuxt
 .output
+playground/.nuxt
+playground/.output
 .vercel_build_output
 .build-*
 .env

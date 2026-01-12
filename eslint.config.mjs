@@ -3,6 +3,8 @@ import antfu from '@antfu/eslint-config'
 export default antfu({
   ignores: [
     'CLAUDE.md',
+    'test/fixtures/**',
+    'playground/**',
   ],
   rules: {
     'node/prefer-global/process': 'off',
