@@ -20,8 +20,10 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
   // Runtime: fetch HTML with internal marker to prevent recursion
+  // Use manual redirect to detect and forward redirects with .md suffix
   const response = await event.fetch(path, {
     headers: { [INTERNAL_HEADER]: '1' },
+    redirect: 'manual',
   }).catch((e) => {
     logger.error(`Failed to fetch HTML for ${path}`, e)
     return null
@@ -36,6 +38,20 @@ export default defineEventHandler(async (event) => {
       })
     }
     return
+  }
+
+  // Handle redirects - forward to .md version of redirect target
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location')
+    if (location) {
+      // Add .md suffix to redirect target
+      const redirectTarget = location.endsWith('/') ? `${location.slice(0, -1)}.md` : `${location}.md`
+      setHeader(event, 'location', redirectTarget)
+      return createError({
+        statusCode: response.status,
+        statusMessage: response.statusText,
+      })
+    }
   }
 
   if (!response.ok) {
