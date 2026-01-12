@@ -291,4 +291,6 @@ export interface PageIndexedContext {
   updatedAt: string
   /** Whether this is a new page or an update */
   isUpdate: boolean
+  /** Whether the content hash changed (triggers IndexNow sync) */
+  contentChanged: boolean
 }

@@ -316,7 +316,9 @@ export async function readPageDataFromFilesystem() {
     const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
     const runtimeSyncEnabled = config.runtimeSync?.enabled ?? false
 
-    const indexNowEnabled = !!(config.indexNow?.enabled && config.indexNow?.key)
+    // IndexNow: auto-read key from env if not configured
+    const indexNowKey = config.indexNow?.key || process.env.NUXT_AI_READY_INDEXNOW_KEY
+    const indexNowEnabled = !!(config.indexNow?.enabled !== false && indexNowKey)
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
@@ -340,8 +342,8 @@ export async function readPageDataFromFilesystem() {
       indexNow: indexNowEnabled
         ? {
             enabled: true,
-            key: config.indexNow!.key,
-            host: config.indexNow!.host || 'api.indexnow.org',
+            key: indexNowKey,
+            host: config.indexNow?.host || 'api.indexnow.org',
           }
         : undefined,
     } as any
@@ -386,9 +388,9 @@ export async function readPageDataFromFilesystem() {
     }
 
     // IndexNow endpoints (only if enabled with key)
-    if (indexNowEnabled) {
+    if (indexNowEnabled && indexNowKey) {
       // Key verification route: /{key}.txt
-      addServerHandler({ route: `/${config.indexNow!.key}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
+      addServerHandler({ route: `/${indexNowKey}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
       // Sync endpoint
       addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post') })
       // Status endpoint needed for IndexNow stats (may not have runtimeSync)
