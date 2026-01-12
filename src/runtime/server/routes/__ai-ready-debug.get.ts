@@ -95,9 +95,11 @@ export default eventHandler(async (event) => {
     mode = 'production'
   }
 
-  // Get page data
-  const pages = await queryPages(event) as PageEntry[]
-  const errorRoutes = await queryPages(event, { where: { hasError: true } }) as PageEntry[]
+  // Get page data - separate queries for pages and errors
+  const [pages, errorRoutes] = await Promise.all([
+    queryPages(event) as Promise<PageEntry[]>,
+    queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
+  ])
 
   // Determine data source
   let source: string

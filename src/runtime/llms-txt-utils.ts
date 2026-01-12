@@ -198,26 +198,31 @@ export async function buildLlmsTxt(event: H3Event) {
   }
 
   // Pages section - combine prerendered pages + sitemap (SSR)
-  const pages = await queryPages(event) as PageEntry[]
-  const urls = await fetchSitemapUrls(event)
-  const errorRoutes = await queryPages(event, { where: { hasError: true } }) as PageEntry[]
-  const errorSet = new Set(errorRoutes.map(e => e.route))
-  const devModeHint = import.meta.dev && pages.length === 0 ? ' (dev mode - run `nuxi generate` for page titles)' : ''
+  // Fetch pages (excludes errors by default) and sitemap URLs in parallel
+  const [pages, errorPages, urls] = await Promise.all([
+    queryPages(event) as Promise<PageEntry[]>,
+    queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
+    fetchSitemapUrls(event),
+  ])
 
-  // Collect prerendered pages (these have titles)
-  const prerendered: PageItem[] = []
+  // Build prerendered list and track seen/error paths
   const seenPaths = new Set<string>()
+  const errorSet = new Set(errorPages.map(p => p.route))
+  const prerendered: PageItem[] = []
 
   for (const page of pages) {
-    prerendered.push({ pathname: page.route, title: page.title, description: page.description })
     seenPaths.add(page.route)
+    prerendered.push({ pathname: page.route, title: page.title, description: page.description })
   }
+
+  const devModeHint = import.meta.dev && prerendered.length === 0 ? ' (dev mode - run `nuxi generate` for page titles)' : ''
 
   // Collect SSR pages from sitemap that weren't prerendered
   // Filter out error routes detected during prerender
   const other: PageItem[] = []
   for (const url of urls) {
-    const pathname = url.loc.startsWith('http') ? new URL(url.loc).pathname : url.loc
+    // Avoid URL parsing when possible - most sitemaps have relative paths
+    const pathname = url.loc.startsWith('/') ? url.loc : new URL(url.loc).pathname
     if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
       other.push({ pathname })
       seenPaths.add(pathname)

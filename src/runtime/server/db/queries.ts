@@ -48,15 +48,22 @@ async function getPrerenderDb(): Promise<DatabaseAdapter> {
   const pages = data.pages || []
   const errorRoutes = new Set(data.errorRoutes || [])
 
+  // Helper to check if SQL requests markdown field
+  const wantsMarkdown = (sql: string) => sql.includes('SELECT *') || sql.toLowerCase().includes('markdown')
+
   return {
     all: async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
       // Parse basic queries
       const isErrorQuery = sql.includes('is_error = 1') || (params.includes(1) && sql.includes('is_error'))
       const excludeErrors = sql.includes('is_error = 0')
+      const includeMarkdown = wantsMarkdown(sql)
 
       if (isErrorQuery) {
         return pages.filter(p => errorRoutes.has(p.route)).map(p => ({
-          ...p,
+          route: p.route,
+          title: p.title,
+          description: p.description,
+          ...(includeMarkdown ? { markdown: p.markdown } : {}),
           headings: p.headings,
           keywords: JSON.stringify(p.keywords),
           updated_at: p.updatedAt,
@@ -70,7 +77,7 @@ async function getPrerenderDb(): Promise<DatabaseAdapter> {
         route: p.route,
         title: p.title,
         description: p.description,
-        markdown: p.markdown,
+        ...(includeMarkdown ? { markdown: p.markdown } : {}),
         headings: p.headings,
         keywords: JSON.stringify(p.keywords),
         updated_at: p.updatedAt,
@@ -84,11 +91,12 @@ async function getPrerenderDb(): Promise<DatabaseAdapter> {
         const page = pages.find(p => p.route === route)
         if (!page)
           return undefined
+        const includeMarkdown = wantsMarkdown(sql)
         return {
           route: page.route,
           title: page.title,
           description: page.description,
-          markdown: page.markdown,
+          ...(includeMarkdown ? { markdown: page.markdown } : {}),
           headings: page.headings,
           keywords: JSON.stringify(page.keywords),
           updated_at: page.updatedAt,
@@ -130,6 +138,7 @@ export interface PageEntry {
   headings: string
   keywords: string[]
   updatedAt: string
+  isError: boolean
 }
 
 export interface PageData extends PageEntry {
@@ -195,6 +204,7 @@ function rowToEntry(row: PageRow): PageEntry {
     headings: row.headings,
     keywords: JSON.parse(row.keywords || '[]'),
     updatedAt: row.updated_at,
+    isError: row.is_error === 1,
   }
 }
 

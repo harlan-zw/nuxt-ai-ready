@@ -341,11 +341,10 @@ export function setupPrerenderHandler(
       await mkdir(publicDataDir, { recursive: true })
 
       if (state.db) {
-        // Query pages from SQLite
-        const pages = await queryAllPages(state.db)
-        const errorRoutesList = (await queryAllPages(state.db, { includeErrors: true }))
-          .filter(p => p.isError)
-          .map(p => p.route)
+        // Single query for all pages (with errors) - excludeMarkdown reduces memory ~80%
+        const allPages = await queryAllPages(state.db, { includeErrors: true, excludeMarkdown: true })
+        const pages = allPages.filter(p => !p.isError)
+        const errorRoutesList = allPages.filter(p => p.isError).map(p => p.route)
 
         // Write JSON for backwards compatibility
         const jsonContent = JSON.stringify({
@@ -363,7 +362,7 @@ export function setupPrerenderHandler(
         await writeFile(publicJsonPath, jsonContent, 'utf-8')
         logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
 
-        // Export database dump for serverless restore
+        // Export database dump for serverless restore (streams in batches internally)
         const dumpData = await exportDbDump(state.db)
         const dumpPath = join(publicDataDir, 'pages.dump')
         await writeFile(dumpPath, dumpData, 'utf-8')

@@ -129,6 +129,17 @@ export interface PageOutput {
   isError: boolean
 }
 
+export interface PageMetaOutput {
+  route: string
+  title: string
+  description: string
+  headings: string
+  keywords: string[]
+  contentHash?: string
+  updatedAt: string
+  isError: boolean
+}
+
 interface PageRow {
   route: string
   title: string
@@ -168,24 +179,38 @@ export async function insertPage(db: DatabaseAdapter, page: PageInput): Promise<
   ])
 }
 
+export interface QueryAllPagesOptions {
+  includeErrors?: boolean
+  excludeMarkdown?: boolean
+}
+
 /**
  * Query all pages from database
+ * @param db - Database adapter
+ * @param options - Query options
+ * @param options.excludeMarkdown - If true, omit markdown field to reduce memory usage
  */
-export async function queryAllPages(db: DatabaseAdapter, options?: { includeErrors?: boolean }): Promise<PageOutput[]> {
+export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPagesOptions & { excludeMarkdown: true }): Promise<PageMetaOutput[]>
+export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPagesOptions & { excludeMarkdown?: false }): Promise<PageOutput[]>
+export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPagesOptions): Promise<PageOutput[] | PageMetaOutput[]>
+export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPagesOptions): Promise<PageOutput[] | PageMetaOutput[]> {
   const where = options?.includeErrors ? '' : 'WHERE is_error = 0'
-  const rows = await db.all<PageRow>(`SELECT route, title, description, markdown, headings, keywords, content_hash, updated_at, is_error FROM ai_ready_pages ${where}`)
+  const fields = options?.excludeMarkdown
+    ? 'route, title, description, headings, keywords, content_hash, updated_at, is_error'
+    : 'route, title, description, markdown, headings, keywords, content_hash, updated_at, is_error'
+  const rows = await db.all<PageRow>(`SELECT ${fields} FROM ai_ready_pages ${where}`)
 
   return rows.map(row => ({
     route: row.route,
     title: row.title,
     description: row.description,
-    markdown: row.markdown,
+    ...(options?.excludeMarkdown ? {} : { markdown: row.markdown }),
     headings: row.headings,
     keywords: JSON.parse(row.keywords || '[]'),
     contentHash: row.content_hash || undefined,
     updatedAt: row.updated_at,
     isError: row.is_error === 1,
-  }))
+  })) as PageOutput[] | PageMetaOutput[]
 }
 
 export interface DumpRow {
@@ -205,15 +230,71 @@ export interface DumpRow {
   last_seen_at: number | null
 }
 
+const DUMP_BATCH_SIZE = 500
+
 /**
- * Export database as compressed dump (base64 gzip)
+ * Export database as compressed dump (base64 gzip) using batched streaming
+ * Processes rows in batches to avoid loading entire database into memory
  */
 export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
-  const rows = await db.all<DumpRow>(`
-    SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at
-    FROM ai_ready_pages
-  `)
-  return compressToBase64(rows)
+  const encoder = new TextEncoder()
+  const chunks: Uint8Array[] = []
+
+  // Create compression stream
+  const compressionStream = new CompressionStream('gzip')
+  const writer = compressionStream.writable.getWriter()
+
+  // Collect compressed output
+  const reader = compressionStream.readable.getReader()
+  const readPromise = (async () => {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done)
+        break
+      chunks.push(value)
+    }
+  })()
+
+  // Stream rows in batches
+  await writer.write(encoder.encode('['))
+  let offset = 0
+  let first = true
+
+  while (true) {
+    const rows = await db.all<DumpRow>(`
+      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at
+      FROM ai_ready_pages
+      ORDER BY route
+      LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
+    `)
+
+    if (rows.length === 0)
+      break
+
+    for (const row of rows) {
+      const prefix = first ? '' : ','
+      first = false
+      await writer.write(encoder.encode(prefix + JSON.stringify(row)))
+    }
+
+    if (rows.length < DUMP_BATCH_SIZE)
+      break
+    offset += DUMP_BATCH_SIZE
+  }
+
+  await writer.write(encoder.encode(']'))
+  await writer.close()
+  await readPromise
+
+  // Combine chunks and convert to base64
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const result = new Uint8Array(totalLength)
+  let pos = 0
+  for (const chunk of chunks) {
+    result.set(chunk, pos)
+    pos += chunk.length
+  }
+  return Buffer.from(result).toString('base64')
 }
 
 /**
