@@ -21,7 +21,7 @@ catalog:
   '@clack/prompts': ^0.11.0
   '@types/better-sqlite3': ^7.6.13
   agents: ^0.3.4
-  ai: ^6.0.27
+  ai: ^6.0.30
   better-sqlite3: ^12.6.0
   consola: ^3.4.2
   db0: ^0.3.4
@@ -48,12 +48,12 @@ catalogs:
     eslint: ^9.39.2
   dev-test:
     '@nuxt/test-utils': ^3.23.0
-    '@vitest/coverage-v8': ^4.0.16
+    '@vitest/coverage-v8': ^4.0.17
     '@vue/test-utils': ^2.4.6
     happy-dom: ^20.1.0
     playwright: ^1.57.0
     playwright-core: ^1.57.0
-    vitest: ^4.0.16
+    vitest: ^4.0.17
   nuxt:
     '@nuxt/content': ^3.10.0
     '@nuxt/devtools-ui-kit': ^3.1.1

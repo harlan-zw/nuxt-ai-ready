@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.7.2...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.2...main)
+
+### 🩹 Fixes
+
+- **perf:** Memory optimizations ([a4654bd](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/a4654bd))
+
+### 🏡 Chore
+
+- Sync documentation files ([cb11e3c](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/cb11e3c))
+- Sync ([662c227](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/662c227))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.1...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.1...main)
