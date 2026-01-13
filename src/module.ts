@@ -212,7 +212,8 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.experimental.asyncContext = true
 
       // Register scheduled task if cron is enabled (runs every minute)
-      if (config.cron) {
+      // Disabled in dev mode - context isn't fully available
+      if (config.cron && !nuxt.options.dev) {
         const cronSchedule = '* * * * *'
         const isVercel = nitroConfig.preset === 'vercel' || nitroConfig.preset === 'vercel-edge'
 
@@ -369,7 +370,7 @@ export async function readPageDataFromFilesystem() {
     }
 
     // Cron endpoint (for Vercel and other HTTP-based cron systems)
-    if (config.cron) {
+    if (config.cron && !nuxt.options.dev) {
       addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get') })
     }
 
