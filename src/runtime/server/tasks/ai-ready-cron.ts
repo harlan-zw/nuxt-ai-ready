@@ -8,6 +8,9 @@ export default defineTask({
     description: 'Scheduled task for AI Ready - runs indexing and IndexNow sync',
   },
   async run({ payload }) {
+    // Skip in dev - context not fully available
+    if (import.meta.dev)
+      return { result: {} }
     // Create a minimal mock event for internal operations
     const mockEvent = {
       $fetch: globalThis.$fetch,

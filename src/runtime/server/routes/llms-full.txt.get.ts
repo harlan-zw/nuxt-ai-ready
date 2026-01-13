@@ -1,4 +1,4 @@
-import { useSiteConfig } from '#imports'
+import { getSiteConfig } from '#site-config/server/composables'
 import { eventHandler, sendIterable, setHeader, setResponseHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { countPages, streamPages } from '../db/queries'
@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as {
     llmsTxt?: { sections?: unknown[], notes?: unknown }
   }
-  const siteConfig = useSiteConfig()
+  const siteConfig = getSiteConfig(event)
 
   // Build header
   const header = buildLlmsFullTxtHeader(

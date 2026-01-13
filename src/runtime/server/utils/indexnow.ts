@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { useSiteConfig } from '#imports'
+import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import {
   countPagesNeedingIndexNowSync,
@@ -69,7 +69,7 @@ export async function syncToIndexNow(
   limit = 100,
 ): Promise<IndexNowResult> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string }
-  const siteConfig = useSiteConfig()
+  const siteConfig = getSiteConfig(event)
 
   if (!config.indexNowKey) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }

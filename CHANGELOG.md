@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.7.3...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.3...main)
+
+### 🩹 Fixes
+
+- Disable cron in development ([dc6a6c9](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/dc6a6c9))
+
+### 🏡 Chore
+
+- Bump ([aa86cf4](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/aa86cf4))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.2...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.2...main)
