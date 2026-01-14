@@ -95,11 +95,28 @@ export default eventHandler(async (event) => {
     mode = 'production'
   }
 
+  // Build diagnostics
+  const issues: string[] = []
+  const suggestions: string[] = []
+
   // Get page data - separate queries for pages and errors
-  const [pages, errorRoutes] = await Promise.all([
-    queryPages(event) as Promise<PageEntry[]>,
-    queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
-  ])
+  let pages: PageEntry[] = []
+  let errorRoutes: PageEntry[] = []
+  let dbError: string | null = null
+
+  try {
+    const [p, e] = await Promise.all([
+      queryPages(event) as Promise<PageEntry[]>,
+      queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
+    ])
+    pages = p
+    errorRoutes = e
+  }
+  catch (err: any) {
+    dbError = err.message || String(err)
+    issues.push(`Database error: ${dbError}`)
+    suggestions.push('Verify your database configuration (D1 binding, SQLite path, etc.)')
+  }
 
   // Determine data source
   let source: string
@@ -172,10 +189,6 @@ export default eventHandler(async (event) => {
     source: jsonFileSource,
   }
 
-  // Build diagnostics
-  const issues: string[] = []
-  const suggestions: string[] = []
-
   if (mode === 'development') {
     issues.push('Development mode: page data is intentionally empty')
     suggestions.push('Run `nuxi generate` or `nuxi build --prerender` to generate page data')
@@ -200,48 +213,53 @@ export default eventHandler(async (event) => {
   let indexNowInfo: DebugInfo['indexNow']
   let cronRunsInfo: CronRunInfo[] | undefined
 
-  if (!isDev && !isPrerender) {
-    const [total, pending, sitemapSeededAt, cronRuns] = await Promise.all([
-      countPages(event),
-      countPages(event, { where: { pending: true } }),
-      getSitemapSeededAt(event),
-      getRecentCronRuns(event, 20),
-    ])
-
-    runtimeSyncInfo = {
-      total,
-      indexed: total - pending,
-      pending,
-      sitemapSeededAt: sitemapSeededAt ? new Date(sitemapSeededAt).toISOString() : null,
-    }
-
-    cronRunsInfo = cronRuns.map(run => ({
-      id: run.id,
-      startedAt: new Date(run.startedAt).toISOString(),
-      finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
-      durationMs: run.durationMs,
-      status: run.status,
-      pagesIndexed: run.pagesIndexed,
-      pagesRemaining: run.pagesRemaining,
-      indexNowSubmitted: run.indexNowSubmitted,
-      indexNowRemaining: run.indexNowRemaining,
-      errors: run.errors,
-    }))
-
-    // IndexNow stats if configured
-    if (runtimeConfig.indexNowKey) {
-      const [indexNowPending, indexNowStats] = await Promise.all([
-        countPagesNeedingIndexNowSync(event),
-        getIndexNowStats(event),
+  if (!isDev && !isPrerender && !dbError) {
+    try {
+      const [total, pending, sitemapSeededAt, cronRuns] = await Promise.all([
+        countPages(event),
+        countPages(event, { where: { pending: true } }),
+        getSitemapSeededAt(event),
+        getRecentCronRuns(event, 20),
       ])
-      indexNowInfo = {
-        pending: indexNowPending,
-        totalSubmitted: indexNowStats.totalSubmitted,
-        lastSubmittedAt: indexNowStats.lastSubmittedAt
-          ? new Date(indexNowStats.lastSubmittedAt).toISOString()
-          : null,
-        lastError: indexNowStats.lastError,
+
+      runtimeSyncInfo = {
+        total,
+        indexed: total - pending,
+        pending,
+        sitemapSeededAt: sitemapSeededAt ? new Date(sitemapSeededAt).toISOString() : null,
       }
+
+      cronRunsInfo = cronRuns.map(run => ({
+        id: run.id,
+        startedAt: new Date(run.startedAt).toISOString(),
+        finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
+        durationMs: run.durationMs,
+        status: run.status,
+        pagesIndexed: run.pagesIndexed,
+        pagesRemaining: run.pagesRemaining,
+        indexNowSubmitted: run.indexNowSubmitted,
+        indexNowRemaining: run.indexNowRemaining,
+        errors: run.errors,
+      }))
+
+      // IndexNow stats if configured
+      if (runtimeConfig.indexNowKey) {
+        const [indexNowPending, indexNowStats] = await Promise.all([
+          countPagesNeedingIndexNowSync(event),
+          getIndexNowStats(event),
+        ])
+        indexNowInfo = {
+          pending: indexNowPending,
+          totalSubmitted: indexNowStats.totalSubmitted,
+          lastSubmittedAt: indexNowStats.lastSubmittedAt
+            ? new Date(indexNowStats.lastSubmittedAt).toISOString()
+            : null,
+          lastError: indexNowStats.lastError,
+        }
+      }
+    }
+    catch (err: any) {
+      issues.push(`Runtime stats error: ${err.message || String(err)}`)
     }
   }
 

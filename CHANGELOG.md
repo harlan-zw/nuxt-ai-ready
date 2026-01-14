@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.4...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.4...main)
+
+### 🏡 Chore
+
+- Still running in dev ([da7bc5e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/da7bc5e))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.3...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.3...main)

@@ -111,6 +111,17 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.alias['#ai-ready/adapter'] = adapterPath
     nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath
 
+    // Resolve database provider alias
+    let providerPath = resolve('./runtime/server/db/provider/sqlite')
+    if (dbType === 'd1') {
+      providerPath = resolve('./runtime/server/db/provider/d1')
+    }
+    else if (dbType === 'libsql') {
+      providerPath = resolve('./runtime/server/db/provider/libsql')
+    }
+    nuxt.options.alias['#ai-ready/db-provider'] = providerPath
+    nuxt.options.nitro.alias['#ai-ready/db-provider'] = providerPath
+
     // set default MCP name
     if (!nuxt.options.mcp?.name) {
       nuxt.options.mcp = nuxt.options.mcp || {}

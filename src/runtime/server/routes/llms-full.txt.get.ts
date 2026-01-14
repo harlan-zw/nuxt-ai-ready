@@ -29,7 +29,15 @@ export default eventHandler(async (event) => {
   )
 
   // Check if any pages exist
-  const total = await countPages(event)
+  let total = 0
+  try {
+    total = await countPages(event)
+  }
+  catch (err: any) {
+    setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
+    return `${header}Database error: ${err.message || String(err)}\n\nRuntime indexing may not be configured correctly for this environment.`
+  }
+
   if (total === 0) {
     setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
     return `${header}No pages indexed. Run \`nuxi generate\` or enable runtime indexing.`
