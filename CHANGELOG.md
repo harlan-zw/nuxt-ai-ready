@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.7.7...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.7...main)
+
+### 🩹 Fixes
+
+- D1 binding resolution race condition ([ed70142](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/ed70142))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.7.6...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.6...main)
+
+### 🩹 Fixes
+
+- D1 binding access for Cloudflare Workers ([dff81e0](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/dff81e0))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.5...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.5...main)
