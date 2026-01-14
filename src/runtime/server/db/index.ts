@@ -1,7 +1,6 @@
 import type { H3Event } from 'h3'
 import type { NitroApp } from 'nitropack/types'
 import type { DatabaseAdapter } from './shared'
-// @ts-expect-error - resolved at build time via module alias
 import { createConnector } from '#ai-ready/db-provider'
 import { useNitroApp } from 'nitropack/runtime'
 import { createAdapter, initSchema } from './shared'
