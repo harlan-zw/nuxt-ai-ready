@@ -17,7 +17,18 @@ export default defineNitroPlugin((nitro) => {
     if (!seeding) {
       seeding = seedFromSitemap(event).catch((err) => {
         // Gracefully handle D1 binding errors - app can use static pages.json fallback
-        if (err.message?.includes('D1 binding')) {
+        if (err.message?.includes('D1 binding') || err.message?.includes('[d1]')) {
+          const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+          if (config.debug) {
+            // Log debug info to help diagnose binding issues
+            const debugInfo = {
+              hasGlobalEnv: !!(globalThis as any).__env__,
+              globalEnvKeys: (globalThis as any).__env__ ? Object.keys((globalThis as any).__env__) : [],
+              hasCloudflareContext: !!(event.context as any)?.cloudflare,
+              error: err.message,
+            }
+            logger.info('[sitemap-seeder] D1 binding debug:', JSON.stringify(debugInfo, null, 2))
+          }
           logger.info('[sitemap-seeder] Skipping runtime seeding - using static pages data')
         }
         else {
