@@ -48,6 +48,12 @@ declare module '#ai-ready/adapter' {
   export default connector
 }
 
+declare module '#ai-ready/db-provider' {
+  import type { H3Event } from 'h3'
+  import type { Connector } from 'db0'
+  export function createConnector(event?: H3Event): Promise<Connector>
+}
+
 export {}
 `,
   })
