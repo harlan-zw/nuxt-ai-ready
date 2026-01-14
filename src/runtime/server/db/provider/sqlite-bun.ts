@@ -1,7 +1,9 @@
 import type { Connector } from 'db0'
 import type { H3Event } from 'h3'
+import { mkdir } from 'node:fs/promises'
 import adapter from '#ai-ready/adapter'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { dirname } from 'pathe'
 
 export async function createConnector(event?: H3Event): Promise<Connector> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
@@ -14,9 +16,8 @@ export async function createConnector(event?: H3Event): Promise<Connector> {
     }
   }
 
-  const binding = (event?.context?.cloudflare?.env as Record<string, unknown>)?.[config.database.bindingName || 'AI_READY_DB']
-  if (!binding) {
-    throw new Error(`D1 binding '${config.database.bindingName || 'AI_READY_DB'}' not found in event context`)
-  }
-  return adapter({ binding })
+  const dbPath = config.database.filename || '.data/ai-ready/pages.db'
+  await mkdir(dirname(dbPath), { recursive: true })
+
+  return adapter({ path: dbPath })
 }

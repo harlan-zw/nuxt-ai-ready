@@ -112,12 +112,15 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath
 
     // Resolve database provider alias
-    let providerPath = resolve('./runtime/server/db/provider/sqlite')
+    let providerPath = resolve('./runtime/server/db/provider/sqlite-node')
     if (dbType === 'd1') {
       providerPath = resolve('./runtime/server/db/provider/d1')
     }
     else if (dbType === 'libsql') {
       providerPath = resolve('./runtime/server/db/provider/libsql')
+    }
+    else if (process.versions.bun) {
+      providerPath = resolve('./runtime/server/db/provider/sqlite-bun')
     }
     nuxt.options.alias['#ai-ready/db-provider'] = providerPath
     nuxt.options.nitro.alias['#ai-ready/db-provider'] = providerPath

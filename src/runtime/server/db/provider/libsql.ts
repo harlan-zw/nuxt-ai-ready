@@ -1,11 +1,10 @@
-import type { H3Event } from 'h3'
 import type { Connector } from 'db0'
-import { useRuntimeConfig } from 'nitropack/runtime'
-// @ts-expect-error - resolved at build time via module alias
+import type { H3Event } from 'h3'
 import adapter from '#ai-ready/adapter'
+import { useRuntimeConfig } from 'nitropack/runtime'
 
 export async function createConnector(event?: H3Event): Promise<Connector> {
-  const config = useRuntimeConfig()['nuxt-ai-ready'] as {
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
     database: {
       type: 'sqlite' | 'd1' | 'libsql'
       filename?: string
