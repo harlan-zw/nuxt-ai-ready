@@ -65,7 +65,7 @@ export function refineDatabaseConfig(
   if (type === 'd1') {
     return {
       type: 'd1',
-      bindingName: config.bindingName || 'AI_READY_DB',
+      bindingName: config.bindingName || 'DB',
     }
   }
 

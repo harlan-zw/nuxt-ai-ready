@@ -21,7 +21,7 @@ export default defineNuxtConfig({
   aiReady: {
     database: {
       type: 'd1',
-      bindingName: 'AI_READY_DB',
+      bindingName: 'DB',
     },
   },
 })

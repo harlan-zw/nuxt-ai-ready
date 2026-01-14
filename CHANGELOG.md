@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v0.7.5...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.5...main)
+
+### 🚀 Enhancements
+
+- Split sqlite provider into node and bun ([51a13d9](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/51a13d9))
+
+### 💅 Refactors
+
+- Separate database providers and use alias to load ([2f81d58](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/2f81d58))
+
+### 🌊 Types
+
+- Add #ai-ready/db-provider virtual module declaration ([23e6661](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/23e6661))
+
+### 🏡 Chore
+
+- Remove session context ([beb6621](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/beb6621))
+- Type check ([273e3a2](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/273e3a2))
+- Support `node-sqlite` ([10ae789](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/10ae789))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.4...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.4...main)

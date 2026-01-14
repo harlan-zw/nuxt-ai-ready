@@ -63,6 +63,19 @@ interface DebugInfo {
       note: string
     }
   }
+  cloudflare?: {
+    hasContext: boolean
+    hasCloudflare: boolean
+    hasCloudflareEnv: boolean
+    hasContextEnv: boolean
+    contextKeys: string[]
+    cloudflareKeys: string[]
+    cloudflareEnvKeys: string[]
+    databaseConfig: {
+      type: string
+      bindingName?: string
+    }
+  }
   diagnostics: {
     issues: string[]
     suggestions: string[]
@@ -263,6 +276,21 @@ export default eventHandler(async (event) => {
     }
   }
 
+  // Cloudflare binding diagnostics
+  const cloudflareInfo = {
+    hasContext: !!event.context,
+    hasCloudflare: !!event.context?.cloudflare,
+    hasCloudflareEnv: !!event.context?.cloudflare?.env,
+    hasContextEnv: !!(event.context as any)?.env,
+    contextKeys: event.context ? Object.keys(event.context) : [],
+    cloudflareKeys: event.context?.cloudflare ? Object.keys(event.context.cloudflare) : [],
+    cloudflareEnvKeys: event.context?.cloudflare?.env ? Object.keys(event.context.cloudflare.env) : [],
+    databaseConfig: {
+      type: runtimeConfig.database?.type || 'unknown',
+      bindingName: runtimeConfig.database?.bindingName,
+    },
+  }
+
   const debugInfo: DebugInfo = {
     version: runtimeConfig.version || 'unknown',
     environment: {
@@ -294,6 +322,7 @@ export default eventHandler(async (event) => {
       pageDataModule: pageDataModuleInfo,
       readPageDataModule: readPageDataModuleInfo,
     },
+    cloudflare: cloudflareInfo,
     diagnostics: {
       issues,
       suggestions,

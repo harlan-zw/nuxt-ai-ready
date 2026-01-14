@@ -16,7 +16,13 @@ export default defineNitroPlugin((nitro) => {
     // Only seed once per process (singleton promise)
     if (!seeding) {
       seeding = seedFromSitemap(event).catch((err) => {
-        logger.error('[sitemap-seeder] Failed to seed:', err)
+        // Gracefully handle D1 binding errors - app can use static pages.json fallback
+        if (err.message?.includes('D1 binding')) {
+          logger.info('[sitemap-seeder] Skipping runtime seeding - using static pages data')
+        }
+        else {
+          logger.error('[sitemap-seeder] Failed to seed:', err)
+        }
       })
     }
     // Don't await - let it run in background
