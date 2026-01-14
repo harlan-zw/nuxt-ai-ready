@@ -259,7 +259,7 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.virtual = nitroConfig.virtual || {}
 
       // Helper to read from SQLite database during prerender
-      // Uses better-sqlite3 directly since we're in Node.js context
+      // Uses node:sqlite or better-sqlite3 directly since we're in Node.js context
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = `
 export async function readPageDataFromFilesystem() {
   if (!import.meta.prerender) {
@@ -274,12 +274,20 @@ export async function readPageDataFromFilesystem() {
     return { pages: [], errorRoutes: [] }
   }
 
-  // Use better-sqlite3 to read pages
-  const Database = (await import('better-sqlite3')).default
-  const db = new Database(dbPath, { readonly: true })
-
-  const rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
-  db.close()
+  let rows = []
+  const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
+  if (nodeVersion >= 22) {
+    const { DatabaseSync } = await import('node:sqlite')
+    const db = new DatabaseSync(dbPath, { open: true })
+    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
+    db.close()
+  }
+  else {
+    const Database = (await import('better-sqlite3')).default
+    const db = new Database(dbPath, { readonly: true })
+    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
+    db.close()
+  }
 
   const pages = rows.filter(r => !r.is_error).map(r => ({
     route: r.route,

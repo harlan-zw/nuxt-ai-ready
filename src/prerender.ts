@@ -64,11 +64,13 @@ async function initCrawler(state: CrawlerState): Promise<void> {
   // Initialize SQLite database for page data
   if (state.dbPath) {
     await mkdir(dirname(state.dbPath), { recursive: true })
-    const { default: betterSqlite3 } = await import('db0/connectors/better-sqlite3')
-    const connector = betterSqlite3({ path: state.dbPath })
+    const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
+    const connectorPath = nodeVersion >= 22 ? 'db0/connectors/node-sqlite' : 'db0/connectors/better-sqlite3'
+    const { default: connectorFn } = await import(connectorPath)
+    const connector = connectorFn({ path: state.dbPath })
     state.db = createAdapter(connector)
     await initSchema(state.db)
-    logger.debug(`Crawler initialized with SQLite at ${state.dbPath}`)
+    logger.debug(`Crawler initialized with SQLite at ${state.dbPath} using ${connectorPath}`)
   }
 
   // Initialize llms-full.txt with header

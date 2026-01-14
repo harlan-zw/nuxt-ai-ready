@@ -1,5 +1,5 @@
 // Schema SQL definitions for database initialization
-// Used by both prerender (better-sqlite3) and runtime (db0)
+// Used by both prerender (node:sqlite/better-sqlite3) and runtime (db0)
 
 export const SCHEMA_VERSION = 'v1.7.0'
 

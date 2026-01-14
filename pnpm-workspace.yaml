@@ -20,9 +20,10 @@ overrides:
 catalog:
   '@clack/prompts': ^0.11.0
   '@types/better-sqlite3': ^7.6.13
-  agents: ^0.3.4
-  ai: ^6.0.30
+  agents: ^0.3.5
+  ai: ^6.0.33
   better-sqlite3: ^12.6.0
+  bumpp: ^10.4.0
   consola: ^3.4.2
   db0: ^0.3.4
   defu: ^6.1.4
@@ -34,16 +35,15 @@ catalog:
   postgres: ^3.4.8
   std-env: 3.10.0
   ufo: ^1.6.2
-  wrangler: ^4.58.0
+  wrangler: ^4.59.1
   zod: ^4.3.5
 catalogs:
   dev-build:
     '@arethetypeswrong/cli': ^0.18.2
-    bumpp: ^10.3.2
     typescript: ^5.9.3
     vue-tsc: ^3.2.2
   dev-lint:
-    '@antfu/eslint-config': ^6.7.3
+    '@antfu/eslint-config': ^7.0.0
     '@nuxtjs/eslint-config-typescript': ^12.1.0
     eslint: ^9.39.2
   dev-test:
