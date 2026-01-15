@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { useDatabase } from '../db'
 import {
   countPagesNeedingIndexNowSync,
   getPagesNeedingIndexNowSync,
@@ -9,11 +10,46 @@ import {
 } from '../db/queries'
 import { logger } from '../logger'
 
+// Backoff: 5min, 10min, 20min, 40min, 1hr max
+const BACKOFF_MINUTES = [5, 10, 20, 40, 60]
+
 export interface IndexNowResult {
   success: boolean
   submitted: number
   remaining: number
   error?: string
+  backoff?: boolean
+}
+
+interface BackoffInfo {
+  until: number
+  attempt: number
+}
+
+async function getBackoffInfo(event: H3Event | undefined): Promise<BackoffInfo | null> {
+  const db = await useDatabase(event).catch(() => null)
+  if (!db)
+    return null
+
+  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
+  if (!row)
+    return null
+
+  const parsed = JSON.parse(row.value) as BackoffInfo
+  return parsed
+}
+
+async function setBackoffInfo(event: H3Event | undefined, info: BackoffInfo | null): Promise<void> {
+  const db = await useDatabase(event).catch(() => null)
+  if (!db)
+    return
+
+  if (info) {
+    await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['indexnow_backoff', JSON.stringify(info)])
+  }
+  else {
+    await db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
+  }
 }
 
 /**
@@ -63,6 +99,7 @@ export async function submitToIndexNow(
 /**
  * Submit pending pages to IndexNow
  * Queries DB for pages needing sync, submits, marks as synced
+ * Implements exponential backoff on 429 rate limit errors
  */
 export async function syncToIndexNow(
   event: H3Event | undefined,
@@ -79,6 +116,21 @@ export async function syncToIndexNow(
     return { success: false, submitted: 0, remaining: 0, error: 'Site URL not configured' }
   }
 
+  // Check if we're in backoff period
+  const backoff = await getBackoffInfo(event)
+  if (backoff && Date.now() < backoff.until) {
+    const waitMinutes = Math.ceil((backoff.until - Date.now()) / 60000)
+    logger.debug(`[indexnow] In backoff period, ${waitMinutes}m remaining`)
+    const remaining = await countPagesNeedingIndexNowSync(event)
+    return {
+      success: false,
+      submitted: 0,
+      remaining,
+      error: `Rate limited, retry in ${waitMinutes}m`,
+      backoff: true,
+    }
+  }
+
   // Get pages needing sync
   const pages = await getPagesNeedingIndexNowSync(event, limit)
   if (pages.length === 0) {
@@ -91,12 +143,23 @@ export async function syncToIndexNow(
   const result = await submitToIndexNow(routes, { key: config.indexNowKey }, siteConfig.url)
 
   if (result.success) {
+    // Clear backoff on success
+    await setBackoffInfo(event, null)
     // Mark as synced and update stats
     await markIndexNowSynced(event, routes)
     await updateIndexNowStats(event, routes.length)
   }
   else {
     await updateIndexNowStats(event, 0, result.error)
+
+    // Set exponential backoff on 429
+    if (result.error?.includes('429')) {
+      const attempt = backoff ? Math.min(backoff.attempt + 1, BACKOFF_MINUTES.length - 1) : 0
+      const backoffMinutes = BACKOFF_MINUTES[attempt] ?? 60
+      const until = Date.now() + (backoffMinutes * 60 * 1000)
+      await setBackoffInfo(event, { until, attempt })
+      logger.warn(`[indexnow] Rate limited, backing off for ${backoffMinutes}m (attempt ${attempt + 1})`)
+    }
   }
 
   const remaining = await countPagesNeedingIndexNowSync(event)
@@ -106,5 +169,6 @@ export async function syncToIndexNow(
     submitted: result.success ? routes.length : 0,
     remaining,
     error: result.error,
+    backoff: !result.success && result.error?.includes('429'),
   }
 }
