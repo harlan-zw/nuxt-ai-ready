@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.10
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.9...v0.7.10)
+
+### 🚀 Enhancements
+
+- Add restore endpoint for force-restoring from dump ([d6780db](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/d6780db))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.8...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.8...main)
