@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.12
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.11...v0.7.12)
+
+### ✅ Tests
+
+- Add restore endpoint test ([8db4ab4](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/8db4ab4))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.11
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.10...v0.7.11)
