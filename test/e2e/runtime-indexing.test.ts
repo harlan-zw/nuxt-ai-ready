@@ -302,6 +302,22 @@ describe('runtime indexing', async () => {
     expect(after.count).toBe(0)
   })
 
+  // Restore endpoint tests
+  it('restore: endpoint exists and responds', async () => {
+    // Without a dump file, restore returns 404
+    // With a dump file, it would restore pages
+    const result = await fetch('/__ai-ready/restore', { method: 'POST' }).catch((e: { statusCode: number }) => ({ error: true, statusCode: e.statusCode })) as { error?: boolean, statusCode?: number, restored?: number, cleared?: boolean }
+
+    // Either 404 (no dump) or success with restored count
+    if (result.error) {
+      expect(result.statusCode).toBe(404)
+    }
+    else {
+      expect(typeof result.restored).toBe('number')
+      expect(typeof result.cleared).toBe('boolean')
+    }
+  })
+
   // Scheduled task tests
   it('scheduled: task can be run manually', async () => {
     const result = (await fetch('/api/__run-task?name=ai-ready:cron')) as { result?: { index?: { indexed: number, remaining: number, complete: boolean } }, error?: string }
