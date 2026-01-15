@@ -65,11 +65,11 @@ export async function submitToIndexNow(
  * Queries DB for pages needing sync, submits, marks as synced
  */
 export async function syncToIndexNow(
-  event: H3Event,
+  event: H3Event | undefined,
   limit = 100,
 ): Promise<IndexNowResult> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string }
-  const siteConfig = getSiteConfig(event)
+  const siteConfig = getSiteConfig(event as H3Event)
 
   if (!config.indexNowKey) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }

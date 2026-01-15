@@ -31,7 +31,7 @@ export interface BatchIndexResult {
  * Shared logic used by poll endpoint and scheduled task
  */
 export async function batchIndexPages(
-  event: H3Event,
+  event: H3Event | undefined,
   options: BatchIndexOptions = {},
 ): Promise<BatchIndexResult> {
   const startTime = Date.now()

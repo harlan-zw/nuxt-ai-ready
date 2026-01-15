@@ -23,7 +23,7 @@ export interface CronResult {
 /**
  * Run cron job logic - shared between scheduled task and HTTP endpoint
  */
-export async function runCron(event: H3Event, options?: { batchSize?: number }): Promise<CronResult> {
+export async function runCron(event: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
   // Skip in dev - DB and context not available
   if (import.meta.dev)
     return {}

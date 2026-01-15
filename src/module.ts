@@ -197,12 +197,12 @@ export default defineNuxtModule<ModuleOptions>({
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
-        sections: [
-          ...defaultLlmsTxtSections,
-          ...(config.llmsTxt.sections || []),
-        ],
-        notes: config.llmsTxt.notes,
-      }
+          sections: [
+            ...defaultLlmsTxtSections,
+            ...(config.llmsTxt.sections || []),
+          ],
+          notes: config.llmsTxt.notes,
+        }
       : { sections: defaultLlmsTxtSections }
 
     // Allow other modules to extend llms.txt content via hook
@@ -252,7 +252,7 @@ export default defineNuxtModule<ModuleOptions>({
 
           nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
           nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
-            ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
+          ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
         }
       }
 
