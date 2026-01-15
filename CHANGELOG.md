@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.13
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.12...v0.7.13)
+
+### 🩹 Fixes
+
+- Indexnow key handler reading wrong config path ([5d5e4dd](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/5d5e4dd))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.12
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.11...v0.7.12)
