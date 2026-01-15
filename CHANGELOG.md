@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.11
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.10...v0.7.11)
+
+### 🩹 Fixes
+
+- Register restore endpoint in module ([15f9130](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/15f9130))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.10
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.9...v0.7.10)
