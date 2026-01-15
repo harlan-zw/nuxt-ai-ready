@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.16
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.15...v0.7.16)
+
+### 🚀 Enhancements
+
+- Fallback to bing on IndexNow rate limit ([ea443ae](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/ea443ae))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.15
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.14...v0.7.15)
