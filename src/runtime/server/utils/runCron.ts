@@ -1,9 +1,20 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
 import { cleanupOldCronRuns, completeCronRun, startCronRun } from '../db/queries'
 import { batchIndexPages } from './batchIndex'
 import { syncToIndexNow } from './indexnow'
+
+function getEvent(providedEvent?: H3Event): H3Event | undefined {
+  if (providedEvent)
+    return providedEvent
+  try {
+    return useEvent()
+  }
+  catch {
+    return undefined
+  }
+}
 
 export interface CronResult {
   runId?: number | null
@@ -23,10 +34,17 @@ export interface CronResult {
 /**
  * Run cron job logic - shared between scheduled task and HTTP endpoint
  */
-export async function runCron(event: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
+export async function runCron(providedEvent: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
   // Skip in dev - DB and context not available
   if (import.meta.dev)
     return {}
+
+  // Get event from context if not provided (for scheduled tasks)
+  const event = getEvent(providedEvent)
+  if (!event) {
+    console.warn('[ai-ready:cron] No event context available, skipping')
+    return {}
+  }
 
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const results: CronResult = {}

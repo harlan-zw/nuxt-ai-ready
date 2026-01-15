@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.7.8...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.8...main)
+
+### 🩹 Fixes
+
+- Split type templates for proper build-time type resolution ([24c594d](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/24c594d))
+- Remove global DB caching to avoid async operations at global scope ([89bdcf9](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/89bdcf9))
+- Resolve cloudflare workers global scope async error ([3241517](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/3241517))
+- Remove global DB caching to avoid async operations at global scope ([#8](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/8))
+- Cron throwing error ([78c41a7](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/78c41a7))
+- Cron throwing error ([08deaa2](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/08deaa2))
+
+### 🏡 Chore
+
+- Bump deps ([6823056](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/6823056))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.7...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.7...main)
