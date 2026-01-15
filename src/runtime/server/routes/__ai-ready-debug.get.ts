@@ -1,7 +1,7 @@
-import type { PageEntry } from '../db/queries'
+import type { IndexNowLogEntry, PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { countPages, countPagesNeedingIndexNowSync, getIndexNowStats, getRecentCronRuns, getSitemapSeededAt, queryPages } from '../db/queries'
+import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, getSitemapSeededAt, queryPages } from '../db/queries'
 
 interface CronRunInfo {
   id: number
@@ -40,6 +40,13 @@ interface DebugInfo {
     lastSubmittedAt: string | null
     lastError: string | null
   }
+  indexNowLog?: Array<{
+    id: number
+    submittedAt: string
+    urlCount: number
+    success: boolean
+    error: string | null
+  }>
   cronRuns?: CronRunInfo[]
   pageData: {
     source: string
@@ -224,6 +231,7 @@ export default eventHandler(async (event) => {
   // Fetch runtime sync stats (only in production)
   let runtimeSyncInfo: DebugInfo['runtimeSync']
   let indexNowInfo: DebugInfo['indexNow']
+  let indexNowLogInfo: DebugInfo['indexNowLog']
   let cronRunsInfo: CronRunInfo[] | undefined
 
   if (!isDev && !isPrerender && !dbError) {
@@ -257,9 +265,10 @@ export default eventHandler(async (event) => {
 
       // IndexNow stats if configured
       if (runtimeConfig.indexNowKey) {
-        const [indexNowPending, indexNowStats] = await Promise.all([
+        const [indexNowPending, indexNowStats, indexNowLogEntries] = await Promise.all([
           countPagesNeedingIndexNowSync(event),
           getIndexNowStats(event),
+          getIndexNowLog(event, 20),
         ])
         indexNowInfo = {
           pending: indexNowPending,
@@ -269,6 +278,13 @@ export default eventHandler(async (event) => {
             : null,
           lastError: indexNowStats.lastError,
         }
+        indexNowLogInfo = indexNowLogEntries.map(entry => ({
+          id: entry.id,
+          submittedAt: new Date(entry.submittedAt).toISOString(),
+          urlCount: entry.urlCount,
+          success: entry.success,
+          error: entry.error,
+        }))
       }
     }
     catch (err: any) {
@@ -305,6 +321,7 @@ export default eventHandler(async (event) => {
     },
     runtimeSync: runtimeSyncInfo,
     indexNow: indexNowInfo,
+    indexNowLog: indexNowLogInfo,
     cronRuns: cronRunsInfo,
     pageData: {
       source,

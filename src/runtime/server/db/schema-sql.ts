@@ -1,7 +1,7 @@
 // Schema SQL definitions for database initialization
 // Used by both prerender (node:sqlite/better-sqlite3) and runtime (db0)
 
-export const SCHEMA_VERSION = 'v1.7.0'
+export const SCHEMA_VERSION = 'v1.8.0'
 
 const PAGES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS ai_ready_pages (
@@ -79,10 +79,22 @@ CREATE TABLE IF NOT EXISTS ai_ready_cron_runs (
 
 const CRON_RUNS_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS idx_ai_ready_cron_runs_started ON ai_ready_cron_runs(started_at DESC)'
 
+const INDEXNOW_LOG_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS ai_ready_indexnow_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  submitted_at INTEGER NOT NULL,
+  url_count INTEGER NOT NULL,
+  success INTEGER NOT NULL DEFAULT 0,
+  error TEXT
+)`
+
+const INDEXNOW_LOG_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS idx_ai_ready_indexnow_log_submitted ON ai_ready_indexnow_log(submitted_at DESC)'
+
 export const DROP_TABLES_SQL = [
   'DROP TABLE IF EXISTS ai_ready_pages_fts',
   'DROP TABLE IF EXISTS ai_ready_pages',
   'DROP TABLE IF EXISTS ai_ready_cron_runs',
+  'DROP TABLE IF EXISTS ai_ready_indexnow_log',
   'DROP TABLE IF EXISTS _ai_ready_info',
   // Legacy unprefixed tables (migration from v1.0.0)
   'DROP TABLE IF EXISTS pages_fts',
@@ -98,4 +110,6 @@ export const ALL_SCHEMA_SQL = [
   INFO_TABLE_SQL,
   CRON_RUNS_TABLE_SQL,
   CRON_RUNS_INDEX_SQL,
+  INDEXNOW_LOG_TABLE_SQL,
+  INDEXNOW_LOG_INDEX_SQL,
 ]

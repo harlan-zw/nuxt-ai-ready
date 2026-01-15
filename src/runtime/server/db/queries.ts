@@ -671,6 +671,72 @@ export async function getIndexNowStats(
 }
 
 // ============================================================================
+// IndexNow Submission Log (debug mode only)
+// ============================================================================
+
+export interface IndexNowLogEntry {
+  id: number
+  submittedAt: number
+  urlCount: number
+  success: boolean
+  error: string | null
+}
+
+/**
+ * Log an IndexNow submission attempt (for debug mode)
+ */
+export async function logIndexNowSubmission(
+  event: H3Event | undefined,
+  urlCount: number,
+  success: boolean,
+  error?: string,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec(
+    'INSERT INTO ai_ready_indexnow_log (submitted_at, url_count, success, error) VALUES (?, ?, ?, ?)',
+    [Date.now(), urlCount, success ? 1 : 0, error || null],
+  )
+
+  // Keep only last 100 entries
+  await db.exec(`
+    DELETE FROM ai_ready_indexnow_log WHERE id NOT IN (
+      SELECT id FROM ai_ready_indexnow_log ORDER BY submitted_at DESC LIMIT 100
+    )
+  `)
+}
+
+/**
+ * Get recent IndexNow submission log entries
+ */
+export async function getIndexNowLog(
+  event: H3Event | undefined,
+  limit = 20,
+): Promise<IndexNowLogEntry[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  const rows = await db.all<{
+    id: number
+    submitted_at: number
+    url_count: number
+    success: number
+    error: string | null
+  }>('SELECT * FROM ai_ready_indexnow_log ORDER BY submitted_at DESC LIMIT ?', [limit])
+
+  return rows.map(row => ({
+    id: row.id,
+    submittedAt: row.submitted_at,
+    urlCount: row.url_count,
+    success: row.success === 1,
+    error: row.error,
+  }))
+}
+
+// ============================================================================
 // Cron Run Logging
 // ============================================================================
 

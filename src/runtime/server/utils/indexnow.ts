@@ -5,6 +5,7 @@ import { useDatabase } from '../db'
 import {
   countPagesNeedingIndexNowSync,
   getPagesNeedingIndexNowSync,
+  logIndexNowSubmission,
   markIndexNowSynced,
   updateIndexNowStats,
 } from '../db/queries'
@@ -105,7 +106,7 @@ export async function syncToIndexNow(
   event: H3Event | undefined,
   limit = 100,
 ): Promise<IndexNowResult> {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string, debug?: boolean }
   const siteConfig = getSiteConfig(event as H3Event)
 
   if (!config.indexNowKey) {
@@ -141,6 +142,11 @@ export async function syncToIndexNow(
 
   // Submit to IndexNow (host always defaults to api.indexnow.org)
   const result = await submitToIndexNow(routes, { key: config.indexNowKey }, siteConfig.url)
+
+  // Log submission when debug is enabled
+  if (config.debug) {
+    await logIndexNowSubmission(event, routes.length, result.success, result.error)
+  }
 
   if (result.success) {
     // Clear backoff on success
