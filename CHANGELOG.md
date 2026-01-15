@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.14
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.13...v0.7.14)
+
+### 🚀 Enhancements
+
+- Add exponential backoff for IndexNow rate limits ([ebcf51e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/ebcf51e))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.13
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.12...v0.7.13)
