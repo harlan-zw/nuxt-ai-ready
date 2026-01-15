@@ -53,20 +53,20 @@ async function setBackoffInfo(event: H3Event | undefined, info: BackoffInfo | nu
   }
 }
 
+// Endpoints to try in order (fallback on 429)
+const INDEXNOW_HOSTS = ['api.indexnow.org', 'www.bing.com']
+
 /**
- * Submit URLs to IndexNow API
+ * Submit URLs to IndexNow API with fallback on rate limit
  */
 export async function submitToIndexNow(
   routes: string[],
-  config: { key: string, host?: string },
+  config: { key: string },
   siteUrl: string,
-): Promise<{ success: boolean, error?: string }> {
+): Promise<{ success: boolean, error?: string, host?: string }> {
   if (!siteUrl) {
     return { success: false, error: 'Site URL not configured' }
   }
-
-  const host = config.host || 'api.indexnow.org'
-  const endpoint = `https://${host}/indexnow`
 
   // Convert routes to absolute URLs
   const urlList = routes.map(route =>
@@ -80,21 +80,39 @@ export async function submitToIndexNow(
     urlList,
   }
 
-  logger.debug(`[indexnow] Submitting ${urlList.length} URLs to ${endpoint}`)
+  let lastError: string | undefined
 
-  const response = await $fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  }).catch((err: Error) => ({ error: err.message }))
+  // Try each host, fallback on 429
+  for (const host of INDEXNOW_HOSTS) {
+    const endpoint = `https://${host}/indexnow`
+    logger.debug(`[indexnow] Submitting ${urlList.length} URLs to ${endpoint}`)
 
-  if (response && typeof response === 'object' && 'error' in response) {
-    logger.warn(`[indexnow] Submission failed: ${response.error}`)
-    return { success: false, error: response.error as string }
+    const response = await $fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }).catch((err: Error) => ({ error: err.message }))
+
+    if (response && typeof response === 'object' && 'error' in response) {
+      lastError = response.error as string
+
+      // On 429, try next host
+      if (lastError.includes('429')) {
+        logger.warn(`[indexnow] Rate limited on ${host}, trying fallback...`)
+        continue
+      }
+
+      // Other errors, don't fallback
+      logger.warn(`[indexnow] Submission failed on ${host}: ${lastError}`)
+      return { success: false, error: lastError, host }
+    }
+
+    logger.debug(`[indexnow] Successfully submitted ${urlList.length} URLs via ${host}`)
+    return { success: true, host }
   }
 
-  logger.debug(`[indexnow] Successfully submitted ${urlList.length} URLs`)
-  return { success: true }
+  // All hosts rate limited
+  return { success: false, error: lastError || 'All endpoints rate limited', host: INDEXNOW_HOSTS[INDEXNOW_HOSTS.length - 1] }
 }
 
 /**
