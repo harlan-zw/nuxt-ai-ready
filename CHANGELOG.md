@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.7.15
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.14...v0.7.15)
+
+### 🚀 Enhancements
+
+- Add IndexNow submission log (debug mode only) ([f284722](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/f284722))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.14
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.13...v0.7.14)
