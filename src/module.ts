@@ -271,9 +271,16 @@ export default defineNuxtModule<ModuleOptions>({
       // Disabled in dev mode - context isn't fully available
       if (config.cron && !nuxt.options.dev) {
         const cronSchedule = '* * * * *'
-        const isVercel = nitroConfig.preset === 'vercel' || nitroConfig.preset === 'vercel-edge'
+        const preset = String(nitroConfig.preset || '')
+        const isVercel = preset === 'vercel' || preset === 'vercel-edge'
+        const isCloudflarePages = preset === 'cloudflare-pages' || preset === 'cloudflare_pages'
 
-        if (isVercel) {
+        if (isCloudflarePages) {
+          // Cloudflare Pages doesn't support scheduled tasks/triggers
+          // Users should use external cron to call GET /__ai-ready/cron
+          logger.warn('Cloudflare Pages does not support cron. Use external cron to call /__ai-ready/cron instead.')
+        }
+        else if (isVercel) {
           // Vercel uses HTTP-based crons - configure vercel.json to hit our endpoint
           // Include secret in path since Vercel crons are HTTP-based
           nitroConfig.vercel = nitroConfig.vercel || {}
@@ -285,7 +292,7 @@ export default defineNuxtModule<ModuleOptions>({
           })
         }
         else {
-          // Native Nitro scheduled tasks (Cloudflare, etc.)
+          // Native Nitro scheduled tasks (Cloudflare Workers, etc.)
           nitroConfig.experimental.tasks = true
 
           nitroConfig.tasks = nitroConfig.tasks || {}
@@ -297,9 +304,8 @@ export default defineNuxtModule<ModuleOptions>({
           nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
           ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
 
-          // Auto-configure Cloudflare wrangler cron triggers (Workers only, not Pages)
-          const preset = String(nitroConfig.preset)
-          const isCloudflareWorkers = preset.startsWith('cloudflare') && !preset.includes('pages')
+          // Auto-configure Cloudflare wrangler cron triggers (Workers only)
+          const isCloudflareWorkers = preset.startsWith('cloudflare')
           if (isCloudflareWorkers) {
             nitroConfig.cloudflare = nitroConfig.cloudflare || {}
             nitroConfig.cloudflare.deployConfig = true
