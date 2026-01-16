@@ -21,7 +21,7 @@ catalog:
   '@clack/prompts': ^0.11.0
   '@types/better-sqlite3': ^7.6.13
   agents: ^0.3.5
-  ai: ^6.0.35
+  ai: ^6.0.38
   better-sqlite3: ^12.6.0
   bumpp: ^10.4.0
   citty: ^0.1.6
@@ -36,7 +36,7 @@ catalog:
   postgres: ^3.4.8
   std-env: 3.10.0
   ufo: ^1.6.3
-  wrangler: ^4.59.1
+  wrangler: ^4.59.2
   zod: ^4.3.5
 catalogs:
   dev-build:
@@ -51,7 +51,7 @@ catalogs:
     '@nuxt/test-utils': ^3.23.0
     '@vitest/coverage-v8': ^4.0.17
     '@vue/test-utils': ^2.4.6
-    happy-dom: ^20.3.0
+    happy-dom: ^20.3.1
     playwright: ^1.57.0
     playwright-core: ^1.57.0
     vitest: ^4.0.17
