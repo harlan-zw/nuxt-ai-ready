@@ -237,7 +237,8 @@ export default defineNuxtModule<ModuleOptions>({
       }
       else {
         runtimeSyncSecret = randomBytes(32).toString('hex')
-        logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
+        if (!nuxt.options.dev && !nuxt.options._prepare)
+          logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
       }
     }
 
