@@ -302,7 +302,10 @@ export default defineNuxtModule<ModuleOptions>({
 
       // Helper to read from SQLite database during prerender
       // Uses node:sqlite or better-sqlite3 directly since we're in Node.js context
-      nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = `
+      // In dev mode, provide a stub to avoid rollup warnings about node:sqlite
+      nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = nuxt.options.dev
+        ? `export async function readPageDataFromFilesystem() { return { pages: [], errorRoutes: [] } }`
+        : `
 export async function readPageDataFromFilesystem() {
   if (!import.meta.prerender) {
     return { pages: [], errorRoutes: [] }
