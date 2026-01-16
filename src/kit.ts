@@ -7,21 +7,31 @@ import { logger } from './logger'
 
 export interface ModuleRegistration {
   name: string
+  version?: string
+  /** Secret for runtime dashboard queries (e.g. stats endpoints) */
   secret?: string
-  features?: Record<string, boolean>
+  features?: Record<string, boolean | string | number>
 }
-
-// Store module registrations to send during license verification
-const moduleRegistrations: ModuleRegistration[] = []
 
 /**
- * Register a module with the license verification system.
- * Module info will be sent to nuxtseo.com during build verification,
- * enabling the dashboard to show module status and query endpoints.
+ * Register a Nuxt SEO Pro module for license verification.
+ * Uses Nuxt hook so modules don't need to import from each other.
+ *
+ * Call this in your module setup - registrations are collected
+ * before the single license verification fetch.
  */
-export function registerModule(registration: ModuleRegistration) {
-  moduleRegistrations.push(registration)
+export function registerNuxtSeoProModule(registration: ModuleRegistration) {
+  const nuxt = useNuxt()
+  // @ts-expect-error untyped
+  nuxt._nuxtSeoProModules = nuxt._nuxtSeoProModules || []
+  // @ts-expect-error untyped
+  nuxt._nuxtSeoProModules.push(registration)
 }
+
+/**
+ * @deprecated Use registerNuxtSeoProModule instead
+ */
+export const registerModule = registerNuxtSeoProModule
 
 export function hookNuxtSeoProLicense() {
   const nuxt = useNuxt()
@@ -52,14 +62,19 @@ export function hookNuxtSeoProLicense() {
       // only pass valid url/name
       const siteUrl = siteConfig.url?.startsWith('http') ? siteConfig.url : undefined
       const siteName = siteConfig.name || undefined
+      // Collect registered modules from nuxt instance
+      // @ts-expect-error untyped
+      const modules: ModuleRegistration[] | undefined = nuxt._nuxtSeoProModules?.length > 0
+        // @ts-expect-error untyped
+        ? nuxt._nuxtSeoProModules
+        : undefined
       const res = await $fetch<{ ok: boolean }>('https://nuxtseo.com/api/pro/verify', {
         method: 'POST',
         body: {
           apiKey: license,
           siteUrl,
           siteName,
-          // Include registered modules for dashboard integration
-          modules: moduleRegistrations.length > 0 ? moduleRegistrations : undefined,
+          modules,
         },
       }).catch((err) => {
         // 401 = invalid key, 403 = no active subscription

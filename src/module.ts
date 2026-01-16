@@ -7,7 +7,7 @@ import { addPlugin, addServerHandler, createResolver, defineNuxtModule, hasNuxtM
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { readPackageJSON } from 'pkg-types'
-import { hookNuxtSeoProLicense, registerModule } from './kit'
+import { hookNuxtSeoProLicense, registerNuxtSeoProModule } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -250,8 +250,9 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     // Register module with nuxtseo.com for dashboard integration
-    registerModule({
+    registerNuxtSeoProModule({
       name: 'nuxt-ai-ready',
+      version,
       secret: runtimeSyncSecret,
       features: {
         cron: !!config.cron,
