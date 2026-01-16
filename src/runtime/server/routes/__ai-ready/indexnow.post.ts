@@ -22,5 +22,5 @@ export default eventHandler(async (event) => {
 
   const limit = query.limit ? Number(query.limit) : 100
 
-  return syncToIndexNow(event, limit)
+  return syncToIndexNow(event, limit, { useWaitUntil: true })
 })

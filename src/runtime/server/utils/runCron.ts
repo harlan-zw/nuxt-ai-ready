@@ -1,9 +1,13 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { StaleCheckResult } from './checkStale'
 import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
-import { cleanupOldCronRuns, completeCronRun, startCronRun } from '../db/queries'
+import { cleanupOldCronRuns, completeCronRun, pruneStaleRoutes, seedRoutes, startCronRun } from '../db/queries'
+import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
+import { checkAndHandleStale } from './checkStale'
 import { syncToIndexNow } from './indexnow'
+import { fetchSitemapUrls } from './sitemap'
 
 function getEvent(providedEvent?: H3Event): H3Event | undefined {
   if (providedEvent)
@@ -18,6 +22,11 @@ function getEvent(providedEvent?: H3Event): H3Event | undefined {
 
 export interface CronResult {
   runId?: number | null
+  stale?: StaleCheckResult
+  sitemap?: {
+    seeded: number
+    pruned: number
+  }
   index?: {
     indexed: number
     remaining: number
@@ -47,8 +56,41 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
   }
 
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const debug = config.debug
+  const startTime = Date.now()
   const results: CronResult = {}
   const allErrors: string[] = []
+
+  if (debug) {
+    logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNowKey})`)
+  }
+
+  // Check for stale data and handle restore/mark-pending
+  // This runs before indexing to ensure data is ready
+  if (config.runtimeSync.enabled) {
+    results.stale = await checkAndHandleStale(event).catch((err) => {
+      console.warn('[ai-ready:cron] Stale check failed:', err.message)
+      allErrors.push(`stale-check: ${err.message}`)
+      return { action: 'none' as const, dbCount: 0, reason: err.message }
+    })
+    if (debug && results.stale) {
+      logger.info(`[cron] Stale check: ${results.stale.action} (db: ${results.stale.dbCount}, dump: ${results.stale.dumpCount ?? 'n/a'})`)
+    }
+  }
+
+  // Seed routes from sitemap (discovers new routes, updates last_seen_at)
+  // Runs every cron cycle but only inserts missing routes
+  if (config.runtimeSync.enabled) {
+    const sitemapResult = await seedFromSitemap(event, config, debug).catch((err) => {
+      console.warn('[ai-ready:cron] Sitemap seeding failed:', err.message)
+      allErrors.push(`sitemap: ${err.message}`)
+      return { seeded: 0, pruned: 0 }
+    })
+    results.sitemap = sitemapResult
+    if (debug && (sitemapResult.seeded > 0 || sitemapResult.pruned > 0)) {
+      logger.info(`[cron] Sitemap: seeded ${sitemapResult.seeded}, pruned ${sitemapResult.pruned}`)
+    }
+  }
 
   // Start logging this cron run
   const runId = await startCronRun(event)
@@ -70,6 +112,9 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
     if (indexResult.errors.length > 0) {
       allErrors.push(...indexResult.errors)
     }
+    if (debug) {
+      logger.info(`[cron] Index: ${indexResult.indexed} pages (${indexResult.remaining} remaining${indexResult.errors.length > 0 ? `, ${indexResult.errors.length} errors` : ''})`)
+    }
   }
 
   // Run IndexNow sync if key is configured
@@ -85,6 +130,12 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
     }
     if (indexNowResult.error) {
       allErrors.push(`IndexNow: ${indexNowResult.error}`)
+    }
+    if (debug) {
+      const status = indexNowResult.error
+        ? `error: ${indexNowResult.error}`
+        : `${indexNowResult.submitted} submitted (${indexNowResult.remaining} remaining)`
+      logger.info(`[cron] IndexNow: ${status}`)
     }
   }
 
@@ -102,5 +153,56 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
     await cleanupOldCronRuns(event, 50)
   }
 
+  // Summary log
+  if (debug) {
+    const duration = Date.now() - startTime
+    const parts = []
+    if (results.stale?.action !== 'none')
+      parts.push(results.stale?.action)
+    if (results.index?.indexed)
+      parts.push(`${results.index.indexed} indexed`)
+    if (results.indexNow?.submitted)
+      parts.push(`${results.indexNow.submitted} submitted to IndexNow`)
+    if (allErrors.length > 0)
+      parts.push(`${allErrors.length} errors`)
+    logger.info(`[cron] Complete in ${duration}ms${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`)
+  }
+
   return results
+}
+
+/**
+ * Seed routes from sitemap into database
+ * Only inserts routes that don't already exist
+ */
+async function seedFromSitemap(event: H3Event, config: ModulePublicRuntimeConfig, debug?: boolean): Promise<{ seeded: number, pruned: number }> {
+  const { pruneTtl } = config.runtimeSync
+
+  // Fetch sitemap
+  const urls = await fetchSitemapUrls(event)
+  if (urls.length === 0) {
+    if (debug)
+      logger.info('[cron] Sitemap: no URLs found')
+    return { seeded: 0, pruned: 0 }
+  }
+
+  if (debug)
+    logger.info(`[cron] Sitemap: found ${urls.length} URLs`)
+
+  // Extract routes from URLs
+  const routes = urls.map((u) => {
+    const url = new URL(u.loc)
+    return url.pathname
+  }).filter(route => !route.includes('.')) // Skip file extensions
+
+  // Seed routes into database (inserts missing, updates last_seen_at for existing)
+  const seeded = await seedRoutes(event, routes)
+
+  // Prune stale routes if configured
+  let pruned = 0
+  if (pruneTtl > 0) {
+    pruned = await pruneStaleRoutes(event, pruneTtl)
+  }
+
+  return { seeded, pruned }
 }

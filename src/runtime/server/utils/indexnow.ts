@@ -115,6 +115,11 @@ export async function submitToIndexNow(
   return { success: false, error: lastError || 'All endpoints rate limited', host: INDEXNOW_HOSTS[INDEXNOW_HOSTS.length - 1] }
 }
 
+export interface SyncToIndexNowOptions {
+  /** Use waitUntil for background DB updates (default: false in cron, true otherwise) */
+  useWaitUntil?: boolean
+}
+
 /**
  * Submit pending pages to IndexNow
  * Queries DB for pages needing sync, submits, marks as synced
@@ -123,6 +128,7 @@ export async function submitToIndexNow(
 export async function syncToIndexNow(
   event: H3Event | undefined,
   limit = 100,
+  options?: SyncToIndexNowOptions,
 ): Promise<IndexNowResult> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string, debug?: boolean }
   const siteConfig = getSiteConfig(event as H3Event)
@@ -192,8 +198,8 @@ export async function syncToIndexNow(
     }
   }
 
-  // Use waitUntil if available (Cloudflare, etc), otherwise await
-  if (event?.waitUntil) {
+  // Only use waitUntil if explicitly requested (avoids race conditions in cron)
+  if (options?.useWaitUntil && event?.waitUntil) {
     event.waitUntil(dbUpdates().catch(err =>
       logger.error(`[indexnow] Background DB update failed: ${err.message}`),
     ))

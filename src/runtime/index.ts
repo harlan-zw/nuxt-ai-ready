@@ -4,14 +4,12 @@ export type { DatabaseAdapter } from './server/db'
 
 export {
   countPages,
-  getSitemapSeededAt,
   getStaleRoutes,
   isPageFresh,
   pruneStaleRoutes,
   queryPages,
   searchPages,
   seedRoutes,
-  setSitemapSeededAt,
   streamPages,
   upsertPage,
 } from './server/db/queries'

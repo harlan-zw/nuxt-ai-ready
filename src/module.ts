@@ -340,12 +340,6 @@ export async function readPageDataFromFilesystem() {
       indexNowKey,
     } as any
 
-    // Register plugins
-    nuxt.options.nitro.plugins = nuxt.options.nitro.plugins || []
-    // sitemap-seeder: seeds routes from sitemap on first request (only if runtimeSync enabled)
-    if (runtimeSyncEnabled)
-      nuxt.options.nitro.plugins.push(resolve('./runtime/server/plugins/sitemap-seeder'))
-
     addServerHandler({
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown.prerender'),
