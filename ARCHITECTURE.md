@@ -281,7 +281,7 @@ The cron task runs every minute when `cron: true` is set. It auto-enables `runti
 // nuxt.config.ts
 aiReady: {
   cron: true,          // every minute, auto-enables runtimeSync
-  indexNowKey: 'key',  // optional IndexNow sync
+  indexNow: 'key',  // optional IndexNow sync
 }
 ```
 
@@ -292,7 +292,7 @@ aiReady: {
 
 The task runs `runCron()` utility which:
 1. Batch indexes pending pages (if runtimeSync enabled)
-2. Submits changed URLs to IndexNow (if indexNowKey configured)
+2. Submits changed URLs to IndexNow (if indexNow configured)
 
 ### Database Schema (v1.5.0)
 
@@ -565,7 +565,7 @@ interface ModuleOptions {
     authToken?: string
   }
   cron?: boolean // Every minute, auto-enables runtimeSync
-  indexNowKey?: string // IndexNow API key
+  indexNow?: string // IndexNow API key
   runtimeSyncSecret?: string // Auth for endpoints
   runtimeSync?: boolean | { // true or config object
     ttl?: number

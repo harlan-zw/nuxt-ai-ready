@@ -97,7 +97,7 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
   - `?ttl=N` - Override pruneTtl config
   - `?secret=<token>` - Required unless dry run
 
-### IndexNow Endpoints (when `indexNowKey` configured)
+### IndexNow Endpoints (when `indexNow` configured)
 
 - `GET /{key}.txt` - Key verification endpoint
 - `POST /__ai-ready/indexnow` - Manual sync trigger:
@@ -112,7 +112,7 @@ Cron task runs every minute when enabled. `cron: true` auto-enables `runtimeSync
 ```ts
 aiReady: {
   cron: true,          // every minute, auto-enables runtimeSync
-  indexNowKey: 'key',  // optional IndexNow sync
+  indexNow: true,   // optional IndexNow sync
 }
 ```
 
@@ -175,7 +175,7 @@ Config key: `aiReady` in nuxt.config.ts
   mcp: { tools: true, resources: true },
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
   cron: true, // every minute, auto-enables runtimeSync
-  indexNowKey: 'your-key', // or NUXT_AI_READY_INDEX_NOW_KEY env
+  indexNow: true, // derives key from site URL
   runtimeSyncSecret: 'token', // auth for poll/prune/indexnow endpoints
   runtimeSync: { ttl: 3600, batchSize: 20, pruneTtl: 0 }, // optional overrides
 }

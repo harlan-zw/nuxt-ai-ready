@@ -21,7 +21,7 @@ import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/serv
  */
 async function fetchPreviousMeta(
   siteUrl: string,
-  indexNowKey: string,
+  indexNow: string,
 ): Promise<BuildMeta | null> {
   // Fetch previous build meta from live site
   const metaUrl = `${siteUrl}/__ai-ready/pages.meta.json`
@@ -37,7 +37,7 @@ async function fetchPreviousMeta(
   }
 
   // Verify key file is live (required for IndexNow to work)
-  const keyUrl = `${siteUrl}/${indexNowKey}.txt`
+  const keyUrl = `${siteUrl}/${indexNow}.txt`
   const keyLive = await fetch(keyUrl)
     .then(r => r.ok)
     .catch(() => false)
@@ -57,7 +57,7 @@ async function fetchPreviousMeta(
 async function handleStaticIndexNow(
   currentPages: PageHashMeta[],
   siteUrl: string,
-  indexNowKey: string,
+  indexNow: string,
   prevMeta: BuildMeta,
 ): Promise<void> {
   // Compare hashes
@@ -73,7 +73,7 @@ async function handleStaticIndexNow(
 
   const result = await submitToIndexNowShared(
     [...changed, ...added],
-    indexNowKey,
+    indexNow,
     siteUrl,
     { logger },
   )
@@ -110,7 +110,7 @@ export interface CrawlerState {
   llmsFullTxtPath?: string
   siteInfo?: SiteInfo
   llmsTxtConfig?: LlmsTxtConfig
-  indexNowKey?: string
+  indexNow?: string
 }
 
 function createCrawlerState(
@@ -118,7 +118,7 @@ function createCrawlerState(
   llmsFullTxtPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
-  indexNowKey?: string,
+  indexNow?: string,
 ): CrawlerState {
   return {
     prerenderedRoutes: new Set(),
@@ -129,7 +129,7 @@ function createCrawlerState(
     llmsFullTxtPath,
     siteInfo,
     llmsTxtConfig,
-    indexNowKey,
+    indexNow,
   }
 }
 
@@ -357,14 +357,14 @@ export function setupPrerenderHandler(
   dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
-  indexNowKey?: string,
+  indexNow?: string,
 ) {
   const nuxt = useNuxt()
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
     const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNowKey)
+    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNow)
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
@@ -454,8 +454,8 @@ export function setupPrerenderHandler(
 
         // Fetch previous meta BEFORE writing new one (for static IndexNow comparison)
         let prevMeta: BuildMeta | null = null
-        if (state.indexNowKey && state.siteInfo?.url) {
-          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNowKey)
+        if (state.indexNow && state.siteInfo?.url) {
+          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNow)
         }
 
         // Write build metadata with page hashes for stale detection + static IndexNow
@@ -470,8 +470,8 @@ export function setupPrerenderHandler(
         logger.debug(`Wrote build metadata: buildId=${buildId}, ${pageHashes.length} page hashes`)
 
         // Submit to IndexNow for static sites (compares with previously fetched meta)
-        if (state.indexNowKey && state.siteInfo?.url && prevMeta) {
-          await handleStaticIndexNow(pageHashes, state.siteInfo.url, state.indexNowKey, prevMeta)
+        if (state.indexNow && state.siteInfo?.url && prevMeta) {
+          await handleStaticIndexNow(pageHashes, state.siteInfo.url, state.indexNow, prevMeta)
         }
       }
 

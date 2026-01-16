@@ -30,7 +30,7 @@ describe('static IndexNow: pages.meta.json', async () => {
         },
       },
       aiReady: {
-        indexNowKey: 'test-indexnow-key',
+        indexNow: 'test-indexnow-key',
       },
     },
   })

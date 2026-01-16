@@ -116,17 +116,16 @@ export interface ModuleOptions {
   /**
    * Enable scheduled cron task (runs every minute)
    * When true, automatically enables runtimeSync for background indexing
-   * Also runs IndexNow sync if indexNowKey is configured
+   * Also runs IndexNow sync if indexNow is enabled
    */
   cron?: boolean
 
   /**
-   * IndexNow API key for instant search engine notifications
-   * When set, enables IndexNow submissions to Bing, Yandex, Naver, Seznam
-   * Get one from https://www.bing.com/indexnow
-   * Can also be set via NUXT_AI_READY_INDEX_NOW_KEY env var
+   * Enable IndexNow for instant search engine notifications
+   * Submits to Bing, Yandex, Naver, Seznam when content changes
+   * Set to `true` to derive key from site URL, or provide your own string
    */
-  indexNowKey?: string
+  indexNow?: boolean | string
 
   /**
    * Secret token for authenticating runtime sync endpoints

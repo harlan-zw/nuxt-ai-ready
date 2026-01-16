@@ -6,11 +6,11 @@ import { useRuntimeConfig } from 'nitropack/runtime'
  * Returns the API key as plain text for search engine verification
  */
 export default eventHandler((event) => {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNow?: string }
 
-  if (!config.indexNowKey)
+  if (!config.indexNow)
     return null // 404
 
   setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
-  return config.indexNowKey
+  return config.indexNow
 })

@@ -55,7 +55,7 @@ function comparePageHashes(
 async function handleStaticIndexNow(
   currentPages: PageHashMeta[],
   siteUrl: string,
-  indexNowKey: string,
+  indexNow: string,
   fetchFn: typeof fetch = globalThis.fetch,
 ): Promise<{ skipped: string, submitted?: number, error?: string } | { success: true, submitted: number }> {
   // Try fetch previous build meta from live site
@@ -70,7 +70,7 @@ async function handleStaticIndexNow(
   }
 
   // Verify key file is live
-  const keyUrl = `${siteUrl}/${indexNowKey}.txt`
+  const keyUrl = `${siteUrl}/${indexNow}.txt`
   const keyLive = await fetchFn(keyUrl)
     .then(r => r.ok)
     .catch(() => false)
@@ -90,8 +90,8 @@ async function handleStaticIndexNow(
   const urls = [...changed, ...added].map(route => `${siteUrl}${route}`)
   const body = {
     host: new URL(siteUrl).host,
-    key: indexNowKey,
-    keyLocation: `${siteUrl}/${indexNowKey}.txt`,
+    key: indexNow,
+    keyLocation: `${siteUrl}/${indexNow}.txt`,
     urlList: urls,
   }
 

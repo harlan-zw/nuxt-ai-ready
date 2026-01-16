@@ -105,10 +105,10 @@ export async function syncToIndexNow(
   limit = 100,
   options?: SyncToIndexNowOptions,
 ): Promise<IndexNowResult> {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNowKey?: string, debug?: boolean }
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNow?: string, debug?: boolean }
   const siteConfig = getSiteConfig(event as H3Event)
 
-  if (!config.indexNowKey) {
+  if (!config.indexNow) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }
   }
 
@@ -143,7 +143,7 @@ export async function syncToIndexNow(
   const routes = pages.map(p => p.route)
 
   // Submit to IndexNow (host always defaults to api.indexnow.org)
-  const result = await submitToIndexNow(routes, { key: config.indexNowKey }, siteConfig.url)
+  const result = await submitToIndexNow(routes, { key: config.indexNow }, siteConfig.url)
 
   // Defer DB updates via waitUntil so response returns immediately
   const dbUpdates = async () => {

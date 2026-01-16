@@ -159,7 +159,7 @@ export default defineNuxtConfig({
     name: 'Test Site',
   },
   aiReady: {
-    indexNowKey: 'test-key-123',
+    indexNow: 'test-key-123',
   },
 })
 `)

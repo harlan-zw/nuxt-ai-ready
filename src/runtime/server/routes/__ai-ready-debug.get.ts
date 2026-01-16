@@ -284,7 +284,7 @@ export default eventHandler(async (event) => {
       }))
 
       // IndexNow stats if configured
-      if (runtimeConfig.indexNowKey) {
+      if (runtimeConfig.indexNow) {
         const [indexNowPending, indexNowStats, indexNowLogEntries] = await Promise.all([
           countPagesNeedingIndexNowSync(event),
           getIndexNowStats(event),

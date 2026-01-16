@@ -6,7 +6,7 @@ import { syncToIndexNow } from '../../utils/indexnow'
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
-  if (!config.indexNowKey) {
+  if (!config.indexNow) {
     throw createError({ statusCode: 400, message: 'IndexNow not configured' })
   }
 

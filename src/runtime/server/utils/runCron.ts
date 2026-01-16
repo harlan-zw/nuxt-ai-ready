@@ -62,7 +62,7 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
   const allErrors: string[] = []
 
   if (debug) {
-    logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNowKey})`)
+    logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNow})`)
   }
 
   // Check for stale data and handle restore/mark-pending
@@ -118,7 +118,7 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
   }
 
   // Run IndexNow sync if key is configured
-  if (config.indexNowKey) {
+  if (config.indexNow) {
     const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
       console.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
       return { success: false, submitted: 0, remaining: 0, error: err.message }

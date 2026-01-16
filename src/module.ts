@@ -1,6 +1,6 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
@@ -47,7 +47,7 @@ export interface ModulePublicRuntimeConfig {
     pruneTtl: number
   }
   runtimeSyncSecret?: string
-  indexNowKey?: string
+  indexNow?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -223,8 +223,10 @@ export default defineNuxtModule<ModuleOptions>({
     const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
-    // IndexNow: auto-read key from env if not configured
-    const indexNowKey = config.indexNowKey || process.env.NUXT_AI_READY_INDEX_NOW_KEY
+    // IndexNow: auto-read key from env, derive from site URL if true
+    const indexNow = config.indexNow === true
+      ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
+      : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
     // Auto-generate runtimeSyncSecret if not provided (when runtimeSync or cron enabled)
     let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
@@ -246,7 +248,7 @@ export default defineNuxtModule<ModuleOptions>({
       secret: runtimeSyncSecret,
       features: {
         cron: !!config.cron,
-        indexNow: !!indexNowKey,
+        indexNow: !!indexNow,
         runtimeSync: runtimeSyncEnabled,
       },
     })
@@ -363,7 +365,7 @@ export async function readPageDataFromFilesystem() {
         pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
       runtimeSyncSecret,
-      indexNowKey,
+      indexNow,
     } as any
 
     addServerHandler({
@@ -399,9 +401,9 @@ export async function readPageDataFromFilesystem() {
     }
 
     // IndexNow endpoints (only if key is configured)
-    if (indexNowKey) {
+    if (indexNow) {
       // Key verification route: /{key}.txt
-      addServerHandler({ route: `/${indexNowKey}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
+      addServerHandler({ route: `/${indexNow}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
       // Sync endpoint
       addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post') })
       // Status endpoint needed for IndexNow stats (may not have runtimeSync)
@@ -438,7 +440,7 @@ export async function readPageDataFromFilesystem() {
         name: siteConfig.name,
         url: siteConfig.url,
         description: siteConfig.description,
-      }, mergedLlmsTxt, indexNowKey)
+      }, mergedLlmsTxt, indexNow)
     }
 
     // Add route rules for static files with proper charset
