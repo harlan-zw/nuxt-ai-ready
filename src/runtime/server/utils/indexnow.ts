@@ -1,7 +1,6 @@
 import type { H3Event } from 'h3'
 import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { submitToIndexNow as submitToIndexNowShared } from '../../../shared/indexnow'
 import { useDatabase } from '../db'
 import {
   batchIndexNowUpdate,
@@ -11,9 +10,10 @@ import {
   updateIndexNowStats,
 } from '../db/queries'
 import { logger } from '../logger'
+import { submitToIndexNowShared } from './indexnow-shared'
 
 // Re-export shared types
-export type { BuildMeta, IndexNowSubmitResult, PageHashMeta } from '../../../shared/indexnow'
+export type { BuildMeta, IndexNowSubmitResult, PageHashMeta } from './indexnow-shared'
 
 // Backoff: 5min, 10min, 20min, 40min, 1hr max
 const BACKOFF_MINUTES = [5, 10, 20, 40, 60]

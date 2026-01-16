@@ -66,7 +66,7 @@ export interface SubmitOptions {
  * Submit URLs to IndexNow API with fallback on rate limit
  * Works in both build-time (native fetch) and runtime ($fetch) contexts
  */
-export async function submitToIndexNow(
+export async function submitToIndexNowShared(
   routes: string[],
   key: string,
   siteUrl: string,

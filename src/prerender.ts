@@ -1,9 +1,9 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
+import type { BuildMeta, PageHashMeta } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig } from './runtime/types'
-import type { BuildMeta, PageHashMeta } from './shared/indexnow'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
@@ -12,8 +12,8 @@ import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
 import { computeContentHash, createAdapter, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
+import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
-import { comparePageHashes, submitToIndexNow } from './shared/indexnow'
 
 /**
  * Fetch previous build meta from live site for IndexNow comparison
@@ -71,7 +71,7 @@ async function handleStaticIndexNow(
 
   logger.info(`[indexnow] Submitting ${totalChanged} changed pages (${changed.length} modified, ${added.length} new)`)
 
-  const result = await submitToIndexNow(
+  const result = await submitToIndexNowShared(
     [...changed, ...added],
     indexNowKey,
     siteUrl,

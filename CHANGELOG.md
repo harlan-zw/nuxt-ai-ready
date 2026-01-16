@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.7.16...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.16...main)
+
+### 🔥 Performance
+
+- **indexnow:** Use waitUntil for background DB updates ([b7ca8b7](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/b7ca8b7))
+
+### 💅 Refactors
+
+- **cloudflare:** Move staleness detection to cron for D1 reliability ([d1876ca](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/d1876ca))
+
+### 📖 Documentation
+
+- Update IndexNow guide for static + runtime support ([#9](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/9))
+
+### 🏡 Chore
+
+- Missing files ([720b0d7](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/720b0d7))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.16
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.15...v0.7.16)
