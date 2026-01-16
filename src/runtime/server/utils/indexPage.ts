@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
-import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
+import { useSiteConfig } from '#site-config/server/composables/useSiteConfig'
+import { useEvent, useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
 import { getPageHash, isPageFresh, queryPages, upsertPage } from '../db/queries'
 import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
@@ -70,7 +71,9 @@ export async function indexPage(
   // Check for error pages
   const isError = html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')
 
-  const result = await convertHtmlToMarkdown(html, route, config.mdreamOptions, { extractUpdatedAt: true })
+  const siteConfig = useSiteConfig(event || useEvent())
+  const fullUrl = `${siteConfig.url}${route}`
+  const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, { extractUpdatedAt: true })
   const updatedAt = result.updatedAt || new Date().toISOString()
   const headings = JSON.stringify(result.headings)
   const keywords = extractKeywords(result.textContent, result.metaKeywords)

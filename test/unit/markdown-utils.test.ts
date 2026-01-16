@@ -1,4 +1,29 @@
+import { htmlToMarkdown } from 'mdream'
 import { describe, expect, it } from 'vitest'
+
+// Test that mdream origin should be just the site origin, not full URL
+// This ensures absolute paths like /docs/foo resolve correctly
+describe('mdream origin handling', () => {
+  const html = '<a href="/docs/getting-started">intro</a>'
+
+  it('resolves absolute paths correctly with origin-only', () => {
+    const md = htmlToMarkdown(html, { origin: 'https://example.com' })
+    expect(md).toBe('[intro](https://example.com/docs/getting-started)')
+  })
+
+  it('incorrectly doubles path when full URL used as origin', () => {
+    // This demonstrates the bug we're avoiding
+    const md = htmlToMarkdown(html, { origin: 'https://example.com/some/page' })
+    expect(md).toBe('[intro](https://example.com/some/page/docs/getting-started)')
+  })
+
+  it('extracting origin from full URL fixes the issue', () => {
+    const fullUrl = 'https://example.com/some/page'
+    const origin = new URL(fullUrl).origin
+    const md = htmlToMarkdown(html, { origin })
+    expect(md).toBe('[intro](https://example.com/docs/getting-started)')
+  })
+})
 
 // Test normalizeWhitespace logic
 function normalizeWhitespace(text: string): string {

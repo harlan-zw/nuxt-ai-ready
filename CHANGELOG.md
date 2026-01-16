@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.8.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.8.0...main)
+
+### 🏡 Chore
+
+- Missing files ([8836b69](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/8836b69))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.7.16...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.7.16...main)

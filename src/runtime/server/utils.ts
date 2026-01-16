@@ -52,7 +52,9 @@ function buildMdreamOptions(
     }),
   })
 
-  let options: HTMLToMarkdownOptions = { origin: url, ...mdreamOptions }
+  // Use just the origin (not full URL) so absolute paths like /docs/foo resolve correctly
+  const origin = new URL(url).origin
+  let options: HTMLToMarkdownOptions = { origin, ...mdreamOptions }
   if (mdreamOptions?.preset === 'minimal') {
     options = withMinimalPreset(options)
   }
