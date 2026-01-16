@@ -15,8 +15,10 @@ import { computeContentHash, createAdapter, exportDbDump, initSchema, insertPage
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 
+const BUILD_FETCH_TIMEOUT = 15000 // 15s timeout for build-time fetches
+
 /**
- * Fetch previous build meta from live site for IndexNow comparison
+ * Fetch previous build meta from live site for hash comparison
  * Must be called BEFORE writing new pages.meta.json
  */
 async function fetchPreviousMeta(
@@ -25,26 +27,38 @@ async function fetchPreviousMeta(
 ): Promise<BuildMeta | null> {
   // Fetch previous build meta from live site
   const metaUrl = `${siteUrl}/__ai-ready/pages.meta.json`
-  logger.debug(`[indexnow] Fetching previous meta from ${metaUrl}`)
+  logger.info(`Fetching previous build meta from ${metaUrl}`)
 
-  const prevMeta = await fetch(metaUrl)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), BUILD_FETCH_TIMEOUT)
+
+  const prevMeta = await fetch(metaUrl, { signal: controller.signal })
     .then(r => r.ok ? r.json() as Promise<BuildMeta> : null)
-    .catch(() => null)
+    .catch((err) => {
+      if (err.name === 'AbortError') {
+        logger.warn(`Timeout fetching previous meta (${BUILD_FETCH_TIMEOUT}ms)`)
+      }
+      return null
+    })
+    .finally(() => clearTimeout(timeoutId))
 
   if (!prevMeta?.pages) {
-    logger.info('[indexnow] First deploy or no previous meta - skipping IndexNow')
+    logger.info('First deploy or no previous meta - will index all pages')
     return null
   }
 
-  // Verify key file is live (required for IndexNow to work)
-  const keyUrl = `${siteUrl}/${indexNow}.txt`
-  const keyLive = await fetch(keyUrl)
-    .then(r => r.ok)
-    .catch(() => false)
+  logger.info(`Previous build: ${prevMeta.pageCount} pages (buildId: ${prevMeta.buildId})`)
 
-  if (!keyLive) {
-    logger.info('[indexnow] Key file not live yet - skipping IndexNow')
-    return null
+  // Verify key file is live (required for IndexNow to work)
+  if (indexNow) {
+    const keyUrl = `${siteUrl}/${indexNow}.txt`
+    const keyLive = await fetch(keyUrl, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok)
+      .catch(() => false)
+
+    if (!keyLive) {
+      logger.info('IndexNow key file not live yet - IndexNow submission will be skipped')
+    }
   }
 
   return prevMeta
@@ -130,6 +144,7 @@ async function initCrawler(state: CrawlerState): Promise<void> {
 
   // Initialize SQLite database for page data
   if (state.dbPath) {
+    logger.debug(`Creating directory for SQLite: ${dirname(state.dbPath)}`)
     await mkdir(dirname(state.dbPath), { recursive: true })
     const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
     const connectorPath = nodeVersion >= 22 ? 'db0/connectors/node-sqlite' : 'db0/connectors/better-sqlite3'
@@ -142,8 +157,10 @@ async function initCrawler(state: CrawlerState): Promise<void> {
 
   // Initialize llms-full.txt with header
   if (state.llmsFullTxtPath) {
+    logger.debug(`Creating directory for llms-full.txt: ${dirname(state.llmsFullTxtPath)}`)
     await mkdir(dirname(state.llmsFullTxtPath), { recursive: true })
     const header = buildLlmsFullTxtHeader(state.siteInfo, state.llmsTxtConfig)
+    logger.debug(`Writing llms-full.txt header (${header.length} bytes)`)
     await writeFile(state.llmsFullTxtPath, header, 'utf-8')
     logger.debug(`llms-full.txt initialized at ${state.llmsFullTxtPath}`)
   }
@@ -194,6 +211,7 @@ async function processMarkdownRoute(
   // Stream-append to llms-full.txt (skip for sitemap-only crawled pages)
   if (state.llmsFullTxtPath && !options?.skipLlmsFullTxt) {
     const pageContent = formatPageForLlmsFullTxt(route, title, description, markdown, state.siteInfo?.url)
+    logger.debug(`Appending to llms-full.txt: ${route} (${pageContent.length} bytes)`)
     await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
   }
 
@@ -326,12 +344,14 @@ async function prerenderRoute(nitro: Nitro, route: string) {
   })
 
   const filePath = join(nitro.options.output.publicDir, route)
+  logger.debug(`Creating directory for prerender: ${dirname(filePath)}`)
   await mkdir(dirname(filePath), { recursive: true })
 
   const data = res._data
   if (data === undefined)
     throw new Error(`No data returned from '${fetchUrl}'`)
 
+  logger.debug(`Writing prerendered file: ${filePath} (${(data as string).length} bytes)`)
   await writeFile(filePath, data as string, 'utf8')
 
   const _route: PrerenderRoute = {
@@ -408,6 +428,7 @@ export function setupPrerenderHandler(
 
       // Write page data JSON for runtime access
       const publicDataDir = join(nitro.options.output.publicDir, '__ai-ready')
+      logger.debug(`Creating __ai-ready public directory: ${publicDataDir}`)
       await mkdir(publicDataDir, { recursive: true })
 
       if (state.db) {
@@ -429,12 +450,14 @@ export function setupPrerenderHandler(
           errorRoutes: errorRoutesList,
         })
         const publicJsonPath = join(publicDataDir, 'pages.json')
+        logger.debug(`Writing pages.json: ${publicJsonPath} (${jsonContent.length} bytes)`)
         await writeFile(publicJsonPath, jsonContent, 'utf-8')
         logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
 
         // Export database dump for serverless restore (streams in batches internally)
         const dumpData = await exportDbDump(state.db)
         const dumpPath = join(publicDataDir, 'pages.dump')
+        logger.debug(`Writing pages.dump: ${dumpPath} (${dumpData.length} bytes)`)
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
@@ -478,6 +501,7 @@ export function setupPrerenderHandler(
           changes: prevMeta ? changes : undefined,
           pages: pageHashes,
         })
+        logger.debug(`Writing pages.meta.json (${metaContent.length} bytes)`)
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
         logger.debug(`Wrote build metadata: buildId=${buildId}, ${pageHashes.length} page hashes`)
 

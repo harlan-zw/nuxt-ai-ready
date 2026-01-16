@@ -245,7 +245,9 @@ export default defineNuxtModule<ModuleOptions>({
     // Write secret to cache for CLI access
     if (runtimeSyncSecret) {
       const cacheDir = join(nuxt.options.rootDir, 'node_modules/.cache/nuxt/ai-ready')
+      logger.debug(`Creating cache directory for secret: ${cacheDir}`)
       await mkdir(cacheDir, { recursive: true })
+      logger.debug(`Writing runtimeSyncSecret to cache`)
       await writeFile(join(cacheDir, 'secret'), runtimeSyncSecret)
     }
 
@@ -484,8 +486,10 @@ export async function readPageDataFromFilesystem() {
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
       nitro.hooks.hook('compiled', async () => {
         const headersPath = join(nitro.options.output.publicDir, '_headers')
+        logger.debug(`Checking for _headers file: ${headersPath}`)
         const exists = await access(headersPath).then(() => true).catch(() => false)
         if (exists) {
+          logger.debug(`Appending .md charset header to _headers`)
           await appendFile(headersPath, `
 /*.md
   Content-Type: text/markdown; charset=utf-8

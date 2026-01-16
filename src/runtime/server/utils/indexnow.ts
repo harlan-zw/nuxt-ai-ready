@@ -66,10 +66,12 @@ export async function submitToIndexNow(
   config: { key: string },
   siteUrl: string,
 ): Promise<{ success: boolean, error?: string, host?: string }> {
+  logger.debug(`[indexnow] Submitting ${routes.length} routes to IndexNow`)
   // Use $fetch wrapper that handles response properly
   const runtimeFetch: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input.toString()
     const body = init?.body ? JSON.parse(init.body as string) : undefined
+    logger.debug(`[indexnow] POST ${url}`)
 
     const result = await $fetch.raw(url, {
       method: init?.method as 'POST',
@@ -132,10 +134,12 @@ export async function syncToIndexNow(
   }
 
   // Get total pending count and pages needing sync
+  logger.debug(`[indexnow] Querying pages needing sync (limit: ${limit})`)
   const [totalPending, pages] = await Promise.all([
     countPagesNeedingIndexNowSync(event),
     getPagesNeedingIndexNowSync(event, limit),
   ])
+  logger.debug(`[indexnow] Found ${totalPending} total pending, ${pages.length} to process`)
   if (pages.length === 0) {
     return { success: true, submitted: 0, remaining: 0 }
   }

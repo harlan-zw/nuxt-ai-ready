@@ -25,6 +25,8 @@ export interface StaleCheckResult {
   addedCount?: number
 }
 
+const FETCH_TIMEOUT = 5000 // 5s timeout for internal asset fetches
+
 /**
  * Fetch build metadata from static assets
  */
@@ -33,6 +35,7 @@ async function fetchBuildMeta(event: H3Event): Promise<BuildMeta | null> {
 
   // Try Cloudflare ASSETS binding first
   if (cfEnv?.ASSETS?.fetch) {
+    logger.debug('[stale-check] Fetching meta from ASSETS binding...')
     const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.meta.json'))
       .catch(() => null)
     if (response?.ok) {
@@ -40,8 +43,9 @@ async function fetchBuildMeta(event: H3Event): Promise<BuildMeta | null> {
     }
   }
 
-  // Fallback to HTTP fetch
-  return globalThis.$fetch('/__ai-ready/pages.meta.json')
+  // Fallback to HTTP fetch with timeout
+  logger.debug('[stale-check] Fetching meta via HTTP...')
+  return globalThis.$fetch('/__ai-ready/pages.meta.json', { timeout: FETCH_TIMEOUT })
     .catch(() => null) as Promise<BuildMeta | null>
 }
 
@@ -55,6 +59,7 @@ async function fetchDump(event: H3Event): Promise<DumpRow[] | null> {
 
   // Try Cloudflare ASSETS binding first
   if (cfEnv?.ASSETS?.fetch) {
+    logger.debug('[stale-check] Fetching dump from ASSETS binding...')
     const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.dump'))
       .catch(() => null)
     if (response?.ok) {
@@ -62,15 +67,21 @@ async function fetchDump(event: H3Event): Promise<DumpRow[] | null> {
     }
   }
 
-  // Fallback to HTTP fetch
+  // Fallback to HTTP fetch with timeout
   if (!dumpData) {
-    dumpData = await globalThis.$fetch('/__ai-ready/pages.dump', { responseType: 'text' })
-      .catch(() => null) as string | null
+    logger.debug('[stale-check] Fetching dump via HTTP...')
+    dumpData = await globalThis.$fetch('/__ai-ready/pages.dump', {
+      responseType: 'text',
+      timeout: FETCH_TIMEOUT,
+    }).catch(() => null) as string | null
   }
 
-  if (!dumpData)
+  if (!dumpData) {
+    logger.debug('[stale-check] Failed to fetch dump')
     return null
+  }
 
+  logger.debug(`[stale-check] Decompressing dump (${(dumpData.length / 1024).toFixed(1)}kb)...`)
   return decompressFromBase64<DumpRow[]>(dumpData)
 }
 

@@ -140,12 +140,18 @@ export async function indexPageByRoute(
   event: H3Event,
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
+  logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
   const html = await event.$fetch(route, {
     headers: { [INDEXING_HEADER]: '1' },
+    timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
   }).catch((err: Error) => {
     logger.warn(`[indexPageByRoute] Failed to fetch ${route}:`, err.message)
     return null
   }) as string | null
+
+  if (html) {
+    logger.debug(`[indexPageByRoute] Fetched ${route} (${html.length} bytes)`)
+  }
 
   if (!html || typeof html !== 'string') {
     // Mark as error in DB to prevent retry loops
