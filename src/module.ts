@@ -295,6 +295,19 @@ export default defineNuxtModule<ModuleOptions>({
           nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
           nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
           ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
+
+          // Auto-configure Cloudflare wrangler cron triggers
+          const isCloudflare = String(nitroConfig.preset).startsWith('cloudflare')
+          if (isCloudflare) {
+            nitroConfig.cloudflare = nitroConfig.cloudflare || {}
+            nitroConfig.cloudflare.deployConfig = true
+            nitroConfig.cloudflare.wrangler = nitroConfig.cloudflare.wrangler || {}
+            nitroConfig.cloudflare.wrangler.triggers = nitroConfig.cloudflare.wrangler.triggers || {}
+            nitroConfig.cloudflare.wrangler.triggers.crons = nitroConfig.cloudflare.wrangler.triggers.crons || []
+            if (!nitroConfig.cloudflare.wrangler.triggers.crons.includes(cronSchedule)) {
+              nitroConfig.cloudflare.wrangler.triggers.crons.push(cronSchedule)
+            }
+          }
         }
       }
 
