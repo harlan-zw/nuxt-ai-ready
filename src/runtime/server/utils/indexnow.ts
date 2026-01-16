@@ -3,10 +3,10 @@ import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import {
+  batchIndexNowUpdate,
   countPagesNeedingIndexNowSync,
   getPagesNeedingIndexNowSync,
   logIndexNowSubmission,
-  markIndexNowSynced,
   updateIndexNowStats,
 } from '../db/queries'
 import { logger } from '../logger'
@@ -150,8 +150,11 @@ export async function syncToIndexNow(
     }
   }
 
-  // Get pages needing sync
-  const pages = await getPagesNeedingIndexNowSync(event, limit)
+  // Get total pending count and pages needing sync
+  const [totalPending, pages] = await Promise.all([
+    countPagesNeedingIndexNowSync(event),
+    getPagesNeedingIndexNowSync(event, limit),
+  ])
   if (pages.length === 0) {
     return { success: true, submitted: 0, remaining: 0 }
   }
@@ -161,37 +164,50 @@ export async function syncToIndexNow(
   // Submit to IndexNow (host always defaults to api.indexnow.org)
   const result = await submitToIndexNow(routes, { key: config.indexNowKey }, siteConfig.url)
 
-  // Log submission when debug is enabled
-  if (config.debug) {
-    await logIndexNowSubmission(event, routes.length, result.success, result.error)
-  }
+  // Defer DB updates via waitUntil so response returns immediately
+  const dbUpdates = async () => {
+    // Log submission when debug is enabled
+    if (config.debug) {
+      await logIndexNowSubmission(event, routes.length, result.success, result.error)
+    }
 
-  if (result.success) {
-    // Clear backoff on success
-    await setBackoffInfo(event, null)
-    // Mark as synced and update stats
-    await markIndexNowSynced(event, routes)
-    await updateIndexNowStats(event, routes.length)
-  }
-  else {
-    await updateIndexNowStats(event, 0, result.error)
+    if (result.success) {
+      // Clear backoff on success
+      await setBackoffInfo(event, null)
+      // Batched: mark pages synced + update stats in parallel
+      await batchIndexNowUpdate(event, routes, routes.length)
+      logger.debug(`[indexnow] DB updated: ${routes.length} pages marked synced via ${result.host}`)
+    }
+    else {
+      await updateIndexNowStats(event, 0, result.error)
 
-    // Set exponential backoff on 429
-    if (result.error?.includes('429')) {
-      const attempt = backoff ? Math.min(backoff.attempt + 1, BACKOFF_MINUTES.length - 1) : 0
-      const backoffMinutes = BACKOFF_MINUTES[attempt] ?? 60
-      const until = Date.now() + (backoffMinutes * 60 * 1000)
-      await setBackoffInfo(event, { until, attempt })
-      logger.warn(`[indexnow] Rate limited, backing off for ${backoffMinutes}m (attempt ${attempt + 1})`)
+      // Set exponential backoff on 429
+      if (result.error?.includes('429')) {
+        const attempt = backoff ? Math.min(backoff.attempt + 1, BACKOFF_MINUTES.length - 1) : 0
+        const backoffMinutes = BACKOFF_MINUTES[attempt] ?? 60
+        const until = Date.now() + (backoffMinutes * 60 * 1000)
+        await setBackoffInfo(event, { until, attempt })
+        logger.warn(`[indexnow] Rate limited, backing off for ${backoffMinutes}m (attempt ${attempt + 1})`)
+      }
     }
   }
 
-  const remaining = await countPagesNeedingIndexNowSync(event)
+  // Use waitUntil if available (Cloudflare, etc), otherwise await
+  if (event?.waitUntil) {
+    event.waitUntil(dbUpdates().catch(err =>
+      logger.error(`[indexnow] Background DB update failed: ${err.message}`),
+    ))
+  }
+  else {
+    await dbUpdates()
+  }
 
+  // Return optimistic result - DB updates happen in background
+  const submitted = result.success ? routes.length : 0
   return {
     success: result.success,
-    submitted: result.success ? routes.length : 0,
-    remaining,
+    submitted,
+    remaining: Math.max(0, totalPending - submitted),
     error: result.error,
     backoff: !result.success && result.error?.includes('429'),
   }

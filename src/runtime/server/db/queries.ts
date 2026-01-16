@@ -637,6 +637,44 @@ export async function updateIndexNowStats(
   }
 }
 
+/**
+ * Batch update for IndexNow: mark pages synced + update stats
+ * Runs all queries in parallel for speed
+ */
+export async function batchIndexNowUpdate(
+  event: H3Event | undefined,
+  routes: string[],
+  submitted: number,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db || routes.length === 0)
+    return
+
+  const now = Date.now()
+  const placeholders = routes.map(() => '?').join(',')
+
+  // Run all updates in parallel
+  await Promise.all([
+    // Mark pages as synced
+    db.exec(
+      `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+      [now, ...routes],
+    ),
+    // Atomic increment total submitted
+    db.exec(`
+      INSERT INTO _ai_ready_info (id, value) VALUES ('indexnow_total_submitted', ?)
+      ON CONFLICT(id) DO UPDATE SET value = CAST((CAST(value AS INTEGER) + ?) AS TEXT)
+    `, [String(submitted), submitted]),
+    // Update last submitted timestamp
+    db.exec(
+      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
+      ['indexnow_last_submitted_at', String(now)],
+    ),
+    // Clear any previous error
+    db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['indexnow_last_error']),
+  ])
+}
+
 export interface IndexNowStats {
   totalSubmitted: number
   lastSubmittedAt: number | null
