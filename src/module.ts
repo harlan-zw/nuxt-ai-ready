@@ -1,12 +1,13 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { access, appendFile } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { readPackageJSON } from 'pkg-types'
-import { hookNuxtSeoProLicense } from './kit'
+import { hookNuxtSeoProLicense, registerModule } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -218,6 +219,38 @@ export default defineNuxtModule<ModuleOptions>({
     // Build-time database path (separate from runtime DB which may be D1/LibSQL)
     const buildDbPath = join(nuxt.options.buildDir, '.data/ai-ready/build.db')
 
+    // Resolve runtimeSync config early (needed for secret generation before nitro:config)
+    const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
+    const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
+
+    // IndexNow: auto-read key from env if not configured
+    const indexNowKey = config.indexNowKey || process.env.NUXT_AI_READY_INDEX_NOW_KEY
+
+    // Auto-generate runtimeSyncSecret if not provided (when runtimeSync or cron enabled)
+    let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
+    if (!runtimeSyncSecret && runtimeSyncEnabled) {
+      runtimeSyncSecret = randomBytes(32).toString('hex')
+      logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
+    }
+
+    // Write secret to cache for CLI access
+    if (runtimeSyncSecret) {
+      const cacheDir = join(nuxt.options.rootDir, 'node_modules/.cache/nuxt/ai-ready')
+      await mkdir(cacheDir, { recursive: true })
+      await writeFile(join(cacheDir, 'secret'), runtimeSyncSecret)
+    }
+
+    // Register module with nuxtseo.com for dashboard integration
+    registerModule({
+      name: 'nuxt-ai-ready',
+      secret: runtimeSyncSecret,
+      features: {
+        cron: !!config.cron,
+        indexNow: !!indexNowKey,
+        runtimeSync: runtimeSyncEnabled,
+      },
+    })
+
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
       // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
@@ -233,12 +266,13 @@ export default defineNuxtModule<ModuleOptions>({
 
         if (isVercel) {
           // Vercel uses HTTP-based crons - configure vercel.json to hit our endpoint
+          // Include secret in path since Vercel crons are HTTP-based
           nitroConfig.vercel = nitroConfig.vercel || {}
           nitroConfig.vercel.config = nitroConfig.vercel.config || {}
           nitroConfig.vercel.config.crons = nitroConfig.vercel.config.crons || []
           nitroConfig.vercel.config.crons.push({
             schedule: cronSchedule,
-            path: '/__ai-ready/cron',
+            path: runtimeSyncSecret ? `/__ai-ready/cron?secret=${runtimeSyncSecret}` : '/__ai-ready/cron',
           })
         }
         else {
@@ -310,14 +344,6 @@ export async function readPageDataFromFilesystem() {
     // Resolve database config
     const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
 
-    // Resolve runtimeSync - can be boolean or object
-    // Auto-enabled when cron is true
-    const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
-    const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
-
-    // IndexNow: auto-read key from env if not configured
-    const indexNowKey = config.indexNowKey || process.env.NUXT_AI_READY_INDEX_NOW_KEY
-
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
@@ -336,7 +362,7 @@ export async function readPageDataFromFilesystem() {
         batchSize: runtimeSyncConfig.batchSize ?? 20,
         pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
-      runtimeSyncSecret: config.runtimeSyncSecret,
+      runtimeSyncSecret,
       indexNowKey,
     } as any
 

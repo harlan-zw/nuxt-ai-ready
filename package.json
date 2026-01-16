@@ -33,6 +33,9 @@
     }
   },
   "main": "./dist/module.mjs",
+  "bin": {
+    "nuxt-ai-ready": "./dist/cli.mjs"
+  },
   "files": [
     "dist",
     "mcp.d.ts"
@@ -68,6 +71,7 @@
   "dependencies": {
     "@clack/prompts": "catalog:",
     "@nuxt/kit": "catalog:nuxt",
+    "citty": "catalog:",
     "consola": "catalog:",
     "db0": "catalog:",
     "defu": "catalog:",

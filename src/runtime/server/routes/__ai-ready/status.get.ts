@@ -1,10 +1,18 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
-import { eventHandler } from 'h3'
+import { createError, eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowStats } from '../../db/queries'
 
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+
+  // Require secret for status endpoint
+  if (config.runtimeSyncSecret) {
+    const { secret } = getQuery(event)
+    if (secret !== config.runtimeSyncSecret) {
+      throw createError({ statusCode: 401, message: 'Unauthorized' })
+    }
+  }
 
   const [total, pending] = await Promise.all([
     countPages(event),

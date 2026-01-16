@@ -5,6 +5,24 @@ import { $fetch } from 'ofetch'
 import { isCI, isTest } from 'std-env'
 import { logger } from './logger'
 
+export interface ModuleRegistration {
+  name: string
+  secret?: string
+  features?: Record<string, boolean>
+}
+
+// Store module registrations to send during license verification
+const moduleRegistrations: ModuleRegistration[] = []
+
+/**
+ * Register a module with the license verification system.
+ * Module info will be sent to nuxtseo.com during build verification,
+ * enabling the dashboard to show module status and query endpoints.
+ */
+export function registerModule(registration: ModuleRegistration) {
+  moduleRegistrations.push(registration)
+}
+
 export function hookNuxtSeoProLicense() {
   const nuxt = useNuxt()
   const isBuild = !nuxt.options.dev && !nuxt.options._prepare
@@ -36,7 +54,13 @@ export function hookNuxtSeoProLicense() {
       const siteName = siteConfig.name || undefined
       const res = await $fetch<{ ok: boolean }>('https://nuxtseo.com/api/pro/verify', {
         method: 'POST',
-        body: { apiKey: license, siteUrl, siteName },
+        body: {
+          apiKey: license,
+          siteUrl,
+          siteName,
+          // Include registered modules for dashboard integration
+          modules: moduleRegistrations.length > 0 ? moduleRegistrations : undefined,
+        },
       }).catch((err) => {
         // 401 = invalid key, 403 = no active subscription
         if (err?.response?.status === 401) {
