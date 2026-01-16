@@ -1,7 +1,7 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
-import type { BuildMeta, PageHashMeta } from './runtime/server/utils/indexnow-shared'
+import type { BuildMeta, BuildMetaChanges, PageHashMeta } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig } from './runtime/types'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
@@ -51,35 +51,26 @@ async function fetchPreviousMeta(
 }
 
 /**
- * Handle IndexNow submission for static sites at build time
- * Compares current build hashes with previously fetched meta
+ * Submit changed pages to IndexNow at build time
  */
-async function handleStaticIndexNow(
-  currentPages: PageHashMeta[],
+async function submitIndexNow(
+  changedRoutes: string[],
+  addedRoutes: string[],
   siteUrl: string,
   indexNow: string,
-  prevMeta: BuildMeta,
 ): Promise<void> {
-  // Compare hashes
-  const { changed, added } = comparePageHashes(currentPages, prevMeta)
-  const totalChanged = changed.length + added.length
-
-  if (totalChanged === 0) {
+  const allRoutes = [...changedRoutes, ...addedRoutes]
+  if (allRoutes.length === 0) {
     logger.debug('[indexnow] No content changes detected')
     return
   }
 
-  logger.info(`[indexnow] Submitting ${totalChanged} changed pages (${changed.length} modified, ${added.length} new)`)
+  logger.info(`[indexnow] Submitting ${allRoutes.length} changed pages (${changedRoutes.length} modified, ${addedRoutes.length} new)`)
 
-  const result = await submitToIndexNowShared(
-    [...changed, ...added],
-    indexNow,
-    siteUrl,
-    { logger },
-  )
+  const result = await submitToIndexNowShared(allRoutes, indexNow, siteUrl, { logger })
 
   if (result.success) {
-    logger.info(`[indexnow] Successfully notified search engines of ${totalChanged} changes`)
+    logger.info(`[indexnow] Successfully notified search engines of ${allRoutes.length} changes`)
   }
   else {
     logger.warn(`[indexnow] Failed to submit: ${result.error}`)
@@ -452,26 +443,52 @@ export function setupPrerenderHandler(
           .filter(p => p.contentHash)
           .map(p => ({ route: p.route, hash: p.contentHash! }))
 
-        // Fetch previous meta BEFORE writing new one (for static IndexNow comparison)
+        // Fetch previous meta BEFORE writing new one (for comparison)
         let prevMeta: BuildMeta | null = null
-        if (state.indexNow && state.siteInfo?.url) {
-          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNow)
+        if (state.siteInfo?.url) {
+          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNow || '')
         }
 
-        // Write build metadata with page hashes for stale detection + static IndexNow
+        // Compare hashes with previous build
+        const { changed, added, removed } = comparePageHashes(pageHashes, prevMeta)
+        const debug = useNuxt().options.runtimeConfig['nuxt-ai-ready']?.debug
+
+        // Build changes object for meta
+        const changes: BuildMetaChanges = {
+          changed: changed.length,
+          added: added.length,
+          removed: removed.length,
+        }
+        // Include route details in debug mode
+        if (debug) {
+          if (changed.length > 0)
+            changes.changedRoutes = changed
+          if (added.length > 0)
+            changes.addedRoutes = added
+          if (removed.length > 0)
+            changes.removedRoutes = removed
+        }
+
+        // Write build metadata with page hashes for stale detection
         const buildId = Date.now().toString(36)
         const metaContent = JSON.stringify({
           buildId,
           pageCount: pages.length,
           createdAt: new Date().toISOString(),
+          changes: prevMeta ? changes : undefined,
           pages: pageHashes,
         })
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
         logger.debug(`Wrote build metadata: buildId=${buildId}, ${pageHashes.length} page hashes`)
 
-        // Submit to IndexNow for static sites (compares with previously fetched meta)
+        // Log changes summary
+        if (prevMeta && (changed.length > 0 || added.length > 0 || removed.length > 0)) {
+          logger.info(`Content changes: ${changed.length} modified, ${added.length} new, ${removed.length} removed`)
+        }
+
+        // Submit to IndexNow for static sites
         if (state.indexNow && state.siteInfo?.url && prevMeta) {
-          await handleStaticIndexNow(pageHashes, state.siteInfo.url, state.indexNow, prevMeta)
+          await submitIndexNow(changed, added, state.siteInfo.url, state.indexNow)
         }
       }
 

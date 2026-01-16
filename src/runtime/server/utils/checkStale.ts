@@ -19,6 +19,10 @@ export interface StaleCheckResult {
   dbCount: number
   dumpCount?: number
   reason?: string
+  /** Number of pages marked pending due to hash change */
+  changedCount?: number
+  /** Number of new pages added from dump */
+  addedCount?: number
 }
 
 /**
@@ -88,20 +92,43 @@ async function setStoredBuildId(event: H3Event, buildId: string): Promise<void> 
 }
 
 /**
- * Mark all non-error pages as pending (need recheck)
- * Error pages have no content to re-index
+ * Get content hashes for all pages in DB
  */
-async function markAllPagesPending(event: H3Event): Promise<number> {
+async function getDbContentHashes(event: H3Event): Promise<Map<string, string | null>> {
   const db = await useDatabase(event)
-  await db.exec('UPDATE ai_ready_pages SET indexed = 0 WHERE is_error = 0')
-  return countPages(event, { where: { pending: true } })
+  const rows = await db.all<{ route: string, content_hash: string | null }>(
+    'SELECT route, content_hash FROM ai_ready_pages',
+  )
+  return new Map(rows.map(r => [r.route, r.content_hash]))
+}
+
+/**
+ * Mark specific routes as pending
+ */
+async function markRoutesPending(event: H3Event, routes: string[]): Promise<void> {
+  if (routes.length === 0)
+    return
+  const db = await useDatabase(event)
+  const placeholders = routes.map(() => '?').join(',')
+  await db.exec(`UPDATE ai_ready_pages SET indexed = 0 WHERE route IN (${placeholders})`, routes)
+}
+
+/**
+ * Insert new pages from dump (as already indexed since dump has full content)
+ */
+async function insertFromDump(event: H3Event, rows: DumpRow[]): Promise<void> {
+  if (rows.length === 0)
+    return
+  const db = await useDatabase(event)
+  const { importDbDump } = await import('../db/shared')
+  await importDbDump(db, rows)
 }
 
 /**
  * Check if data is stale and handle restore/mark-pending
  * Called at start of cron - handles:
  * 1. Empty DB → restore from dump
- * 2. Build ID changed → mark all pages pending for recheck
+ * 2. Build ID changed → compare hashes, only mark changed pages pending, add new pages from dump
  */
 export async function checkAndHandleStale(event: H3Event): Promise<StaleCheckResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
@@ -146,20 +173,63 @@ export async function checkAndHandleStale(event: H3Event): Promise<StaleCheckRes
     }
   }
 
-  // Case 2: Build ID changed - mark all pages pending
+  // Case 2: Build ID changed - compare hashes and only mark changed pages pending
   if (storedBuildId !== meta.buildId) {
     if (debug)
-      logger.info(`[stale-check] Build ID changed (${storedBuildId} → ${meta.buildId}), marking pages pending...`)
+      logger.info(`[stale-check] Build ID changed (${storedBuildId} → ${meta.buildId}), comparing hashes...`)
 
-    const pendingCount = await markAllPagesPending(event)
+    const dumpRows = await fetchDump(event)
+    if (!dumpRows) {
+      logger.warn('[stale-check] Failed to fetch dump for hash comparison')
+      return { action: 'none', dbCount, dumpCount: meta.pageCount, reason: 'dump_fetch_failed' }
+    }
+
+    // Get current DB hashes
+    const dbHashes = await getDbContentHashes(event)
+
+    // Find changed and new pages
+    const changedRoutes: string[] = []
+    const newRows: DumpRow[] = []
+
+    for (const row of dumpRows) {
+      const dbHash = dbHashes.get(row.route)
+      if (dbHash === undefined) {
+        // New page not in DB
+        newRows.push(row)
+      }
+      else if (dbHash !== row.content_hash) {
+        // Hash changed - mark pending for re-index
+        changedRoutes.push(row.route)
+      }
+      // If hash matches, page is unchanged - do nothing
+    }
+
+    // Insert new pages from dump (already has full content)
+    if (newRows.length > 0) {
+      await insertFromDump(event, newRows)
+      if (debug)
+        logger.info(`[stale-check] Added ${newRows.length} new pages from dump`)
+    }
+
+    // Mark changed pages as pending
+    if (changedRoutes.length > 0) {
+      await markRoutesPending(event, changedRoutes)
+      if (debug)
+        logger.info(`[stale-check] Marked ${changedRoutes.length} pages pending (hash changed)`)
+    }
+
     await setStoredBuildId(event, meta.buildId)
 
-    logger.info(`[stale-check] Marked ${pendingCount} pages as pending for recheck (buildId: ${meta.buildId})`)
+    const unchangedCount = dumpRows.length - newRows.length - changedRoutes.length
+    logger.info(`[stale-check] Build ID changed: ${changedRoutes.length} changed, ${newRows.length} new, ${unchangedCount} unchanged (buildId: ${meta.buildId})`)
+
     return {
-      action: 'marked_pending',
+      action: changedRoutes.length > 0 || newRows.length > 0 ? 'marked_pending' : 'none',
       buildId: meta.buildId,
-      dbCount,
+      dbCount: dbCount + newRows.length,
       dumpCount: meta.pageCount,
+      changedCount: changedRoutes.length,
+      addedCount: newRows.length,
     }
   }
 

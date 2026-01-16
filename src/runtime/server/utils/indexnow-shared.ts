@@ -126,10 +126,21 @@ export interface PageHashMeta {
   hash: string
 }
 
+export interface BuildMetaChanges {
+  changed: number
+  added: number
+  removed: number
+  changedRoutes?: string[]
+  addedRoutes?: string[]
+  removedRoutes?: string[]
+}
+
 export interface BuildMeta {
   buildId: string
   pageCount: number
   createdAt: string
+  /** Changes from previous build (only present if prevMeta was available) */
+  changes?: BuildMetaChanges
   pages: PageHashMeta[]
 }
 
