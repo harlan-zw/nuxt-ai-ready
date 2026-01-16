@@ -369,6 +369,12 @@ export function setupPrerenderHandler(
         const dumpPath = join(publicDataDir, 'pages.dump')
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
+
+        // Write build metadata for stale detection
+        const buildId = Date.now().toString(36)
+        const metaContent = JSON.stringify({ buildId, pageCount: pages.length, createdAt: new Date().toISOString() })
+        await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
+        logger.debug(`Wrote build metadata: buildId=${buildId}`)
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed

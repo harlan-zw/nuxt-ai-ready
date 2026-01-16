@@ -39,7 +39,8 @@ export function createAdapter(connector: Connector): DatabaseAdapter {
 }
 
 /**
- * Initialize database schema with version checking and lazy restore
+ * Initialize database schema with version checking
+ * Note: Restore logic moved to cron for reliability on Cloudflare
  */
 export async function initSchema(db: DatabaseAdapter): Promise<void> {
   const needsRebuild = await checkSchemaVersion(db)
@@ -58,47 +59,6 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
     'INSERT OR REPLACE INTO _ai_ready_info (id, version) VALUES (?, ?)',
     ['schema', SCHEMA_VERSION],
   )
-
-  // Lazy restore: if DB is empty, try to load from dump (production only)
-  if (!import.meta.prerender && !import.meta.dev) {
-    await restoreFromDumpIfEmpty(db)
-  }
-}
-
-async function restoreFromDumpIfEmpty(db: DatabaseAdapter): Promise<void> {
-  // Check if already has data
-  const row = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_pages')
-  if (row && row.count > 0)
-    return
-
-  // Try to fetch and restore dump
-  try {
-    let dumpData: string | null = null
-
-    // On Cloudflare, prefer ASSETS binding for direct static file access
-    const cfEnv = (globalThis as any).__env__
-    if (cfEnv?.ASSETS) {
-      const response = await cfEnv.ASSETS.fetch('https://placeholder/__ai-ready/pages.dump')
-      if (response.ok)
-        dumpData = await response.text()
-    }
-
-    // Fallback to HTTP fetch for other platforms
-    if (!dumpData) {
-      dumpData = await globalThis.$fetch('/__ai-ready/pages.dump', {
-        responseType: 'text',
-      }) as string
-    }
-
-    if (!dumpData)
-      return
-
-    const rows = await decompressFromBase64<DumpRow[]>(dumpData)
-    await importDbDump(db, rows)
-  }
-  catch {
-    // Silently fail - dump might not exist yet
-  }
 }
 
 async function checkSchemaVersion(db: DatabaseAdapter): Promise<boolean> {
@@ -269,6 +229,7 @@ export interface DumpRow {
   indexed: number
   source: string
   last_seen_at: number | null
+  indexnow_synced_at: number | null
 }
 
 const DUMP_BATCH_SIZE = 500
@@ -303,7 +264,7 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
 
   while (true) {
     const rows = await db.all<DumpRow>(`
-      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at
+      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at
       FROM ai_ready_pages
       ORDER BY route
       LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
@@ -340,13 +301,15 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
 
 /**
  * Import dump into database
+ * Sets indexed=1, last_seen_at=indexed_at, indexnow_synced_at=indexed_at
+ * (pages from dump were already indexed and synced during build, no need to re-notify)
  */
 export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promise<void> {
   for (const row of rows) {
     const source = row.source || 'prerender'
     await db.exec(`
-      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL)
-    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.content_hash || null, row.updated_at, row.indexed_at, row.is_error, source])
+      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.content_hash || null, row.updated_at, row.indexed_at, row.is_error, source, row.indexed_at, row.indexed_at])
   }
 }

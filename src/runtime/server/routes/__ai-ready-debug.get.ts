@@ -1,7 +1,14 @@
-import type { IndexNowLogEntry, PageEntry } from '../db/queries'
+import type { PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, getSitemapSeededAt, queryPages } from '../db/queries'
+import { useDatabase } from '../db'
+import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
+
+interface BuildMeta {
+  buildId: string
+  pageCount: number
+  createdAt: string
+}
 
 interface CronRunInfo {
   id: number
@@ -32,13 +39,18 @@ interface DebugInfo {
     total: number
     indexed: number
     pending: number
-    sitemapSeededAt: string | null
+    errors: number
   }
   indexNow?: {
     pending: number
     totalSubmitted: number
     lastSubmittedAt: string | null
     lastError: string | null
+    backoff?: {
+      until: string
+      minutesRemaining: number
+      attempt: number
+    } | null
   }
   indexNowLog?: Array<{
     id: number
@@ -58,6 +70,13 @@ interface DebugInfo {
     available: boolean
     pageCount: number
     source: string
+  }
+  buildInfo?: {
+    storedBuildId: string | null
+    dumpBuildId: string | null
+    dumpPageCount: number | null
+    isStale: boolean
+    dumpCreatedAt: string | null
   }
   virtualModules: {
     pageDataModule: {
@@ -233,13 +252,14 @@ export default eventHandler(async (event) => {
   let indexNowInfo: DebugInfo['indexNow']
   let indexNowLogInfo: DebugInfo['indexNowLog']
   let cronRunsInfo: CronRunInfo[] | undefined
+  let buildInfo: DebugInfo['buildInfo']
 
   if (!isDev && !isPrerender && !dbError) {
     try {
-      const [total, pending, sitemapSeededAt, cronRuns] = await Promise.all([
+      const [total, pending, errors, cronRuns] = await Promise.all([
         countPages(event),
         countPages(event, { where: { pending: true } }),
-        getSitemapSeededAt(event),
+        countPages(event, { where: { hasError: true } }),
         getRecentCronRuns(event, 20),
       ])
 
@@ -247,7 +267,7 @@ export default eventHandler(async (event) => {
         total,
         indexed: total - pending,
         pending,
-        sitemapSeededAt: sitemapSeededAt ? new Date(sitemapSeededAt).toISOString() : null,
+        errors,
       }
 
       cronRunsInfo = cronRuns.map(run => ({
@@ -270,6 +290,23 @@ export default eventHandler(async (event) => {
           getIndexNowStats(event),
           getIndexNowLog(event, 20),
         ])
+
+        // Get backoff info
+        const db = await useDatabase(event)
+        const backoffRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
+        let backoffInfo: { until: string, minutesRemaining: number, attempt: number } | null = null
+        if (backoffRow) {
+          const parsed = JSON.parse(backoffRow.value) as { until: number, attempt: number }
+          const now = Date.now()
+          if (parsed.until > now) {
+            backoffInfo = {
+              until: new Date(parsed.until).toISOString(),
+              minutesRemaining: Math.ceil((parsed.until - now) / 60000),
+              attempt: parsed.attempt,
+            }
+          }
+        }
+
         indexNowInfo = {
           pending: indexNowPending,
           totalSubmitted: indexNowStats.totalSubmitted,
@@ -277,6 +314,7 @@ export default eventHandler(async (event) => {
             ? new Date(indexNowStats.lastSubmittedAt).toISOString()
             : null,
           lastError: indexNowStats.lastError,
+          backoff: backoffInfo,
         }
         indexNowLogInfo = indexNowLogEntries.map(entry => ({
           id: entry.id,
@@ -285,6 +323,41 @@ export default eventHandler(async (event) => {
           success: entry.success,
           error: entry.error,
         }))
+      }
+
+      // Build info - fetch stored build ID and dump metadata
+      const db = await useDatabase(event)
+      const storedRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['build_id'])
+      const storedBuildId = storedRow?.value || null
+
+      // Fetch dump metadata
+      let dumpMeta: BuildMeta | null = null
+      const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
+      if (cfEnv?.ASSETS?.fetch) {
+        const metaResponse = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.meta.json')).catch(() => null)
+        if (metaResponse?.ok)
+          dumpMeta = await metaResponse.json().catch(() => null)
+      }
+      if (!dumpMeta) {
+        dumpMeta = await globalThis.$fetch('/__ai-ready/pages.meta.json').catch(() => null) as BuildMeta | null
+      }
+
+      buildInfo = {
+        storedBuildId,
+        dumpBuildId: dumpMeta?.buildId || null,
+        dumpPageCount: dumpMeta?.pageCount || null,
+        isStale: dumpMeta ? storedBuildId !== dumpMeta.buildId : false,
+        dumpCreatedAt: dumpMeta?.createdAt || null,
+      }
+
+      // Add diagnostic if stale
+      if (buildInfo.isStale) {
+        issues.push(`Build ID mismatch: DB has "${storedBuildId || 'none'}", dump has "${dumpMeta?.buildId}"`)
+        suggestions.push('Cron will mark pages pending on next run, or manually trigger /__ai-ready/cron')
+      }
+      else if (!storedBuildId && dumpMeta) {
+        issues.push('No build ID stored in DB - data may need restore')
+        suggestions.push('Wait for cron to run, or manually trigger /__ai-ready/cron')
       }
     }
     catch (err: any) {
@@ -323,6 +396,7 @@ export default eventHandler(async (event) => {
     indexNow: indexNowInfo,
     indexNowLog: indexNowLogInfo,
     cronRuns: cronRunsInfo,
+    buildInfo,
     pageData: {
       source,
       pageCount: pages.length,
