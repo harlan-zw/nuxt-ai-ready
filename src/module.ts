@@ -228,11 +228,17 @@ export default defineNuxtModule<ModuleOptions>({
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
-    // Auto-generate runtimeSyncSecret if not provided (when runtimeSync or cron enabled)
+    // Auto-derive runtimeSyncSecret: explicit config > env > license key > random
+    const license = nuxt.options.runtimeConfig.seoProKey || process.env.NUXT_SEO_PRO_KEY
     let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
     if (!runtimeSyncSecret && runtimeSyncEnabled) {
-      runtimeSyncSecret = randomBytes(32).toString('hex')
-      logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
+      if (license) {
+        runtimeSyncSecret = license
+      }
+      else {
+        runtimeSyncSecret = randomBytes(32).toString('hex')
+        logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
+      }
     }
 
     // Write secret to cache for CLI access
