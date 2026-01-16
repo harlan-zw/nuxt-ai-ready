@@ -4,6 +4,9 @@ import { glob } from 'tinyglobby'
 import { defineBuildConfig } from 'unbuild'
 
 export default defineBuildConfig({
+  entries: [
+    { input: './src/cli', builder: 'rollup' },
+  ],
   failOnWarn: false,
   hooks: {
     'build:done': async ({ options }) => {

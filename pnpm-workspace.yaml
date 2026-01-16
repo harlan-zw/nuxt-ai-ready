@@ -24,6 +24,7 @@ catalog:
   ai: ^6.0.35
   better-sqlite3: ^12.6.0
   bumpp: ^10.4.0
+  citty: ^0.1.6
   consola: ^3.4.2
   db0: ^0.3.4
   defu: ^6.1.4
