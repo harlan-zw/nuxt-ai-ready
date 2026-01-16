@@ -412,7 +412,7 @@ export async function readPageDataFromFilesystem() {
         name: siteConfig.name,
         url: siteConfig.url,
         description: siteConfig.description,
-      }, mergedLlmsTxt)
+      }, mergedLlmsTxt, indexNowKey)
     }
 
     // Add route rules for static files with proper charset

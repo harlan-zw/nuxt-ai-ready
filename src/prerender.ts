@@ -3,6 +3,7 @@ import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig } from './runtime/types'
+import type { BuildMeta, PageHashMeta } from './shared/indexnow'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
@@ -12,6 +13,78 @@ import { withBase } from 'ufo'
 import { logger } from './logger'
 import { computeContentHash, createAdapter, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
+import { comparePageHashes, submitToIndexNow } from './shared/indexnow'
+
+/**
+ * Fetch previous build meta from live site for IndexNow comparison
+ * Must be called BEFORE writing new pages.meta.json
+ */
+async function fetchPreviousMeta(
+  siteUrl: string,
+  indexNowKey: string,
+): Promise<BuildMeta | null> {
+  // Fetch previous build meta from live site
+  const metaUrl = `${siteUrl}/__ai-ready/pages.meta.json`
+  logger.debug(`[indexnow] Fetching previous meta from ${metaUrl}`)
+
+  const prevMeta = await fetch(metaUrl)
+    .then(r => r.ok ? r.json() as Promise<BuildMeta> : null)
+    .catch(() => null)
+
+  if (!prevMeta?.pages) {
+    logger.info('[indexnow] First deploy or no previous meta - skipping IndexNow')
+    return null
+  }
+
+  // Verify key file is live (required for IndexNow to work)
+  const keyUrl = `${siteUrl}/${indexNowKey}.txt`
+  const keyLive = await fetch(keyUrl)
+    .then(r => r.ok)
+    .catch(() => false)
+
+  if (!keyLive) {
+    logger.info('[indexnow] Key file not live yet - skipping IndexNow')
+    return null
+  }
+
+  return prevMeta
+}
+
+/**
+ * Handle IndexNow submission for static sites at build time
+ * Compares current build hashes with previously fetched meta
+ */
+async function handleStaticIndexNow(
+  currentPages: PageHashMeta[],
+  siteUrl: string,
+  indexNowKey: string,
+  prevMeta: BuildMeta,
+): Promise<void> {
+  // Compare hashes
+  const { changed, added } = comparePageHashes(currentPages, prevMeta)
+  const totalChanged = changed.length + added.length
+
+  if (totalChanged === 0) {
+    logger.debug('[indexnow] No content changes detected')
+    return
+  }
+
+  logger.info(`[indexnow] Submitting ${totalChanged} changed pages (${changed.length} modified, ${added.length} new)`)
+
+  const result = await submitToIndexNow(
+    [...changed, ...added],
+    indexNowKey,
+    siteUrl,
+    { logger },
+  )
+
+  if (result.success) {
+    logger.info(`[indexnow] Successfully notified search engines of ${totalChanged} changes`)
+  }
+  else {
+    logger.warn(`[indexnow] Failed to submit: ${result.error}`)
+  }
+}
 
 export interface ParsedMarkdownResult {
   markdown: string
@@ -37,6 +110,7 @@ export interface CrawlerState {
   llmsFullTxtPath?: string
   siteInfo?: SiteInfo
   llmsTxtConfig?: LlmsTxtConfig
+  indexNowKey?: string
 }
 
 function createCrawlerState(
@@ -44,6 +118,7 @@ function createCrawlerState(
   llmsFullTxtPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
+  indexNowKey?: string,
 ): CrawlerState {
   return {
     prerenderedRoutes: new Set(),
@@ -54,6 +129,7 @@ function createCrawlerState(
     llmsFullTxtPath,
     siteInfo,
     llmsTxtConfig,
+    indexNowKey,
   }
 }
 
@@ -281,13 +357,14 @@ export function setupPrerenderHandler(
   dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
+  indexNowKey?: string,
 ) {
   const nuxt = useNuxt()
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
     const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig)
+    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNowKey)
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
@@ -370,11 +447,32 @@ export function setupPrerenderHandler(
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
-        // Write build metadata for stale detection
+        // Build page hashes for static IndexNow comparison
+        const pageHashes: PageHashMeta[] = pages
+          .filter(p => p.contentHash)
+          .map(p => ({ route: p.route, hash: p.contentHash! }))
+
+        // Fetch previous meta BEFORE writing new one (for static IndexNow comparison)
+        let prevMeta: BuildMeta | null = null
+        if (state.indexNowKey && state.siteInfo?.url) {
+          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNowKey)
+        }
+
+        // Write build metadata with page hashes for stale detection + static IndexNow
         const buildId = Date.now().toString(36)
-        const metaContent = JSON.stringify({ buildId, pageCount: pages.length, createdAt: new Date().toISOString() })
+        const metaContent = JSON.stringify({
+          buildId,
+          pageCount: pages.length,
+          createdAt: new Date().toISOString(),
+          pages: pageHashes,
+        })
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
-        logger.debug(`Wrote build metadata: buildId=${buildId}`)
+        logger.debug(`Wrote build metadata: buildId=${buildId}, ${pageHashes.length} page hashes`)
+
+        // Submit to IndexNow for static sites (compares with previously fetched meta)
+        if (state.indexNowKey && state.siteInfo?.url && prevMeta) {
+          await handleStaticIndexNow(pageHashes, state.siteInfo.url, state.indexNowKey, prevMeta)
+        }
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed

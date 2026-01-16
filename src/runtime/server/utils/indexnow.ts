@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { submitToIndexNow as submitToIndexNowShared } from '../../../shared/indexnow'
 import { useDatabase } from '../db'
 import {
   batchIndexNowUpdate,
@@ -10,6 +11,9 @@ import {
   updateIndexNowStats,
 } from '../db/queries'
 import { logger } from '../logger'
+
+// Re-export shared types
+export type { BuildMeta, IndexNowSubmitResult, PageHashMeta } from '../../../shared/indexnow'
 
 // Backoff: 5min, 10min, 20min, 40min, 1hr max
 const BACKOFF_MINUTES = [5, 10, 20, 40, 60]
@@ -53,66 +57,37 @@ async function setBackoffInfo(event: H3Event | undefined, info: BackoffInfo | nu
   }
 }
 
-// Endpoints to try in order (fallback on 429)
-const INDEXNOW_HOSTS = ['api.indexnow.org', 'www.bing.com']
-
 /**
  * Submit URLs to IndexNow API with fallback on rate limit
+ * Wrapper around shared implementation with runtime-specific fetch
  */
 export async function submitToIndexNow(
   routes: string[],
   config: { key: string },
   siteUrl: string,
 ): Promise<{ success: boolean, error?: string, host?: string }> {
-  if (!siteUrl) {
-    return { success: false, error: 'Site URL not configured' }
-  }
+  // Use $fetch wrapper that handles response properly
+  const runtimeFetch: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    const body = init?.body ? JSON.parse(init.body as string) : undefined
 
-  // Convert routes to absolute URLs
-  const urlList = routes.map(route =>
-    route.startsWith('http') ? route : `${siteUrl}${route}`,
-  )
-
-  const body = {
-    host: new URL(siteUrl).host,
-    key: config.key,
-    keyLocation: `${siteUrl}/${config.key}.txt`,
-    urlList,
-  }
-
-  let lastError: string | undefined
-
-  // Try each host, fallback on 429
-  for (const host of INDEXNOW_HOSTS) {
-    const endpoint = `https://${host}/indexnow`
-    logger.debug(`[indexnow] Submitting ${urlList.length} URLs to ${endpoint}`)
-
-    const response = await $fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const result = await $fetch.raw(url, {
+      method: init?.method as 'POST',
+      headers: init?.headers as Record<string, string>,
       body,
-    }).catch((err: Error) => ({ error: err.message }))
+    }).catch((err: Error) => ({ _error: err.message }))
 
-    if (response && typeof response === 'object' && 'error' in response) {
-      lastError = response.error as string
-
-      // On 429, try next host
-      if (lastError.includes('429')) {
-        logger.warn(`[indexnow] Rate limited on ${host}, trying fallback...`)
-        continue
-      }
-
-      // Other errors, don't fallback
-      logger.warn(`[indexnow] Submission failed on ${host}: ${lastError}`)
-      return { success: false, error: lastError, host }
+    if (result && '_error' in result) {
+      return { ok: false, status: 500, statusText: result._error } as Response
     }
 
-    logger.debug(`[indexnow] Successfully submitted ${urlList.length} URLs via ${host}`)
-    return { success: true, host }
+    return { ok: result.status >= 200 && result.status < 300, status: result.status } as Response
   }
 
-  // All hosts rate limited
-  return { success: false, error: lastError || 'All endpoints rate limited', host: INDEXNOW_HOSTS[INDEXNOW_HOSTS.length - 1] }
+  return submitToIndexNowShared(routes, config.key, siteUrl, {
+    fetchFn: runtimeFetch,
+    logger,
+  })
 }
 
 export interface SyncToIndexNowOptions {

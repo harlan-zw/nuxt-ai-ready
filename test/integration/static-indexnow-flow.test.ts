@@ -34,7 +34,11 @@ describe('static IndexNow flow (integration)', () => {
   let staticServerPort: number
   let indexNowRequests: IndexNowRequest[] = []
 
-  let servePagesMeta = false // Control whether static server returns pages.meta.json
+  // Mutable state for controlling static server behavior
+  const serverState = {
+    servePagesMeta: false,
+    savedPagesMeta: null as string | null,
+  }
 
   beforeAll(async () => {
     // Create temp directory
@@ -74,7 +78,7 @@ describe('static IndexNow flow (integration)', () => {
 
     // Create static file server for serving first build output
     staticServer = createServer(async (req, res) => {
-      console.log(`[static-server] ${req.method} ${req.url} (servePagesMeta: ${servePagesMeta})`)
+      console.log(`[static-server] ${req.method} ${req.url}`)
       const distDir = join(tempDir, '.output/public')
       let filePath = join(distDir, req.url || '/')
 
@@ -87,25 +91,17 @@ describe('static IndexNow flow (integration)', () => {
 
       // Control serving pages.meta.json (simulate first deploy vs subsequent)
       if (req.url === '/__ai-ready/pages.meta.json') {
-        if (!servePagesMeta) {
-          console.log('[static-server] Blocking pages.meta.json (servePagesMeta=false)')
+        if (!serverState.servePagesMeta || !serverState.savedPagesMeta) {
+          console.log('[static-server] Blocking pages.meta.json (not enabled or no saved content)')
           res.writeHead(404)
           res.end()
           return
         }
-        // Log what we're serving
-        const metaPath = join(distDir, '__ai-ready/pages.meta.json')
-        console.log('[static-server] Reading from:', metaPath)
-        const metaContent = await readFile(metaPath, 'utf-8').catch((err) => {
-          console.log('[static-server] Read error:', err.message)
-          return null
-        })
-        if (metaContent) {
-          console.log('[static-server] Serving pages.meta.json:', metaContent.slice(0, 500))
-        }
-        else {
-          console.log('[static-server] No meta content found at path')
-        }
+        // Serve cached content (simulates live site with stable deployed content)
+        console.log('[static-server] Serving cached pages.meta.json:', serverState.savedPagesMeta.slice(0, 200))
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(serverState.savedPagesMeta)
+        return
       }
 
       // Handle directory requests
@@ -205,8 +201,10 @@ export default defineNuxtConfig({
     // No IndexNow requests on first build (no previous meta to compare)
     expect(indexNowRequests).toHaveLength(0)
 
-    // Enable serving pages.meta.json for subsequent builds (simulates live site)
-    servePagesMeta = true
+    // Save first build's pages.meta.json for subsequent builds (simulates live site)
+    serverState.savedPagesMeta = await readFile(metaPath, 'utf-8')
+    serverState.servePagesMeta = true
+    console.log('Saved pages.meta.json for subsequent builds:', serverState.savedPagesMeta.slice(0, 200))
   }, 120000)
 
   it('second build with changes submits to IndexNow', async () => {
