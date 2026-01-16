@@ -297,9 +297,10 @@ export default defineNuxtModule<ModuleOptions>({
           nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
           ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
 
-          // Auto-configure Cloudflare wrangler cron triggers
-          const isCloudflare = String(nitroConfig.preset).startsWith('cloudflare')
-          if (isCloudflare) {
+          // Auto-configure Cloudflare wrangler cron triggers (Workers only, not Pages)
+          const preset = String(nitroConfig.preset)
+          const isCloudflareWorkers = preset.startsWith('cloudflare') && !preset.includes('pages')
+          if (isCloudflareWorkers) {
             nitroConfig.cloudflare = nitroConfig.cloudflare || {}
             nitroConfig.cloudflare.deployConfig = true
             nitroConfig.cloudflare.wrangler = nitroConfig.cloudflare.wrangler || {}

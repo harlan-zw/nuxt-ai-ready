@@ -1,6 +1,56 @@
 # Changelog
 
 
+## v0.9.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.0...main)
+
+### 🩹 Fixes
+
+- Use nuxt seo pro key as secret ([aac00ec](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/aac00ec))
+- Dev node:sql warning ([e72fe7b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/e72fe7b))
+- **cloudflare:** Configure wrangler crons ([ebed74c](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/ebed74c))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.8.2...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.8.2...main)
+
+### 🚀 Enhancements
+
+- ⚠️  Rename indexNowKey to indexNow with auto-generation ([0d6cb7b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/0d6cb7b))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Rename indexNowKey to indexNow with auto-generation ([0d6cb7b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/0d6cb7b))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.8.1...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.8.1...main)
+
+### 🚀 Enhancements
+
+- **cli:** Add nuxt-ai-ready CLI for runtime management ([#10](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/10))
+
+### 🩹 Fixes
+
+- Broken full URL resolving ([9f52168](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/9f52168))
+
+### 🏡 Chore
+
+- Bump ([72e0b41](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/72e0b41))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.8.0...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.8.0...main)
