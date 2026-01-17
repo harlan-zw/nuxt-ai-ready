@@ -134,6 +134,13 @@ export interface ModuleOptions {
   runtimeSyncSecret?: string
 
   /**
+   * Enable cron run logging to database for debugging
+   * Logs each cron execution with results (indexed, submitted, errors)
+   * Auto-prunes entries older than 24 hours
+   */
+  debugCron?: boolean
+
+  /**
    * Runtime sync configuration (opt-in for dynamic content sites)
    * When enabled, pages are re-indexed at runtime from sitemap
    * Set to `true` for defaults or object to customize

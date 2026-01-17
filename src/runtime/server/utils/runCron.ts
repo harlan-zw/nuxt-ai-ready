@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
 import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
-import { cleanupOldCronRuns, completeCronRun, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
+import { completeCronRun, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale } from './checkStale'
@@ -102,8 +102,8 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
     }
   }
 
-  // Start logging this cron run
-  const runId = await startCronRun(event)
+  // Start logging this cron run (only if debugCron enabled)
+  const runId = config.debugCron ? await startCronRun(event) : null
   results.runId = runId
 
   // Run runtime indexing if enabled
@@ -149,8 +149,8 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
     }
   }
 
-  // Complete the cron run log
-  if (runId) {
+  // Complete the cron run log (only if debugCron enabled)
+  if (runId && config.debugCron) {
     await completeCronRun(event, runId, {
       pagesIndexed: results.index?.indexed || 0,
       pagesRemaining: results.index?.remaining || 0,
@@ -159,8 +159,8 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
       errors: allErrors,
     })
 
-    // Cleanup old runs periodically (keep last 50)
-    await cleanupOldCronRuns(event, 50)
+    // Prune cron logs older than 24 hours
+    await pruneCronRunsByAge(event)
   }
 
   // Summary log

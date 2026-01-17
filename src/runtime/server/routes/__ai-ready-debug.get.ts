@@ -32,6 +32,7 @@ interface DebugInfo {
   }
   config: {
     debug: boolean
+    debugCron: boolean
     cacheMaxAgeSeconds: number
     mdreamOptions: unknown
   }
@@ -256,11 +257,10 @@ export default eventHandler(async (event) => {
 
   if (!isDev && !isPrerender && !dbError) {
     try {
-      const [total, pending, errors, cronRuns] = await Promise.all([
+      const [total, pending, errors] = await Promise.all([
         countPages(event),
         countPages(event, { where: { pending: true } }),
         countPages(event, { where: { hasError: true } }),
-        getRecentCronRuns(event, 20),
       ])
 
       runtimeSyncInfo = {
@@ -270,18 +270,22 @@ export default eventHandler(async (event) => {
         errors,
       }
 
-      cronRunsInfo = cronRuns.map(run => ({
-        id: run.id,
-        startedAt: new Date(run.startedAt).toISOString(),
-        finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
-        durationMs: run.durationMs,
-        status: run.status,
-        pagesIndexed: run.pagesIndexed,
-        pagesRemaining: run.pagesRemaining,
-        indexNowSubmitted: run.indexNowSubmitted,
-        indexNowRemaining: run.indexNowRemaining,
-        errors: run.errors,
-      }))
+      // Only fetch cron runs if debugCron is enabled
+      if (runtimeConfig.debugCron) {
+        const cronRuns = await getRecentCronRuns(event, 20)
+        cronRunsInfo = cronRuns.map(run => ({
+          id: run.id,
+          startedAt: new Date(run.startedAt).toISOString(),
+          finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
+          durationMs: run.durationMs,
+          status: run.status,
+          pagesIndexed: run.pagesIndexed,
+          pagesRemaining: run.pagesRemaining,
+          indexNowSubmitted: run.indexNowSubmitted,
+          indexNowRemaining: run.indexNowRemaining,
+          errors: run.errors,
+        }))
+      }
 
       // IndexNow stats if configured
       if (runtimeConfig.indexNow) {
@@ -389,6 +393,7 @@ export default eventHandler(async (event) => {
     },
     config: {
       debug: runtimeConfig.debug,
+      debugCron: runtimeConfig.debugCron,
       cacheMaxAgeSeconds: runtimeConfig.cacheMaxAgeSeconds,
       mdreamOptions: runtimeConfig.mdreamOptions,
     },

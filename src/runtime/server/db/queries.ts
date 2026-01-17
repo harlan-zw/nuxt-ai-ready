@@ -922,6 +922,33 @@ export async function cleanupOldCronRuns(
   return deleteCount
 }
 
+/**
+ * Clean up cron runs older than specified age
+ * @param maxAgeMs Maximum age in milliseconds (default: 24 hours)
+ */
+export async function pruneCronRunsByAge(
+  event: H3Event | undefined,
+  maxAgeMs = 24 * 60 * 60 * 1000,
+): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
+  const threshold = Date.now() - maxAgeMs
+
+  const countRow = await db.first<{ count: number }>(
+    'SELECT COUNT(*) as count FROM ai_ready_cron_runs WHERE started_at < ?',
+    [threshold],
+  )
+  const count = countRow?.count || 0
+
+  if (count > 0) {
+    await db.exec('DELETE FROM ai_ready_cron_runs WHERE started_at < ?', [threshold])
+  }
+
+  return count
+}
+
 // ============================================================================
 // Sitemap Tracking (Multi-Sitemap Support)
 // ============================================================================

@@ -30,6 +30,7 @@ export interface ModuleHooks {
 
 export interface ModulePublicRuntimeConfig {
   debug: boolean
+  debugCron: boolean
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
@@ -391,6 +392,7 @@ export const logger = createConsola({
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
       debug: config.debug || false,
+      debugCron: config.debugCron || false,
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,
