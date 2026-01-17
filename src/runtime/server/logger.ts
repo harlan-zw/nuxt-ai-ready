@@ -1,5 +1,1 @@
-import { createConsola } from 'consola'
-
-export const logger = createConsola({
-  defaults: { tag: 'nuxt-ai-ready' },
-})
+export { logger } from '#ai-ready-virtual/logger.mjs'

@@ -921,3 +921,166 @@ export async function cleanupOldCronRuns(
 
   return deleteCount
 }
+
+// ============================================================================
+// Sitemap Tracking (Multi-Sitemap Support)
+// ============================================================================
+
+export interface SitemapEntry {
+  name: string
+  route: string
+  lastCrawledAt: number | null
+  urlCount: number
+  errorCount: number
+  lastError: string | null
+}
+
+interface SitemapRow {
+  name: string
+  route: string
+  last_crawled_at: number | null
+  url_count: number
+  error_count: number
+  last_error: string | null
+}
+
+function rowToSitemapEntry(row: SitemapRow): SitemapEntry {
+  return {
+    name: row.name,
+    route: row.route,
+    lastCrawledAt: row.last_crawled_at,
+    urlCount: row.url_count,
+    errorCount: row.error_count,
+    lastError: row.last_error,
+  }
+}
+
+/**
+ * Sync sitemap list from config to DB
+ * Inserts new sitemaps, removes stale ones
+ */
+export async function syncSitemaps(
+  event: H3Event | undefined,
+  sitemaps: Array<{ name: string, route: string }>,
+): Promise<{ added: number, removed: number }> {
+  const db = await getDb(event)
+  if (!db)
+    return { added: 0, removed: 0 }
+
+  const existingRows = await db.all<{ name: string }>('SELECT name FROM ai_ready_sitemaps')
+  const existingNames = new Set(existingRows.map(r => r.name))
+  const configNames = new Set(sitemaps.map(s => s.name))
+
+  let added = 0
+  let removed = 0
+
+  // Insert new sitemaps
+  for (const sitemap of sitemaps) {
+    if (!existingNames.has(sitemap.name)) {
+      await db.exec(
+        'INSERT INTO ai_ready_sitemaps (name, route) VALUES (?, ?)',
+        [sitemap.name, sitemap.route],
+      )
+      added++
+    }
+  }
+
+  // Remove sitemaps no longer in config
+  for (const name of existingNames) {
+    if (!configNames.has(name)) {
+      await db.exec('DELETE FROM ai_ready_sitemaps WHERE name = ?', [name])
+      removed++
+    }
+  }
+
+  return { added, removed }
+}
+
+/**
+ * Get next sitemap to crawl
+ * Prioritizes: sitemaps with errors (for retry), then oldest crawled
+ */
+export async function getNextSitemapToCrawl(
+  event: H3Event | undefined,
+): Promise<SitemapEntry | null> {
+  const db = await getDb(event)
+  if (!db)
+    return null
+
+  // First try sitemaps with errors (retry after some time)
+  // Only retry if error_count < 3 to avoid infinite retries
+  const errorRow = await db.first<SitemapRow>(`
+    SELECT * FROM ai_ready_sitemaps
+    WHERE error_count > 0 AND error_count < 3
+    ORDER BY last_crawled_at ASC NULLS FIRST
+    LIMIT 1
+  `)
+  if (errorRow)
+    return rowToSitemapEntry(errorRow)
+
+  // Otherwise get oldest crawled (or never crawled)
+  const row = await db.first<SitemapRow>(`
+    SELECT * FROM ai_ready_sitemaps
+    WHERE error_count = 0
+    ORDER BY last_crawled_at ASC NULLS FIRST
+    LIMIT 1
+  `)
+  return row ? rowToSitemapEntry(row) : null
+}
+
+/**
+ * Mark sitemap as successfully crawled
+ */
+export async function markSitemapCrawled(
+  event: H3Event | undefined,
+  name: string,
+  urlCount: number,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec(`
+    UPDATE ai_ready_sitemaps SET
+      last_crawled_at = ?,
+      url_count = ?,
+      error_count = 0,
+      last_error = NULL
+    WHERE name = ?
+  `, [Date.now(), urlCount, name])
+}
+
+/**
+ * Mark sitemap crawl as failed
+ */
+export async function markSitemapError(
+  event: H3Event | undefined,
+  name: string,
+  error: string,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec(`
+    UPDATE ai_ready_sitemaps SET
+      last_crawled_at = ?,
+      error_count = error_count + 1,
+      last_error = ?
+    WHERE name = ?
+  `, [Date.now(), error, name])
+}
+
+/**
+ * Get all sitemaps with their status
+ */
+export async function getSitemapStatus(
+  event: H3Event | undefined,
+): Promise<SitemapEntry[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  const rows = await db.all<SitemapRow>('SELECT * FROM ai_ready_sitemaps ORDER BY name')
+  return rows.map(rowToSitemapEntry)
+}

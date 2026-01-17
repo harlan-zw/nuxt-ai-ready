@@ -62,6 +62,11 @@ export {}
 declare module '#ai-ready-virtual/page-data.mjs' {
   export const pages: never[]
 }
+
+declare module '#ai-ready-virtual/logger.mjs' {
+  import type { ConsolaInstance } from 'consola'
+  export const logger: ConsolaInstance
+}
 `,
   })
 

@@ -9,34 +9,43 @@ interface BuildMeta {
   buildId: string
   pageCount: number
   createdAt: string
-  pages: PageHashMeta[]
+  /** Page hashes - object format (new) or array format (legacy) */
+  pages: Record<string, string> | PageHashMeta[]
 }
 
 // Mock fetch responses
 const mockFetch = vi.fn()
 
+// Normalize pages to Map (handles both old array and new object format)
+function normalizePagesToMap(pages: Record<string, string> | PageHashMeta[]): Map<string, string> {
+  if (Array.isArray(pages))
+    return new Map(pages.map(p => [p.route, p.hash]))
+  return new Map(Object.entries(pages))
+}
+
 // Inline the comparison logic from prerender.ts for testing
 function comparePageHashes(
-  currentPages: PageHashMeta[],
+  currentPages: Record<string, string> | PageHashMeta[],
   prevMeta: BuildMeta | null,
 ): { changed: string[], added: string[], removed: string[] } {
   if (!prevMeta?.pages) {
     return { changed: [], added: [], removed: [] }
   }
 
-  const prevHashes = new Map(prevMeta.pages.map(p => [p.route, p.hash]))
-  const currentRoutes = new Set(currentPages.map(p => p.route))
+  const prevHashes = normalizePagesToMap(prevMeta.pages)
+  const currentHashes = normalizePagesToMap(currentPages)
+  const currentRoutes = new Set(currentHashes.keys())
 
   const changed: string[] = []
   const added: string[] = []
 
-  for (const page of currentPages) {
-    const prevHash = prevHashes.get(page.route)
+  for (const [route, hash] of currentHashes) {
+    const prevHash = prevHashes.get(route)
     if (!prevHash) {
-      added.push(page.route)
+      added.push(route)
     }
-    else if (prevHash !== page.hash) {
-      changed.push(page.route)
+    else if (prevHash !== hash) {
+      changed.push(route)
     }
   }
 

@@ -1,7 +1,7 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
-import type { BuildMeta, BuildMetaChanges, PageHashMeta } from './runtime/server/utils/indexnow-shared'
+import type { BuildMeta, BuildMetaChanges } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig } from './runtime/types'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
@@ -461,10 +461,12 @@ export function setupPrerenderHandler(
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
-        // Build page hashes for static IndexNow comparison
-        const pageHashes: PageHashMeta[] = pages
-          .filter(p => p.contentHash)
-          .map(p => ({ route: p.route, hash: p.contentHash! }))
+        // Build page hashes for static IndexNow comparison (object format for smaller payload)
+        const pageHashes: Record<string, string> = {}
+        for (const p of pages) {
+          if (p.contentHash)
+            pageHashes[p.route] = p.contentHash
+        }
 
         // Fetch previous meta BEFORE writing new one (for comparison)
         let prevMeta: BuildMeta | null = null
@@ -503,7 +505,7 @@ export function setupPrerenderHandler(
         })
         logger.debug(`Writing pages.meta.json (${metaContent.length} bytes)`)
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
-        logger.debug(`Wrote build metadata: buildId=${buildId}, ${pageHashes.length} page hashes`)
+        logger.debug(`Wrote build metadata: buildId=${buildId}, ${Object.keys(pageHashes).length} page hashes`)
 
         // Log changes summary
         if (prevMeta && (changed.length > 0 || added.length > 0 || removed.length > 0)) {

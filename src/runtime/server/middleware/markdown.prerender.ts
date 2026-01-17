@@ -1,6 +1,7 @@
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { logger } from '../logger'
 import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
 import { extractKeywords } from '../utils/keywords'
 
@@ -17,6 +18,7 @@ export default defineEventHandler(async (event) => {
   const { path } = renderInfo
   const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any
 
+  logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
   const response = await event.fetch(path)
   if (!response.ok) {
     return createError({
@@ -27,6 +29,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const html = await response.text()
+  logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
 
   // Skip error pages that returned 200 (e.g., Vue Router "no match" pages)
   if (html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')) {

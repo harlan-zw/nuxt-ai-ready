@@ -1,7 +1,7 @@
 // Schema SQL definitions for database initialization
 // Used by both prerender (node:sqlite/better-sqlite3) and runtime (db0)
 
-export const SCHEMA_VERSION = 'v1.8.0'
+export const SCHEMA_VERSION = 'v1.9.0'
 
 const PAGES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS ai_ready_pages (
@@ -90,11 +90,24 @@ CREATE TABLE IF NOT EXISTS ai_ready_indexnow_log (
 
 const INDEXNOW_LOG_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS idx_ai_ready_indexnow_log_submitted ON ai_ready_indexnow_log(submitted_at DESC)'
 
+const SITEMAPS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS ai_ready_sitemaps (
+  name TEXT PRIMARY KEY,
+  route TEXT NOT NULL,
+  last_crawled_at INTEGER,
+  url_count INTEGER DEFAULT 0,
+  error_count INTEGER DEFAULT 0,
+  last_error TEXT
+)`
+
+const SITEMAPS_INDEX_SQL = 'CREATE INDEX IF NOT EXISTS idx_ai_ready_sitemaps_crawled ON ai_ready_sitemaps(last_crawled_at)'
+
 export const DROP_TABLES_SQL = [
   'DROP TABLE IF EXISTS ai_ready_pages_fts',
   'DROP TABLE IF EXISTS ai_ready_pages',
   'DROP TABLE IF EXISTS ai_ready_cron_runs',
   'DROP TABLE IF EXISTS ai_ready_indexnow_log',
+  'DROP TABLE IF EXISTS ai_ready_sitemaps',
   'DROP TABLE IF EXISTS _ai_ready_info',
   // Legacy unprefixed tables (migration from v1.0.0)
   'DROP TABLE IF EXISTS pages_fts',
@@ -112,4 +125,6 @@ export const ALL_SCHEMA_SQL = [
   CRON_RUNS_INDEX_SQL,
   INDEXNOW_LOG_TABLE_SQL,
   INDEXNOW_LOG_INDEX_SQL,
+  SITEMAPS_TABLE_SQL,
+  SITEMAPS_INDEX_SQL,
 ]

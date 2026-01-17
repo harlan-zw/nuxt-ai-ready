@@ -3,7 +3,7 @@ import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { addPlugin, addServerHandler, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
+import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { readPackageJSON } from 'pkg-types'
@@ -374,6 +374,15 @@ export async function readPageDataFromFilesystem() {
 `
       // Runtime module exports empty arrays (pages read from database at runtime)
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
+
+      // Logger with debug level configured from module options
+      nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
+import { createConsola } from 'consola'
+export const logger = createConsola({
+  defaults: { tag: 'nuxt-ai-ready' },
+  level: ${config.debug ? 4 : 3},
+})
+`
     })
 
     // Resolve database config
@@ -431,6 +440,9 @@ export async function readPageDataFromFilesystem() {
       addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
       addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
       addServerHandler({ route: '/__ai-ready/restore', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/restore.post') })
+
+      // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
+      addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
     }
 
     // IndexNow endpoints (only if key is configured)

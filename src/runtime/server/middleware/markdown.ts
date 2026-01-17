@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
 
   // Runtime: fetch HTML with internal marker to prevent recursion
   // Use manual redirect to detect and forward redirects with .md suffix
+  logger.debug(`[markdown] Fetching HTML for ${path}`)
   const response = await event.fetch(path, {
     headers: { [INTERNAL_HEADER]: '1' },
     redirect: 'manual',
@@ -78,6 +79,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const html = await response.text()
+  logger.debug(`[markdown] Fetched HTML for ${path} (${html.length} bytes)`)
 
   // Runtime: convert to markdown with hooks
   const result = await convertHtmlToMarkdown(

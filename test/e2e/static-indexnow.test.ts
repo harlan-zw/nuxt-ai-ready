@@ -4,16 +4,12 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
-interface PageHashMeta {
-  route: string
-  hash: string
-}
-
 interface BuildMeta {
   buildId: string
   pageCount: number
   createdAt: string
-  pages: PageHashMeta[]
+  /** Page hashes - object format (new) */
+  pages: Record<string, string>
 }
 
 describe('static IndexNow: pages.meta.json', async () => {
@@ -36,7 +32,7 @@ describe('static IndexNow: pages.meta.json', async () => {
   })
 
   describe('pages.meta.json structure', () => {
-    it('contains buildId, pageCount, createdAt, and pages array', async () => {
+    it('contains buildId, pageCount, createdAt, and pages object', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
 
       expect(meta).toHaveProperty('buildId')
@@ -53,44 +49,42 @@ describe('static IndexNow: pages.meta.json', async () => {
       expect(typeof meta.createdAt).toBe('string')
       expect(new Date(meta.createdAt).getTime()).not.toBeNaN()
 
-      expect(Array.isArray(meta.pages)).toBe(true)
+      expect(typeof meta.pages).toBe('object')
+      expect(Array.isArray(meta.pages)).toBe(false)
     })
 
-    it('pages array contains route and hash for each page', async () => {
+    it('pages object contains route keys and hash values', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
+      const routes = Object.keys(meta.pages)
 
-      expect(meta.pages.length).toBeGreaterThan(0)
+      expect(routes.length).toBeGreaterThan(0)
 
-      for (const page of meta.pages) {
-        expect(page).toHaveProperty('route')
-        expect(page).toHaveProperty('hash')
+      for (const [route, hash] of Object.entries(meta.pages)) {
+        expect(typeof route).toBe('string')
+        expect(route.startsWith('/')).toBe(true)
 
-        expect(typeof page.route).toBe('string')
-        expect(page.route.startsWith('/')).toBe(true)
-
-        expect(typeof page.hash).toBe('string')
-        expect(page.hash.length).toBe(16) // SHA-256 truncated to 16 chars
+        expect(typeof hash).toBe('string')
+        expect(hash.length).toBe(16) // SHA-256 truncated to 16 chars
       }
     })
 
-    it('pageCount matches pages array length', async () => {
+    it('pageCount matches pages object size', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
 
-      expect(meta.pageCount).toBe(meta.pages.length)
+      expect(meta.pageCount).toBe(Object.keys(meta.pages).length)
     })
 
     it('includes expected routes', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
-      const routes = meta.pages.map(p => p.route)
 
-      expect(routes).toContain('/')
-      expect(routes).toContain('/about')
-      expect(routes).toContain('/docs/getting-started')
+      expect(meta.pages).toHaveProperty('/')
+      expect(meta.pages).toHaveProperty('/about')
+      expect(meta.pages).toHaveProperty('/docs/getting-started')
     })
 
     it('hashes are unique per page', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
-      const hashes = meta.pages.map(p => p.hash)
+      const hashes = Object.values(meta.pages)
       const uniqueHashes = new Set(hashes)
 
       // All hashes should be unique (different content = different hash)
@@ -100,8 +94,8 @@ describe('static IndexNow: pages.meta.json', async () => {
     it('hashes are hex strings', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
 
-      for (const page of meta.pages) {
-        expect(page.hash).toMatch(/^[0-9a-f]{16}$/)
+      for (const hash of Object.values(meta.pages)) {
+        expect(hash).toMatch(/^[0-9a-f]{16}$/)
       }
     })
   })

@@ -1,6 +1,44 @@
 # Changelog
 
 
+## v0.9.3...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.3...main)
+
+### 🩹 Fixes
+
+- Debug changed pages between builds ([41be12a](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/41be12a))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.9.2...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.2...main)
+
+### 🩹 Fixes
+
+- **cloudflare-pages:** Disable nitro tasks ([b6c54f0](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/b6c54f0))
+- Module telementry ([8f0e3c2](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/8f0e3c2))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.9.1...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.1...main)
+
+### 🩹 Fixes
+
+- Less dev noise ([adb389d](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/adb389d))
+- **cloudflare-pages:** Disable cron usage ([01acbae](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/01acbae))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.9.0...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.0...main)
