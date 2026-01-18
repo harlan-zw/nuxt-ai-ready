@@ -2,13 +2,15 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { completeCronRun, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
+import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale } from './checkStale'
 import { useFetch } from './fetch'
 import { syncToIndexNow } from './indexnow'
 import { getSitemapsFromConfig } from './sitemap'
+
+const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
 export interface CronResult {
   runId?: number | null
@@ -50,6 +52,36 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
 
   if (debug) {
     logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNow})`)
+  }
+
+  // Fast path: single query to check if any work is needed
+  if (config.runtimeSync.enabled) {
+    const status = await getCronFastPathStatus(event)
+    if (status) {
+      const now = Date.now()
+      const staleCheckNeeded = !status.lastStaleCheck || (now - status.lastStaleCheck) >= STALE_CHECK_INTERVAL_MS
+      const inBackoff = status.indexNowBackoff && now < status.indexNowBackoff.until
+      const hasWork = staleCheckNeeded
+        || status.pendingPages > 0
+        || status.sitemapsNeedCrawl > 0
+        || (config.indexNow && status.indexNowPending > 0 && !inBackoff)
+
+      if (!hasWork) {
+        if (debug) {
+          const duration = Date.now() - startTime
+          logger.info(`[cron] Fast path: no work needed (${duration}ms)`)
+        }
+        return {
+          stale: { action: 'none', dbCount: status.totalPages, reason: 'fast_path_no_work' },
+          index: { indexed: 0, remaining: 0, complete: true },
+          indexNow: config.indexNow ? { submitted: 0, remaining: status.indexNowPending } : undefined,
+        }
+      }
+
+      if (debug) {
+        logger.info(`[cron] Work needed: stale=${staleCheckNeeded}, pending=${status.pendingPages}, sitemaps=${status.sitemapsNeedCrawl}, indexNow=${status.indexNowPending}`)
+      }
+    }
   }
 
   // Check for stale data and handle restore/mark-pending

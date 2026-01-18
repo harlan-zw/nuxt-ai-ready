@@ -950,6 +950,67 @@ export async function pruneCronRunsByAge(
 }
 
 // ============================================================================
+// Cron Fast-Path Status (single query for all checks)
+// ============================================================================
+
+export interface CronFastPathStatus {
+  totalPages: number
+  pendingPages: number
+  indexNowPending: number
+  lastStaleCheck: number | null
+  buildId: string | null
+  indexNowBackoff: { until: number, attempt: number } | null
+  sitemapsNeedCrawl: number
+}
+
+/**
+ * Get all cron status in a single query for fast-path checking
+ * Reduces 6+ sequential DB calls to 1
+ */
+export async function getCronFastPathStatus(
+  event: H3Event | undefined,
+  sitemapIntervalMinutes = 5,
+): Promise<CronFastPathStatus | null> {
+  const db = await getDb(event)
+  if (!db)
+    return null
+
+  const sitemapThreshold = Date.now() - sitemapIntervalMinutes * 60 * 1000
+
+  const row = await db.first<{
+    total_pages: number
+    pending_pages: number
+    indexnow_pending: number
+    last_stale_check: string | null
+    build_id: string | null
+    indexnow_backoff: string | null
+    sitemaps_need_crawl: number
+  }>(`
+    SELECT
+      (SELECT COUNT(*) FROM ai_ready_pages) as total_pages,
+      (SELECT COUNT(*) FROM ai_ready_pages WHERE indexed = 0 AND is_error = 0) as pending_pages,
+      (SELECT COUNT(*) FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0 AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)) as indexnow_pending,
+      (SELECT value FROM _ai_ready_info WHERE id = 'last_stale_check') as last_stale_check,
+      (SELECT value FROM _ai_ready_info WHERE id = 'build_id') as build_id,
+      (SELECT value FROM _ai_ready_info WHERE id = 'indexnow_backoff') as indexnow_backoff,
+      (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 3) as sitemaps_need_crawl
+  `, [sitemapThreshold])
+
+  if (!row)
+    return null
+
+  return {
+    totalPages: row.total_pages,
+    pendingPages: row.pending_pages,
+    indexNowPending: row.indexnow_pending,
+    lastStaleCheck: row.last_stale_check ? Number.parseInt(row.last_stale_check, 10) : null,
+    buildId: row.build_id,
+    indexNowBackoff: row.indexnow_backoff ? JSON.parse(row.indexnow_backoff) : null,
+    sitemapsNeedCrawl: row.sitemaps_need_crawl,
+  }
+}
+
+// ============================================================================
 // Sitemap Tracking (Multi-Sitemap Support)
 // ============================================================================
 
