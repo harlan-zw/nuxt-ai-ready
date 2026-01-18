@@ -1,8 +1,10 @@
 import type { H3Event } from 'h3'
+import type { ModulePublicRuntimeConfig } from '../../../module'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
 import { logger } from '../logger'
+import { fetchPublicAsset } from './fetchPublicAsset'
 
 export interface SitemapUrl {
   loc: string
@@ -14,7 +16,17 @@ export interface SitemapConfig {
   route: string
 }
 
-const FETCH_TIMEOUT = 15000 // 15s for sitemap (must fit within CF worker limit)
+const FETCH_TIMEOUT = 15000 // 15s for sitemap
+
+interface CloudflareEnv {
+  ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
+}
+
+function hasCloudflareAssets(event: H3Event): boolean {
+  const cfEnv = (event?.context?.cloudflare?.env
+    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
+  return !!cfEnv?.ASSETS?.fetch
+}
 
 /**
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
@@ -78,25 +90,39 @@ export async function fetchSitemapByRoute(
   event: H3Event,
   route: string,
 ): Promise<{ urls: SitemapUrl[], error?: string }> {
+  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const fetchRoute = withLeadingSlash(route)
-  logger.debug(`[sitemap] Fetching ${fetchRoute} (timeout: ${FETCH_TIMEOUT}ms)`)
 
-  let sitemapXml: string
-  try {
-    const res = await event.$fetch<string>(fetchRoute, {
-      responseType: 'text',
-      timeout: FETCH_TIMEOUT,
-    })
-    if (!res || typeof res !== 'string') {
-      logger.warn(`[sitemap] Empty response from ${fetchRoute}`)
-      return { urls: [], error: 'Empty response' }
+  // Use ASSETS.fetch for prerendered sitemaps on Cloudflare (avoids self-fetch issues)
+  const usePublicAsset = config.sitemapPrerendered && hasCloudflareAssets(event)
+  logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : 'event.$fetch'}`)
+
+  let sitemapXml: string | null = null
+
+  if (usePublicAsset) {
+    sitemapXml = await fetchPublicAsset<string>(event, fetchRoute, { responseType: 'text' })
+    if (!sitemapXml) {
+      logger.warn(`[sitemap] Not found in ASSETS: ${fetchRoute}`)
+      return { urls: [], error: 'Not found in ASSETS' }
     }
-    sitemapXml = res
   }
-  catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    logger.warn(`[sitemap] Failed to fetch ${fetchRoute}: ${msg}`)
-    return { urls: [], error: msg }
+  else {
+    try {
+      const res = await event.$fetch<string>(fetchRoute, {
+        responseType: 'text',
+        timeout: FETCH_TIMEOUT,
+      })
+      if (!res || typeof res !== 'string') {
+        logger.warn(`[sitemap] Empty response from ${fetchRoute}`)
+        return { urls: [], error: 'Empty response' }
+      }
+      sitemapXml = res
+    }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      logger.warn(`[sitemap] Failed to fetch ${fetchRoute}: ${msg}`)
+      return { urls: [], error: msg }
+    }
   }
 
   logger.debug(`[sitemap] Parsing sitemap XML (${sitemapXml.length} bytes)`)

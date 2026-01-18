@@ -49,6 +49,7 @@ export interface ModulePublicRuntimeConfig {
   }
   runtimeSyncSecret?: string
   indexNow?: string
+  sitemapPrerendered: boolean
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -235,6 +236,16 @@ export default defineNuxtModule<ModuleOptions>({
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
+    // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
+    const sitemapConfig = nuxt.options.sitemap as { zeroRuntime?: boolean } | undefined
+    const sitemapRouteRule = nuxt.options.nitro?.routeRules?.['/sitemap.xml'] as { prerender?: boolean } | undefined
+    const sitemapPrerendered = !!(
+      sitemapConfig?.zeroRuntime
+      || sitemapRouteRule?.prerender
+      || process.argv.includes('generate')
+      || process.env.NUXT_GENERATE === 'true'
+    )
+
     // Auto-derive runtimeSyncSecret: explicit config > env > license key > random
     const license = (nuxt.options.runtimeConfig.seoProKey as string | undefined) || process.env.NUXT_SEO_PRO_KEY
     let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
@@ -416,6 +427,7 @@ export const logger = createConsola({
       },
       runtimeSyncSecret,
       indexNow,
+      sitemapPrerendered,
     } as any
 
     addServerHandler({
