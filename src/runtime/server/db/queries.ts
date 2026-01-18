@@ -1219,3 +1219,50 @@ export async function getSitemapStatus(
   const rows = await db.all<SitemapRow>('SELECT * FROM ai_ready_sitemaps ORDER BY name')
   return rows.map(rowToSitemapEntry)
 }
+
+// ============================================================================
+// Page Activity Stats
+// ============================================================================
+
+export interface RecentPageActivity {
+  route: string
+  title: string
+  indexedAt: number
+}
+
+/**
+ * Get recently indexed pages
+ */
+export async function getRecentlyIndexedPages(
+  event: H3Event | undefined,
+  limit = 10,
+): Promise<RecentPageActivity[]> {
+  const db = await getDb(event)
+  if (!db)
+    return []
+
+  const rows = await db.all<{ route: string, title: string, indexed_at: number }>(
+    'SELECT route, title, indexed_at FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0 ORDER BY indexed_at DESC LIMIT ?',
+    [limit],
+  )
+  return rows.map(r => ({ route: r.route, title: r.title, indexedAt: r.indexed_at }))
+}
+
+/**
+ * Count pages indexed in a time window
+ */
+export async function countRecentlyIndexed(
+  event: H3Event | undefined,
+  sinceMs: number,
+): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
+  const threshold = Date.now() - sinceMs
+  const row = await db.first<{ count: number }>(
+    'SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 1 AND indexed_at > ?',
+    [threshold],
+  )
+  return row?.count || 0
+}
