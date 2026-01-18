@@ -1011,6 +1011,49 @@ export async function getCronFastPathStatus(
 }
 
 // ============================================================================
+// Cron Lock (prevent overlapping runs)
+// ============================================================================
+
+const CRON_LOCK_TTL_MS = 120_000 // 2 minutes - stale lock threshold
+
+/**
+ * Try to acquire cron lock. Returns true if acquired, false if another run is active.
+ * Uses timestamp-based lock with TTL to handle crashed/abandoned runs.
+ */
+export async function tryAcquireCronLock(event: H3Event | undefined): Promise<boolean> {
+  const db = await getDb(event)
+  if (!db)
+    return true // No DB = no lock needed
+
+  const now = Date.now()
+
+  // Check for existing lock
+  const existing = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
+  if (existing) {
+    const lockTime = Number.parseInt(existing.value, 10)
+    // Lock is still valid (not stale)
+    if (now - lockTime < CRON_LOCK_TTL_MS) {
+      return false
+    }
+  }
+
+  // Acquire lock
+  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['cron_lock', String(now)])
+  return true
+}
+
+/**
+ * Release cron lock
+ */
+export async function releaseCronLock(event: H3Event | undefined): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
+}
+
+// ============================================================================
 // Sitemap Tracking (Multi-Sitemap Support)
 // ============================================================================
 

@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
+import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale } from './checkStale'
@@ -49,6 +49,15 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   const startTime = Date.now()
   const results: CronResult = {}
   const allErrors: string[] = []
+
+  // Prevent overlapping cron runs
+  const acquired = await tryAcquireCronLock(event)
+  if (!acquired) {
+    if (debug) {
+      logger.info(`[cron] Skipping - another cron run is in progress`)
+    }
+    return { stale: { action: 'none' as const, dbCount: 0, reason: 'lock_held' } }
+  }
 
   if (debug) {
     logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNow})`)
@@ -177,6 +186,9 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
     // Prune cron logs older than 24 hours
     await pruneCronRunsByAge(event)
   }
+
+  // Release cron lock
+  await releaseCronLock(event)
 
   // Summary log
   if (debug) {

@@ -35,7 +35,7 @@ export async function batchIndexPages(
   options: BatchIndexOptions = {},
 ): Promise<BatchIndexResult> {
   const startTime = Date.now()
-  const limit = Math.min(options.limit ?? 10, 50)
+  const limit = Math.min(options.limit ?? 3, 50)
   const timeout = options.timeout ?? 30000
 
   const beforeCount = await countPages(event, { where: { pending: true } })
