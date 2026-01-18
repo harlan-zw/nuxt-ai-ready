@@ -40,17 +40,23 @@ export function createAdapter(connector: Connector): DatabaseAdapter {
 
 /**
  * Initialize database schema with version checking
- * Note: Restore logic moved to cron for reliability on Cloudflare
+ * Skips if schema is already at current version
  */
 export async function initSchema(db: DatabaseAdapter): Promise<void> {
-  const needsRebuild = await checkSchemaVersion(db)
+  const currentVersion = await getSchemaVersion(db)
 
-  if (needsRebuild) {
+  // Skip if already initialized with current version
+  if (currentVersion === SCHEMA_VERSION)
+    return
+
+  // Drop and rebuild if version mismatch (migration)
+  if (currentVersion && currentVersion !== SCHEMA_VERSION) {
     for (const sql of DROP_TABLES_SQL) {
       await db.exec(sql)
     }
   }
 
+  // Create all tables/indexes
   for (const sql of ALL_SCHEMA_SQL) {
     await db.exec(sql)
   }
@@ -61,13 +67,13 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
   )
 }
 
-async function checkSchemaVersion(db: DatabaseAdapter): Promise<boolean> {
+async function getSchemaVersion(db: DatabaseAdapter): Promise<string | null> {
   const info = await db.first<{ version: string }>(
     'SELECT version FROM _ai_ready_info WHERE id = ?',
     ['schema'],
   ).catch(() => null)
 
-  return !info || info.version !== SCHEMA_VERSION
+  return info?.version || null
 }
 
 /**

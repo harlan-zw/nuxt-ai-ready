@@ -1,5 +1,4 @@
 import type { H3Event } from 'h3'
-import { getSiteConfig } from '#site-config/server/composables'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import {
@@ -107,14 +106,18 @@ export async function syncToIndexNow(
   limit = 100,
   options?: SyncToIndexNowOptions,
 ): Promise<IndexNowResult> {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as { indexNow?: string, debug?: boolean }
-  const siteConfig = getSiteConfig(event as H3Event)
+  const runtimeConfig = useRuntimeConfig(event)
+  const config = runtimeConfig['nuxt-ai-ready'] as { indexNow?: string, debug?: boolean }
+  // Get site URL from nuxt-site-config's runtime config (works without event)
+  // Check both private and public site config
+  const siteUrl = (runtimeConfig.site as { url?: string } | undefined)?.url
+    || (runtimeConfig.public?.site as { url?: string } | undefined)?.url
 
   if (!config.indexNow) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }
   }
 
-  if (!siteConfig.url) {
+  if (!siteUrl) {
     return { success: false, submitted: 0, remaining: 0, error: 'Site URL not configured' }
   }
 
@@ -147,7 +150,7 @@ export async function syncToIndexNow(
   const routes = pages.map(p => p.route)
 
   // Submit to IndexNow (host always defaults to api.indexnow.org)
-  const result = await submitToIndexNow(routes, { key: config.indexNow }, siteConfig.url)
+  const result = await submitToIndexNow(routes, { key: config.indexNow }, siteUrl)
 
   // Defer DB updates via waitUntil so response returns immediately
   const dbUpdates = async () => {
