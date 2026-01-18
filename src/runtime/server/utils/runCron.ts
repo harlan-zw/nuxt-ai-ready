@@ -6,9 +6,8 @@ import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSite
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale } from './checkStale'
-import { useFetch } from './fetch'
 import { syncToIndexNow } from './indexnow'
-import { getSitemapsFromConfig } from './sitemap'
+import { fetchSitemapByRoute, getSitemapsFromConfig } from './sitemap'
 
 const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -33,8 +32,6 @@ export interface CronResult {
     error?: string
   }
 }
-
-const PING_TIMEOUT = 30000 // 30s for sitemap ping
 
 /**
  * Run cron job logic - shared between scheduled task and HTTP endpoint
@@ -220,7 +217,6 @@ async function pingSitemap(
   debug?: boolean,
 ): Promise<{ name?: string, pinged: boolean, pruned: number, error?: string }> {
   const { pruneTtl } = config.runtimeSync
-  const $fetch = useFetch(event)
 
   // Sync sitemap list from runtime config to DB
   const sitemaps = getSitemapsFromConfig(event)
@@ -247,27 +243,23 @@ async function pingSitemap(
   if (debug)
     logger.info(`[cron] Pinging sitemap: ${nextSitemap.name} (${nextSitemap.route})`)
 
-  // Ping the sitemap to trigger rendering
-  // The sitemap-seeder plugin will hook into sitemap:resolved and seed routes
-  let error: string | undefined
-  try {
-    if (debug)
-      logger.info(`[cron] Starting sitemap fetch: ${nextSitemap.route}`)
-    await $fetch(nextSitemap.route, {
-      responseType: 'text',
-      timeout: PING_TIMEOUT,
-    })
-    if (debug)
-      logger.info(`[cron] Sitemap fetch complete`)
-    // Success - plugin already seeded routes via hook
-    // Just mark as crawled (url count tracked by plugin via markSitemapCrawled)
-    // Note: plugin may have already called markSitemapCrawled, but we call again
-    // in case the hook didn't fire (e.g., cached response)
-    await markSitemapCrawled(event, nextSitemap.name, 0)
-  }
-  catch (e) {
-    error = e instanceof Error ? e.message : String(e)
+  // Fetch sitemap using fetchSitemapByRoute which handles ASSETS.fetch on Cloudflare
+  // This avoids self-fetch hangs in cron context
+  if (debug)
+    logger.info(`[cron] Starting sitemap fetch: ${nextSitemap.route}`)
+
+  const { urls, error } = await fetchSitemapByRoute(event, nextSitemap.route)
+
+  if (error) {
     await markSitemapError(event, nextSitemap.name, error)
+  }
+  else {
+    if (debug)
+      logger.info(`[cron] Sitemap fetch complete (${urls.length} URLs)`)
+    // Success - mark as crawled with URL count
+    // Note: sitemap-seeder plugin may also call this via hook, but we call
+    // again in case the hook didn't fire (e.g., ASSETS.fetch bypasses hooks)
+    await markSitemapCrawled(event, nextSitemap.name, urls.length)
   }
 
   // Prune stale routes if configured

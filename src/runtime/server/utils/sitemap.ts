@@ -22,12 +22,6 @@ interface CloudflareEnv {
   ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
 }
 
-function hasCloudflareAssets(event: H3Event): boolean {
-  const cfEnv = (event?.context?.cloudflare?.env
-    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
-  return !!cfEnv?.ASSETS?.fetch
-}
-
 /**
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
  * Returns empty array if sitemap module not configured
@@ -85,17 +79,22 @@ function normalizeUrls(urls: unknown[]): SitemapUrl[] {
 
 /**
  * Fetch and parse a single sitemap by route
+ * Supports both request context (event.$fetch) and cron context (ASSETS.fetch or globalThis.$fetch)
  */
 export async function fetchSitemapByRoute(
-  event: H3Event,
+  event: H3Event | undefined,
   route: string,
 ): Promise<{ urls: SitemapUrl[], error?: string }> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const fetchRoute = withLeadingSlash(route)
 
   // Use ASSETS.fetch for prerendered sitemaps on Cloudflare (avoids self-fetch issues)
-  const usePublicAsset = config.sitemapPrerendered && hasCloudflareAssets(event)
-  logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : 'event.$fetch'}`)
+  // Works in both request context (event) and cron context (globalThis.__env__)
+  const cfEnv = (event?.context?.cloudflare?.env
+    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
+  const hasAssets = !!cfEnv?.ASSETS?.fetch
+  const usePublicAsset = config.sitemapPrerendered && hasAssets
+  logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.$fetch' : 'globalThis.$fetch'}`)
 
   let sitemapXml: string | null = null
 
@@ -108,7 +107,9 @@ export async function fetchSitemapByRoute(
   }
   else {
     try {
-      const res = await event.$fetch<string>(fetchRoute, {
+      // Use event.$fetch when available, fallback to globalThis.$fetch for cron
+      const $fetch = event?.$fetch ?? globalThis.$fetch
+      const res = await $fetch<string>(fetchRoute, {
         responseType: 'text',
         timeout: FETCH_TIMEOUT,
       })
