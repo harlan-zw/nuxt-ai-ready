@@ -6,6 +6,7 @@ import { useDatabase } from '../db'
 import { countPages } from '../db/queries'
 import { decompressFromBase64, importDbDump } from '../db/shared'
 import { logger } from '../logger'
+import { fetchPublicAsset } from './fetchPublicAsset'
 
 export interface BuildMeta {
   buildId: string
@@ -25,56 +26,20 @@ export interface StaleCheckResult {
   addedCount?: number
 }
 
-const FETCH_TIMEOUT = 5000 // 5s timeout for internal asset fetches
-
 /**
  * Fetch build metadata from static assets
  */
-async function fetchBuildMeta(event: H3Event): Promise<BuildMeta | null> {
-  const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
-
-  // Try Cloudflare ASSETS binding first
-  if (cfEnv?.ASSETS?.fetch) {
-    logger.debug('[stale-check] Fetching meta from ASSETS binding...')
-    const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.meta.json'))
-      .catch(() => null)
-    if (response?.ok) {
-      return response.json().catch(() => null)
-    }
-  }
-
-  // Fallback to HTTP fetch with timeout
-  logger.debug('[stale-check] Fetching meta via HTTP...')
-  return globalThis.$fetch('/__ai-ready/pages.meta.json', { timeout: FETCH_TIMEOUT })
-    .catch(() => null) as Promise<BuildMeta | null>
+async function fetchBuildMeta(event?: H3Event): Promise<BuildMeta | null> {
+  logger.debug('[stale-check] Fetching meta...')
+  return fetchPublicAsset<BuildMeta>(event, '/__ai-ready/pages.meta.json')
 }
 
 /**
  * Fetch and decompress dump data
  */
-async function fetchDump(event: H3Event): Promise<DumpRow[] | null> {
-  const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
-
-  let dumpData: string | null = null
-
-  // Try Cloudflare ASSETS binding first
-  if (cfEnv?.ASSETS?.fetch) {
-    logger.debug('[stale-check] Fetching dump from ASSETS binding...')
-    const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.dump'))
-      .catch(() => null)
-    if (response?.ok) {
-      dumpData = await response.text()
-    }
-  }
-
-  // Fallback to HTTP fetch with timeout
-  if (!dumpData) {
-    logger.debug('[stale-check] Fetching dump via HTTP...')
-    dumpData = await globalThis.$fetch('/__ai-ready/pages.dump', {
-      responseType: 'text',
-      timeout: FETCH_TIMEOUT,
-    }).catch(() => null) as string | null
-  }
+async function fetchDump(event?: H3Event): Promise<DumpRow[] | null> {
+  logger.debug('[stale-check] Fetching dump...')
+  const dumpData = await fetchPublicAsset<string>(event, '/__ai-ready/pages.dump', { responseType: 'text' })
 
   if (!dumpData) {
     logger.debug('[stale-check] Failed to fetch dump')
@@ -88,7 +53,7 @@ async function fetchDump(event: H3Event): Promise<DumpRow[] | null> {
 /**
  * Get stored build ID from database
  */
-async function getStoredBuildId(event: H3Event): Promise<string | null> {
+async function getStoredBuildId(event?: H3Event): Promise<string | null> {
   const db = await useDatabase(event)
   const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['build_id'])
   return row?.value || null
@@ -97,7 +62,7 @@ async function getStoredBuildId(event: H3Event): Promise<string | null> {
 /**
  * Set stored build ID in database
  */
-async function setStoredBuildId(event: H3Event, buildId: string): Promise<void> {
+async function setStoredBuildId(event: H3Event | undefined, buildId: string): Promise<void> {
   const db = await useDatabase(event)
   await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['build_id', buildId])
 }
@@ -105,7 +70,7 @@ async function setStoredBuildId(event: H3Event, buildId: string): Promise<void> 
 /**
  * Get content hashes for all pages in DB
  */
-async function getDbContentHashes(event: H3Event): Promise<Map<string, string | null>> {
+async function getDbContentHashes(event?: H3Event): Promise<Map<string, string | null>> {
   const db = await useDatabase(event)
   const rows = await db.all<{ route: string, content_hash: string | null }>(
     'SELECT route, content_hash FROM ai_ready_pages',
@@ -116,7 +81,7 @@ async function getDbContentHashes(event: H3Event): Promise<Map<string, string | 
 /**
  * Mark specific routes as pending
  */
-async function markRoutesPending(event: H3Event, routes: string[]): Promise<void> {
+async function markRoutesPending(event: H3Event | undefined, routes: string[]): Promise<void> {
   if (routes.length === 0)
     return
   const db = await useDatabase(event)
@@ -127,7 +92,7 @@ async function markRoutesPending(event: H3Event, routes: string[]): Promise<void
 /**
  * Insert new pages from dump (as already indexed since dump has full content)
  */
-async function insertFromDump(event: H3Event, rows: DumpRow[]): Promise<void> {
+async function insertFromDump(event: H3Event | undefined, rows: DumpRow[]): Promise<void> {
   if (rows.length === 0)
     return
   const db = await useDatabase(event)
@@ -141,7 +106,7 @@ async function insertFromDump(event: H3Event, rows: DumpRow[]): Promise<void> {
  * 1. Empty DB → restore from dump
  * 2. Build ID changed → compare hashes, only mark changed pages pending, add new pages from dump
  */
-export async function checkAndHandleStale(event: H3Event): Promise<StaleCheckResult> {
+export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const debug = config.debug
 

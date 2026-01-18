@@ -3,6 +3,7 @@ import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
+import { fetchPublicAsset } from '../utils/fetchPublicAsset'
 
 interface BuildMeta {
   buildId: string
@@ -198,35 +199,13 @@ export default eventHandler(async (event) => {
   }
 
   // Check if page data is accessible via public directory
-  let publicData: { pages?: unknown[] } | null = null
-  let jsonFileSource = 'fetch(\'/__ai-ready/pages.json\')'
-
-  // Try Cloudflare ASSETS binding first
-  const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
-  if (cfEnv?.ASSETS?.fetch) {
-    try {
-      const response = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.json'))
-      if (response.ok) {
-        publicData = await response.json()
-        jsonFileSource = 'env.ASSETS.fetch(\'/__ai-ready/pages.json\')'
-      }
-    }
-    catch {
-      // Fall through to regular fetch
-    }
-  }
-
-  // Fall back to regular fetch
-  if (!publicData) {
-    publicData = await globalThis.$fetch('/__ai-ready/pages.json', {
-      baseURL: '/',
-    }).catch(() => null) as { pages?: unknown[] } | null
-  }
+  const hasAssets = !!event.context?.cloudflare?.env?.ASSETS
+  const publicData = await fetchPublicAsset<{ pages?: unknown[] }>(event, '/__ai-ready/pages.json')
 
   const jsonFileStatus = {
     available: !!publicData,
     pageCount: publicData?.pages?.length ?? 0,
-    source: jsonFileSource,
+    source: hasAssets ? 'env.ASSETS.fetch' : '$fetch (with timeout)',
   }
 
   if (mode === 'development') {
@@ -335,16 +314,7 @@ export default eventHandler(async (event) => {
       const storedBuildId = storedRow?.value || null
 
       // Fetch dump metadata
-      let dumpMeta: BuildMeta | null = null
-      const cfEnv = event.context?.cloudflare?.env as { ASSETS?: { fetch: (req: Request | string) => Promise<Response> } } | undefined
-      if (cfEnv?.ASSETS?.fetch) {
-        const metaResponse = await cfEnv.ASSETS.fetch(new Request('https://assets.local/__ai-ready/pages.meta.json')).catch(() => null)
-        if (metaResponse?.ok)
-          dumpMeta = await metaResponse.json().catch(() => null)
-      }
-      if (!dumpMeta) {
-        dumpMeta = await globalThis.$fetch('/__ai-ready/pages.meta.json').catch(() => null) as BuildMeta | null
-      }
+      const dumpMeta = await fetchPublicAsset<BuildMeta>(event, '/__ai-ready/pages.meta.json')
 
       buildInfo = {
         storedBuildId,

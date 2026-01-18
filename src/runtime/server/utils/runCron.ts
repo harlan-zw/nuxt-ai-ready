@@ -1,24 +1,14 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
-import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { completeCronRun, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, startCronRun, syncSitemaps } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale } from './checkStale'
+import { useFetch } from './fetch'
 import { syncToIndexNow } from './indexnow'
 import { getSitemapsFromConfig } from './sitemap'
-
-function getEvent(providedEvent?: H3Event): H3Event | undefined {
-  if (providedEvent)
-    return providedEvent
-  try {
-    return useEvent()
-  }
-  catch {
-    return undefined
-  }
-}
 
 export interface CronResult {
   runId?: number | null
@@ -47,17 +37,10 @@ const PING_TIMEOUT = 30000 // 30s for sitemap ping
 /**
  * Run cron job logic - shared between scheduled task and HTTP endpoint
  */
-export async function runCron(providedEvent: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
+export async function runCron(event: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
   // Skip in dev - DB and context not available
   if (import.meta.dev)
     return {}
-
-  // Get event from context if not provided (for scheduled tasks)
-  const event = getEvent(providedEvent)
-  if (!event) {
-    console.warn('[ai-ready:cron] No event context available, skipping')
-    return {}
-  }
 
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const debug = config.debug
@@ -188,11 +171,12 @@ export async function runCron(providedEvent: H3Event | undefined, options?: { ba
  * The sitemap-seeder plugin hooks into sitemap:resolved to seed routes
  */
 async function pingSitemap(
-  event: H3Event,
+  event: H3Event | undefined,
   config: ModulePublicRuntimeConfig,
   debug?: boolean,
 ): Promise<{ name?: string, pinged: boolean, pruned: number, error?: string }> {
   const { pruneTtl } = config.runtimeSync
+  const $fetch = useFetch(event)
 
   // Sync sitemap list from runtime config to DB
   const sitemaps = getSitemapsFromConfig(event)
@@ -223,10 +207,14 @@ async function pingSitemap(
   // The sitemap-seeder plugin will hook into sitemap:resolved and seed routes
   let error: string | undefined
   try {
-    await event.$fetch(nextSitemap.route, {
+    if (debug)
+      logger.info(`[cron] Starting sitemap fetch: ${nextSitemap.route}`)
+    await $fetch(nextSitemap.route, {
       responseType: 'text',
       timeout: PING_TIMEOUT,
     })
+    if (debug)
+      logger.info(`[cron] Sitemap fetch complete`)
     // Success - plugin already seeded routes via hook
     // Just mark as crawled (url count tracked by plugin via markSitemapCrawled)
     // Note: plugin may have already called markSitemapCrawled, but we call again

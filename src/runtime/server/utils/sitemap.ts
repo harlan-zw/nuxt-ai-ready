@@ -20,7 +20,7 @@ const FETCH_TIMEOUT = 15000 // 15s for sitemap (must fit within CF worker limit)
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
  * Returns empty array if sitemap module not configured
  */
-export function getSitemapsFromConfig(event: H3Event): SitemapConfig[] {
+export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
   const runtimeConfig = useRuntimeConfig(event)
   const sitemapConfig = runtimeConfig.sitemap as {
     sitemaps?: Record<string, { sitemapName?: string, _route?: string }>

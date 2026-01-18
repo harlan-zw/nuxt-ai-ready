@@ -108,7 +108,13 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
 
     // Resolve database adapter alias at build time
-    const dbType = config.database?.type || 'sqlite'
+    // Auto-detect D1 for Cloudflare deployments
+    const preset = String(nuxt.options.nitro.preset || '')
+    const isCloudflare = preset.startsWith('cloudflare')
+    const dbType = config.database?.type || (isCloudflare ? 'd1' : 'sqlite')
+    if (isCloudflare && !config.database?.type) {
+      logger.debug(`Auto-detected Cloudflare preset "${preset}", using D1 database`)
+    }
     const adapterPath = await resolveDatabaseAdapter(dbType)
     nuxt.options.alias['#ai-ready/adapter'] = adapterPath
     nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath

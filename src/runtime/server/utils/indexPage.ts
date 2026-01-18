@@ -7,6 +7,7 @@ import { getPageHash, isPageFresh, queryPages, upsertPage } from '../db/queries'
 import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown } from '../utils'
+import { useFetch } from './fetch'
 import { extractKeywords } from './keywords'
 
 // Header to identify internal indexing requests
@@ -137,11 +138,12 @@ export async function indexPage(
  */
 export async function indexPageByRoute(
   route: string,
-  event: H3Event,
+  event: H3Event | undefined,
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
+  const $fetch = useFetch(event)
   logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
-  const html = await event.$fetch(route, {
+  const html = await $fetch(route, {
     headers: { [INDEXING_HEADER]: '1' },
     timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
   }).catch((err: Error) => {
