@@ -68,6 +68,23 @@ async function setStoredBuildId(event: H3Event | undefined, buildId: string): Pr
 }
 
 /**
+ * Get last stale check timestamp from database
+ */
+async function getLastStaleCheck(event?: H3Event): Promise<number | null> {
+  const db = await useDatabase(event)
+  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['last_stale_check'])
+  return row?.value ? Number.parseInt(row.value, 10) : null
+}
+
+/**
+ * Set last stale check timestamp in database
+ */
+async function setLastStaleCheck(event: H3Event | undefined): Promise<void> {
+  const db = await useDatabase(event)
+  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['last_stale_check', Date.now().toString()])
+}
+
+/**
  * Get content hashes for all pages in DB
  */
 async function getDbContentHashes(event?: H3Event): Promise<Map<string, string | null>> {
@@ -100,11 +117,14 @@ async function insertFromDump(event: H3Event | undefined, rows: DumpRow[]): Prom
   await importDbDump(db, rows)
 }
 
+const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Check if data is stale and handle restore/mark-pending
  * Called at start of cron - handles:
  * 1. Empty DB → restore from dump
  * 2. Build ID changed → compare hashes, only mark changed pages pending, add new pages from dump
+ * Skips HTTP fetch if checked within 5 minutes and DB is populated
  */
 export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
@@ -112,6 +132,17 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
 
   const dbCount = await countPages(event)
   const storedBuildId = await getStoredBuildId(event)
+
+  // Fast path: skip HTTP fetch if recently checked and DB has data
+  if (dbCount > 0 && storedBuildId) {
+    const lastCheck = await getLastStaleCheck(event)
+    if (lastCheck && (Date.now() - lastCheck) < STALE_CHECK_INTERVAL_MS) {
+      if (debug)
+        logger.info(`[stale-check] Skipping - checked ${Math.round((Date.now() - lastCheck) / 1000)}s ago`)
+      return { action: 'none', dbCount, buildId: storedBuildId, reason: 'recently_checked' }
+    }
+  }
+
   const meta = await fetchBuildMeta(event)
 
   if (debug) {
@@ -139,6 +170,7 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
     const db = await useDatabase(event)
     await importDbDump(db, rows)
     await setStoredBuildId(event, meta.buildId)
+    await setLastStaleCheck(event)
 
     logger.info(`[stale-check] Restored ${rows.length} pages from dump (buildId: ${meta.buildId})`)
     return {
@@ -195,6 +227,7 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
     }
 
     await setStoredBuildId(event, meta.buildId)
+    await setLastStaleCheck(event)
 
     const unchangedCount = dumpRows.length - newRows.length - changedRoutes.length
     logger.info(`[stale-check] Build ID changed: ${changedRoutes.length} changed, ${newRows.length} new, ${unchangedCount} unchanged (buildId: ${meta.buildId})`)
@@ -210,6 +243,7 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
   }
 
   // Case 3: Same build ID - no action needed
+  await setLastStaleCheck(event)
   if (debug)
     logger.info('[stale-check] Build ID unchanged, no action needed')
 

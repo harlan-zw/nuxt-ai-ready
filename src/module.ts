@@ -236,7 +236,7 @@ export default defineNuxtModule<ModuleOptions>({
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
     // Auto-derive runtimeSyncSecret: explicit config > env > license key > random
-    const license = nuxt.options.runtimeConfig.seoProKey || process.env.NUXT_SEO_PRO_KEY
+    const license = (nuxt.options.runtimeConfig.seoProKey as string | undefined) || process.env.NUXT_SEO_PRO_KEY
     let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
     if (!runtimeSyncSecret && runtimeSyncEnabled) {
       if (license) {

@@ -1026,32 +1026,36 @@ export async function syncSitemaps(
 /**
  * Get next sitemap to crawl
  * Prioritizes: sitemaps with errors (for retry), then oldest crawled
+ * Skips sitemaps crawled within minIntervalMinutes (default 5 min)
  */
 export async function getNextSitemapToCrawl(
   event: H3Event | undefined,
+  minIntervalMinutes = 5,
 ): Promise<SitemapEntry | null> {
   const db = await getDb(event)
   if (!db)
     return null
 
-  // First try sitemaps with errors (retry after some time)
+  // First try sitemaps with errors (retry after interval)
   // Only retry if error_count < 3 to avoid infinite retries
   const errorRow = await db.first<SitemapRow>(`
     SELECT * FROM ai_ready_sitemaps
     WHERE error_count > 0 AND error_count < 3
+      AND (last_crawled_at IS NULL OR last_crawled_at < datetime('now', '-' || ? || ' minutes'))
     ORDER BY last_crawled_at ASC NULLS FIRST
     LIMIT 1
-  `)
+  `, [minIntervalMinutes])
   if (errorRow)
     return rowToSitemapEntry(errorRow)
 
-  // Otherwise get oldest crawled (or never crawled)
+  // Otherwise get oldest crawled (or never crawled) outside interval
   const row = await db.first<SitemapRow>(`
     SELECT * FROM ai_ready_sitemaps
     WHERE error_count = 0
+      AND (last_crawled_at IS NULL OR last_crawled_at < datetime('now', '-' || ? || ' minutes'))
     ORDER BY last_crawled_at ASC NULLS FIRST
     LIMIT 1
-  `)
+  `, [minIntervalMinutes])
   return row ? rowToSitemapEntry(row) : null
 }
 

@@ -39,7 +39,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
+        const cwd = resolve((args.cwd as string) || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -112,7 +112,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
+        const cwd = resolve((args.cwd as string) || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -125,7 +125,7 @@ const main = defineCommand({
           params.set('all', 'true')
         }
         else {
-          params.set('limit', args.limit || '10')
+          params.set('limit', (args.limit as string) || '10')
         }
 
         const url = `${args.url}/__ai-ready/poll?${params}`
@@ -176,7 +176,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
+        const cwd = resolve((args.cwd as string) || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -237,7 +237,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
+        const cwd = resolve((args.cwd as string) || '.')
         const secret = await getSecret(cwd)
 
         if (!secret && !args.dry) {
@@ -251,7 +251,7 @@ const main = defineCommand({
         if (args.dry)
           params.set('dry', 'true')
         if (args.ttl)
-          params.set('ttl', args.ttl)
+          params.set('ttl', args.ttl as string)
 
         const url = `${args.url}/__ai-ready/prune?${params}`
         consola.info(`${args.dry ? 'Previewing' : 'Pruning'} stale routes at ${args.url}...`)
@@ -308,7 +308,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
+        const cwd = resolve((args.cwd as string) || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -318,7 +318,7 @@ const main = defineCommand({
 
         const params = new URLSearchParams({
           secret,
-          limit: args.limit || '100',
+          limit: (args.limit as string) || '100',
         })
 
         const url = `${args.url}/__ai-ready/indexnow?${params}`

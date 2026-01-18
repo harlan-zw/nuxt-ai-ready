@@ -9,6 +9,7 @@ import {
   updateIndexNowStats,
 } from '../db/queries'
 import { logger } from '../logger'
+import { createUniversalContext } from './context'
 import { submitToIndexNowShared } from './indexnow-shared'
 
 // Re-export shared types
@@ -108,10 +109,7 @@ export async function syncToIndexNow(
 ): Promise<IndexNowResult> {
   const runtimeConfig = useRuntimeConfig(event)
   const config = runtimeConfig['nuxt-ai-ready'] as { indexNow?: string, debug?: boolean }
-  // Get site URL from nuxt-site-config's runtime config (works without event)
-  // Check both private and public site config
-  const siteUrl = (runtimeConfig.site as { url?: string } | undefined)?.url
-    || (runtimeConfig.public?.site as { url?: string } | undefined)?.url
+  const { siteUrl } = createUniversalContext(event)
 
   if (!config.indexNow) {
     return { success: false, submitted: 0, remaining: 0, error: 'IndexNow not configured' }
