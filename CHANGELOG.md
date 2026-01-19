@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.10.8...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.8...main)
+
+### 🩹 Fixes
+
+- **cloudflare-worker:** Rework bulk work ([cce54ec](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/cce54ec))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.10.7...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.7...main)

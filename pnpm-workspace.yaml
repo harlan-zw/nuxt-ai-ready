@@ -20,9 +20,9 @@ overrides:
 catalog:
   '@clack/prompts': ^0.11.0
   '@types/better-sqlite3': ^7.6.13
-  agents: ^0.3.5
-  ai: ^6.0.38
-  better-sqlite3: ^12.6.0
+  agents: ^0.3.6
+  ai: ^6.0.40
+  better-sqlite3: ^12.6.2
   bumpp: ^10.4.0
   citty: ^0.1.6
   consola: ^3.4.2
@@ -51,12 +51,12 @@ catalogs:
     '@nuxt/test-utils': ^3.23.0
     '@vitest/coverage-v8': ^4.0.17
     '@vue/test-utils': ^2.4.6
-    happy-dom: ^20.3.1
+    happy-dom: ^20.3.3
     playwright: ^1.57.0
     playwright-core: ^1.57.0
     vitest: ^4.0.17
   nuxt:
-    '@nuxt/content': ^3.10.0
+    '@nuxt/content': ^3.11.0
     '@nuxt/devtools-ui-kit': ^3.1.1
     '@nuxt/kit': ^4.2.2
     '@nuxt/module-builder': ^1.0.2
@@ -68,10 +68,10 @@ catalogs:
     '@nuxtjs/sitemap': ^7.5.2
     '@vueuse/nuxt': ^14.1.0
     nuxt: ^4.2.2
-    nuxt-site-config: ^3.2.17
+    nuxt-site-config: ^3.2.18
   vue:
     '@headlessui/vue': ^1.7.23
-    vue: ^3.5.26
+    vue: ^3.5.27
     vue-router: ^4.6.4
 onlyBuiltDependencies:
   - '@firebase/util'
