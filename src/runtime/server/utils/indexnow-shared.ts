@@ -3,7 +3,7 @@
  * This module has no Nuxt/Nitro dependencies so it can be used in both contexts
  */
 
-// Endpoints to try in order (fallback on 429)
+// Endpoints to try in order (fallback on 429/500)
 // Can be overridden via INDEXNOW_TEST_ENDPOINT env var for testing
 export const INDEXNOW_HOSTS = ['api.indexnow.org', 'www.bing.com']
 
@@ -83,7 +83,7 @@ export async function submitToIndexNowShared(
   const endpoints = getIndexNowEndpoints()
   let lastError: string | undefined
 
-  // Try each endpoint, fallback on 429
+  // Try each endpoint, fallback on 429/500
   for (const endpoint of endpoints) {
     log?.debug(`[indexnow] Submitting ${body.urlList.length} URLs to ${endpoint}`)
 
@@ -98,9 +98,9 @@ export async function submitToIndexNowShared(
     if ('error' in response) {
       lastError = response.error
 
-      // On 429, try next endpoint
-      if (lastError?.includes('429')) {
-        log?.warn(`[indexnow] Rate limited on ${endpoint}, trying fallback...`)
+      // On 429/500, try next endpoint (may be transient)
+      if (lastError?.includes('429') || lastError?.includes('500')) {
+        log?.warn(`[indexnow] ${lastError} on ${endpoint}, trying fallback...`)
         continue
       }
 

@@ -67,23 +67,14 @@ export async function submitToIndexNow(
   siteUrl: string,
 ): Promise<{ success: boolean, error?: string, host?: string }> {
   logger.debug(`[indexnow] Submitting ${routes.length} routes to IndexNow`)
-  // Use $fetch wrapper that handles response properly
+
+  // Use native fetch directly - $fetch has issues in Cloudflare Workers
   const runtimeFetch: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input.toString()
-    const body = init?.body ? JSON.parse(init.body as string) : undefined
     logger.debug(`[indexnow] POST ${url}`)
+    logger.debug(`[indexnow] Body: ${init?.body}`)
 
-    const result = await $fetch.raw(url, {
-      method: init?.method as 'POST',
-      headers: init?.headers as Record<string, string>,
-      body,
-    }).catch((err: Error) => ({ _error: err.message }))
-
-    if (result && '_error' in result) {
-      return { ok: false, status: 500, statusText: result._error } as Response
-    }
-
-    return { ok: result.status >= 200 && result.status < 300, status: result.status } as Response
+    return globalThis.fetch(url, init)
   }
 
   return submitToIndexNowShared(routes, config.key, siteUrl, {
