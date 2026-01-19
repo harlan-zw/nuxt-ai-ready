@@ -6,7 +6,7 @@ import { useDatabase } from '../db'
 import { countPages } from '../db/queries'
 import { decompressFromBase64, importDbDump } from '../db/shared'
 import { logger } from '../logger'
-import { fetchPublicAsset } from './fetchPublicAsset'
+import { fetchPublicAsset } from './cloudflare'
 
 export interface BuildMeta {
   buildId: string
@@ -117,7 +117,7 @@ async function insertFromDump(event: H3Event | undefined, rows: DumpRow[]): Prom
   await importDbDump(db, rows)
 }
 
-const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+export const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
 /**
  * Check if data is stale and handle restore/mark-pending

@@ -708,6 +708,43 @@ export async function getIndexNowStats(
   }
 }
 
+export interface IndexNowBackoffStatus {
+  active: boolean
+  until: number | null
+  remainingMs: number | null
+  attempt: number | null
+}
+
+/**
+ * Get IndexNow backoff status for status endpoint
+ */
+export async function getIndexNowBackoff(
+  event: H3Event | undefined,
+): Promise<IndexNowBackoffStatus> {
+  const db = await getDb(event)
+  if (!db)
+    return { active: false, until: null, remainingMs: null, attempt: null }
+
+  const row = await db.first<{ value: string }>(
+    'SELECT value FROM _ai_ready_info WHERE id = ?',
+    ['indexnow_backoff'],
+  )
+
+  if (!row)
+    return { active: false, until: null, remainingMs: null, attempt: null }
+
+  const parsed = JSON.parse(row.value) as { until: number, attempt: number }
+  const now = Date.now()
+  const active = now < parsed.until
+
+  return {
+    active,
+    until: parsed.until,
+    remainingMs: active ? parsed.until - now : null,
+    attempt: parsed.attempt,
+  }
+}
+
 // ============================================================================
 // IndexNow Submission Log (debug mode only)
 // ============================================================================
@@ -924,7 +961,6 @@ export async function cleanupOldCronRuns(
 
 /**
  * Clean up cron runs older than specified age
- * @param maxAgeMs Maximum age in milliseconds (default: 24 hours)
  */
 export async function pruneCronRunsByAge(
   event: H3Event | undefined,
@@ -1014,7 +1050,7 @@ export async function getCronFastPathStatus(
 // Cron Lock (prevent overlapping runs)
 // ============================================================================
 
-const CRON_LOCK_TTL_MS = 120_000 // 2 minutes - stale lock threshold
+const CRON_LOCK_TTL_MS = 300_000 // 5 minutes - stale lock threshold (matches cron interval)
 
 /**
  * Try to acquire cron lock. Returns true if acquired, false if another run is active.
@@ -1051,6 +1087,42 @@ export async function releaseCronLock(event: H3Event | undefined): Promise<void>
     return
 
   await db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
+}
+
+export interface CronLockStatus {
+  held: boolean
+  since: number | null
+  elapsedMs: number | null
+  stale: boolean
+}
+
+/**
+ * Get cron lock status for status endpoint
+ */
+export async function getCronLockStatus(event: H3Event | undefined): Promise<CronLockStatus> {
+  const db = await getDb(event)
+  if (!db)
+    return { held: false, since: null, elapsedMs: null, stale: false }
+
+  const row = await db.first<{ value: string }>(
+    'SELECT value FROM _ai_ready_info WHERE id = ?',
+    ['cron_lock'],
+  )
+
+  if (!row)
+    return { held: false, since: null, elapsedMs: null, stale: false }
+
+  const lockTime = Number.parseInt(row.value, 10)
+  const now = Date.now()
+  const elapsed = now - lockTime
+  const stale = elapsed >= CRON_LOCK_TTL_MS
+
+  return {
+    held: !stale,
+    since: lockTime,
+    elapsedMs: elapsed,
+    stale,
+  }
 }
 
 // ============================================================================

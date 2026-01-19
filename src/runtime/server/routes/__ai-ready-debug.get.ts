@@ -3,7 +3,7 @@ import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
-import { fetchPublicAsset } from '../utils/fetchPublicAsset'
+import { fetchPublicAsset, hasAssets } from '../utils/cloudflare'
 
 interface BuildMeta {
   buildId: string
@@ -199,13 +199,13 @@ export default eventHandler(async (event) => {
   }
 
   // Check if page data is accessible via public directory
-  const hasAssets = !!event.context?.cloudflare?.env?.ASSETS
+  const cfHasAssets = hasAssets(event)
   const publicData = await fetchPublicAsset<{ pages?: unknown[] }>(event, '/__ai-ready/pages.json')
 
   const jsonFileStatus = {
     available: !!publicData,
     pageCount: publicData?.pages?.length ?? 0,
-    source: hasAssets ? 'env.ASSETS.fetch' : '$fetch (with timeout)',
+    source: cfHasAssets ? 'env.ASSETS.fetch' : '$fetch (with timeout)',
   }
 
   if (mode === 'development') {

@@ -4,6 +4,9 @@ import { countPages, queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { indexPageByRoute } from './indexPage'
 
+/** Concurrent fetches per batch (balances speed vs memory/subrequests) */
+const CONCURRENCY = 5
+
 export interface BatchIndexOptions {
   /** Max pages per batch (default: 10, max: 50) */
   limit?: number
@@ -11,6 +14,8 @@ export interface BatchIndexOptions {
   all?: boolean
   /** Max ms to run (for all mode, default: 30000) */
   timeout?: number
+  /** Concurrent page fetches (default: 5) */
+  concurrency?: number
 }
 
 export interface BatchIndexResult {
@@ -27,16 +32,17 @@ export interface BatchIndexResult {
 }
 
 /**
- * Batch index pending pages (max 50 per batch)
- * Shared logic used by poll endpoint and scheduled task
+ * Batch index pending pages with parallel processing
+ * Processes pages in concurrent chunks for better throughput
  */
 export async function batchIndexPages(
   event: H3Event | undefined,
   options: BatchIndexOptions = {},
 ): Promise<BatchIndexResult> {
   const startTime = Date.now()
-  const limit = Math.min(options.limit ?? 3, 50)
+  const limit = Math.min(options.limit ?? 10, 50)
   const timeout = options.timeout ?? 30000
+  const concurrency = options.concurrency ?? CONCURRENCY
 
   const beforeCount = await countPages(event, { where: { pending: true } })
   if (beforeCount === 0) {
@@ -51,39 +57,53 @@ export async function batchIndexPages(
 
   let indexed = 0
   const errors: string[] = []
-  let iteration = 0
+  let processed = 0
 
-  while (true) {
+  while (processed < limit) {
     // Check timeout for 'all' mode
     if (options.all && (Date.now() - startTime) >= timeout) {
       logger.debug(`[batchIndex] Timeout reached after ${Date.now() - startTime}ms`)
       break
     }
 
-    // Check limit for non-all mode
-    if (!options.all && iteration >= limit) {
-      break
-    }
+    // Fetch next chunk of pending pages
+    const chunkSize = Math.min(concurrency, limit - processed)
+    const pages = await queryPages(event, { where: { pending: true }, limit: chunkSize }) as PageEntry[]
 
-    const pages = await queryPages(event, { where: { pending: true }, limit: 1 }) as PageEntry[]
-    const route = pages[0]?.route
-    if (!route)
+    if (pages.length === 0)
       break
 
-    iteration++
+    // Process chunk in parallel
+    logger.debug(`[batchIndex] Processing ${pages.length} pages concurrently`)
+    const results = await Promise.all(
+      pages.map(async (page) => {
+        const result = await indexPageByRoute(page.route, event, {
+          markFailedAsError: true,
+          force: true,
+        })
+        return { route: page.route, success: result.success }
+      }),
+    )
 
-    const result = await indexPageByRoute(route, event, {
-      markFailedAsError: true,
-      force: true,
-    })
+    // Tally results
+    for (const result of results) {
+      processed++
+      if (result.success) {
+        indexed++
+        logger.debug(`[batchIndex] Indexed: ${result.route}`)
+      }
+      else {
+        errors.push(result.route)
+      }
+    }
 
-    if (result.success) {
-      indexed++
-      logger.debug(`[batchIndex] Indexed: ${route}`)
-    }
-    else {
-      errors.push(route)
-    }
+    // Exit if we got fewer pages than requested (no more pending)
+    if (pages.length < chunkSize)
+      break
+
+    // For non-all mode, respect the limit
+    if (!options.all && processed >= limit)
+      break
   }
 
   const remaining = await countPages(event, { where: { pending: true } })

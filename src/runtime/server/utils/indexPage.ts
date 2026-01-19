@@ -7,7 +7,6 @@ import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown } from '../utils'
 import { createUniversalContext } from './context'
-import { useFetch } from './fetch'
 import { extractKeywords } from './keywords'
 
 // Header to identify internal indexing requests
@@ -141,7 +140,7 @@ export async function indexPageByRoute(
   event: H3Event | undefined,
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
-  const $fetch = useFetch(event)
+  const $fetch = event?.$fetch ?? globalThis.$fetch
   logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
   const html = await $fetch(route, {
     headers: { [INDEXING_HEADER]: '1' },

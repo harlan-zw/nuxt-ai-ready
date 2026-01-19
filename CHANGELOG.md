@@ -1,6 +1,120 @@
 # Changelog
 
 
+## v0.10.7...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.7...main)
+
+### 🩹 Fixes
+
+- **cloudflare-workers:** Indexnow 500 error ([1950ed2](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/1950ed2))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.6...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.6...main)
+
+### 🩹 Fixes
+
+- Maybe cron sitemap bug ([52668ec](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/52668ec))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.5...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.5...main)
+
+### 🩹 Fixes
+
+- **cloudflare-workers:** Broken sitemap fetching ([5ae3c22](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/5ae3c22))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.4...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.4...main)
+
+### 🩹 Fixes
+
+- Expose indexing status ([97fac9e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/97fac9e))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.3...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.3...main)
+
+### 🔥 Performance
+
+- Optimize cron ([e21f5ce](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/e21f5ce))
+- Optimize cron ([af45652](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/af45652))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.2...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.2...main)
+
+### 🔥 Performance
+
+- Optimize cron ([0b35ba6](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/0b35ba6))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.1...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.1...main)
+
+### 🩹 Fixes
+
+- Misc cron bugs ([075c5ce](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/075c5ce))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.0...main)
+
+### 🩹 Fixes
+
+- Safer cron usage ([c446b77](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/c446b77))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.9.4...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.4...main)
+
+### 🚀 Enhancements
+
+- `debugCron` ([394c2be](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/394c2be))
+
+### 🩹 Fixes
+
+- Debug changed pages between builds ([9e1226b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/9e1226b))
+- Better runtime debug logs ([e6c51ef](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/e6c51ef))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.9.3...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.9.3...main)

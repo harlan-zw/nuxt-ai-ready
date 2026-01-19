@@ -103,7 +103,7 @@ describe('runtime indexing', async () => {
 
   // Poll endpoint tests
   it('poll: returns status with correct shape', async () => {
-    const result = (await fetch('/__ai-ready/poll', { method: 'POST' })) as {
+    const result = (await fetch('/__ai-ready/poll?secret=test-secret-123', { method: 'POST' })) as {
       indexed: number
       remaining: number
       duration: number
@@ -118,24 +118,24 @@ describe('runtime indexing', async () => {
   })
 
   it('poll: respects limit parameter', async () => {
-    const result = (await fetch('/__ai-ready/poll?limit=1', { method: 'POST' })) as { indexed: number }
+    const result = (await fetch('/__ai-ready/poll?limit=1&secret=test-secret-123', { method: 'POST' })) as { indexed: number }
     expect(result.indexed).toBeLessThanOrEqual(1)
   })
 
   it('poll: caps limit at 50', async () => {
     // Even with limit=100, should process at most 50
-    const result = (await fetch('/__ai-ready/poll?limit=100', { method: 'POST' })) as { indexed: number }
+    const result = (await fetch('/__ai-ready/poll?limit=100&secret=test-secret-123', { method: 'POST' })) as { indexed: number }
     expect(result.indexed).toBeLessThanOrEqual(50)
   })
 
   it('poll: all=true processes multiple pages', async () => {
-    const result = (await fetch('/__ai-ready/poll?all=true&timeout=5000', { method: 'POST' })) as { indexed: number, complete: boolean }
+    const result = (await fetch('/__ai-ready/poll?all=true&timeout=5000&secret=test-secret-123', { method: 'POST' })) as { indexed: number, complete: boolean }
     expect(typeof result.indexed).toBe('number')
     expect(typeof result.complete).toBe('boolean')
   })
 
   it('status: returns indexing status', async () => {
-    const result = (await fetch('/__ai-ready/status')) as { total: number, indexed: number, pending: number }
+    const result = (await fetch('/__ai-ready/status?secret=test-secret-123')) as { total: number, indexed: number, pending: number }
     expect(typeof result.total).toBe('number')
     expect(typeof result.indexed).toBe('number')
     expect(typeof result.pending).toBe('number')
@@ -291,7 +291,7 @@ describe('runtime indexing', async () => {
     const before = (await fetch('/__ai-ready/prune?ttl=604800&dry=true', { method: 'POST' })) as { count: number }
     expect(before.count).toBeGreaterThan(0)
 
-    const result = (await fetch('/__ai-ready/prune?ttl=604800', { method: 'POST' })) as { pruned: number, ttl: number, dry: boolean }
+    const result = (await fetch('/__ai-ready/prune?ttl=604800&secret=test-secret-123', { method: 'POST' })) as { pruned: number, ttl: number, dry: boolean }
     expect(typeof result.pruned).toBe('number')
     expect(typeof result.ttl).toBe('number')
     expect(result.dry).toBe(false)
@@ -306,7 +306,7 @@ describe('runtime indexing', async () => {
   it('restore: endpoint exists and responds', async () => {
     // Without a dump file, restore returns 404
     // With a dump file, it would restore pages
-    const result = await fetch('/__ai-ready/restore', { method: 'POST' }).catch((e: { statusCode: number }) => ({ error: true, statusCode: e.statusCode })) as { error?: boolean, statusCode?: number, restored?: number, cleared?: boolean }
+    const result = await fetch('/__ai-ready/restore?secret=test-secret-123', { method: 'POST' }).catch((e: { statusCode: number }) => ({ error: true, statusCode: e.statusCode })) as { error?: boolean, statusCode?: number, restored?: number, cleared?: boolean }
 
     // Either 404 (no dump) or success with restored count
     if (result.error) {

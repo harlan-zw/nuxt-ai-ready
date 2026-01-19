@@ -5,11 +5,9 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
-import { checkAndHandleStale } from './checkStale'
+import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
 import { syncToIndexNow } from './indexnow'
 import { fetchSitemapByRoute, getSitemapsFromConfig } from './sitemap'
-
-const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
 export interface CronResult {
   runId?: number | null

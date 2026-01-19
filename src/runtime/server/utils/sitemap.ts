@@ -4,7 +4,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
 import { logger } from '../logger'
-import { fetchPublicAsset } from './fetchPublicAsset'
+import { fetchPublicAsset, hasAssets } from './cloudflare'
 
 export interface SitemapUrl {
   loc: string
@@ -17,10 +17,6 @@ export interface SitemapConfig {
 }
 
 const FETCH_TIMEOUT = 15000 // 15s for sitemap
-
-interface CloudflareEnv {
-  ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
-}
 
 /**
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
@@ -89,11 +85,7 @@ export async function fetchSitemapByRoute(
   const fetchRoute = withLeadingSlash(route)
 
   // Use ASSETS.fetch for prerendered sitemaps on Cloudflare (avoids self-fetch issues)
-  // Works in both request context (event) and cron context (globalThis.__env__)
-  const cfEnv = (event?.context?.cloudflare?.env
-    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
-  const hasAssets = !!cfEnv?.ASSETS?.fetch
-  const usePublicAsset = config.sitemapPrerendered && hasAssets
+  const usePublicAsset = config.sitemapPrerendered && hasAssets(event)
   logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.$fetch' : 'globalThis.$fetch'}`)
 
   let sitemapXml: string | null = null

@@ -195,8 +195,8 @@ export default defineNuxtConfig({
     const meta = JSON.parse(await readFile(metaPath, 'utf-8'))
 
     expect(meta.buildId).toBeDefined()
-    expect(meta.pages).toBeInstanceOf(Array)
-    expect(meta.pages.length).toBeGreaterThan(0)
+    expect(typeof meta.pages).toBe('object')
+    expect(Object.keys(meta.pages).length).toBeGreaterThan(0)
 
     // No IndexNow requests on first build (no previous meta to compare)
     expect(indexNowRequests).toHaveLength(0)

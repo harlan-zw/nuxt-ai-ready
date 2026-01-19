@@ -288,10 +288,10 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
-      // Register scheduled task if cron is enabled (runs every minute)
+      // Register scheduled task if cron is enabled (runs every 5 minutes)
       // Disabled in dev mode - context isn't fully available
       if (config.cron && !nuxt.options.dev) {
-        const cronSchedule = '* * * * *'
+        const cronSchedule = '*/5 * * * *'
         const preset = String(nitroConfig.preset || '')
         const isVercel = preset === 'vercel' || preset === 'vercel-edge'
         const isCloudflarePages = preset === 'cloudflare-pages' || preset === 'cloudflare_pages'
@@ -422,7 +422,7 @@ export const logger = createConsola({
       runtimeSync: {
         enabled: runtimeSyncEnabled,
         ttl: runtimeSyncConfig.ttl ?? 3600,
-        batchSize: runtimeSyncConfig.batchSize ?? 20,
+        batchSize: runtimeSyncConfig.batchSize ?? 50,
         pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
       runtimeSyncSecret,

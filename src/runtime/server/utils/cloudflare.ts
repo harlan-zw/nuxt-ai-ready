@@ -2,8 +2,23 @@ import type { H3Event } from 'h3'
 
 const FETCH_TIMEOUT = 5000
 
-interface CloudflareEnv {
+export interface CloudflareEnv {
   ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
+}
+
+/**
+ * Get Cloudflare environment from event context or globalThis.__env__ (for scheduled tasks)
+ */
+export function getCfEnv(event?: H3Event): CloudflareEnv | undefined {
+  return (event?.context?.cloudflare?.env
+    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
+}
+
+/**
+ * Check if Cloudflare ASSETS binding is available
+ */
+export function hasAssets(event?: H3Event): boolean {
+  return !!getCfEnv(event)?.ASSETS?.fetch
 }
 
 /**
@@ -16,9 +31,7 @@ export async function fetchPublicAsset<T = unknown>(
   options?: { responseType?: 'json' | 'text' | 'arrayBuffer' },
 ): Promise<T | null> {
   const responseType = options?.responseType ?? 'json'
-  // Try event context first, then globalThis.__env__ for scheduled tasks
-  const cfEnv = (event?.context?.cloudflare?.env
-    ?? (globalThis as any).__env__) as CloudflareEnv | undefined
+  const cfEnv = getCfEnv(event)
 
   // Try Cloudflare ASSETS binding first
   if (cfEnv?.ASSETS?.fetch) {

@@ -9,6 +9,7 @@ export default defineNuxtConfig({
 
   aiReady: {
     cron: true,
+    runtimeSyncSecret: 'test-secret-123',
     runtimeSync: {
       ttl: 0, // No TTL for testing
       batchSize: 5,

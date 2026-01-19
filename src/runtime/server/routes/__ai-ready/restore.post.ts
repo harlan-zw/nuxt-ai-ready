@@ -5,7 +5,7 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../../db'
 import { decompressFromBase64, importDbDump } from '../../db/shared'
 import { logger } from '../../logger'
-import { fetchPublicAsset } from '../../utils/fetchPublicAsset'
+import { fetchPublicAsset } from '../../utils/cloudflare'
 
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig

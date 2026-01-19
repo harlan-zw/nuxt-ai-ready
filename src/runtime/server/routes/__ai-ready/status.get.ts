@@ -1,7 +1,7 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import { createError, eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { countPages, countPagesNeedingIndexNowSync, countRecentlyIndexed, getIndexNowStats, getRecentCronRuns, getRecentlyIndexedPages, getSitemapStatus } from '../../db/queries'
+import { countPages, countPagesNeedingIndexNowSync, countRecentlyIndexed, getCronLockStatus, getIndexNowBackoff, getIndexNowStats, getRecentCronRuns, getRecentlyIndexedPages, getSitemapStatus } from '../../db/queries'
 
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
@@ -35,9 +35,10 @@ export default eventHandler(async (event) => {
 
   // Include IndexNow stats if key is configured
   if (config.indexNow) {
-    const [indexNowPending, indexNowStats] = await Promise.all([
+    const [indexNowPending, indexNowStats, backoff] = await Promise.all([
       countPagesNeedingIndexNowSync(event),
       getIndexNowStats(event),
+      getIndexNowBackoff(event),
     ])
 
     result.indexNow = {
@@ -45,17 +46,30 @@ export default eventHandler(async (event) => {
       totalSubmitted: indexNowStats.totalSubmitted,
       lastSubmittedAt: indexNowStats.lastSubmittedAt,
       lastError: indexNowStats.lastError,
+      backoff: {
+        active: backoff.active,
+        until: backoff.until,
+        remainingMs: backoff.remainingMs,
+        attempt: backoff.attempt,
+      },
     }
   }
 
   // Include cron and sitemap info if runtime sync is enabled
   if (config.runtimeSync) {
-    const [cronRuns, sitemaps] = await Promise.all([
+    const [cronRuns, sitemaps, cronLock] = await Promise.all([
       getRecentCronRuns(event, 3),
       getSitemapStatus(event),
+      getCronLockStatus(event),
     ])
 
     result.cron = {
+      lock: {
+        held: cronLock.held,
+        since: cronLock.since,
+        elapsedMs: cronLock.elapsedMs,
+        stale: cronLock.stale,
+      },
       recentRuns: cronRuns.map(r => ({
         startedAt: r.startedAt,
         durationMs: r.durationMs,
