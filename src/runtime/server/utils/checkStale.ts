@@ -3,7 +3,7 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { DumpRow } from '../db/shared'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { useDatabase } from '../db'
-import { countPages } from '../db/queries'
+import { countPages, resetSitemapErrors } from '../db/queries'
 import { decompressFromBase64, importDbDump } from '../db/shared'
 import { logger } from '../logger'
 import { fetchPublicAsset } from './cloudflare'
@@ -24,6 +24,8 @@ export interface StaleCheckResult {
   changedCount?: number
   /** Number of new pages added from dump */
   addedCount?: number
+  /** Number of sitemaps with errors reset */
+  sitemapsReset?: number
 }
 
 /**
@@ -186,6 +188,11 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
     if (debug)
       logger.info(`[stale-check] Build ID changed (${storedBuildId} → ${meta.buildId}), comparing hashes...`)
 
+    // Reset sitemap errors on new build (deployment might fix the issue)
+    const sitemapsReset = await resetSitemapErrors(event)
+    if (sitemapsReset > 0 && debug)
+      logger.info(`[stale-check] Reset ${sitemapsReset} sitemap error(s)`)
+
     const dumpRows = await fetchDump(event)
     if (!dumpRows) {
       logger.warn('[stale-check] Failed to fetch dump for hash comparison')
@@ -239,6 +246,7 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
       dumpCount: meta.pageCount,
       changedCount: changedRoutes.length,
       addedCount: newRows.length,
+      sitemapsReset,
     }
   }
 

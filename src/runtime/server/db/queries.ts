@@ -1029,7 +1029,7 @@ export async function getCronFastPathStatus(
       (SELECT value FROM _ai_ready_info WHERE id = 'last_stale_check') as last_stale_check,
       (SELECT value FROM _ai_ready_info WHERE id = 'build_id') as build_id,
       (SELECT value FROM _ai_ready_info WHERE id = 'indexnow_backoff') as indexnow_backoff,
-      (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 3) as sitemaps_need_crawl
+      (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 10) as sitemaps_need_crawl
   `, [sitemapThreshold])
 
   if (!row)
@@ -1212,15 +1212,18 @@ export async function getNextSitemapToCrawl(
   if (!db)
     return null
 
+  // Calculate threshold as milliseconds timestamp (matching how we store last_crawled_at)
+  const threshold = Date.now() - minIntervalMinutes * 60 * 1000
+
   // First try sitemaps with errors (retry after interval)
-  // Only retry if error_count < 3 to avoid infinite retries
+  // Only retry if error_count < 10 to avoid infinite retries
   const errorRow = await db.first<SitemapRow>(`
     SELECT * FROM ai_ready_sitemaps
-    WHERE error_count > 0 AND error_count < 3
-      AND (last_crawled_at IS NULL OR last_crawled_at < datetime('now', '-' || ? || ' minutes'))
+    WHERE error_count > 0 AND error_count < 10
+      AND (last_crawled_at IS NULL OR last_crawled_at < ?)
     ORDER BY last_crawled_at ASC NULLS FIRST
     LIMIT 1
-  `, [minIntervalMinutes])
+  `, [threshold])
   if (errorRow)
     return rowToSitemapEntry(errorRow)
 
@@ -1228,10 +1231,10 @@ export async function getNextSitemapToCrawl(
   const row = await db.first<SitemapRow>(`
     SELECT * FROM ai_ready_sitemaps
     WHERE error_count = 0
-      AND (last_crawled_at IS NULL OR last_crawled_at < datetime('now', '-' || ? || ' minutes'))
+      AND (last_crawled_at IS NULL OR last_crawled_at < ?)
     ORDER BY last_crawled_at ASC NULLS FIRST
     LIMIT 1
-  `, [minIntervalMinutes])
+  `, [threshold])
   return row ? rowToSitemapEntry(row) : null
 }
 
@@ -1276,6 +1279,26 @@ export async function markSitemapError(
       last_error = ?
     WHERE name = ?
   `, [Date.now(), error, name])
+}
+
+/**
+ * Reset all sitemap errors (called on build_id change)
+ */
+export async function resetSitemapErrors(event: H3Event | undefined): Promise<number> {
+  const db = await getDb(event)
+  if (!db)
+    return 0
+
+  const countRow = await db.first<{ count: number }>(
+    'SELECT COUNT(*) as count FROM ai_ready_sitemaps WHERE error_count > 0',
+  )
+  const count = countRow?.count || 0
+
+  if (count > 0) {
+    await db.exec('UPDATE ai_ready_sitemaps SET error_count = 0, last_error = NULL, last_crawled_at = NULL')
+  }
+
+  return count
 }
 
 /**
