@@ -364,7 +364,7 @@ export async function readPageDataFromFilesystem() {
   let rows = []
   const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
   if (nodeVersion >= 22) {
-    const { DatabaseSync } = await import('node:sqlite')
+    const { DatabaseSync } = await import('node' + ':sqlite')
     const db = new DatabaseSync(dbPath, { open: true })
     rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
     db.close()
