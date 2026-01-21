@@ -501,7 +501,7 @@ export const logger = createConsola({
 
     if (isStatic || hasPrerenderedRoutes) {
       const siteConfig = useSiteConfig()
-      setupPrerenderHandler(buildDbPath, {
+      setupPrerenderHandler(config, buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url,
         description: siteConfig.description,

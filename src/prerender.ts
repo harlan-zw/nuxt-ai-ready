@@ -3,7 +3,7 @@ import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
 import type { BuildMeta, BuildMetaChanges } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
-import type { LlmsTxtConfig } from './runtime/types'
+import type { LlmsTxtConfig, ModuleOptions, ParsedMarkdownResult, SitemapEntry } from './runtime/types'
 import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
@@ -91,20 +91,6 @@ async function submitIndexNow(
   }
 }
 
-export interface ParsedMarkdownResult {
-  markdown: string
-  title: string
-  description: string
-  headings: Array<Record<string, string>>
-  keywords?: string[]
-  updatedAt?: string
-}
-
-interface SitemapEntry {
-  loc: string
-  lastmod?: string | Date
-}
-
 export interface CrawlerState {
   prerenderedRoutes: Set<string>
   errorRoutes: Set<string>
@@ -116,6 +102,7 @@ export interface CrawlerState {
   siteInfo?: SiteInfo
   llmsTxtConfig?: LlmsTxtConfig
   indexNow?: string
+  concurrency: number
 }
 
 function createCrawlerState(
@@ -124,6 +111,7 @@ function createCrawlerState(
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
   indexNow?: string,
+  concurrency = 10,
 ): CrawlerState {
   return {
     prerenderedRoutes: new Set(),
@@ -135,6 +123,7 @@ function createCrawlerState(
     siteInfo,
     llmsTxtConfig,
     indexNow,
+    concurrency,
   }
 }
 
@@ -160,7 +149,7 @@ async function initCrawler(state: CrawlerState): Promise<void> {
     logger.debug(`Creating directory for llms-full.txt: ${dirname(state.llmsFullTxtPath)}`)
     await mkdir(dirname(state.llmsFullTxtPath), { recursive: true })
     const header = buildLlmsFullTxtHeader(state.siteInfo, state.llmsTxtConfig)
-    logger.debug(`Writing llms-full.txt header (${header.length} bytes)`)
+    logger.debug(`Writing llms-full.txt header (${(header.length / 1024).toFixed(1)}kb)`)
     await writeFile(state.llmsFullTxtPath, header, 'utf-8')
     logger.debug(`llms-full.txt initialized at ${state.llmsFullTxtPath}`)
   }
@@ -211,7 +200,7 @@ async function processMarkdownRoute(
   // Stream-append to llms-full.txt (skip for sitemap-only crawled pages)
   if (state.llmsFullTxtPath && !options?.skipLlmsFullTxt) {
     const pageContent = formatPageForLlmsFullTxt(route, title, description, markdown, state.siteInfo?.url)
-    logger.debug(`Appending to llms-full.txt: ${route} (${pageContent.length} bytes)`)
+    logger.debug(`Appending to llms-full.txt: ${route} (${(pageContent.length / 1024).toFixed(1)}kb)`)
     await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
   }
 
@@ -278,7 +267,7 @@ async function crawlSitemapEntries(
   logger.debug(`Crawling ${entries.length} sitemap entries`)
   let crawled = 0
   let skipped = 0
-  const BATCH_SIZE = 10
+  const BATCH_SIZE = state.concurrency
 
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE)
@@ -367,7 +356,7 @@ async function prerenderRoute(nitro: Nitro, route: string) {
   if (data === undefined)
     throw new Error(`No data returned from '${fetchUrl}'`)
 
-  logger.debug(`Writing prerendered file: ${filePath} (${(data as string).length} bytes)`)
+  logger.debug(`Writing prerendered file: ${filePath} (${((data as string).length / 1024).toFixed(1)}kb)`)
   await writeFile(filePath, data as string, 'utf8')
 
   const _route: PrerenderRoute = {
@@ -381,6 +370,7 @@ async function prerenderRoute(nitro: Nitro, route: string) {
 }
 
 export function setupPrerenderHandler(
+  options: ModuleOptions,
   dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
@@ -391,7 +381,7 @@ export function setupPrerenderHandler(
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
     const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNow)
+    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNow, options.prerender?.concurrency)
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
@@ -466,14 +456,14 @@ export function setupPrerenderHandler(
           errorRoutes: errorRoutesList,
         })
         const publicJsonPath = join(publicDataDir, 'pages.json')
-        logger.debug(`Writing pages.json: ${publicJsonPath} (${jsonContent.length} bytes)`)
+        logger.debug(`Writing pages.json: ${publicJsonPath} (${(jsonContent.length / 1024).toFixed(1)}kb)`)
         await writeFile(publicJsonPath, jsonContent, 'utf-8')
         logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
 
         // Export database dump for serverless restore (streams in batches internally)
         const dumpData = await exportDbDump(state.db)
         const dumpPath = join(publicDataDir, 'pages.dump')
-        logger.debug(`Writing pages.dump: ${dumpPath} (${dumpData.length} bytes)`)
+        logger.debug(`Writing pages.dump: ${dumpPath} (${(dumpData.length / 1024).toFixed(1)}kb)`)
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
@@ -519,7 +509,7 @@ export function setupPrerenderHandler(
           changes: prevMeta ? changes : undefined,
           pages: pageHashes,
         })
-        logger.debug(`Writing pages.meta.json (${metaContent.length} bytes)`)
+        logger.debug(`Writing pages.meta.json (${(metaContent.length / 1024).toFixed(1)}kb)`)
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
         logger.debug(`Wrote build metadata: buildId=${buildId}, ${Object.keys(pageHashes).length} page hashes`)
 

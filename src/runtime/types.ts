@@ -134,9 +134,19 @@ export interface ModuleOptions {
   runtimeSyncSecret?: string
 
   /**
+   * Prerender configuration
+   */
+  prerender?: {
+    /**
+     * Number of pages to crawl concurrently during build
+     * Set to 1 to disable batching
+     * @default 10
+     */
+    concurrency?: number
+  }
+
+  /**
    * Enable cron run logging to database for debugging
-   * Logs each cron execution with results (indexed, submitted, errors)
-   * Auto-prunes entries older than 24 hours
    */
   debugCron?: boolean
 
