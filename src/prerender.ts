@@ -17,6 +17,20 @@ import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/serv
 
 const BUILD_FETCH_TIMEOUT = 15000 // 15s timeout for build-time fetches
 
+export interface ParsedMarkdownResult {
+  markdown: string
+  title: string
+  description: string
+  headings: Array<Record<string, string>>
+  keywords?: string[]
+  updatedAt?: string
+}
+
+interface SitemapEntry {
+  loc: string
+  lastmod?: string | Date
+}
+
 /**
  * Fetch previous build meta from live site for hash comparison
  * Must be called BEFORE writing new pages.meta.json
