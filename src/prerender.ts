@@ -218,6 +218,57 @@ async function processMarkdownRoute(
   state.prerenderedRoutes.add(route)
 }
 
+async function processSitemapEntry(
+  state: CrawlerState,
+  nuxt: Nuxt,
+  nitro: Nitro,
+  entry: string | SitemapEntry,
+): Promise<{ crawled: boolean, skipped: boolean }> {
+  const loc = typeof entry === 'string' ? entry : entry.loc
+  const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
+  // Handle both absolute URLs and relative paths
+  const route = loc.startsWith('http') ? new URL(loc).pathname : loc
+
+  // Skip internal/special files (e.g., _headers, _redirects)
+  if (route.split('/').some(segment => segment.startsWith('_'))) {
+    return { crawled: false, skipped: true }
+  }
+
+  if (state.prerenderedRoutes.has(route)) {
+    return { crawled: false, skipped: true }
+  }
+
+  const mdRoute = route === '/' ? '/index.md' : `${route}.md`
+  const mdUrl = withBase(mdRoute, nitro.options.baseURL)
+  logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
+
+  // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
+  const res = await globalThis.$fetch(mdUrl, {
+    headers: { 'x-nitro-prerender': mdRoute },
+  }).catch((err) => {
+    logger.debug(`Skipping ${route}: ${err.message}`)
+    return null
+  }) as string | null
+
+  if (!res)
+    return { crawled: false, skipped: false }
+
+  // Check if response is JSON before parsing
+  let parsed: ParsedMarkdownResult
+  try {
+    parsed = JSON.parse(res) as ParsedMarkdownResult
+  }
+  catch (err) {
+    // Response is not JSON - likely HTML was returned instead of markdown
+    logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`, err)
+    return { crawled: false, skipped: false }
+  }
+
+  // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
+  await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
+  return { crawled: true, skipped: false }
+}
+
 async function crawlSitemapEntries(
   state: CrawlerState,
   nuxt: Nuxt,
@@ -227,53 +278,18 @@ async function crawlSitemapEntries(
   logger.debug(`Crawling ${entries.length} sitemap entries`)
   let crawled = 0
   let skipped = 0
+  const BATCH_SIZE = 10
 
-  for (const entry of entries) {
-    const loc = typeof entry === 'string' ? entry : entry.loc
-    const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
-    // Handle both absolute URLs and relative paths
-    const route = loc.startsWith('http') ? new URL(loc).pathname : loc
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE)
+    const results = await Promise.all(batch.map(entry => processSitemapEntry(state, nuxt, nitro, entry)))
 
-    // Skip internal/special files (e.g., _headers, _redirects)
-    if (route.split('/').some(segment => segment.startsWith('_'))) {
-      skipped++
-      continue
+    for (const result of results) {
+      if (result.crawled)
+        crawled++
+      if (result.skipped)
+        skipped++
     }
-
-    if (state.prerenderedRoutes.has(route)) {
-      skipped++
-      continue
-    }
-
-    const mdRoute = route === '/' ? '/index.md' : `${route}.md`
-    const mdUrl = withBase(mdRoute, nitro.options.baseURL)
-    logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
-
-    // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
-    const res = await globalThis.$fetch(mdUrl, {
-      headers: { 'x-nitro-prerender': mdRoute },
-    }).catch((err) => {
-      logger.debug(`Skipping ${route}: ${err.message}`)
-      return null
-    }) as string | null
-
-    if (!res)
-      continue
-
-    // Check if response is JSON before parsing
-    let parsed: ParsedMarkdownResult
-    try {
-      parsed = JSON.parse(res) as ParsedMarkdownResult
-    }
-    catch (err) {
-      // Response is not JSON - likely HTML was returned instead of markdown
-      logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`, err)
-      continue
-    }
-
-    // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
-    await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
-    crawled++
   }
 
   logger.debug(`Sitemap crawl complete: ${crawled} crawled, ${skipped} skipped`)
