@@ -565,6 +565,8 @@ export function setupPrerenderHandler(
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
+        if (state.db)
+          await state.db.close()
       })
     }
     else if (usePrerenderHook) {
@@ -581,6 +583,8 @@ export function setupPrerenderHandler(
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
+        if (state.db)
+          await state.db.close()
       })
     }
   })

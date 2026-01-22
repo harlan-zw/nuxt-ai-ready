@@ -508,6 +508,9 @@ export const logger = createConsola({
       }, mergedLlmsTxt, indexNow)
     }
 
+    // Add lifecycle plugin to handle database connection cleanup
+    addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
+
     // Add route rules for static files with proper charset
     nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
     nuxt.options.nitro.routeRules['/llms.txt'] = { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }

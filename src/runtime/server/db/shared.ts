@@ -18,6 +18,7 @@ export interface DatabaseAdapter {
   all: <T>(sql: string, params?: unknown[]) => Promise<T[]>
   first: <T>(sql: string, params?: unknown[]) => Promise<T | undefined>
   exec: (sql: string, params?: unknown[]) => Promise<void>
+  close: () => Promise<void>
 }
 
 /**
@@ -34,6 +35,11 @@ export function createAdapter(connector: Connector): DatabaseAdapter {
     },
     exec: async (sql: string, params: unknown[] = []): Promise<void> => {
       await connector.prepare(sql).run(...(params as never[]))
+    },
+    close: async (): Promise<void> => {
+      if (connector.dispose) {
+        await connector.dispose()
+      }
     },
   }
 }
