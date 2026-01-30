@@ -118,7 +118,7 @@ async function getPrerenderDb(): Promise<RawExecutor> {
       }
       return undefined
     },
-    exec: async (): Promise<void> => {
+    exec: async (_query: string, _params: unknown[] = []): Promise<void> => {
       // No-op for prerender (read-only)
     },
   }
