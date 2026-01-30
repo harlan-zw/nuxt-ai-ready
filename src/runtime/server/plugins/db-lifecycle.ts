@@ -1,14 +1,14 @@
 import type { NitroApp } from 'nitropack/types'
-import { closeDatabase } from '../db/index'
+import { closeDrizzle } from '../db'
 
 export default function dbLifecyclePlugin(nitroApp: NitroApp) {
   // Close request-scoped database connection
   nitroApp.hooks.hook('afterResponse', async (event) => {
-    await closeDatabase(event)
+    await closeDrizzle(event)
   })
 
   // Close fallback database connection on app close
   nitroApp.hooks.hook('close', async () => {
-    await closeDatabase()
+    await closeDrizzle()
   })
 }

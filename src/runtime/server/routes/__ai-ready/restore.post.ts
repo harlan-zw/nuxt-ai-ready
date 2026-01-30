@@ -2,7 +2,7 @@ import type { ModulePublicRuntimeConfig } from '../../../../module'
 import type { DumpRow } from '../../db/shared'
 import { createError, eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../../db'
+import { useRawDb } from '../../db'
 import { decompressFromBase64, importDbDump } from '../../db/shared'
 import { logger } from '../../logger'
 import { fetchPublicAsset } from '../../utils/cloudflare'
@@ -29,7 +29,7 @@ export default eventHandler(async (event) => {
 
   logger.debug(`[restore] Fetched dump (${dumpData.length} bytes)`)
 
-  const db = await useDatabase(event)
+  const db = await useRawDb(event)
 
   // Clear existing pages if requested (default: true for full restore)
   const clear = query.clear !== 'false' && query.clear !== '0'

@@ -11,7 +11,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
-import { computeContentHash, createAdapter, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
+import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 
@@ -149,13 +149,17 @@ async function initCrawler(state: CrawlerState): Promise<void> {
   if (state.dbPath) {
     logger.debug(`Creating directory for SQLite: ${dirname(state.dbPath)}`)
     await mkdir(dirname(state.dbPath), { recursive: true })
-    const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
-    const connectorPath = nodeVersion >= 22 ? 'db0/connectors/node-sqlite' : 'db0/connectors/better-sqlite3'
-    const { default: connectorFn } = await import(connectorPath)
-    const connector = connectorFn({ path: state.dbPath })
-    state.db = createAdapter(connector)
-    await initSchema(state.db)
-    logger.debug(`Crawler initialized with SQLite at ${state.dbPath} using ${connectorPath}`)
+    const { default: Database } = await import('better-sqlite3')
+    const sqlite = new Database(state.dbPath)
+    const db: DatabaseAdapter = {
+      all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params) as T[],
+      first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params) as T | undefined,
+      exec: async (sql: string, params: unknown[] = []) => { sqlite.prepare(sql).run(...params) },
+      close: async () => { sqlite.close() },
+    }
+    state.db = db
+    await initSchema(db)
+    logger.debug(`Crawler initialized with SQLite at ${state.dbPath}`)
   }
 
   // Initialize llms-full.txt with header
@@ -566,7 +570,7 @@ export function setupPrerenderHandler(
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
         if (state.db)
-          await state.db.close()
+          await state.db.close?.()
       })
     }
     else if (usePrerenderHook) {
@@ -584,7 +588,7 @@ export function setupPrerenderHandler(
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
         if (state.db)
-          await state.db.close()
+          await state.db.close?.()
       })
     }
   })

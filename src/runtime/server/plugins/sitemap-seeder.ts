@@ -1,10 +1,11 @@
 import type { H3Event } from 'h3'
 import type { NitroApp } from 'nitropack/types'
-import { markSitemapCrawled, seedRoutes } from '../db/queries'
+import { getPageLastmods, markSitemapCrawled, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
 
 interface ResolvedSitemapUrl {
   loc: string
+  lastmod?: string | Date
   _path?: { pathname: string } | null
 }
 
@@ -26,10 +27,12 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     if (urls.length === 0)
       return
 
-    logger.debug(`[sitemap-seeder] Seeding ${urls.length} routes from ${sitemapName}`)
+    logger.debug(`[sitemap-seeder] Processing ${urls.length} routes from ${sitemapName}`)
 
     // Extract routes from URLs
     const routes: string[] = []
+    const routeToUrl = new Map<string, ResolvedSitemapUrl>()
+
     for (const u of urls) {
       let route: string
       // Prefer pre-parsed path if available
@@ -44,7 +47,27 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
       // Skip file extensions
       if (!route.includes('.')) {
         routes.push(route)
+        routeToUrl.set(route, u)
       }
+    }
+
+    // Enrich sitemap entries with lastmod from our indexed pages
+    const lastmods = await getPageLastmods(event).catch((e) => {
+      logger.warn(`[sitemap-seeder] Failed to get lastmods: ${e.message}`)
+      return new Map<string, string>()
+    })
+
+    let enriched = 0
+    for (const [route, url] of routeToUrl) {
+      const lastmod = lastmods.get(route)
+      if (lastmod && !url.lastmod) {
+        url.lastmod = lastmod
+        enriched++
+      }
+    }
+
+    if (enriched > 0) {
+      logger.debug(`[sitemap-seeder] Enriched ${enriched} URLs with lastmod`)
     }
 
     // Seed routes into database
