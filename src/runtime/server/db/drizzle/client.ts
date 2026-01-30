@@ -5,6 +5,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import type { H3Event } from 'h3'
+import { closeDriver } from './raw'
 
 export type DatabaseDialect = 'sqlite' | 'postgres'
 
@@ -47,9 +48,12 @@ export async function useDrizzle(event?: H3Event): Promise<DrizzleDatabase> {
 
 export async function closeDrizzle(event?: H3Event): Promise<void> {
   if (event?.context?.[DB_CONTEXT_KEY]) {
+    const client = event.context[DB_CONTEXT_KEY] as DrizzleDatabase
+    closeDriver(client.db)
     delete event.context[DB_CONTEXT_KEY]
   }
   else if (!event && fallbackClient) {
+    closeDriver(fallbackClient.db)
     fallbackClient = undefined
   }
 }

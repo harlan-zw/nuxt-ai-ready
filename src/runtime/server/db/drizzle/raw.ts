@@ -107,3 +107,30 @@ export async function useRawDb(event?: H3Event): Promise<RawExecutor> {
   const client = await useDrizzle(event)
   return getRawExecutor(client)
 }
+
+/**
+ * Close underlying database driver connection
+ */
+export function closeDriver(db: DrizzleDatabase['db']): void {
+  const cached = driverCache.get(db)
+  if (!cached)
+    return
+
+  const { type, driver } = cached
+
+  switch (type) {
+    case 'better-sqlite3': {
+      const sqlite = driver as { close?: () => void }
+      sqlite.close?.()
+      break
+    }
+    case 'libsql': {
+      const client = driver as { close?: () => void }
+      client.close?.()
+      break
+    }
+    // d1 and neon are serverless/HTTP - no connection to close
+  }
+
+  driverCache.delete(db)
+}
