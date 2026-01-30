@@ -13,12 +13,14 @@ trustPolicyExclude:
   - semver
 packages:
   - playground
+  # test/fixtures/vercel-serverless uses published package, not workspace
 overrides:
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
 
 catalog:
   '@clack/prompts': ^0.11.0
+  '@libsql/client': ^0.17.0
   '@types/better-sqlite3': ^7.6.13
   agents: ^0.3.6
   ai: ^6.0.40
@@ -26,8 +28,8 @@ catalog:
   bumpp: ^10.4.0
   citty: ^0.1.6
   consola: ^3.4.2
-  db0: ^0.3.4
   defu: ^6.1.4
+  drizzle-orm: ^0.44.0
   execa: ^9.6.1
   mdream: ^0.15.3
   ofetch: ^1.5.1

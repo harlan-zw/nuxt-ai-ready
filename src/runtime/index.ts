@@ -1,9 +1,11 @@
-// Database access
-export { useDatabase } from './server/db'
-export type { DatabaseAdapter } from './server/db'
+// Database access - Drizzle
+export { closeDrizzle, useDrizzle, useRawDb } from './server/db'
+export type { DatabaseDialect, DrizzleDatabase, RawExecutor } from './server/db'
 
+// Queries from the full queries module (uses raw SQL internally)
 export {
   countPages,
+  getPageLastmods,
   getStaleRoutes,
   isPageFresh,
   pruneStaleRoutes,

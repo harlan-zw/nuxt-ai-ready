@@ -85,14 +85,19 @@ export interface ModuleOptions {
 
   /**
    * Database configuration for page storage
-   * Uses db0 for cross-platform SQLite support
+   * Supports SQLite, LibSQL/Turso, Cloudflare D1, and Neon Postgres
    */
   database?: {
     /**
      * Database type - auto-detected if not specified
-     * @default 'sqlite' (auto-detects best connector)
+     * - 'sqlite': Local SQLite via better-sqlite3 (default for Node.js)
+     * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun)
+     * - 'd1': Cloudflare D1 (auto-detected on Cloudflare)
+     * - 'libsql': Turso/LibSQL
+     * - 'neon': Vercel Postgres via Neon serverless (auto-detected on Vercel with POSTGRES_URL)
+     * @default 'sqlite' (auto-detects based on platform)
      */
-    type?: 'sqlite' | 'd1' | 'libsql'
+    type?: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     /**
      * SQLite filename (relative to rootDir or absolute)
      * @default '.data/ai-ready/pages.db'
@@ -104,7 +109,8 @@ export interface ModuleOptions {
      */
     bindingName?: string
     /**
-     * LibSQL/Turso URL
+     * Database URL for LibSQL/Turso or Neon/Vercel Postgres
+     * For Vercel: auto-reads from POSTGRES_URL env var
      */
     url?: string
     /**

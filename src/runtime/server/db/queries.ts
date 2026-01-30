@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3'
-import type { DatabaseAdapter } from './shared'
+import type { RawExecutor } from './drizzle/raw'
 import { useEvent } from 'nitropack/runtime'
-import { useDatabase } from './index'
+import { initSchema } from './drizzle/queries'
+import { useRawDb } from './drizzle/raw'
 import { normalizeRouteKey } from './shared'
 
 /** Try to get the current H3Event from context or use provided event */
@@ -17,9 +18,10 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
 }
 
 let devWarningShown = false
+let schemaInitialized = false
 
 /** Get database, with dev mode warning and prerender handling */
-async function getDb(event?: H3Event): Promise<DatabaseAdapter | null> {
+async function getDb(event?: H3Event): Promise<RawExecutor | null> {
   if (import.meta.dev) {
     if (!devWarningShown) {
       console.warn('[nuxt-ai-ready] Page data unavailable in dev. Run `nuxi generate` for full metadata.')
@@ -33,12 +35,21 @@ async function getDb(event?: H3Event): Promise<DatabaseAdapter | null> {
     return getPrerenderDb()
   }
 
-  // Runtime: use database via db0
-  return useDatabase(getEventFromContext(event))
+  // Runtime: use raw database executor
+  const resolvedEvent = getEventFromContext(event)
+  const db = await useRawDb(resolvedEvent)
+
+  // Initialize schema on first connection
+  if (!schemaInitialized) {
+    await initSchema(resolvedEvent)
+    schemaInitialized = true
+  }
+
+  return db
 }
 
 /** Get prerender database adapter (reads from build-time SQLite) */
-async function getPrerenderDb(): Promise<DatabaseAdapter> {
+async function getPrerenderDb(): Promise<RawExecutor> {
   const m = await import('#ai-ready-virtual/read-page-data.mjs')
   const data = await (m as unknown as {
     readPageDataFromFilesystem: () => Promise<{ pages: PageData[], errorRoutes: string[] }>
@@ -52,6 +63,7 @@ async function getPrerenderDb(): Promise<DatabaseAdapter> {
   const wantsMarkdown = (sql: string) => sql.includes('SELECT *') || sql.toLowerCase().includes('markdown')
 
   return {
+    dialect: 'sqlite' as const,
     all: async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
       // Parse basic queries
       const isErrorQuery = sql.includes('is_error = 1') || (params.includes(1) && sql.includes('is_error'))
@@ -213,6 +225,30 @@ function rowToData(row: PageRow): PageData {
     ...rowToEntry(row),
     markdown: row.markdown,
   }
+}
+
+/**
+ * Get lastmod (updatedAt) for all indexed pages
+ * Returns a Map for O(1) lookup when enriching sitemaps
+ */
+export async function getPageLastmods(
+  event: H3Event | undefined,
+): Promise<Map<string, string>> {
+  const db = await getDb(event)
+  if (!db)
+    return new Map()
+
+  const rows = await db.all<{ route: string, updated_at: string }>(
+    'SELECT route, updated_at FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0',
+  )
+
+  const map = new Map<string, string>()
+  for (const row of rows) {
+    if (row.route && row.updated_at) {
+      map.set(row.route, row.updated_at)
+    }
+  }
+  return map
 }
 
 /**

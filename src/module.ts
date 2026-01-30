@@ -11,7 +11,7 @@ import { hookNuxtSeoProLicense, registerNuxtSeoProModule } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
-import { refineDatabaseConfig, resolveDatabaseAdapter } from './utils/database'
+import { refineDatabaseConfig } from './utils/database'
 
 export interface ModuleHooks {
   /**
@@ -108,31 +108,41 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
 
-    // Resolve database adapter alias at build time
-    // Auto-detect D1 for Cloudflare deployments
+    // Auto-detect database type based on deployment preset
     const preset = String(nuxt.options.nitro.preset || '')
     const isCloudflare = preset.startsWith('cloudflare')
-    const dbType = config.database?.type || (isCloudflare ? 'd1' : 'sqlite')
-    if (isCloudflare && !config.database?.type) {
-      logger.debug(`Auto-detected Cloudflare preset "${preset}", using D1 database`)
-    }
-    const adapterPath = await resolveDatabaseAdapter(dbType)
-    nuxt.options.alias['#ai-ready/adapter'] = adapterPath
-    nuxt.options.nitro.alias['#ai-ready/adapter'] = adapterPath
+    const isVercel = preset === 'vercel' || preset === 'vercel-edge'
+    const isVercelEdge = preset === 'vercel-edge'
+    const isBun = preset === 'bun'
 
-    // Resolve database provider alias
-    let providerPath = resolve('./runtime/server/db/provider/sqlite-node')
-    if (dbType === 'd1') {
-      providerPath = resolve('./runtime/server/db/provider/d1')
+    // Check for Postgres env vars (Vercel Postgres sets POSTGRES_URL)
+    const hasPostgresUrl = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL || config.database?.url)
+
+    let dbType = config.database?.type
+    if (!dbType) {
+      if (isCloudflare) {
+        dbType = 'd1'
+        logger.debug(`Auto-detected Cloudflare preset "${preset}", using D1 database`)
+      }
+      else if (isVercel && hasPostgresUrl) {
+        // Vercel with Postgres URL - use Neon serverless (works on both serverless & edge)
+        dbType = 'neon'
+        logger.debug(`Auto-detected Vercel preset with POSTGRES_URL, using Neon serverless driver`)
+      }
+      else if (isVercelEdge) {
+        // Vercel Edge without Postgres - warn user
+        logger.warn(`Vercel Edge has no filesystem. Set POSTGRES_URL (Vercel Postgres) or configure database.type: 'libsql' for full functionality.`)
+        dbType = 'neon' // Will fail at runtime with helpful error if no URL
+      }
+      else if (isBun) {
+        dbType = 'bun'
+        logger.debug(`Auto-detected Bun preset, using bun:sqlite driver`)
+      }
+      else {
+        dbType = 'sqlite'
+      }
     }
-    else if (dbType === 'libsql') {
-      providerPath = resolve('./runtime/server/db/provider/libsql')
-    }
-    else if (process.versions.bun) {
-      providerPath = resolve('./runtime/server/db/provider/sqlite-bun')
-    }
-    nuxt.options.alias['#ai-ready/db-provider'] = providerPath
-    nuxt.options.nitro.alias['#ai-ready/db-provider'] = providerPath
+    // Database type is passed to runtime config - the drizzle client handles provider selection
 
     // set default MCP name
     if (!nuxt.options.mcp?.name) {
@@ -401,6 +411,23 @@ export const logger = createConsola({
   level: ${config.debug ? 4 : 3},
 })
 `
+
+      // Database provider - tree-shakeable by aliasing to configured provider at build time
+      const providerMap: Record<string, string> = {
+        sqlite: '#ai-ready/server/db/drizzle/providers/sqlite',
+        bun: '#ai-ready/server/db/drizzle/providers/bun',
+        d1: '#ai-ready/server/db/drizzle/providers/d1',
+        libsql: '#ai-ready/server/db/drizzle/providers/libsql',
+        neon: '#ai-ready/server/db/drizzle/providers/neon',
+      }
+      const providerPath = providerMap[dbType!] || providerMap.sqlite
+      nitroConfig.virtual['#ai-ready-virtual/db-provider.mjs'] = `export { createClient } from '${providerPath}'`
+
+      // Database schema - tree-shakeable by aliasing to sqlite or postgres at build time
+      const schemaPath = dbType === 'neon'
+        ? '#ai-ready/server/db/schema/postgres'
+        : '#ai-ready/server/db/schema/sqlite'
+      nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`
     })
 
     // Resolve database config

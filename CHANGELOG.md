@@ -1,6 +1,60 @@
 # Changelog
 
 
+## v0.10.11...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.11...main)
+
+### 🚀 Enhancements
+
+- Implement proper database connection lifecycle and cleanup ([63b45e6](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/63b45e6))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.10...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.10...main)
+
+### 🚀 Enhancements
+
+- **prerender:** Add concurrency option and use KB for file size logs ([9e178eb](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/9e178eb))
+
+### 🩹 Fixes
+
+- **module:** Silence node:sqlite rollup warning in virtual module ([8e046f5](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/8e046f5))
+
+### 💅 Refactors
+
+- **prerender:** Crawl sitemap entries in batches to improve performance ([a30b9ce](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/a30b9ce))
+
+### 🏡 Chore
+
+- Bump deps ([5f9b51a](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/5f9b51a))
+- Broken type ([ad6183e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/ad6183e))
+- Broken type ([214987e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/214987e))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.10.9...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.9...main)
+
+### 🩹 Fixes
+
+- **cloudflare-worker:** Not rechecking sitemap ([42619f4](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/42619f4))
+
+### 🏡 Chore
+
+- Bump deps ([7dfa2e7](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/7dfa2e7))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.10.8...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.8...main)

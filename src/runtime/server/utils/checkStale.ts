@@ -2,8 +2,14 @@ import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { DumpRow } from '../db/shared'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
-import { countPages, resetSitemapErrors } from '../db/queries'
+import {
+  countPages,
+  getContentHashes,
+  getInfoValue,
+  markRoutesPending,
+  resetSitemapErrors,
+  setInfoValue,
+} from '../db'
 import { decompressFromBase64, importDbDump } from '../db/shared'
 import { logger } from '../logger'
 import { fetchPublicAsset } from './cloudflare'
@@ -56,56 +62,29 @@ async function fetchDump(event?: H3Event): Promise<DumpRow[] | null> {
  * Get stored build ID from database
  */
 async function getStoredBuildId(event?: H3Event): Promise<string | null> {
-  const db = await useDatabase(event)
-  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['build_id'])
-  return row?.value || null
+  return getInfoValue(event, 'build_id')
 }
 
 /**
  * Set stored build ID in database
  */
 async function setStoredBuildId(event: H3Event | undefined, buildId: string): Promise<void> {
-  const db = await useDatabase(event)
-  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['build_id', buildId])
+  await setInfoValue(event, 'build_id', buildId)
 }
 
 /**
  * Get last stale check timestamp from database
  */
 async function getLastStaleCheck(event?: H3Event): Promise<number | null> {
-  const db = await useDatabase(event)
-  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['last_stale_check'])
-  return row?.value ? Number.parseInt(row.value, 10) : null
+  const value = await getInfoValue(event, 'last_stale_check')
+  return value ? Number.parseInt(value, 10) : null
 }
 
 /**
  * Set last stale check timestamp in database
  */
 async function setLastStaleCheck(event: H3Event | undefined): Promise<void> {
-  const db = await useDatabase(event)
-  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['last_stale_check', Date.now().toString()])
-}
-
-/**
- * Get content hashes for all pages in DB
- */
-async function getDbContentHashes(event?: H3Event): Promise<Map<string, string | null>> {
-  const db = await useDatabase(event)
-  const rows = await db.all<{ route: string, content_hash: string | null }>(
-    'SELECT route, content_hash FROM ai_ready_pages',
-  )
-  return new Map(rows.map(r => [r.route, r.content_hash]))
-}
-
-/**
- * Mark specific routes as pending
- */
-async function markRoutesPending(event: H3Event | undefined, routes: string[]): Promise<void> {
-  if (routes.length === 0)
-    return
-  const db = await useDatabase(event)
-  const placeholders = routes.map(() => '?').join(',')
-  await db.exec(`UPDATE ai_ready_pages SET indexed = 0 WHERE route IN (${placeholders})`, routes)
+  await setInfoValue(event, 'last_stale_check', Date.now().toString())
 }
 
 /**
@@ -114,8 +93,8 @@ async function markRoutesPending(event: H3Event | undefined, routes: string[]): 
 async function insertFromDump(event: H3Event | undefined, rows: DumpRow[]): Promise<void> {
   if (rows.length === 0)
     return
-  const db = await useDatabase(event)
-  const { importDbDump } = await import('../db/shared')
+  const { useRawDb } = await import('../db')
+  const db = await useRawDb(event)
   await importDbDump(db, rows)
 }
 
@@ -169,7 +148,8 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
       return { action: 'none', dbCount: 0, dumpCount: meta.pageCount, reason: 'dump_fetch_failed' }
     }
 
-    const db = await useDatabase(event)
+    const { useRawDb } = await import('../db')
+    const db = await useRawDb(event)
     await importDbDump(db, rows)
     await setStoredBuildId(event, meta.buildId)
     await setLastStaleCheck(event)
@@ -200,7 +180,7 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
     }
 
     // Get current DB hashes
-    const dbHashes = await getDbContentHashes(event)
+    const dbHashes = await getContentHashes(event)
 
     // Find changed and new pages
     const changedRoutes: string[] = []

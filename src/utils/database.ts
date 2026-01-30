@@ -1,7 +1,9 @@
 import { isAbsolute, join } from 'pathe'
 
+export type DatabaseType = 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
+
 export interface DatabaseConfig {
-  type?: 'sqlite' | 'd1' | 'libsql'
+  type?: DatabaseType
   filename?: string
   bindingName?: string
   url?: string
@@ -9,40 +11,11 @@ export interface DatabaseConfig {
 }
 
 export interface RefinedDatabaseConfig {
-  type: 'sqlite' | 'd1' | 'libsql'
+  type: DatabaseType
   filename?: string
   bindingName?: string
   url?: string
   authToken?: string
-}
-
-/**
- * Resolve the database adapter connector path based on type and runtime
- */
-export async function resolveDatabaseAdapter(
-  type: 'sqlite' | 'd1' | 'libsql' | undefined,
-): Promise<string> {
-  const connectors: Record<string, string> = {
-    d1: 'db0/connectors/cloudflare-d1',
-    libsql: 'db0/connectors/libsql/node',
-  }
-
-  if (type && type !== 'sqlite' && connectors[type]) {
-    return connectors[type]
-  }
-
-  // Auto-detect best SQLite connector
-  if (process.versions.bun) {
-    return 'db0/connectors/bun-sqlite'
-  }
-
-  // Check if node:sqlite available (Node 22.5+)
-  const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
-  if (nodeVersion >= 22) {
-    return 'db0/connectors/node-sqlite'
-  }
-
-  return 'db0/connectors/better-sqlite3'
 }
 
 /**
@@ -54,10 +27,10 @@ export function refineDatabaseConfig(
 ): RefinedDatabaseConfig {
   const type = config.type || 'sqlite'
 
-  if (type === 'sqlite') {
+  if (type === 'sqlite' || type === 'bun') {
     const filename = config.filename || '.data/ai-ready/pages.db'
     return {
-      type: 'sqlite',
+      type,
       filename: isAbsolute(filename) ? filename : join(rootDir, filename),
     }
   }
@@ -66,6 +39,13 @@ export function refineDatabaseConfig(
     return {
       type: 'd1',
       bindingName: config.bindingName || 'DB',
+    }
+  }
+
+  if (type === 'neon') {
+    return {
+      type: 'neon',
+      url: config.url, // Will fallback to POSTGRES_URL at runtime
     }
   }
 
