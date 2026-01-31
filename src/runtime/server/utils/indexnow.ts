@@ -1,6 +1,10 @@
 import type { H3Event } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
+import {
+  deleteInfoValue,
+  getInfoValue,
+  setInfoValue,
+} from '../db'
 import {
   batchIndexNowUpdate,
   countPagesNeedingIndexNowSync,
@@ -32,28 +36,19 @@ interface BackoffInfo {
 }
 
 async function getBackoffInfo(event: H3Event | undefined): Promise<BackoffInfo | null> {
-  const db = await useDatabase(event).catch(() => null)
-  if (!db)
+  const value = await getInfoValue(event, 'indexnow_backoff').catch(() => null)
+  if (!value)
     return null
 
-  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
-  if (!row)
-    return null
-
-  const parsed = JSON.parse(row.value) as BackoffInfo
-  return parsed
+  return JSON.parse(value) as BackoffInfo
 }
 
 async function setBackoffInfo(event: H3Event | undefined, info: BackoffInfo | null): Promise<void> {
-  const db = await useDatabase(event).catch(() => null)
-  if (!db)
-    return
-
   if (info) {
-    await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['indexnow_backoff', JSON.stringify(info)])
+    await setInfoValue(event, 'indexnow_backoff', JSON.stringify(info)).catch(() => {})
   }
   else {
-    await db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
+    await deleteInfoValue(event, 'indexnow_backoff').catch(() => {})
   }
 }
 

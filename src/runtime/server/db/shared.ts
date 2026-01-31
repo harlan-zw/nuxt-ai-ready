@@ -1,5 +1,4 @@
 // Shared database utilities for build-time and runtime
-import type { Connector } from 'db0'
 import { subtle } from 'uncrypto'
 import { ALL_SCHEMA_SQL, DROP_TABLES_SQL, SCHEMA_VERSION } from './schema-sql'
 
@@ -18,30 +17,7 @@ export interface DatabaseAdapter {
   all: <T>(sql: string, params?: unknown[]) => Promise<T[]>
   first: <T>(sql: string, params?: unknown[]) => Promise<T | undefined>
   exec: (sql: string, params?: unknown[]) => Promise<void>
-  close: () => Promise<void>
-}
-
-/**
- * Create a DatabaseAdapter from a db0 Connector
- */
-export function createAdapter(connector: Connector): DatabaseAdapter {
-  return {
-    all: async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
-      const result = await connector.prepare(sql).all(...(params as never[]))
-      return (result || []) as T[]
-    },
-    first: async <T>(sql: string, params: unknown[] = []): Promise<T | undefined> => {
-      return connector.prepare(sql).get(...(params as never[])) as T | undefined
-    },
-    exec: async (sql: string, params: unknown[] = []): Promise<void> => {
-      await connector.prepare(sql).run(...(params as never[]))
-    },
-    close: async (): Promise<void> => {
-      if (connector.dispose) {
-        await connector.dispose()
-      }
-    },
-  }
+  close?: () => Promise<void>
 }
 
 /**

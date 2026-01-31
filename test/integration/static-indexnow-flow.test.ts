@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Integration test for static IndexNow flow
  *

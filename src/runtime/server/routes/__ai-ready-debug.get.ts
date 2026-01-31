@@ -1,7 +1,7 @@
 import type { PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { useDatabase } from '../db'
+import { useRawDb } from '../db'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
 import { fetchPublicAsset, hasAssets } from '../utils/cloudflare'
 
@@ -168,7 +168,7 @@ export default eventHandler(async (event) => {
     source = '#ai-ready-virtual/read-page-data.mjs (reads from filesystem)'
   }
   else {
-    source = 'database (db0 adapter)'
+    source = 'database'
   }
 
   // Check virtual module states
@@ -275,7 +275,7 @@ export default eventHandler(async (event) => {
         ])
 
         // Get backoff info
-        const db = await useDatabase(event)
+        const db = await useRawDb(event)
         const backoffRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
         let backoffInfo: { until: string, minutesRemaining: number, attempt: number } | null = null
         if (backoffRow) {
@@ -309,7 +309,7 @@ export default eventHandler(async (event) => {
       }
 
       // Build info - fetch stored build ID and dump metadata
-      const db = await useDatabase(event)
+      const db = await useRawDb(event)
       const storedRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['build_id'])
       const storedBuildId = storedRow?.value || null
 
