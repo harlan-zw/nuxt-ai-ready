@@ -33,6 +33,12 @@ Install `nuxt-ai-ready` dependency to your project:
 npx nuxi@latest module add nuxt-ai-ready
 ```
 
+> [!TIP]
+> Generate an Agent Skill for this package using [skilld](https://github.com/harlan-zw/skilld):
+> ```bash
+> npx skilld add nuxt-ai-ready
+> ```
+
 ## Documentation
 
 [📖 Read the full documentation](https://nuxtseo.com/ai-ready) for more information.
