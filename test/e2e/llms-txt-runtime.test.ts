@@ -40,7 +40,7 @@ describe('llms.txt runtime generation with sitemap', async () => {
   })
 
   it('llms.txt content is valid markdown format', async () => {
-    const llmsTxt = await $fetch('/llms.txt')
+    const llmsTxt = await $fetch('/llms.txt') as string
 
     // Should be valid llms.txt format with proper structure
     const lines = llmsTxt.split('\n')
