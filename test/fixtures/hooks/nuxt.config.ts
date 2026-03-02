@@ -12,7 +12,8 @@ export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   hooks: {
     // Test ai-ready:llms-txt hook
-    'ai-ready:llms-txt': (payload) => {
+    // @ts-expect-error hook registered by nuxt-ai-ready module
+    'ai-ready:llms-txt': (payload: { sections: Array<Record<string, unknown>>, notes: string[] }) => {
       console.log('[Hook] ai-ready:llms-txt called')
       payload.sections?.push({
         title: 'Custom Hook Section',

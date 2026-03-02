@@ -5,6 +5,7 @@ import { defineCommand, runMain } from 'citty'
 import { consola } from 'consola'
 import { colors } from 'consola/utils'
 import { join, resolve } from 'pathe'
+import { readPackageJSON } from 'pkg-types'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const secretPath = join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret')
@@ -18,9 +19,10 @@ const main = defineCommand({
   meta: {
     name: 'nuxt-ai-ready',
     description: 'Nuxt AI Ready CLI',
+    version: await readPackageJSON(import.meta.url).then(p => p.version || '0.0.0'),
   },
   subCommands: {
-    status: defineCommand({
+    status: () => defineCommand({
       meta: {
         name: 'status',
         description: 'Show indexing status and IndexNow sync progress',
@@ -39,7 +41,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve((args.cwd as string) || '.')
+        const cwd = resolve(args.cwd || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -82,7 +84,7 @@ const main = defineCommand({
       },
     }),
 
-    poll: defineCommand({
+    poll: () => defineCommand({
       meta: {
         name: 'poll',
         description: 'Trigger page indexing',
@@ -112,7 +114,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve((args.cwd as string) || '.')
+        const cwd = resolve(args.cwd || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -125,7 +127,7 @@ const main = defineCommand({
           params.set('all', 'true')
         }
         else {
-          params.set('limit', (args.limit as string) || '10')
+          params.set('limit', args.limit || '10')
         }
 
         const url = `${args.url}/__ai-ready/poll?${params}`
@@ -152,7 +154,7 @@ const main = defineCommand({
       },
     }),
 
-    restore: defineCommand({
+    restore: () => defineCommand({
       meta: {
         name: 'restore',
         description: 'Restore database from prerendered dump',
@@ -166,8 +168,9 @@ const main = defineCommand({
         },
         clear: {
           type: 'boolean',
-          description: 'Clear existing pages first (default: true)',
+          description: 'Clear existing pages first',
           default: true,
+          negativeDescription: 'Restore without clearing existing pages',
         },
         cwd: {
           type: 'string',
@@ -176,7 +179,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve((args.cwd as string) || '.')
+        const cwd = resolve(args.cwd || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -209,7 +212,7 @@ const main = defineCommand({
       },
     }),
 
-    prune: defineCommand({
+    prune: () => defineCommand({
       meta: {
         name: 'prune',
         description: 'Remove stale routes from database',
@@ -237,7 +240,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve((args.cwd as string) || '.')
+        const cwd = resolve(args.cwd || '.')
         const secret = await getSecret(cwd)
 
         if (!secret && !args.dry) {
@@ -251,7 +254,7 @@ const main = defineCommand({
         if (args.dry)
           params.set('dry', 'true')
         if (args.ttl)
-          params.set('ttl', args.ttl as string)
+          params.set('ttl', args.ttl)
 
         const url = `${args.url}/__ai-ready/prune?${params}`
         consola.info(`${args.dry ? 'Previewing' : 'Pruning'} stale routes at ${args.url}...`)
@@ -283,7 +286,7 @@ const main = defineCommand({
       },
     }),
 
-    indexnow: defineCommand({
+    indexnow: () => defineCommand({
       meta: {
         name: 'indexnow',
         description: 'Trigger IndexNow sync',
@@ -308,7 +311,7 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        const cwd = resolve((args.cwd as string) || '.')
+        const cwd = resolve(args.cwd || '.')
         const secret = await getSecret(cwd)
 
         if (!secret) {
@@ -318,7 +321,7 @@ const main = defineCommand({
 
         const params = new URLSearchParams({
           secret,
-          limit: (args.limit as string) || '100',
+          limit: args.limit || '100',
         })
 
         const url = `${args.url}/__ai-ready/indexnow?${params}`

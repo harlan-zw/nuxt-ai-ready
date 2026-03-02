@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.11.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.11.0...main)
+
+### 🚀 Enhancements
+
+- Add Vercel Edge & Neon Postgres support with Drizzle ORM ([#11](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/11))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.10.11...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.10.11...main)

@@ -28,6 +28,13 @@ export interface ModuleHooks {
   }) => void | Promise<void>
 }
 
+declare module '@nuxt/schema' {
+  interface NuxtHooks {
+    'ai-ready:page:markdown': ModuleHooks['ai-ready:page:markdown']
+    'ai-ready:llms-txt': ModuleHooks['ai-ready:llms-txt']
+  }
+}
+
 export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
@@ -145,9 +152,9 @@ export default defineNuxtModule<ModuleOptions>({
     // Database type is passed to runtime config - the drizzle client handles provider selection
 
     // set default MCP name
-    if (!nuxt.options.mcp?.name) {
-      nuxt.options.mcp = nuxt.options.mcp || {}
-      nuxt.options.mcp.name = useSiteConfig().name
+    if (nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
+      nuxt.options.mcp = nuxt.options.mcp || {} as Record<string, unknown>
+      ;(nuxt.options.mcp as Record<string, unknown>).name = useSiteConfig().name
     }
 
     // Add runtime server directories to Nitro scan
@@ -157,9 +164,11 @@ export default defineNuxtModule<ModuleOptions>({
     )
 
     if (typeof config.contentSignal === 'object') {
-      nuxt.options.robots = nuxt.options.robots || {}
-      nuxt.options.robots.groups = nuxt.options.robots.groups || []
-      nuxt.options.robots.groups.push({
+      const robotsOpts = (nuxt.options.robots !== false ? nuxt.options.robots : {}) as Record<string, unknown>
+      nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
+      const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
+      robotsOpts.groups = groups
+      groups.push({
         userAgent: '*',
         contentUsage: [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`],
         contentSignal: [`ai-train=${config.contentSignal.aiTrain ? 'yes' : 'no'}`, `search=${config.contentSignal.search ? 'yes' : 'no'}`, `ai-input=${config.contentSignal.aiInput ? 'yes' : 'no'}`],
@@ -186,7 +195,7 @@ export default defineNuxtModule<ModuleOptions>({
     const hasMCP = hasNuxtModule('@nuxtjs/mcp-toolkit')
     if (hasMCP) {
       // Register MCP definitions from runtime directory
-      nuxt.hook('mcp:definitions:paths', (paths) => {
+      nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
         const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
         const mcpConfig = config.mcp || {}
         if (mcpConfig.tools !== false)
@@ -198,7 +207,7 @@ export default defineNuxtModule<ModuleOptions>({
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
       const mcpLink = {
         title: 'MCP',
-        href: withSiteUrl(nuxt.options.mcp?.route || '/mcp'),
+        href: withSiteUrl((nuxt.options.mcp !== false && nuxt.options.mcp?.route) || '/mcp'),
         description: 'Model Context Protocol server endpoint for AI agent integration.',
       }
 
@@ -229,7 +238,7 @@ export default defineNuxtModule<ModuleOptions>({
       sections: mergedLlmsTxt.sections || [],
       notes: typeof mergedLlmsTxt.notes === 'string' ? [mergedLlmsTxt.notes] : (mergedLlmsTxt.notes || []),
     }
-    await nuxt.callHook('ai-ready:llms-txt', llmsTxtPayload)
+    await nuxt.callHook('ai-ready:llms-txt' as any, llmsTxtPayload)
     mergedLlmsTxt.sections = llmsTxtPayload.sections
     mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
 

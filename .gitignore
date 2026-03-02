@@ -64,3 +64,6 @@ Temporary Items
 
 .temp-test
 .claude
+
+# Skilld references (recreated by `skilld install`)
+.skilld

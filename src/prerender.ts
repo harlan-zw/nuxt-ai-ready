@@ -198,7 +198,7 @@ async function processMarkdownRoute(
       updatedAt = parsedDate.toISOString()
   }
 
-  await nuxt.hooks.callHook('ai-ready:page:markdown', { route, markdown, title, description, headings })
+  await nuxt.hooks.callHook('ai-ready:page:markdown' as any, { route, markdown, title, description, headings })
 
   // Insert into SQLite database
   if (state.db) {
@@ -560,7 +560,7 @@ export function setupPrerenderHandler(
 
     if (useSitemapHook) {
       // sitemap:prerender:done fires after sitemap.xml is written
-      nuxt.hooks.hook('sitemap:prerender:done', async (ctx) => {
+      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ content: string }> }) => {
         if (!state.initialized)
           return
 

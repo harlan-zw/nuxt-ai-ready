@@ -79,12 +79,12 @@ export function hookNuxtSeoProLicense() {
       }).catch((err) => {
         // 401 = invalid key, 403 = no active subscription
         if (err?.response?.status === 401) {
-          spinner.stop('❌ Invalid API key')
+          spinner.error('Invalid API key')
           p.note('Your API key is invalid.\n\nhttps://nuxtseo.com/pro/dashboard', 'License Issue')
           throw new Error('Invalid Nuxt SEO Pro API key.')
         }
         if (err?.response?.status === 403) {
-          spinner.stop('❌ No active subscription')
+          spinner.error('No active subscription')
           p.note('Your subscription has expired or is inactive.\n\nhttps://nuxtseo.com/pro/dashboard', 'License Issue')
           throw new Error('No active Nuxt SEO Pro subscription.')
         }
@@ -92,7 +92,7 @@ export function hookNuxtSeoProLicense() {
         return null
       })
       if (!res) {
-        spinner.stop('⚠️  License verification skipped (network issue)')
+        spinner.cancel('License verification skipped (network issue)')
         return
       }
       spinner.stop('License verified ✓')

@@ -189,3 +189,8 @@ Config key: `aiReady` in nuxt.config.ts
 - MCP paths registered via `mcp:definitions:paths` hook (from @nuxtjs/mcp-toolkit)
 - Prerendering required for `llms-full.txt` generation (`nuxi generate` or `nuxi build --prerender`)
 - SPA mode without prerendering has limited functionality
+
+<!-- skilld -->
+Before modifying code, evaluate each installed skill against the current task.
+For each skill, determine YES/NO relevance and invoke all YES skills before proceeding.
+<!-- /skilld -->
