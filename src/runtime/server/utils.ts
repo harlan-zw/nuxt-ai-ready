@@ -101,8 +101,8 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { p
 
   // Normalize path
   let path = isExplicit ? originalPath.slice(0, -3) : originalPath
-  if (path === '/index') {
-    path = '/'
+  if (path.endsWith('/index')) {
+    path = path.slice(0, -5) || '/'
   }
 
   return { path, isExplicit }

@@ -249,7 +249,7 @@ async function processSitemapEntry(
     return { crawled: false, skipped: true }
   }
 
-  const mdRoute = route === '/' ? '/index.md' : `${route}.md`
+  const mdRoute = route.endsWith('/') ? `${route}index.md` : `${route}.md`
   const mdUrl = withBase(mdRoute, nitro.options.baseURL)
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
