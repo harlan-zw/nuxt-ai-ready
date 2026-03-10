@@ -67,8 +67,8 @@ function getMarkdownRenderInfoPath(
 
   // Normalize path
   let path = isExplicit ? originalPath.slice(0, -3) : originalPath
-  if (path === '/index') {
-    path = '/'
+  if (path.endsWith('/index')) {
+    path = path.slice(0, -5) || '/'
   }
 
   return { path, isExplicit }
@@ -134,7 +134,12 @@ describe('getMarkdownRenderInfo path logic', () => {
 
     it('handles trailing slash pattern', () => {
       const result = getMarkdownRenderInfoPath('/about/index.md', true, false)
-      expect(result).toEqual({ path: '/about/index', isExplicit: true })
+      expect(result).toEqual({ path: '/about/', isExplicit: true })
+    })
+
+    it('normalizes nested /index.md paths', () => {
+      const result = getMarkdownRenderInfoPath('/docs/getting-started/index.md', true, false)
+      expect(result).toEqual({ path: '/docs/getting-started/', isExplicit: true })
     })
   })
 

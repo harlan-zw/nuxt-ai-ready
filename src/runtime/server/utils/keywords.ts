@@ -302,5 +302,6 @@ export function extractKeywords(text: string, metaKeywords?: string, max = 10): 
     freq.set(word, (freq.get(word) || 0) + 1)
 
   // Sort by frequency, take top N
-  return freq.entries().toSorted((a, b) => b[1] - a[1]).slice(0, max).map(([word]) => word)
+  const entries: [string, number][] = [...freq]
+  return entries.sort((a, b) => b[1] - a[1]).slice(0, max).map(([word]) => word)
 }
