@@ -32,7 +32,7 @@ catalog:
   drizzle-orm: ^0.45.1
   eslint-plugin-harlanzw: ^0.5.15
   execa: ^9.6.1
-  mdream: ^0.16.0
+  mdream: ^0.17.0
   ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0

@@ -5,6 +5,7 @@ import type { MarkdownContext } from '../types'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeader, getHeaders } from 'h3'
 import { htmlToMarkdown } from 'mdream'
+import { shouldServeMarkdown } from 'mdream/negotiate'
 import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp } from 'nitropack/runtime'
@@ -108,23 +109,13 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { p
 }
 
 // Detect if client prefers markdown based on Accept header or AI bot detection
-function clientPrefersMarkdown(event: H3Event): boolean {
-  const accept = getHeader(event, 'accept') || ''
+export function clientPrefersMarkdown(event: H3Event): boolean {
+  const acceptHeader = getHeader(event, 'accept') || ''
   const secFetchDest = getHeader(event, 'sec-fetch-dest') || ''
 
   // Browsers send sec-fetch-dest header - if it's 'document', it's a browser navigation
   if (secFetchDest === 'document') {
     return false
-  }
-
-  // If client accepts text/html, serve HTML (browser behavior)
-  if (accept.includes('text/html')) {
-    return false
-  }
-
-  // Explicit text/markdown request
-  if (accept.includes('text/markdown')) {
-    return true
   }
 
   // Check if it's an AI bot via nuxt/robots
@@ -133,7 +124,7 @@ function clientPrefersMarkdown(event: H3Event): boolean {
     return true
   }
 
-  return false
+  return shouldServeMarkdown(acceptHeader, secFetchDest)
 }
 
 interface ConvertHtmlOptions {
