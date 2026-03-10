@@ -1,4 +1,5 @@
 import antfu from '@antfu/eslint-config'
+import harlanzw from 'eslint-plugin-harlanzw'
 
 export default antfu({
   ignores: [
@@ -12,4 +13,4 @@ export default antfu({
     'no-use-before-define': 'off',
     'node/prefer-global/buffer': 'off',
   },
-})
+}, ...harlanzw())

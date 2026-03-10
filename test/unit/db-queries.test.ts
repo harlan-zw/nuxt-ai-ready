@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+const RE_LEADING_SLASH = /^\//
+const RE_SLASH = /\//g
+
 // Create a minimal DatabaseAdapter interface for testing
 interface TestDatabaseAdapter {
   exec: (sql: string, params?: unknown[]) => Promise<void>
@@ -24,7 +27,7 @@ function createTestAdapter(db: Database.Database): TestDatabaseAdapter {
 
 // Inline the functions we're testing (to avoid module resolution issues)
 function normalizeRouteKey(route: string): string {
-  return route.replace(/^\//, '').replace(/\//g, ':') || 'index'
+  return route.replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
 }
 
 async function seedRoutes(db: TestDatabaseAdapter, routes: string[]): Promise<number> {

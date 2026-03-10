@@ -9,7 +9,7 @@ export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(markdown)
   const hashBuffer = await subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashArray = [...new Uint8Array(hashBuffer)]
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
 }
 
@@ -58,12 +58,15 @@ async function getSchemaVersion(db: DatabaseAdapter): Promise<string | null> {
   return info?.version || null
 }
 
+const RE_LEADING_SLASH = /^\//
+const RE_SLASH = /\//g
+
 /**
  * Normalize route to storage key format
  * e.g., '/about/team' -> 'about:team', '/' -> 'index'
  */
 export function normalizeRouteKey(route: string): string {
-  return route.replace(/^\//, '').replace(/\//g, ':') || 'index'
+  return route.replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
 }
 
 /**

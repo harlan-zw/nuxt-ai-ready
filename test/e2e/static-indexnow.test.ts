@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
+const RE_HEX_16 = /^[0-9a-f]{16}$/
+
 interface BuildMeta {
   buildId: string
   pageCount: number
@@ -95,7 +97,7 @@ describe('static IndexNow: pages.meta.json', async () => {
       const meta = await $fetch('/__ai-ready/pages.meta.json') as BuildMeta
 
       for (const hash of Object.values(meta.pages)) {
-        expect(hash).toMatch(/^[0-9a-f]{16}$/)
+        expect(hash).toMatch(RE_HEX_16)
       }
     })
   })

@@ -1,6 +1,8 @@
 import { htmlToMarkdown } from 'mdream'
 import { describe, expect, it } from 'vitest'
 
+const RE_NBSP = /\u00A0/g
+
 // Test that mdream origin should be just the site origin, not full URL
 // This ensures absolute paths like /docs/foo resolve correctly
 describe('mdream origin handling', () => {
@@ -27,7 +29,7 @@ describe('mdream origin handling', () => {
 
 // Test normalizeWhitespace logic
 function normalizeWhitespace(text: string): string {
-  return text.replace(/\u00A0/g, ' ')
+  return text.replace(RE_NBSP, ' ')
 }
 
 // Test getMarkdownRenderInfo path logic (without H3 event dependency)

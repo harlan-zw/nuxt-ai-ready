@@ -1,6 +1,8 @@
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from '../../src/runtime/types'
 import { describe, expect, it } from 'vitest'
 
+const RE_MD_SECTIONS = /## Section 1\n\n\n## Section 2/
+
 // Inline normalize functions to avoid Nuxt runtime deps
 function normalizeLink(link: LlmsTxtLink): string {
   const parts: string[] = []
@@ -314,7 +316,7 @@ describe('llms.txt normalizer', () => {
 
       const result = normalizeLlmsTxtConfig(config)
       // Sections should be separated
-      expect(result).toMatch(/## Section 1\n\n\n## Section 2/)
+      expect(result).toMatch(RE_MD_SECTIONS)
     })
 
     it('should handle sections with only links (no description)', () => {

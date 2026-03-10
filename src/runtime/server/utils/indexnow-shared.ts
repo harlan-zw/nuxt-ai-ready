@@ -117,7 +117,7 @@ export async function submitToIndexNowShared(
   return {
     success: false,
     error: lastError || 'All endpoints rate limited',
-    host: endpoints[endpoints.length - 1],
+    host: endpoints.at(-1),
   }
 }
 

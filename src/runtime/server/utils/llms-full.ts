@@ -5,6 +5,10 @@
 import type { LlmsTxtConfig } from '../../types'
 import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
 
+const RE_TRAILING_SLASH = /\/$/
+const RE_FRONTMATTER = /^---\n[\s\S]*?\n---\n*/
+const RE_HEADING = /^(#{1,6}) ([^\n]+)$/gm
+
 export function formatPageForLlmsFullTxt(
   route: string,
   title: string,
@@ -12,14 +16,14 @@ export function formatPageForLlmsFullTxt(
   markdown: string,
   siteUrl?: string,
 ): string {
-  const canonicalUrl = siteUrl ? `${siteUrl.replace(/\/$/, '')}${route}` : route
+  const canonicalUrl = siteUrl ? `${siteUrl.replace(RE_TRAILING_SLASH, '')}${route}` : route
   const heading = title && title !== route ? `### ${title}` : `### ${route}`
 
   // Strip frontmatter and normalize headings (h1 → h1., etc)
 
   const content = markdown
-    .replace(/^---\n[\s\S]*?\n---\n*/, '')
-    .replace(/^(#{1,6}) ([^\n]+)$/gm, (_, hashes, text) => `h${(hashes as string).length}. ${text}`)
+    .replace(RE_FRONTMATTER, '')
+    .replace(RE_HEADING, (_, hashes, text) => `h${(hashes as string).length}. ${text}`)
 
   const parts = [heading, '']
   parts.push(`Source: ${canonicalUrl}`)

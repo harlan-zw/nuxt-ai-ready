@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/cloudflare')
 
+const RE_MD_H1 = /^# /
+const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
+
 describe('cloudflare module build output', async () => {
   await setup({
     server: false,
@@ -45,10 +48,10 @@ describe('cloudflare module build output', async () => {
     const llmsTxt = await readFile(join(outputDir, 'public', 'llms.txt'), 'utf-8')
 
     // Should have header
-    expect(llmsTxt).toMatch(/^# /)
+    expect(llmsTxt).toMatch(RE_MD_H1)
 
     // Should have pages section
-    expect(llmsTxt).toMatch(/## (Prerendered )?Pages/)
+    expect(llmsTxt).toMatch(RE_MD_PAGES_HEADING)
 
     // Should have page titles
     expect(llmsTxt).toContain('Welcome to Test Site')

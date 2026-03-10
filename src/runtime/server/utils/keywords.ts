@@ -1,6 +1,10 @@
 // Simple keyword extractor - English only, no dependencies
 // Based on keyword-extractor but simplified for our use case
 
+const RE_NON_WORD_CHARS = /[^\w\s-]/g
+const RE_WHITESPACE = /\s+/
+const RE_DIGITS = /^\d+$/
+
 const STOPWORDS = new Set([
   // Articles, pronouns, prepositions
   'a',
@@ -288,9 +292,9 @@ export function extractKeywords(text: string, metaKeywords?: string, max = 10): 
   // Tokenize: lowercase, split on non-word chars, filter
   const words = text
     .toLowerCase()
-    .replace(/[^\w\s-]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !STOPWORDS.has(w) && !/^\d+$/.test(w))
+    .replace(RE_NON_WORD_CHARS, ' ')
+    .split(RE_WHITESPACE)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w) && !RE_DIGITS.test(w))
 
   // Count frequency
   const freq = new Map<string, number>()
@@ -298,8 +302,5 @@ export function extractKeywords(text: string, metaKeywords?: string, max = 10): 
     freq.set(word, (freq.get(word) || 0) + 1)
 
   // Sort by frequency, take top N
-  return Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, max)
-    .map(([word]) => word)
+  return freq.entries().toSorted((a, b) => b[1] - a[1]).slice(0, max).map(([word]) => word)
 }

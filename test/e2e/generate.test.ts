@@ -4,6 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
+const RE_MD_H1 = /^# /
+const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
+const RE_MD_LINK_WELCOME = /\[Welcome to Test Site\]\(\/?/
+const RE_MD_LINK_ABOUT = /\[About · Test Site — UTF-8 Support\]\(\/about\)/
+const RE_MD_SOURCE_URL = /Source: https?:\/\//
+const RE_MD_H1_M = /^# /m
+
 describe('nuxt generate (static build)', async () => {
   await setup({
     rootDir: resolve('../fixtures/basic'),
@@ -25,21 +32,21 @@ describe('nuxt generate (static build)', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       // Header with site name
-      expect(llmsTxt).toMatch(/^# /)
+      expect(llmsTxt).toMatch(RE_MD_H1)
 
       // Canonical Origin section
       expect(llmsTxt).toContain('Canonical Origin:')
 
       // Pages section (either "## Pages" or "## Prerendered Pages" when both types exist)
-      expect(llmsTxt).toMatch(/## (Prerendered )?Pages/)
+      expect(llmsTxt).toMatch(RE_MD_PAGES_HEADING)
     })
 
     it('includes page titles with links', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       // Pages should have markdown links with titles
-      expect(llmsTxt).toMatch(/\[Welcome to Test Site\]\(\/?/)
-      expect(llmsTxt).toMatch(/\[About · Test Site — UTF-8 Support\]\(\/about\)/)
+      expect(llmsTxt).toMatch(RE_MD_LINK_WELCOME)
+      expect(llmsTxt).toMatch(RE_MD_LINK_ABOUT)
     })
 
     it('includes page descriptions', async () => {
@@ -63,7 +70,7 @@ describe('nuxt generate (static build)', async () => {
       const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Header
-      expect(llmsFullTxt).toMatch(/^# /)
+      expect(llmsFullTxt).toMatch(RE_MD_H1)
 
       // Pages section
       expect(llmsFullTxt).toContain('## Pages')
@@ -76,7 +83,7 @@ describe('nuxt generate (static build)', async () => {
       const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Source URLs for pages
-      expect(llmsFullTxt).toMatch(/Source: https?:\/\//)
+      expect(llmsFullTxt).toMatch(RE_MD_SOURCE_URL)
     })
 
     it('preserves markdown content from pages', async () => {
@@ -127,7 +134,7 @@ describe('nuxt generate (static build)', async () => {
       const indexMd = await $fetch('/index.md', { responseType: 'text' })
 
       // h1 and h2 headings converted
-      expect(indexMd).toMatch(/^# /m)
+      expect(indexMd).toMatch(RE_MD_H1_M)
       expect(indexMd).toContain('## Features')
     })
   })

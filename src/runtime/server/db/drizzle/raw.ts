@@ -23,6 +23,8 @@ export function registerDriver(
   driverCache.set(db, { type, driver })
 }
 
+const RE_PARAM_PLACEHOLDER = /\?/g
+
 /**
  * Get raw SQL executor for a Drizzle client
  */
@@ -57,7 +59,7 @@ export function getRawExecutor(client: DrizzleDatabase) {
           const sqlFn = driver as { query: (sql: string, params: unknown[]) => Promise<{ rows: unknown[] } | unknown[]> }
           // Convert ? to $1, $2, etc
           let idx = 0
-          const pgQuery = query.replace(/\?/g, () => `$${++idx}`)
+          const pgQuery = query.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
           const result = await sqlFn.query(pgQuery, params)
           return ((result as any).rows || result) as T[]
         }
@@ -89,7 +91,7 @@ export function getRawExecutor(client: DrizzleDatabase) {
         case 'neon': {
           const sqlFn = driver as { query: (sql: string, params: unknown[]) => Promise<void> }
           let idx = 0
-          const pgQuery = query.replace(/\?/g, () => `$${++idx}`)
+          const pgQuery = query.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
           await sqlFn.query(pgQuery, params)
           break
         }

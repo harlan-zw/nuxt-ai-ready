@@ -47,8 +47,11 @@ export interface PageMetaOutput {
 // Helpers
 // ============================================================================
 
+const RE_LEADING_SLASH = /^\//
+const RE_SLASH = /\//g
+
 function normalizeRouteKey(route: string): string {
-  return route.replace(/^\//, '').replace(/\//g, ':') || 'index'
+  return route.replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
 }
 
 function rowToPage(row: any): PageOutput {

@@ -20,6 +20,9 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
 let devWarningShown = false
 let schemaInitialized = false
 
+const RE_FTS_CHARS = /[*:^"()]/g
+const RE_WHITESPACE = /\s+/
+
 /** Get database, with dev mode warning and prerender handling */
 async function getDb(event?: H3Event): Promise<RawExecutor | null> {
   if (import.meta.dev) {
@@ -386,12 +389,12 @@ export async function searchPages(
   const { limit = 10 } = options
 
   // Sanitize and prepare query for FTS5
-  const sanitized = query.replace(/[*:^"()]/g, ' ').trim()
+  const sanitized = query.replace(RE_FTS_CHARS, ' ').trim()
   if (!sanitized)
     return []
 
   // Add prefix matching for partial words
-  const terms = sanitized.split(/\s+/).map(t => `${t}*`).join(' ')
+  const terms = sanitized.split(RE_WHITESPACE).map(t => `${t}*`).join(' ')
 
   // BM25 weights: route, title, description, markdown, headings, keywords
   return db.all<SearchResult>(`

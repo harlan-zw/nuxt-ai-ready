@@ -8,7 +8,7 @@
 
 ## Why Nuxt AI Ready?
 
-ChatGPT search interest doubled in the past year. Users now ask AI assistants questions your site could answer—but LLMs only cite sources they can parse.
+[ChatGPT](https://chatgpt.com) search interest doubled in the past year. Users now ask AI assistants questions your site could answer - but LLMs only cite sources they can parse.
 
 Two standards are emerging: [llms.txt](https://llmstxt.org/) (4,400 searches/mo, +26,900% YoY) for AI-readable site summaries, and [MCP](https://modelcontextprotocol.io/) (22,200 searches/mo) for letting agents query your content directly.
 

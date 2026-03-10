@@ -17,6 +17,10 @@ import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/serv
 
 const BUILD_FETCH_TIMEOUT = 15000 // 15s timeout for build-time fetches
 
+const RE_HTML_MD_EXT = /\.(html|md)$/
+const RE_INDEX_SUFFIX = /\/index$/
+const RE_MD_EXT = /\.md$/
+
 export interface ParsedMarkdownResult {
   markdown: string
   title: string
@@ -405,7 +409,7 @@ export function setupPrerenderHandler(
     nitro.hooks.hook('prerender:generate', async (route) => {
       // Track error routes for filtering in llms.txt
       if (route.error) {
-        const pageRoute = route.route.replace(/\.(html|md)$/, '').replace(/\/index$/, '') || '/'
+        const pageRoute = route.route.replace(RE_HTML_MD_EXT, '').replace(RE_INDEX_SUFFIX, '') || '/'
         state.errorRoutes.add(pageRoute)
         logger.debug(`Detected error page: ${pageRoute}`)
         return
@@ -414,7 +418,7 @@ export function setupPrerenderHandler(
       if (!route.fileName?.endsWith('.md'))
         return
 
-      let pageRoute = route.route.replace(/\.md$/, '')
+      let pageRoute = route.route.replace(RE_MD_EXT, '')
       if (pageRoute === '/index')
         pageRoute = '/'
 

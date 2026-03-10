@@ -9,6 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/cloudflare')
 
+const RE_MD_H1 = /^# /
+
 // cloudflare-module preset doesn't work with wrangler dev locally
 // (requires __STATIC_CONTENT_MANIFEST which is only available in deployed workers)
 // This test is skipped - use cloudflare-pages preset for local wrangler testing
@@ -111,7 +113,7 @@ describe.skip('cloudflare D1 runtime', async () => {
     expect(response.ok).toBe(true)
 
     const text = await response.text()
-    expect(text).toMatch(/^# /)
+    expect(text).toMatch(RE_MD_H1)
     expect(text).toContain('Test Site')
   })
 

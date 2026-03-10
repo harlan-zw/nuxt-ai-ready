@@ -9,6 +9,28 @@
 
 - Add Vercel Edge & Neon Postgres support with Drizzle ORM ([#11](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/11))
 
+### 📖 Documentation
+
+- Add skilld agent skill snippet ([#13](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/13))
+
+### 🏡 Chore
+
+- Release v0.11.0 ([97a91e7](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/97a91e7))
+- Sync ([e2f353e](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/e2f353e))
+- Test ([1cb12b1](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/1cb12b1))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v0.11.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.11.0...main)
+
+### 🚀 Enhancements
+
+- Add Vercel Edge & Neon Postgres support with Drizzle ORM ([#11](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/11))
+
 ### ❤️ Contributors
 
 - Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))

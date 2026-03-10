@@ -1,3 +1,4 @@
+/* eslint-disable harlanzw/vue-no-faux-composables */
 import type * as schema from '#ai-ready-virtual/db-schema.mjs'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'

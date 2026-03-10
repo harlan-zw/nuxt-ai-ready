@@ -9,9 +9,11 @@ import { extractionPlugin } from 'mdream/plugins'
 import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp } from 'nitropack/runtime'
 
+const RE_NBSP = /\u00A0/g
+
 // Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
 function normalizeWhitespace(text: string): string {
-  return text.replace(/\u00A0/g, ' ')
+  return text.replace(RE_NBSP, ' ')
 }
 
 interface ExtractedMeta {

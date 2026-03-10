@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
+const RE_MD_H1 = /^# /
+const RE_MD_ABS_LINK = /- \[.*\]\(https?:\/\//
+
 describe('llms.txt runtime generation with sitemap', async () => {
   await setup({
     rootDir: resolve('../fixtures/basic'),
@@ -46,9 +49,9 @@ describe('llms.txt runtime generation with sitemap', async () => {
     const lines = llmsTxt.split('\n')
 
     // First line should be header
-    expect(lines[0]).toMatch(/^# /)
+    expect(lines[0]).toMatch(RE_MD_H1)
 
     // Should have sitemap/robots links with absolute URLs
-    expect(llmsTxt).toMatch(/- \[.*\]\(https?:\/\//)
+    expect(llmsTxt).toMatch(RE_MD_ABS_LINK)
   })
 })

@@ -1,3 +1,4 @@
+/* eslint-disable harlanzw/vue-no-faux-composables */
 import type { H3Event } from 'h3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
