@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import type { HTMLToMarkdownOptions } from 'mdream'
+import type { MdreamOptions } from 'mdream'
 
 export interface ModuleOptions {
   /**
@@ -17,12 +17,7 @@ export interface ModuleOptions {
   /**
    * Options to pass to mdream htmlToMarkdown function
    */
-  mdreamOptions?: HTMLToMarkdownOptions & {
-    /**
-     * Preset to apply to the htmlToMarkdown function
-     */
-    preset?: 'minimal'
-  }
+  mdreamOptions?: MdreamOptions
 
   /**
    * Cache configuration
@@ -91,10 +86,10 @@ export interface ModuleOptions {
     /**
      * Database type - auto-detected if not specified
      * - 'sqlite': Local SQLite via better-sqlite3 (default for Node.js)
-     * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun)
      * - 'd1': Cloudflare D1 (auto-detected on Cloudflare)
-     * - 'libsql': Turso/LibSQL
-     * - 'neon': Vercel Postgres via Neon serverless (auto-detected on Vercel with POSTGRES_URL)
+     * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun) [experimental]
+     * - 'libsql': Turso/LibSQL [experimental]
+     * - 'neon': Vercel Postgres via Neon serverless (auto-detected on Vercel with POSTGRES_URL) [experimental]
      * @default 'sqlite' (auto-detects based on platform)
      */
     type?: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'

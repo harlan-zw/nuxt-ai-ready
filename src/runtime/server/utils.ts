@@ -1,13 +1,11 @@
 import type { H3Event } from 'h3'
-import type { HTMLToMarkdownOptions } from 'mdream'
+import type { MdreamOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../module'
 import type { MarkdownContext } from '../types'
+import { shouldServeMarkdown } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeader, getHeaders } from 'h3'
 import { htmlToMarkdown } from 'mdream'
-import { shouldServeMarkdown } from 'mdream/negotiate'
-import { extractionPlugin } from 'mdream/plugins'
-import { withMinimalPreset } from 'mdream/preset/minimal'
 import { useNitroApp } from 'nitropack/runtime'
 
 const RE_NBSP = /\u00A0/g
@@ -32,15 +30,15 @@ function buildMdreamOptions(
   mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions'],
   meta: ExtractedMeta,
   extractUpdatedAt = false,
-): HTMLToMarkdownOptions {
-  const extractPlugin = extractionPlugin({
+): MdreamOptions {
+  const extraction: MdreamOptions['extraction'] = {
     'title': (el) => { meta.title = el.textContent },
     'meta[name="description"]': (el) => { meta.description = el.attributes.content || '' },
     'meta[name="keywords"]': (el) => { meta.metaKeywords = el.attributes.content || '' },
     'h1, h2, h3, h4, h5, h6': (el) => {
       const text = el.textContent?.trim()
       if (text)
-        meta.headings.push({ [el.name.toLowerCase()]: text })
+        meta.headings.push({ [el.tagName.toLowerCase()]: text })
     },
     'p, li, td, th, blockquote, figcaption': (el) => {
       const text = el.textContent?.trim()
@@ -53,16 +51,15 @@ function buildMdreamOptions(
           meta.updatedAt = el.attributes.content
       },
     }),
-  })
+  }
 
   // Use just the origin (not full URL) so absolute paths like /docs/foo resolve correctly
   const origin = new URL(url).origin
-  let options: HTMLToMarkdownOptions = { origin, ...mdreamOptions }
-  if (mdreamOptions?.preset === 'minimal') {
-    options = withMinimalPreset(options)
+  return {
+    origin,
+    ...mdreamOptions,
+    extraction: { ...extraction, ...mdreamOptions?.extraction },
   }
-  options.plugins = [extractPlugin, ...(options.plugins || [])]
-  return options
 }
 
 // Check if request should be rendered as markdown
