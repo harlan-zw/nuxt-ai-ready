@@ -29,10 +29,7 @@ describe('runtime indexing', async () => {
     expect(typeof md).toBe('string')
   })
 
-  it('provides page data via MCP list_pages after indexing', async () => {
-    // The list_pages tool should return indexed pages
-    // Note: This depends on MCP being available
-    // For now we just verify the pages are accessible
+  it('serves about page as markdown', async () => {
     const aboutMd = await fetch('/about.md')
     expect(aboutMd).toBeTruthy()
   })
