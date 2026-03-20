@@ -41,20 +41,19 @@ describe('nuxt generate (static build)', async () => {
       expect(llmsTxt).toMatch(RE_MD_PAGES_HEADING)
     })
 
-    it('includes page titles with links', async () => {
+    it('includes page routes with descriptions', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
-      // Pages should have markdown links with titles
-      expect(llmsTxt).toMatch(RE_MD_LINK_WELCOME)
-      expect(llmsTxt).toMatch(RE_MD_LINK_ABOUT)
+      // Pages listed as "- /route: description"
+      expect(llmsTxt).toContain('- /: ')
+      expect(llmsTxt).toContain('- /about: ')
     })
 
     it('includes page descriptions', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
-      // Pages should have descriptions after the link: [Title](/path): Description
-      expect(llmsTxt).toContain('): A test site for the Nuxt AI Search module')
-      expect(llmsTxt).toContain('): Learn about this test site')
+      expect(llmsTxt).toContain('A test site for the Nuxt AI Search module')
+      expect(llmsTxt).toContain('Learn about this test site')
     })
 
     it('includes LLM Resources section', async () => {
