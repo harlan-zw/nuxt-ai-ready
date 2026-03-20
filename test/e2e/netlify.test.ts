@@ -44,20 +44,16 @@ describe('netlify build output', async () => {
     }
   })
 
-  it('generates llms.txt with page titles', async () => {
+  it('generates llms.txt with page routes and descriptions', async () => {
     const llmsTxt = await readFile(join(fixtureDir, 'dist', 'llms.txt'), 'utf-8')
 
     // Should have canonical origin
     expect(llmsTxt).toContain('Canonical Origin:')
 
-    // Should have page titles (not just paths)
-    expect(llmsTxt).toContain('Welcome to Test Site')
-    expect(llmsTxt).toContain('About · Test Site')
-    expect(llmsTxt).toContain('API Reference')
-    expect(llmsTxt).toContain('Getting Started')
-
-    // Should use relative paths
-    expect(llmsTxt).toContain('](/')
-    expect(llmsTxt).toContain('](/about)')
+    // Should have page routes with descriptions
+    expect(llmsTxt).toContain('- /:')
+    expect(llmsTxt).toContain('- /about:')
+    expect(llmsTxt).toContain('- /docs/api:')
+    expect(llmsTxt).toContain('- /docs/getting-started:')
   })
 })

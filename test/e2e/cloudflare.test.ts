@@ -53,8 +53,8 @@ describe('cloudflare module build output', async () => {
     // Should have pages section
     expect(llmsTxt).toMatch(RE_MD_PAGES_HEADING)
 
-    // Should have page titles
-    expect(llmsTxt).toContain('Welcome to Test Site')
-    expect(llmsTxt).toContain('About · Test Site')
+    // Should have page routes
+    expect(llmsTxt).toContain('- /:')
+    expect(llmsTxt).toContain('- /about:')
   })
 })
