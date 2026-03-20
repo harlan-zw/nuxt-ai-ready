@@ -1,24 +1,19 @@
-import type { ModulePublicRuntimeConfig } from '../../../../module'
-import { createError, eventHandler, getQuery } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, getQuery } from 'h3'
 import { batchIndexPages } from '../../utils/batchIndex'
 
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const { requireAuth } = await import('../../utils/auth')
+  requireAuth(event)
+
   const query = getQuery(event)
 
-  // Check secret if configured
-  if (config.runtimeSyncSecret) {
-    const secret = query.secret as string
-    if (secret !== config.runtimeSyncSecret) {
-      throw createError({ statusCode: 401, message: 'Unauthorized' })
-    }
-  }
+  const limit = query.limit ? Math.max(1, Math.min(50, Math.trunc(Number(query.limit)) || 10)) : undefined
+  const timeout = query.timeout ? Math.max(1000, Math.trunc(Number(query.timeout)) || 30000) : undefined
 
   const result = await batchIndexPages(event, {
-    limit: query.limit ? Number(query.limit) : undefined,
+    limit,
     all: query.all === 'true' || query.all === '1',
-    timeout: query.timeout ? Number(query.timeout) : undefined,
+    timeout,
   })
 
   return {

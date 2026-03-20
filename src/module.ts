@@ -42,7 +42,7 @@ export interface ModulePublicRuntimeConfig {
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   database: {
-    type: 'sqlite' | 'd1' | 'libsql'
+    type: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     filename?: string
     bindingName?: string
     url?: string
@@ -94,7 +94,7 @@ export default defineNuxtModule<ModuleOptions>({
         maxAge: 3600, // 1 hour
         swr: true,
       },
-      cacheMaxAgeSeconds: 600, // 10 minutes
+      llmsTxtCacheSeconds: 600, // 10 minutes
     }
   },
   async setup(config, nuxt) {
@@ -334,13 +334,13 @@ export default defineNuxtModule<ModuleOptions>({
         }
         else if (isVercel) {
           // Vercel uses HTTP-based crons - configure vercel.json to hit our endpoint
-          // Include secret in path since Vercel crons are HTTP-based
+          // Auth uses Authorization: Bearer header (set CRON_SECRET env var on Vercel)
           nitroConfig.vercel = nitroConfig.vercel || {}
           nitroConfig.vercel.config = nitroConfig.vercel.config || {}
           nitroConfig.vercel.config.crons = nitroConfig.vercel.config.crons || []
           nitroConfig.vercel.config.crons.push({
             schedule: cronSchedule,
-            path: runtimeSyncSecret ? `/__ai-ready/cron?secret=${runtimeSyncSecret}` : '/__ai-ready/cron',
+            path: '/__ai-ready/cron',
           })
         }
         else {
@@ -464,7 +464,7 @@ export const logger = createConsola({
         swr: true,
       }) as Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>,
       llmsTxt: mergedLlmsTxt,
-      cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
+      llmsTxtCacheSeconds: config.llmsTxtCacheSeconds ?? 600,
       prerenderCacheDir,
       database,
       runtimeSync: {

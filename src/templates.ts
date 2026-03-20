@@ -18,7 +18,7 @@ import type { MdreamOptions } from 'mdream'
 
 declare module 'nitropack/types' {
   interface NitroRuntimeHooks {
-    'ai-ready:markdown': (context: MarkdownContext) => void | Promise<void>
+    'ai-ready:page:markdown': (context: MarkdownContext) => void | Promise<void>
     'ai-ready:mdreamConfig': (config: MdreamOptions) => void | Promise<void>
     'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>
   }

@@ -92,7 +92,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   // This runs before indexing to ensure data is ready
   if (config.runtimeSync.enabled) {
     results.stale = await checkAndHandleStale(event).catch((err) => {
-      console.warn('[ai-ready:cron] Stale check failed:', err.message)
+      logger.warn('[ai-ready:cron] Stale check failed:', err.message)
       allErrors.push(`stale-check: ${err.message}`)
       return { action: 'none' as const, dbCount: 0, reason: err.message }
     })
@@ -106,7 +106,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   if (config.runtimeSync.enabled) {
     const sitemapResult = await pingSitemap(event, config, debug).catch((err): { name?: string, pinged: boolean, pruned: number, error?: string } => {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[ai-ready:cron] Sitemap ping failed:', msg)
+      logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
       allErrors.push(`sitemap: ${msg}`)
       return { pinged: false, pruned: 0, error: msg }
     })
@@ -149,7 +149,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   // Run IndexNow sync if key is configured
   if (config.indexNow) {
     const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
-      console.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
+      logger.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
       return { success: false, submitted: 0, remaining: 0, error: err.message }
     })
     results.indexNow = {

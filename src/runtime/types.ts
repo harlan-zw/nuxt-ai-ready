@@ -76,7 +76,7 @@ export interface ModuleOptions {
    * Set to 0 to disable caching
    * @default 600 (10 minutes)
    */
-  cacheMaxAgeSeconds?: number
+  llmsTxtCacheSeconds?: number
 
   /**
    * Database configuration for page storage
@@ -130,7 +130,7 @@ export interface ModuleOptions {
 
   /**
    * Secret token for authenticating runtime sync endpoints
-   * When set, requires ?secret=<token> query param for poll/prune/indexnow endpoints
+   * When set, requires `Authorization: Bearer <token>` header for poll/prune/indexnow endpoints
    */
   runtimeSyncSecret?: string
 
@@ -182,7 +182,7 @@ export interface ModuleOptions {
 /**
  * Page-level entry for discovery and metadata queries
  */
-export interface BulkDocument {
+export interface PageDocument {
   /** Page route/path */
   route: string
   /** Page title */
@@ -206,13 +206,13 @@ export interface BulkDocument {
  * You can modify the markdown content before it's returned to the client.
  *
  * @example Modify markdown content
- * nitroApp.hooks.hook('ai-ready:markdown', async (context) => {
+ * nitroApp.hooks.hook('ai-ready:page:markdown', async (context) => {
  *   // Add a footer to all markdown
  *   context.markdown += '\n\n---\n*Generated with mdream*'
  * })
  *
  * @example Track conversions and add headers
- * nitroApp.hooks.hook('ai-ready:markdown', async (context) => {
+ * nitroApp.hooks.hook('ai-ready:page:markdown', async (context) => {
  *   console.log(`Converted ${context.route} (${context.title})`)
  *
  *   // Add custom headers
@@ -282,8 +282,8 @@ export interface PageIndexedContext {
   title: string
   /** Page description */
   description: string
-  /** Page headings as JSON string */
-  headings: string
+  /** Page headings structure (e.g., [{ "h1": "Title" }, { "h2": "Subtitle" }]) */
+  headings: Array<Record<string, string>>
   /** Top keywords for search */
   keywords: string[]
   /** Full markdown content */

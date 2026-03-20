@@ -150,7 +150,7 @@ export interface PageEntry {
   route: string
   title: string
   description: string
-  headings: string
+  headings: Array<Record<string, string>>
   keywords: string[]
   updatedAt: string
   isError: boolean
@@ -211,13 +211,24 @@ function buildWhereClause(where?: QueryPagesOptions['where']): { sql: string, pa
   }
 }
 
+function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+  if (!json)
+    return fallback
+  try {
+    return JSON.parse(json) as T
+  }
+  catch {
+    return fallback
+  }
+}
+
 function rowToEntry(row: PageRow): PageEntry {
   return {
     route: row.route,
     title: row.title,
     description: row.description,
-    headings: row.headings,
-    keywords: JSON.parse(row.keywords || '[]'),
+    headings: safeJsonParse<Array<Record<string, string>>>(row.headings, []),
+    keywords: safeJsonParse<string[]>(row.keywords, []),
     updatedAt: row.updated_at,
     isError: row.is_error === 1,
   }
@@ -772,7 +783,10 @@ export async function getIndexNowBackoff(
   if (!row)
     return { active: false, until: null, remainingMs: null, attempt: null }
 
-  const parsed = JSON.parse(row.value) as { until: number, attempt: number }
+  const parsed = safeJsonParse<{ until: number, attempt: number } | null>(row.value, null)
+  if (!parsed)
+    return { active: false, until: null, remainingMs: null, attempt: null }
+
   const now = Date.now()
   const active = now < parsed.until
 
@@ -890,7 +904,7 @@ function rowToCronRun(row: CronRunRow): CronRun {
     pagesRemaining: row.pages_remaining,
     indexNowSubmitted: row.indexnow_submitted,
     indexNowRemaining: row.indexnow_remaining,
-    errors: JSON.parse(row.errors || '[]'),
+    errors: safeJsonParse<string[]>(row.errors, []),
     status: row.status,
   }
 }
@@ -1080,7 +1094,7 @@ export async function getCronFastPathStatus(
     indexNowPending: row.indexnow_pending,
     lastStaleCheck: row.last_stale_check ? Number.parseInt(row.last_stale_check, 10) : null,
     buildId: row.build_id,
-    indexNowBackoff: row.indexnow_backoff ? JSON.parse(row.indexnow_backoff) : null,
+    indexNowBackoff: safeJsonParse<{ until: number, attempt: number } | null>(row.indexnow_backoff, null),
     sitemapsNeedCrawl: row.sitemaps_need_crawl,
   }
 }
@@ -1093,7 +1107,7 @@ const CRON_LOCK_TTL_MS = 300_000 // 5 minutes - stale lock threshold (matches cr
 
 /**
  * Try to acquire cron lock. Returns true if acquired, false if another run is active.
- * Uses timestamp-based lock with TTL to handle crashed/abandoned runs.
+ * Uses atomic INSERT OR REPLACE with conditional check to prevent race conditions.
  */
 export async function tryAcquireCronLock(event: H3Event | undefined): Promise<boolean> {
   const db = await getDb(event)
@@ -1101,20 +1115,18 @@ export async function tryAcquireCronLock(event: H3Event | undefined): Promise<bo
     return true // No DB = no lock needed
 
   const now = Date.now()
+  const staleThreshold = now - CRON_LOCK_TTL_MS
 
-  // Check for existing lock
-  const existing = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
-  if (existing) {
-    const lockTime = Number.parseInt(existing.value, 10)
-    // Lock is still valid (not stale)
-    if (now - lockTime < CRON_LOCK_TTL_MS) {
-      return false
-    }
-  }
+  // Atomic: only acquire if no lock exists or existing lock is stale
+  await db.exec(`
+    INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
+    ON CONFLICT(id) DO UPDATE SET value = ?
+    WHERE CAST(value AS INTEGER) < ?
+  `, [String(now), String(now), staleThreshold])
 
-  // Acquire lock
-  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['cron_lock', String(now)])
-  return true
+  // Verify we hold the lock (our timestamp was written)
+  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
+  return row?.value === String(now)
 }
 
 /**
