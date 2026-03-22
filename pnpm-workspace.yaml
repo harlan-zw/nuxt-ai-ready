@@ -33,6 +33,7 @@ catalog:
   eslint-plugin-harlanzw: ^0.7.0
   execa: ^9.6.1
   mdream: ^1.0.1
+  nuxtseo-shared: ^0.1.0
   ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0

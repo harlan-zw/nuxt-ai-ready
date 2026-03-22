@@ -86,6 +86,7 @@
     "drizzle-orm": "catalog:",
     "mdream": "catalog:",
     "nuxt-site-config": "catalog:nuxt",
+    "nuxtseo-shared": "catalog:",
     "ofetch": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
