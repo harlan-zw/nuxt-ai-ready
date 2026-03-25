@@ -89,6 +89,7 @@ export default defineEventHandler(async (event) => {
     { hooks: { route: path, event } },
   )
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
+  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
 
   // Set cache headers
   if (config.markdownCacheHeaders) {
