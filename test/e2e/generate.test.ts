@@ -6,8 +6,6 @@ const { resolve } = createResolver(import.meta.url)
 
 const RE_MD_H1 = /^# /
 const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
-const RE_MD_LINK_WELCOME = /\[Welcome to Test Site\]\(\/?/
-const RE_MD_LINK_ABOUT = /\[About · Test Site — UTF-8 Support\]\(\/about\)/
 const RE_MD_SOURCE_URL = /Source: https?:\/\//
 const RE_MD_H1_M = /^# /m
 
