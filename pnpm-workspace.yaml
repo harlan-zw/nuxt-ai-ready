@@ -20,61 +20,61 @@ overrides:
 catalog:
   '@clack/prompts': ^1.1.0
   '@libsql/client': ^0.17.2
-  '@mdream/js': ^1.0.1
+  '@mdream/js': ^1.0.3
   '@types/better-sqlite3': ^7.6.13
-  agents: ^0.7.9
-  ai: ^6.0.116
+  agents: ^0.8.4
+  ai: ^6.0.138
   better-sqlite3: ^12.8.0
   bumpp: ^11.0.1
   citty: ^0.2.1
   consola: ^3.4.2
   defu: ^6.1.4
   drizzle-orm: ^0.45.1
-  eslint-plugin-harlanzw: ^0.7.0
+  eslint-plugin-harlanzw: ^0.11.0
   execa: ^9.6.1
-  mdream: ^1.0.1
+  mdream: ^1.0.3
   ofetch: ^1.5.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0
   postgres: ^3.4.8
   std-env: 4.0.0
   ufo: ^1.6.3
-  wrangler: ^4.75.0
+  wrangler: ^4.77.0
   zod: ^4.3.6
 catalogs:
   dev-build:
     '@arethetypeswrong/cli': ^0.18.2
-    typescript: ^5.9.3
+    typescript: ^6.0.2
     vue-tsc: ^3.2.6
   dev-lint:
     '@antfu/eslint-config': ^7.7.3
     '@nuxtjs/eslint-config-typescript': ^12.1.0
-    eslint: ^10.0.3
+    eslint: ^10.1.0
   dev-test:
     '@nuxt/test-utils': ^4.0.0
-    '@vitest/coverage-v8': ^4.1.0
+    '@vitest/coverage-v8': ^4.1.1
     '@vue/test-utils': ^2.4.6
-    happy-dom: ^20.8.4
+    happy-dom: ^20.8.8
     playwright: ^1.58.2
     playwright-core: ^1.58.2
-    vitest: ^4.1.0
+    vitest: ^4.1.1
   nuxt:
     '@nuxt/content': ^3.12.0
     '@nuxt/devtools-ui-kit': ^3.2.4
     '@nuxt/kit': ^4.4.2
     '@nuxt/module-builder': ^1.0.2
-    '@nuxt/ui': ^4.5.1
+    '@nuxt/ui': ^4.6.0
     '@nuxtjs/color-mode': ^4.0.0
-    '@nuxtjs/i18n': ^10.2.3
-    '@nuxtjs/mcp-toolkit': ^0.11.0
-    '@nuxtjs/robots': ^5.7.1
-    '@nuxtjs/sitemap': ^7.6.0
+    '@nuxtjs/i18n': ^10.2.4
+    '@nuxtjs/mcp-toolkit': ^0.12.0
+    '@nuxtjs/robots': ^6.0.4
+    '@nuxtjs/sitemap': ^8.0.3
     '@vueuse/nuxt': ^14.2.1
     nuxt: ^4.4.2
-    nuxt-site-config: ^3.2.21
+    nuxt-site-config: ^4.0.6
   vue:
     '@headlessui/vue': ^1.7.23
-    vue: ^3.5.30
+    vue: ^3.5.31
     vue-router: ^5.0.4
 onlyBuiltDependencies:
   - '@firebase/util'
@@ -87,3 +87,5 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
+
+trustPolicyIgnoreAfter: 262800
