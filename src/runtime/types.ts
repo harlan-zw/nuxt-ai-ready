@@ -260,6 +260,8 @@ export interface LlmsTxtSection {
   description?: string | string[]
   /** The links of the section */
   links?: LlmsTxtLink[]
+  /** Mark section as optional per llms.txt spec. Optional sections appear under `## Optional` and LLMs may skip them with shorter context windows. */
+  optional?: boolean
 }
 
 /**
