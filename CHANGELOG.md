@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v1.0.2...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.2...main)
+
+### 🏡 Chore
+
+- Broken build ([c7feda2](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/c7feda2))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.0.1...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.1...main)
