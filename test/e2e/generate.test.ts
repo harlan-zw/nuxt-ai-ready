@@ -43,8 +43,13 @@ describe('nuxt generate (static build)', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
       // Pages listed as "- /route: description"
-      expect(llmsTxt).toContain('- /:')
-      expect(llmsTxt).toContain('- /about:')
+      expect(llmsTxt).toContain('- /: ')
+      expect(llmsTxt).toContain('- /about: ')
+    })
+
+    it('includes page descriptions', async () => {
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
+
       expect(llmsTxt).toContain('A test site for the Nuxt AI Search module')
       expect(llmsTxt).toContain('Learn about this test site')
     })

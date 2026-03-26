@@ -7,7 +7,7 @@ import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNux
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { readPackageJSON } from 'pkg-types'
-import { hookNuxtSeoProLicense, registerNuxtSeoProModule } from './kit'
+import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -75,7 +75,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=7',
     },
     'nuxt-site-config': {
-      version: '>=3',
+      version: '>=3.2',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.4.0',
@@ -288,18 +288,6 @@ export default defineNuxtModule<ModuleOptions>({
       logger.debug(`Writing runtimeSyncSecret to cache`)
       await writeFile(join(cacheDir, 'secret'), runtimeSyncSecret)
     }
-
-    // Register module with nuxtseo.com for dashboard integration
-    registerNuxtSeoProModule({
-      name: 'nuxt-ai-ready',
-      version,
-      secret: runtimeSyncSecret,
-      features: {
-        cron: !!config.cron,
-        indexNow: !!indexNow,
-        runtimeSync: runtimeSyncEnabled,
-      },
-    })
 
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {

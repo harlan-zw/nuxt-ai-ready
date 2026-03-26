@@ -51,9 +51,9 @@ describe('netlify build output', async () => {
     expect(llmsTxt).toContain('Canonical Origin:')
 
     // Should have page routes with descriptions
-    expect(llmsTxt).toContain('- /:')
-    expect(llmsTxt).toContain('- /about:')
-    expect(llmsTxt).toContain('- /docs/api:')
-    expect(llmsTxt).toContain('- /docs/getting-started:')
+    expect(llmsTxt).toContain('- /: ')
+    expect(llmsTxt).toContain('- /about: ')
+    expect(llmsTxt).toContain('- /docs/api: ')
+    expect(llmsTxt).toContain('- /docs/getting-started: ')
   })
 })
