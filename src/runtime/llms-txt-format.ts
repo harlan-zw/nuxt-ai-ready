@@ -12,9 +12,10 @@ function normalizeLink(link: LlmsTxtLink): string {
   return parts.join('\n')
 }
 
-function normalizeSection(section: LlmsTxtSection): string {
+function normalizeSection(section: LlmsTxtSection, headingLevel: number = 2): string {
+  const prefix = '#'.repeat(headingLevel)
   const parts: string[] = []
-  parts.push(`## ${section.title}`)
+  parts.push(`${prefix} ${section.title}`)
   parts.push('')
   if (section.description) {
     const descriptions = Array.isArray(section.description)
@@ -33,8 +34,14 @@ function normalizeSection(section: LlmsTxtSection): string {
  */
 export function normalizeLlmsTxtConfig(config: LlmsTxtConfig): string {
   const parts: string[] = []
-  if (config.sections?.length)
-    parts.push(...config.sections.map(normalizeSection))
+  const required = config.sections?.filter(s => !s.optional) ?? []
+  const optional = config.sections?.filter(s => s.optional) ?? []
+  if (required.length)
+    parts.push(...required.map(s => normalizeSection(s)))
+  if (optional.length) {
+    parts.push('## Optional')
+    parts.push(...optional.map(s => normalizeSection(s, 3)))
+  }
   if (config.notes) {
     parts.push('## Notes')
     parts.push('')
