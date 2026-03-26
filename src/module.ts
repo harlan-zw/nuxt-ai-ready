@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { readPackageJSON } from 'pkg-types'
 import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
@@ -437,6 +438,13 @@ export const logger = createConsola({
         ? '#ai-ready/server/db/schema/postgres'
         : '#ai-ready/server/db/schema/sqlite'
       nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`
+
+      // Devtools metadata (build-time config not available in runtime config)
+      nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
+        contentSignal: config.contentSignal || false,
+        mcp: { enabled: hasMCP, tools: hasMCP && (config.mcp?.tools !== false), resources: hasMCP && (config.mcp?.resources !== false) },
+        cron: !!config.cron,
+      })}`
     })
 
     // Resolve database config
@@ -484,6 +492,9 @@ export const logger = createConsola({
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+
+    // Devtools API endpoint
+    addServerHandler({ route: '/__ai-ready/devtools', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {
@@ -546,6 +557,14 @@ export const logger = createConsola({
 
     // Add lifecycle plugin to handle database connection cleanup
     addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
+
+    // DevTools integration
+    setupDevToolsUI({
+      route: '/__nuxt-ai-ready',
+      name: 'nuxt-ai-ready',
+      title: 'AI Ready',
+      icon: 'carbon:machine-learning-model',
+    }, resolve, nuxt)
 
     // Add route rules for static files with proper charset
     nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
