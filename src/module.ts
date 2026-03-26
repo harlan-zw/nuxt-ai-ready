@@ -5,10 +5,9 @@ import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
-import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { readPackageJSON } from 'pkg-types'
-import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -78,6 +77,9 @@ export default defineNuxtModule<ModuleOptions>({
     'nuxt-site-config': {
       version: '>=3.2',
     },
+    'nuxtseo-shared': {
+      version: '>=0.8.0',
+    },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.4.0',
       optional: true,
@@ -118,10 +120,6 @@ export default defineNuxtModule<ModuleOptions>({
     if (rawConfig.mdreamOptions?.preset) {
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
-
-    // Install site config for accessing site name and description
-    await installNuxtSiteConfig()
-    hookNuxtSeoProLicense()
 
     // Set up alias
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
@@ -266,6 +264,19 @@ export default defineNuxtModule<ModuleOptions>({
     const indexNow = config.indexNow === true
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
+
+    nuxt.hooks.hook('nuxt-seo-pro:modules' as any, (modules: any[]) => {
+      const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
+      if (mod) {
+        mod.features = {
+          mcp: hasMCP,
+          runtimeSync: runtimeSyncEnabled,
+          cron: !!config.cron,
+          indexNow: !!indexNow,
+          database: dbType,
+        }
+      }
+    })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
     const sitemapConfig = nuxt.options.sitemap as { zeroRuntime?: boolean } | undefined
