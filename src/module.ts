@@ -5,7 +5,7 @@ import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
-import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { readPackageJSON } from 'pkg-types'
 import { logger } from './logger'
@@ -120,6 +120,9 @@ export default defineNuxtModule<ModuleOptions>({
     if (rawConfig.mdreamOptions?.preset) {
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
+
+    // Install site config for accessing site name and description
+    await installNuxtSiteConfig()
 
     // Set up alias
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
