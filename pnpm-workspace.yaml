@@ -11,19 +11,18 @@ trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1
   - undici-types@6.21.0
   - semver
+
 packages:
   - playground
+  - devtools
+
 overrides:
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
-
 catalog:
-  '@clack/prompts': ^1.1.0
   '@libsql/client': ^0.17.2
   '@mdream/js': ^1.0.3
   '@types/better-sqlite3': ^7.6.13
-  agents: ^0.8.4
-  ai: ^6.0.138
   better-sqlite3: ^12.8.0
   bumpp: ^11.0.1
   citty: ^0.2.1
@@ -33,11 +32,10 @@ catalog:
   eslint-plugin-harlanzw: ^0.11.0
   execa: ^9.6.1
   mdream: ^1.0.3
-  ofetch: ^1.5.1
+  nuxtseo-layer-devtools: ^0.4.4
+  nuxtseo-shared: ^0.8.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0
-  postgres: ^3.4.8
-  std-env: 4.0.0
   ufo: ^1.6.3
   wrangler: ^4.77.0
   zod: ^4.3.6
@@ -60,12 +58,9 @@ catalogs:
     vitest: ^4.1.1
   nuxt:
     '@nuxt/content': ^3.12.0
-    '@nuxt/devtools-ui-kit': ^3.2.4
     '@nuxt/kit': ^4.4.2
     '@nuxt/module-builder': ^1.0.2
     '@nuxt/ui': ^4.6.0
-    '@nuxtjs/color-mode': ^4.0.0
-    '@nuxtjs/i18n': ^10.2.4
     '@nuxtjs/mcp-toolkit': ^0.12.0
     '@nuxtjs/robots': ^6.0.4
     '@nuxtjs/sitemap': ^8.0.3
@@ -73,7 +68,6 @@ catalogs:
     nuxt: ^4.4.2
     nuxt-site-config: ^4.0.6
   vue:
-    '@headlessui/vue': ^1.7.23
     vue: ^3.5.31
     vue-router: ^5.0.4
 onlyBuiltDependencies:
@@ -87,5 +81,4 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
-
 trustPolicyIgnoreAfter: 262800

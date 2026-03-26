@@ -1,23 +1,15 @@
-import type { ModulePublicRuntimeConfig } from '../../../../module'
 import type { DumpRow } from '../../db/shared'
-import { createError, eventHandler, getQuery } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { createError, eventHandler } from 'h3'
 import { useRawDb } from '../../db'
 import { decompressFromBase64, importDbDump } from '../../db/shared'
 import { logger } from '../../logger'
 import { fetchPublicAsset } from '../../utils/cloudflare'
 
 export default eventHandler(async (event) => {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  const query = getQuery(event)
+  const { requireAuth } = await import('../../utils/auth')
+  requireAuth(event)
 
-  // Check secret if configured
-  if (config.runtimeSyncSecret) {
-    const secret = query.secret as string
-    if (secret !== config.runtimeSyncSecret) {
-      throw createError({ statusCode: 401, message: 'Unauthorized' })
-    }
-  }
+  const query = (await import('h3')).getQuery(event)
 
   // Fetch dump file
   logger.debug('[restore] Fetching dump...')

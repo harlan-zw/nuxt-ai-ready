@@ -127,7 +127,7 @@ export function clientPrefersMarkdown(event: H3Event): boolean {
 interface ConvertHtmlOptions {
   /** Extract updatedAt from meta tags */
   extractUpdatedAt?: boolean
-  /** Call runtime hooks (ai-ready:mdreamConfig, ai-ready:markdown) */
+  /** Call runtime hooks (ai-ready:mdreamConfig, ai-ready:page:markdown) */
   hooks?: { route: string, event: H3Event }
 }
 
@@ -155,7 +155,7 @@ export async function convertHtmlToMarkdown(
       isPrerender: false,
       event: opts.hooks.event,
     }
-    await nitroApp.hooks.callHook('ai-ready:markdown', context)
+    await nitroApp.hooks.callHook('ai-ready:page:markdown', context)
     markdown = context.markdown
   }
   else {

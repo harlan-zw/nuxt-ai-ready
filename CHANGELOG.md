@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v0.12.1...0.x
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.12.1...0.x)
+
+### 🩹 Fixes
+
+- Vary markdown cache by accept headers ([73ca6ae](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/73ca6ae))
+
+## v0.12.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.12.0...main)
+
+### 🩹 Fixes
+
+- Safer markdown serving logic ([428adea](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/428adea))
+- Broken prerendering for index.md ([3ff4cb9](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/3ff4cb9))
+
+### 🏡 Chore
+
+- Bump and lint ([13e1b28](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/13e1b28))
+- Lint ([860113f](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/860113f))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.11.0...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.11.0...main)

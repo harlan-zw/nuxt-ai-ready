@@ -104,7 +104,7 @@ export async function indexPage(
       route,
       title: result.title,
       description: result.description,
-      headings,
+      headings: result.headings,
       keywords,
       markdown: result.markdown,
       updatedAt,

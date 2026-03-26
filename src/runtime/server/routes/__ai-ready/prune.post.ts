@@ -1,5 +1,5 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
-import { createError, eventHandler, getQuery } from 'h3'
+import { eventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { getStaleRoutes, pruneStaleRoutes } from '../../db/queries'
 
@@ -7,16 +7,15 @@ export default eventHandler(async (event) => {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const query = getQuery(event)
 
-  // Check secret if configured (skip for dry runs)
   const dry = query.dry === 'true' || query.dry === '1'
-  if (!dry && config.runtimeSyncSecret) {
-    const secret = query.secret as string
-    if (secret !== config.runtimeSyncSecret) {
-      throw createError({ statusCode: 401, message: 'Unauthorized' })
-    }
+
+  // Require auth for non-dry runs
+  if (!dry) {
+    const { requireAuth } = await import('../../utils/auth')
+    requireAuth(event)
   }
 
-  const ttl = query.ttl ? Number(query.ttl) : config.runtimeSync.pruneTtl
+  const ttl = query.ttl ? Math.max(0, Math.trunc(Number(query.ttl)) || config.runtimeSync.pruneTtl) : config.runtimeSync.pruneTtl
 
   // Dry run: preview stale routes without deleting
   if (dry) {

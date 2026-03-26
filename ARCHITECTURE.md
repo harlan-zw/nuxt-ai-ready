@@ -66,7 +66,7 @@ src/
     └── prerender-db.ts       # Prerender database adapter
 
 └── runtime/
-    ├── types.ts              # Public types (ModuleOptions, BulkDocument, etc)
+    ├── types.ts              # Public types (ModuleOptions, PageDocument, etc)
     ├── llms-txt-utils.ts     # buildLlmsTxt, page sorting/grouping
     ├── llms-txt-format.ts    # normalizeLlmsTxtConfig (pure formatting)
     ├── index.ts              # Runtime entry - exports database, queries, indexing utils
@@ -151,7 +151,7 @@ Setup sequence:
 ### Nitro Hooks
 
 ```typescript
-'ai-ready:markdown' // Modify markdown output at runtime
+'ai-ready:page:markdown' // Modify markdown output at runtime
 'ai-ready:mdreamConfig' // Modify mdream options per-request
 'ai-ready:page:indexed' // Called when page indexed at runtime (route, title, description, markdown)
 ```
@@ -261,7 +261,7 @@ POST /__ai-ready/prune?dry=true
 # Returns: { routes: ["/old-page"], count: 1, ttl: 86400, dry: true }
 
 # Prune stale routes (execute)
-POST /__ai-ready/prune?secret=<token>
+POST /__ai-ready/prune  # requires Authorization: Bearer <token>
 # Returns: { pruned: 1, ttl: 86400, dry: false }
 
 # Cron trigger (Vercel, external cron)
@@ -269,7 +269,7 @@ GET /__ai-ready/cron
 # Returns: { index: { indexed, remaining, complete }, indexNow?: { submitted, remaining } }
 
 # IndexNow manual sync
-POST /__ai-ready/indexnow?secret=<token>
+POST /__ai-ready/indexnow  # requires Authorization: Bearer <token>
 # Returns: { success, submitted, remaining, error? }
 ```
 
@@ -378,7 +378,7 @@ This targets API clients (Claude Code, curl, Bun) while excluding browsers.
 
 ### Metadata Extraction
 
-Uses mdream's `extractionPlugin` to capture:
+Uses mdream's declarative `extraction` option to capture:
 - `<title>` → title
 - `<meta name="description">` → description
 - `h1-h6` → headings array
@@ -551,14 +551,14 @@ cache: '1h'
 interface ModuleOptions {
   enabled?: boolean
   debug?: boolean
-  mdreamOptions?: HTMLToMarkdownOptions & { preset?: 'minimal' }
+  mdreamOptions?: MdreamOptions
   markdownCacheHeaders?: { maxAge?: number, swr?: boolean }
   llmsTxt?: LlmsTxtConfig
   contentSignal?: false | { aiTrain?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
-  cacheMaxAgeSeconds?: number
+  llmsTxtCacheSeconds?: number
   database?: {
-    type?: 'sqlite' | 'd1' | 'libsql'
+    type?: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     filename?: string
     bindingName?: string
     url?: string
@@ -575,10 +575,10 @@ interface ModuleOptions {
 }
 ```
 
-### BulkDocument (page-level)
+### PageDocument (page-level)
 
 ```typescript
-interface BulkDocument {
+interface PageDocument {
   route: string
   title: string
   description: string

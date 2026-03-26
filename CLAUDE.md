@@ -84,25 +84,25 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 - `GET /__ai-ready/status` - Returns `{ total, indexed, pending, indexNow? }`
 - `POST /__ai-ready/restore` - Force restore from prerendered dump:
   - `?clear=false` - Don't clear existing pages first (default: true)
-  - `?secret=<token>` - Required if `runtimeSyncSecret` configured
+  - Requires `Authorization: Bearer <token>` header if `runtimeSyncSecret` configured
   - Returns: `{ restored, cleared }`
 - `POST /__ai-ready/poll` - Process pending pages:
   - `?limit=N` - Max pages per batch (default: 10, max: 50)
   - `?all=true` - Process until complete
   - `?timeout=30000` - Max ms for `all` mode (default: 30s)
-  - `?secret=<token>` - Required if `runtimeSyncSecret` configured
+  - Requires `Authorization: Bearer <token>` header if `runtimeSyncSecret` configured
   - Returns: `{ indexed, remaining, errors, duration, complete }`
 - `POST /__ai-ready/prune` - Remove stale routes:
   - `?dry=true` - Preview without deleting
   - `?ttl=N` - Override pruneTtl config
-  - `?secret=<token>` - Required unless dry run
+  - Requires `Authorization: Bearer <token>` header unless dry run
 
 ### IndexNow Endpoints (when `indexNow` configured)
 
 - `GET /{key}.txt` - Key verification endpoint
 - `POST /__ai-ready/indexnow` - Manual sync trigger:
   - `?limit=N` - Max URLs to submit (default: 100)
-  - `?secret=<token>` - Required if `runtimeSyncSecret` configured
+  - Requires `Authorization: Bearer <token>` header if `runtimeSyncSecret` configured
   - Returns: `{ success, submitted, remaining, error? }`
 
 ### Scheduled Task (`src/runtime/server/tasks/ai-ready-cron.ts`)
@@ -144,7 +144,7 @@ aiReady: {
 'ai-ready:page:markdown': (context) => void // Process page markdown during prerender
 
 // Nitro hooks (runtime)
-'ai-ready:markdown': (context) => void     // Modify markdown output
+'ai-ready:page:markdown': (context) => void // Modify markdown output
 'ai-ready:mdreamConfig': (config) => void  // Customize mdream options
 'ai-ready:page:indexed': (context) => void // Called when page indexed at runtime
 ```
@@ -152,7 +152,7 @@ aiReady: {
 ### Type Exports
 
 - `ModuleOptions`: Module configuration interface
-- `BulkDocument`: Page-level data (route, title, description, markdown, headings, updatedAt)
+- `PageDocument`: Page-level data (route, title, description, markdown, headings, updatedAt)
 - `PageEntry`: Page metadata without markdown (route, title, description, headings, updatedAt)
 - `PageData`: PageEntry + markdown content
 - `MarkdownContext`: Hook context for markdown processing
@@ -167,9 +167,9 @@ Config key: `aiReady` in nuxt.config.ts
 {
   enabled: true,
   debug: false,
-  mdreamOptions: { preset: 'minimal' },
+  mdreamOptions: { minimal: true },
   markdownCacheHeaders: { maxAge: 3600, swr: true },
-  cacheMaxAgeSeconds: 600,
+  llmsTxtCacheSeconds: 600,
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },

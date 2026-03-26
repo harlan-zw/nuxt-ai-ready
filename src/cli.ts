@@ -15,6 +15,10 @@ async function getSecret(cwd: string): Promise<string | null> {
   return fsp.readFile(secretPath, 'utf-8').then(s => s.trim()).catch(() => null)
 }
 
+function authHeaders(secret: string): Record<string, string> {
+  return { Authorization: `Bearer ${secret}` }
+}
+
 const main = defineCommand({
   meta: {
     name: 'nuxt-ai-ready',
@@ -49,10 +53,10 @@ const main = defineCommand({
           return
         }
 
-        const url = `${args.url}/__ai-ready/status?secret=${secret}`
+        const url = `${args.url}/__ai-ready/status`
         consola.info(`Fetching status from ${args.url}...`)
 
-        const res = await fetch(url)
+        const res = await fetch(url, { headers: authHeaders(secret) })
           .then(r => r.json())
           .catch((err) => {
             consola.error(`Failed to connect: ${err.message}`)
@@ -68,6 +72,21 @@ const main = defineCommand({
         consola.info(`Indexed: ${colors.green(res.indexed?.toString() || '0')}`)
         consola.info(`Pending: ${colors.yellow(res.pending?.toString() || '0')}`)
 
+        if (res.activity) {
+          consola.log('')
+          consola.info(colors.bold('Activity:'))
+          consola.info(`  Last 1h: ${colors.cyan(res.activity.last1h?.toString() || '0')} pages indexed`)
+          consola.info(`  Last 24h: ${colors.cyan(res.activity.last24h?.toString() || '0')} pages indexed`)
+          if (res.activity.recentPages?.length) {
+            consola.info(`  Recent:`)
+            for (const p of res.activity.recentPages.slice(0, 5)) {
+              const ago = Date.now() - p.indexedAt
+              const agoStr = ago < 60000 ? `${Math.round(ago / 1000)}s` : ago < 3600000 ? `${Math.round(ago / 60000)}m` : `${Math.round(ago / 3600000)}h`
+              consola.info(`    ${colors.dim(`${agoStr} ago`)} ${p.route} ${colors.dim(p.title || '')}`)
+            }
+          }
+        }
+
         if (res.indexNow) {
           consola.log('')
           consola.info(colors.bold('IndexNow:'))
@@ -75,10 +94,37 @@ const main = defineCommand({
           consola.info(`  Total submitted: ${colors.green(res.indexNow.totalSubmitted?.toString() || '0')}`)
           if (res.indexNow.lastSubmittedAt) {
             const date = new Date(res.indexNow.lastSubmittedAt)
-            consola.info(`  Last submitted: ${colors.dim(date.toISOString())}`)
+            consola.info(`  Last sync: ${colors.dim(date.toISOString())}`)
           }
           if (res.indexNow.lastError) {
             consola.info(`  Last error: ${colors.red(res.indexNow.lastError)}`)
+          }
+          if (res.indexNow.backoff?.active) {
+            const remainMin = Math.ceil((res.indexNow.backoff.remainingMs || 0) / 60000)
+            consola.warn(`  Backoff: ${colors.yellow(`${remainMin}m remaining`)} (attempt ${res.indexNow.backoff.attempt})`)
+          }
+        }
+
+        if (res.cron) {
+          consola.log('')
+          consola.info(colors.bold('Cron:'))
+          if (res.cron.lock?.held) {
+            consola.warn(`  Lock: ${colors.yellow('held')} (${Math.round((res.cron.lock.elapsedMs || 0) / 1000)}s)`)
+          }
+          if (res.cron.recentRuns?.length) {
+            for (const run of res.cron.recentRuns) {
+              const status = run.status === 'success' ? colors.green(run.status) : run.status === 'error' ? colors.red(run.status) : colors.yellow(run.status)
+              consola.info(`  ${colors.dim(new Date(run.startedAt).toLocaleTimeString())} ${status} ${colors.dim(`${run.durationMs || 0}ms`)} ${run.pagesIndexed ? `${run.pagesIndexed} indexed` : ''}`)
+            }
+          }
+        }
+
+        if (res.sitemaps?.length) {
+          consola.log('')
+          consola.info(colors.bold('Sitemaps:'))
+          for (const s of res.sitemaps) {
+            const err = s.errorCount > 0 ? colors.red(` (${s.errorCount} errors)`) : ''
+            consola.info(`  ${s.name}: ${colors.cyan(s.urlCount?.toString() || '0')} URLs${err}`)
           }
         }
       },
@@ -122,7 +168,7 @@ const main = defineCommand({
           return
         }
 
-        const params = new URLSearchParams({ secret })
+        const params = new URLSearchParams()
         if (args.all) {
           params.set('all', 'true')
         }
@@ -133,7 +179,7 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/poll?${params}`
         consola.info(`Triggering poll at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST' })
+        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
           .then(r => r.json())
           .catch((err) => {
             consola.error(`Failed: ${err.message}`)
@@ -187,7 +233,7 @@ const main = defineCommand({
           return
         }
 
-        const params = new URLSearchParams({ secret })
+        const params = new URLSearchParams()
         if (!args.clear) {
           params.set('clear', 'false')
         }
@@ -195,7 +241,7 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/restore?${params}`
         consola.info(`Restoring database at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST' })
+        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
           .then(r => r.json())
           .catch((err) => {
             consola.error(`Failed: ${err.message}`)
@@ -249,8 +295,6 @@ const main = defineCommand({
         }
 
         const params = new URLSearchParams()
-        if (secret)
-          params.set('secret', secret)
         if (args.dry)
           params.set('dry', 'true')
         if (args.ttl)
@@ -259,7 +303,10 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/prune?${params}`
         consola.info(`${args.dry ? 'Previewing' : 'Pruning'} stale routes at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST' })
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: secret ? authHeaders(secret) : undefined,
+        })
           .then(r => r.json())
           .catch((err) => {
             consola.error(`Failed: ${err.message}`)
@@ -320,14 +367,13 @@ const main = defineCommand({
         }
 
         const params = new URLSearchParams({
-          secret,
           limit: args.limit || '100',
         })
 
         const url = `${args.url}/__ai-ready/indexnow?${params}`
         consola.info(`Triggering IndexNow sync at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST' })
+        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
           .then(r => r.json())
           .catch((err) => {
             consola.error(`Failed: ${err.message}`)

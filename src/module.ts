@@ -6,8 +6,9 @@ import { join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { readPackageJSON } from 'pkg-types'
-import { hookNuxtSeoProLicense, registerNuxtSeoProModule } from './kit'
+import { hookNuxtSeoProLicense } from './kit'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -42,7 +43,7 @@ export interface ModulePublicRuntimeConfig {
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   database: {
-    type: 'sqlite' | 'd1' | 'libsql'
+    type: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     filename?: string
     bindingName?: string
     url?: string
@@ -75,7 +76,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=7',
     },
     'nuxt-site-config': {
-      version: '>=3',
+      version: '>=3.2',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.4.0',
@@ -94,7 +95,7 @@ export default defineNuxtModule<ModuleOptions>({
         maxAge: 3600, // 1 hour
         swr: true,
       },
-      cacheMaxAgeSeconds: 600, // 10 minutes
+      llmsTxtCacheSeconds: 600, // 10 minutes
     }
   },
   async setup(config, nuxt) {
@@ -289,18 +290,6 @@ export default defineNuxtModule<ModuleOptions>({
       await writeFile(join(cacheDir, 'secret'), runtimeSyncSecret)
     }
 
-    // Register module with nuxtseo.com for dashboard integration
-    registerNuxtSeoProModule({
-      name: 'nuxt-ai-ready',
-      version,
-      secret: runtimeSyncSecret,
-      features: {
-        cron: !!config.cron,
-        indexNow: !!indexNow,
-        runtimeSync: runtimeSyncEnabled,
-      },
-    })
-
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
       // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
@@ -334,13 +323,13 @@ export default defineNuxtModule<ModuleOptions>({
         }
         else if (isVercel) {
           // Vercel uses HTTP-based crons - configure vercel.json to hit our endpoint
-          // Include secret in path since Vercel crons are HTTP-based
+          // Auth uses Authorization: Bearer header (set CRON_SECRET env var on Vercel)
           nitroConfig.vercel = nitroConfig.vercel || {}
           nitroConfig.vercel.config = nitroConfig.vercel.config || {}
           nitroConfig.vercel.config.crons = nitroConfig.vercel.config.crons || []
           nitroConfig.vercel.config.crons.push({
             schedule: cronSchedule,
-            path: runtimeSyncSecret ? `/__ai-ready/cron?secret=${runtimeSyncSecret}` : '/__ai-ready/cron',
+            path: '/__ai-ready/cron',
           })
         }
         else {
@@ -449,6 +438,13 @@ export const logger = createConsola({
         ? '#ai-ready/server/db/schema/postgres'
         : '#ai-ready/server/db/schema/sqlite'
       nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`
+
+      // Devtools metadata (build-time config not available in runtime config)
+      nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
+        contentSignal: config.contentSignal || false,
+        mcp: { enabled: hasMCP, tools: hasMCP && (config.mcp?.tools !== false), resources: hasMCP && (config.mcp?.resources !== false) },
+        cron: !!config.cron,
+      })}`
     })
 
     // Resolve database config
@@ -464,7 +460,7 @@ export const logger = createConsola({
         swr: true,
       }) as Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>,
       llmsTxt: mergedLlmsTxt,
-      cacheMaxAgeSeconds: config.cacheMaxAgeSeconds ?? 600,
+      llmsTxtCacheSeconds: config.llmsTxtCacheSeconds ?? 600,
       prerenderCacheDir,
       database,
       runtimeSync: {
@@ -496,6 +492,9 @@ export const logger = createConsola({
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+
+    // Devtools API endpoint
+    addServerHandler({ route: '/__ai-ready/devtools', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {
@@ -558,6 +557,14 @@ export const logger = createConsola({
 
     // Add lifecycle plugin to handle database connection cleanup
     addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
+
+    // DevTools integration
+    setupDevToolsUI({
+      route: '/__nuxt-ai-ready',
+      name: 'nuxt-ai-ready',
+      title: 'AI Ready',
+      icon: 'carbon:machine-learning-model',
+    }, resolve, nuxt)
 
     // Add route rules for static files with proper charset
     nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}

@@ -34,7 +34,7 @@ interface DebugInfo {
   config: {
     debug: boolean
     debugCron: boolean
-    cacheMaxAgeSeconds: number
+    llmsTxtCacheSeconds: number
     mdreamOptions: unknown
   }
   runtimeSync?: {
@@ -279,9 +279,13 @@ export default eventHandler(async (event) => {
         const backoffRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
         let backoffInfo: { until: string, minutesRemaining: number, attempt: number } | null = null
         if (backoffRow) {
-          const parsed = JSON.parse(backoffRow.value) as { until: number, attempt: number }
+          let parsed: { until: number, attempt: number } | null = null
+          try {
+            parsed = JSON.parse(backoffRow.value)
+          }
+          catch {}
           const now = Date.now()
-          if (parsed.until > now) {
+          if (parsed && parsed.until > now) {
             backoffInfo = {
               until: new Date(parsed.until).toISOString(),
               minutesRemaining: Math.ceil((parsed.until - now) / 60000),
@@ -364,7 +368,7 @@ export default eventHandler(async (event) => {
     config: {
       debug: runtimeConfig.debug,
       debugCron: runtimeConfig.debugCron,
-      cacheMaxAgeSeconds: runtimeConfig.cacheMaxAgeSeconds,
+      llmsTxtCacheSeconds: runtimeConfig.llmsTxtCacheSeconds,
       mdreamOptions: runtimeConfig.mdreamOptions,
     },
     runtimeSync: runtimeSyncInfo,

@@ -14,7 +14,7 @@ const buildLlmsTxtCached = defineCachedFunction(
 
 export default eventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any
-  const cacheEnabled = !import.meta.dev && runtimeConfig.cacheMaxAgeSeconds > 0
+  const cacheEnabled = !import.meta.dev && runtimeConfig.llmsTxtCacheSeconds > 0
 
   const content = cacheEnabled
     ? await buildLlmsTxtCached(event)
@@ -22,7 +22,7 @@ export default eventHandler(async (event) => {
 
   setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
   if (cacheEnabled) {
-    setHeader(event, 'Cache-Control', `public, max-age=${runtimeConfig.cacheMaxAgeSeconds}, s-maxage=${runtimeConfig.cacheMaxAgeSeconds}, stale-while-revalidate=3600`)
+    setHeader(event, 'Cache-Control', `public, max-age=${runtimeConfig.llmsTxtCacheSeconds}, s-maxage=${runtimeConfig.llmsTxtCacheSeconds}, stale-while-revalidate=3600`)
   }
 
   return content
