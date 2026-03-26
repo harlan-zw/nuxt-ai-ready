@@ -177,6 +177,13 @@ export interface ModuleOptions {
      */
     pruneTtl?: number
   }
+
+  // --- Deprecated v0 options (removed in next major) ---
+
+  /**
+   * @deprecated Use `llmsTxtCacheSeconds` instead. Will be removed in v2.
+   */
+  cacheMaxAgeSeconds?: number
 }
 
 /**

@@ -70,10 +70,10 @@ export default defineNuxtModule<ModuleOptions>({
   },
   moduleDependencies: {
     '@nuxtjs/robots': {
-      version: '>=5.6.0',
+      version: '>=6.0.0',
     },
     '@nuxtjs/sitemap': {
-      version: '>=7',
+      version: '>=8.0.0',
     },
     'nuxt-site-config': {
       version: '>=3.2',
@@ -107,6 +107,16 @@ export default defineNuxtModule<ModuleOptions>({
     if (config.enabled === false) {
       logger.debug('Module is disabled, skipping setup.')
       return
+    }
+
+    // --- v0 → v1 deprecation handling ---
+    const rawConfig = (nuxt.options as any).aiReady || {}
+    if ('cacheMaxAgeSeconds' in rawConfig) {
+      logger.warn('`cacheMaxAgeSeconds` is deprecated, use `llmsTxtCacheSeconds` instead.')
+      config.llmsTxtCacheSeconds ??= rawConfig.cacheMaxAgeSeconds
+    }
+    if (rawConfig.mdreamOptions?.preset) {
+      logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
 
     // Install site config for accessing site name and description
