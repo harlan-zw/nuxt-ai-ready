@@ -13,9 +13,10 @@ function normalizeLink(link: LlmsTxtLink): string {
   return parts.join('\n')
 }
 
-function normalizeSection(section: LlmsTxtSection): string {
+function normalizeSection(section: LlmsTxtSection, headingLevel: number = 2): string {
+  const prefix = '#'.repeat(headingLevel)
   const parts: string[] = []
-  parts.push(`## ${section.title}`)
+  parts.push(`${prefix} ${section.title}`)
   parts.push('')
   if (section.description) {
     const descriptions = Array.isArray(section.description)
@@ -32,8 +33,14 @@ function normalizeSection(section: LlmsTxtSection): string {
 
 function normalizeLlmsTxtConfig(config: LlmsTxtConfig): string {
   const parts: string[] = []
-  if (config.sections?.length) {
-    parts.push(...config.sections.map(normalizeSection))
+  const required = config.sections?.filter(s => !s.optional) ?? []
+  const optional = config.sections?.filter(s => s.optional) ?? []
+  if (required.length) {
+    parts.push(...required.map(s => normalizeSection(s)))
+  }
+  if (optional.length) {
+    parts.push('## Optional')
+    parts.push(...optional.map(s => normalizeSection(s, 3)))
   }
   if (config.notes) {
     parts.push('## Notes')
@@ -346,6 +353,104 @@ describe('llms.txt normalizer', () => {
 
       const result = normalizeLlmsTxtConfig(config)
       expect(result).toContain('## Empty Links Section')
+    })
+  })
+
+  describe('optional sections', () => {
+    it('should render optional section under ## Optional heading', () => {
+      const config: LlmsTxtConfig = {
+        sections: [{
+          title: 'Debug Endpoints',
+          optional: true,
+        }],
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      expect(result).toContain('## Optional')
+      expect(result).toContain('### Debug Endpoints')
+    })
+
+    it('should use h3 for optional sections instead of h2', () => {
+      const config: LlmsTxtConfig = {
+        sections: [{
+          title: 'Debug Endpoints',
+          description: 'Internal debugging information',
+          optional: true,
+          links: [
+            { title: 'Debug Route', href: '/__ai-ready-debug' },
+          ],
+        }],
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      expect(result).toContain('### Debug Endpoints')
+      expect(result).not.toMatch(/^## Debug Endpoints$/m)
+      expect(result).toContain('Internal debugging information')
+      expect(result).toContain('- [Debug Route](/__ai-ready-debug)')
+    })
+
+    it('should render required sections first, then optional', () => {
+      const config: LlmsTxtConfig = {
+        sections: [
+          { title: 'API Reference', description: 'Main API docs' },
+          { title: 'Debug Endpoints', optional: true },
+          { title: 'Getting Started', description: 'Quick start guide' },
+        ],
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      expect(result).toContain('## API Reference')
+      expect(result).toContain('## Getting Started')
+      expect(result).toContain('## Optional')
+      expect(result).toContain('### Debug Endpoints')
+      expect(result.indexOf('## API Reference')).toBeLessThan(result.indexOf('## Optional'))
+      expect(result.indexOf('## Getting Started')).toBeLessThan(result.indexOf('## Optional'))
+    })
+
+    it('should group multiple optional sections under single ## Optional', () => {
+      const config: LlmsTxtConfig = {
+        sections: [
+          { title: 'Debug Endpoints', optional: true },
+          { title: 'Legacy API', optional: true, description: 'Old API endpoints still available.' },
+        ],
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      const optionalCount = result.split('## Optional').length - 1
+      expect(optionalCount).toBe(1)
+      expect(result).toContain('### Debug Endpoints')
+      expect(result).toContain('### Legacy API')
+      expect(result).toContain('Old API endpoints still available.')
+    })
+
+    it('should show ## Optional heading when all sections are optional', () => {
+      const config: LlmsTxtConfig = {
+        sections: [
+          { title: 'First', optional: true },
+          { title: 'Second', optional: true },
+        ],
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      expect(result).toContain('## Optional')
+      expect(result).toContain('### First')
+      expect(result).toContain('### Second')
+      expect(result).not.toMatch(/^## First$/m)
+      expect(result).not.toMatch(/^## Second$/m)
+    })
+
+    it('should render optional sections before notes', () => {
+      const config: LlmsTxtConfig = {
+        sections: [
+          { title: 'Content' },
+          { title: 'Debug', optional: true },
+        ],
+        notes: 'Auto-generated',
+      }
+
+      const result = normalizeLlmsTxtConfig(config)
+      expect(result.indexOf('## Optional')).toBeLessThan(result.indexOf('## Notes'))
+      expect(result.indexOf('### Debug')).toBeLessThan(result.indexOf('## Notes'))
     })
   })
 })
