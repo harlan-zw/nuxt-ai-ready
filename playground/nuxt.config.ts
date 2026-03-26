@@ -6,13 +6,12 @@ export default defineNuxtConfig({
     '@nuxt/content',
     'nuxt-site-config',
     '@nuxtjs/sitemap',
-    '@nuxtjs/mcp-toolkit',
+    // '@nuxtjs/mcp-toolkit',
   ],
-
   // css: ['~/assets/css/main.css'],
 
   site: {
-    url: 'https://example.com',
+    url: 'https://nuxtseo.com',
     name: 'Minimal AI Ready Demo',
     description: 'Showcase of nuxt-ai-ready core features',
   },

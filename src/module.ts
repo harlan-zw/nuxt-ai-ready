@@ -563,7 +563,7 @@ export const logger = createConsola({
       route: '/__nuxt-ai-ready',
       name: 'nuxt-ai-ready',
       title: 'AI Ready',
-      icon: 'carbon:machine-learning-model',
+      icon: 'carbon:ai-label',
     }, resolve, nuxt)
 
     // Add route rules for static files with proper charset

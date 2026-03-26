@@ -11,12 +11,11 @@ trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1
   - undici-types@6.21.0
   - semver
-
 packages:
   - playground
   - devtools
-
 overrides:
+  h3: ^1.15.10
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
 catalog:
@@ -29,10 +28,10 @@ catalog:
   consola: ^3.4.2
   defu: ^6.1.4
   drizzle-orm: ^0.45.1
-  eslint-plugin-harlanzw: ^0.11.0
+  eslint-plugin-harlanzw: ^0.12.0
   execa: ^9.6.1
   mdream: ^1.0.3
-  nuxtseo-layer-devtools: ^0.4.4
+  nuxtseo-layer-devtools: ^0.4.5
   nuxtseo-shared: ^0.8.1
   pathe: ^2.0.3
   pkg-types: ^2.3.0
@@ -81,4 +80,5 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - vue-demi
+
 trustPolicyIgnoreAfter: 262800

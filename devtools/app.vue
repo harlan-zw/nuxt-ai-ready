@@ -30,17 +30,17 @@ const currentTab = computed(() => {
   const path = route.path
   if (path === '/llms-txt')
     return 'llms-txt'
-  if (path === '/pages')
-    return 'pages'
+  if (path === '/debug')
+    return 'debug'
   if (path === '/docs')
     return 'docs'
-  return 'overview'
+  return 'pages'
 })
 
 const navItems = [
-  { value: 'overview', to: '/', icon: 'carbon:dashboard', label: 'Overview' },
+  { value: 'pages', to: '/', icon: 'carbon:list', label: 'Pages' },
   { value: 'llms-txt', to: '/llms-txt', icon: 'carbon:document', label: 'llms.txt' },
-  { value: 'pages', to: '/pages', icon: 'carbon:list', label: 'Pages' },
+  { value: 'debug', to: '/debug', icon: 'carbon:debug', label: 'Debug' },
   { value: 'docs', to: '/docs', icon: 'carbon:book', label: 'Docs' },
 ]
 
@@ -51,7 +51,7 @@ const runtimeVersion = computed(() => globalData.value?.version || 'unknown')
   <DevtoolsLayout
     module-name="nuxt-ai-ready"
     title="AI Ready"
-    icon="carbon:machine-learning-model"
+    icon="carbon:bot"
     :version="runtimeVersion"
     :nav-items="navItems"
     github-url="https://github.com/nuxt-seo-pro/nuxt-ai-ready"

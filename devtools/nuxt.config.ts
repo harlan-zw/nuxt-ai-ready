@@ -4,6 +4,10 @@ export default defineNuxtConfig({
   extends: ['nuxtseo-layer-devtools'],
 
   aiReady: false,
+  robots: false,
+  sitemap: false,
+  site: false,
+  mcp: false,
 
   imports: {
     autoImport: true,

@@ -1,218 +1,178 @@
 <script lang="ts" setup>
+import { useAsyncData } from '#imports'
+import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { hasProductionUrl, isProductionMode, previewSource } from 'nuxtseo-layer-devtools/composables/state'
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { GlobalDataKey } from '../composables/types'
 
 const globalData = inject(GlobalDataKey)
-
-const config = computed(() => globalData?.value?.config)
-const stats = computed(() => globalData?.value?.stats)
 const isDev = computed(() => globalData?.value?.isDev ?? true)
-const hasSiteUrl = computed(() => hasProductionUrl.value)
+const stats = computed(() => globalData?.value?.stats)
+const pages = computed(() => globalData?.value?.pages || [])
+
+const search = ref('')
+const selectedRoute = ref<string | null>(null)
+
+const filteredPages = computed(() => {
+  if (!search.value)
+    return pages.value
+  const q = search.value.toLowerCase()
+  return pages.value.filter(p =>
+    p.route.toLowerCase().includes(q)
+    || p.title?.toLowerCase().includes(q)
+    || p.description?.toLowerCase().includes(q),
+  )
+})
+
+// Fetch markdown for selected page
+const { data: markdownContent, status: mdStatus } = useAsyncData('page-markdown', async () => {
+  if (!appFetch.value || !selectedRoute.value)
+    return null
+  try {
+    const mdRoute = selectedRoute.value === '/' ? '/index.md' : `${selectedRoute.value}.md`
+    return await appFetch.value(mdRoute, { responseType: 'text' }) as string
+  }
+  catch {
+    return null
+  }
+}, {
+  watch: [selectedRoute, appFetch],
+})
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Production CTA Banner (dev mode, no production URL) -->
-    <DevtoolsAlert
-      v-if="isDev && !hasSiteUrl"
-      variant="info"
-    >
-      <p class="font-medium mb-2">
-        Configure your site URL to preview production data
-      </p>
-      <p class="mb-3 text-sm opacity-80">
-        Page data, search, and llms.txt content are only available after prerendering or from a production site.
-        Add your production URL to inspect live data from this panel.
-      </p>
-      <DevtoolsSnippet
-        lang="js"
-        code="`// nuxt.config.ts\nexport default defineNuxtConfig({\n  site: { url: 'https://your-site.com' },\n})`"
-      />
-    </DevtoolsAlert>
-
-    <!-- Production CTA Banner (dev mode, has production URL) -->
-    <DevtoolsAlert
-      v-if="isDev && hasSiteUrl && !isProductionMode"
-      variant="production"
-    >
-      <p class="font-medium mb-2">
-        Production data available
-      </p>
-      <p class="mb-3 text-sm opacity-80">
-        In development, the database is empty and llms.txt is a stub.
-        Switch to production mode to see indexed pages, search results, and live llms.txt content.
-      </p>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--seo-green)] text-white hover:opacity-90 transition-opacity cursor-pointer"
-        @click="previewSource = 'production'"
+  <div class="space-y-4">
+    <!-- Dev mode empty state -->
+    <template v-if="isDev && !isProductionMode">
+      <DevtoolsEmptyState
+        icon="carbon:list"
+        title="No pages in development"
+        description="Pages are indexed during prerendering or via runtime sync. The database is empty in dev mode."
       >
-        <UIcon name="carbon:cloud" class="w-3.5 h-3.5" />
-        Switch to Production
-      </button>
-    </DevtoolsAlert>
-
-    <!-- Production Stats -->
-    <div v-if="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <DevtoolsMetric
-        label="Total Pages"
-        :value="stats.total"
-        icon="carbon:document-multiple"
-      />
-      <DevtoolsMetric
-        label="Indexed"
-        :value="stats.indexed"
-        icon="carbon:checkmark-filled"
-        variant="success"
-      />
-      <DevtoolsMetric
-        label="Pending"
-        :value="stats.pending"
-        icon="carbon:time"
-        :variant="stats.pending > 0 ? 'warning' : 'default'"
-      />
-      <DevtoolsMetric
-        label="Errors"
-        :value="stats.errors"
-        icon="carbon:warning-alt"
-        :variant="stats.errors > 0 ? 'danger' : 'default'"
-      />
-    </div>
-
-    <!-- Configuration Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- Database -->
-      <DevtoolsPanel title="Database">
-        <div class="config-row">
-          <span class="config-label">Type</span>
-          <span class="config-value">{{ config?.database?.type || 'sqlite' }}</span>
+        <div class="mt-4 space-y-2">
+          <button
+            v-if="hasProductionUrl"
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--seo-green)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+            @click="previewSource = 'production'"
+          >
+            <UIcon name="carbon:cloud" class="w-3.5 h-3.5" />
+            Switch to Production
+          </button>
+          <p class="text-xs text-[var(--color-text-muted)]">
+            Or run <code class="px-1 py-0.5 rounded bg-[var(--color-surface-elevated)]">nuxi generate</code> to populate page data.
+          </p>
         </div>
-      </DevtoolsPanel>
+      </DevtoolsEmptyState>
+    </template>
 
-      <!-- MCP -->
-      <DevtoolsPanel title="MCP Server">
-        <template v-if="config?.mcp?.enabled">
-          <div class="config-row">
-            <span class="config-label">Tools</span>
-            <span class="config-value" :class="config.mcp.tools ? 'text-green-500' : ''">{{ config.mcp.tools ? 'Enabled' : 'Disabled' }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Resources</span>
-            <span class="config-value" :class="config.mcp.resources ? 'text-green-500' : ''">{{ config.mcp.resources ? 'Enabled' : 'Disabled' }}</span>
-          </div>
-        </template>
-        <p v-else class="text-xs text-[var(--color-text-muted)]">
-          Not installed. Add <code class="px-1 py-0.5 rounded bg-[var(--color-surface-sunken)]">@nuxtjs/mcp-toolkit</code> to enable.
-        </p>
-      </DevtoolsPanel>
-
-      <!-- IndexNow -->
-      <DevtoolsPanel title="IndexNow">
-        <div class="config-row">
-          <span class="config-label">Status</span>
-          <span class="config-value" :class="config?.indexNow ? 'text-green-500' : ''">
-            {{ config?.indexNow ? 'Enabled' : 'Disabled' }}
-          </span>
-        </div>
-      </DevtoolsPanel>
-
-      <!-- Content Signals -->
-      <DevtoolsPanel title="Content Signals">
-        <template v-if="config?.contentSignal">
-          <div class="config-row">
-            <span class="config-label">AI Train</span>
-            <span class="config-value">{{ config.contentSignal.aiTrain ? 'Yes' : 'No' }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Search</span>
-            <span class="config-value">{{ config.contentSignal.search ? 'Yes' : 'No' }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">AI Input</span>
-            <span class="config-value">{{ config.contentSignal.aiInput ? 'Yes' : 'No' }}</span>
-          </div>
-        </template>
-        <p v-else class="text-xs text-[var(--color-text-muted)]">
-          Not configured. Uses default robot directives.
-        </p>
-      </DevtoolsPanel>
-
-      <!-- Runtime Sync -->
-      <DevtoolsPanel title="Runtime Sync">
-        <template v-if="config?.runtimeSync?.enabled">
-          <div class="config-row">
-            <span class="config-label">TTL</span>
-            <span class="config-value">{{ config.runtimeSync.ttl }}s</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Batch Size</span>
-            <span class="config-value">{{ config.runtimeSync.batchSize }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Prune TTL</span>
-            <span class="config-value">{{ config.runtimeSync.pruneTtl ? `${config.runtimeSync.pruneTtl}s` : 'Never' }}</span>
-          </div>
-        </template>
-        <p v-else class="text-xs text-[var(--color-text-muted)]">
-          Disabled. Using prerendered data only.
-        </p>
-      </DevtoolsPanel>
-
-      <!-- Cron & Cache -->
-      <DevtoolsPanel title="Scheduled Tasks">
-        <div class="config-row">
-          <span class="config-label">Cron</span>
-          <span class="config-value">{{ config?.cron ? 'Every 5 minutes' : 'Disabled' }}</span>
-        </div>
-        <div class="config-row">
-          <span class="config-label">Sitemap Prerendered</span>
-          <span class="config-value">{{ config?.sitemapPrerendered ? 'Yes' : 'No' }}</span>
-        </div>
-      </DevtoolsPanel>
-    </div>
-
-    <!-- Cache Settings -->
-    <DevtoolsSection text="Cache Settings" icon="carbon:timer">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="config-row">
-          <span class="config-label">Markdown Max-Age</span>
-          <span class="config-value font-mono">{{ config?.markdownCacheHeaders?.maxAge || 3600 }}s</span>
-        </div>
-        <div class="config-row">
-          <span class="config-label">Markdown SWR</span>
-          <span class="config-value">{{ config?.markdownCacheHeaders?.swr ? 'Enabled' : 'Disabled' }}</span>
-        </div>
-        <div class="config-row">
-          <span class="config-label">llms.txt Cache</span>
-          <span class="config-value font-mono">{{ config?.llmsTxtCacheSeconds || 600 }}s</span>
-        </div>
+    <!-- Page browser (production mode or has pages) -->
+    <template v-else>
+      <!-- Stats -->
+      <div v-if="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <DevtoolsMetric
+          label="Total Pages"
+          :value="stats.total"
+          icon="carbon:document-multiple"
+        />
+        <DevtoolsMetric
+          label="Indexed"
+          :value="stats.indexed"
+          icon="carbon:checkmark-filled"
+          variant="success"
+        />
+        <DevtoolsMetric
+          label="Pending"
+          :value="stats.pending"
+          icon="carbon:time"
+          :variant="stats.pending > 0 ? 'warning' : 'default'"
+        />
+        <DevtoolsMetric
+          label="Errors"
+          :value="stats.errors"
+          icon="carbon:warning-alt"
+          :variant="stats.errors > 0 ? 'danger' : 'default'"
+        />
       </div>
-    </DevtoolsSection>
+
+      <!-- Search -->
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1">
+          <UIcon name="carbon:search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search pages..."
+            class="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-[var(--color-surface-sunken)] border border-[var(--color-border)] text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] outline-none focus:border-[var(--seo-green)] transition-colors"
+          >
+        </div>
+        <span class="text-xs text-[var(--color-text-muted)] shrink-0">
+          {{ filteredPages.length }} page{{ filteredPages.length === 1 ? '' : 's' }}
+        </span>
+      </div>
+
+      <!-- Page list -->
+      <div v-if="filteredPages.length" class="space-y-1">
+        <button
+          v-for="page in filteredPages"
+          :key="page.route"
+          type="button"
+          class="w-full text-left p-3 rounded-lg border transition-all cursor-pointer"
+          :class="selectedRoute === page.route
+            ? 'bg-[var(--color-surface-elevated)] border-[var(--seo-green)]'
+            : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)]'"
+          @click="selectedRoute = selectedRoute === page.route ? null : page.route"
+        >
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-mono text-[var(--seo-green)] truncate">
+                {{ page.route }}
+              </div>
+              <div v-if="page.title" class="text-sm font-medium text-[var(--color-text)] truncate mt-0.5">
+                {{ page.title }}
+              </div>
+              <div v-if="page.description" class="text-xs text-[var(--color-text-muted)] line-clamp-2 mt-0.5">
+                {{ page.description }}
+              </div>
+            </div>
+            <div v-if="page.updatedAt" class="text-[10px] text-[var(--color-text-subtle)] shrink-0">
+              {{ new Date(page.updatedAt).toLocaleDateString() }}
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <DevtoolsEmptyState
+        v-else-if="search"
+        icon="carbon:search"
+        title="No matching pages"
+        :description="`No pages match &quot;${search}&quot;`"
+      />
+
+      <DevtoolsEmptyState
+        v-else
+        icon="carbon:list"
+        title="No pages indexed"
+        description="The production site has no indexed pages yet. Ensure prerendering has run."
+      />
+
+      <!-- Markdown preview panel -->
+      <DevtoolsPanel
+        v-if="selectedRoute"
+        :title="`${selectedRoute}.md`"
+        icon="carbon:document"
+      >
+        <div v-if="mdStatus === 'pending'" class="py-4">
+          <DevtoolsLoading />
+        </div>
+        <div v-else-if="markdownContent" class="relative">
+          <DevtoolsCopyButton :text="markdownContent" class="absolute top-2 right-2 z-10" />
+          <pre class="text-xs font-mono whitespace-pre-wrap p-4 rounded-lg bg-[var(--color-surface-sunken)] text-[var(--color-text)] overflow-auto max-h-[500px]">{{ markdownContent }}</pre>
+        </div>
+        <p v-else class="text-xs text-[var(--color-text-muted)] p-4">
+          Could not load markdown for this route.
+        </p>
+      </DevtoolsPanel>
+    </template>
   </div>
 </template>
-
-<style scoped>
-.config-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.config-row:last-child {
-  border-bottom: none;
-}
-
-.config-label {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.config-value {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-text);
-}
-</style>

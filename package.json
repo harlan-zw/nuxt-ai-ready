@@ -124,8 +124,5 @@
     "vue-tsc": "catalog:dev-build",
     "wrangler": "catalog:",
     "zod": "catalog:"
-  },
-  "resolutions": {
-    "nuxt-ai-ready": "workspace:*"
   }
 }
