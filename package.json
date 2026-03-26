@@ -1,7 +1,7 @@
 {
   "name": "nuxt-ai-ready",
   "type": "module",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "packageManager": "pnpm@10.33.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
