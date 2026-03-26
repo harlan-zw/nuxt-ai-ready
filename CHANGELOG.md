@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.0.0...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.0...main)
+
+### 💅 Refactors
+
+- Inhherit nuxt seo pro license check ([e5372ad](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/e5372ad))
+
+### 🏡 Chore
+
+- Sync ([dfd9779](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/dfd9779))
+- Build ([f9e17a1](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/f9e17a1))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.12.1...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.12.1...main)
