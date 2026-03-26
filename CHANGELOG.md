@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v0.12.1...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.12.1...main)
+
+### 🚀 Enhancements
+
+- ⚠️  Migrate to `mdream` v1 ([931e6ef](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/931e6ef))
+- Support optional sections in llms.txt ([#18](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/18))
+- Add pagination to MCP pages resource ([#17](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/17))
+- ⚠️  V1 breaking changes and quality improvements ([#15](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/15))
+
+### 🩹 Fixes
+
+- **test:** Disable mcp-toolkit in test fixtures (h3 v2 incompatibility) ([b85366b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/b85366b))
+- **test:** Update llms.txt expectations for new format, skip cloudflare WASM ([d31f698](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/d31f698))
+- Vary markdown cache by accept headers ([f513c08](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/f513c08))
+
+### 🏡 Chore
+
+- Bump deps ([db4700b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/db4700b))
+- Bump deps ([2740b06](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/2740b06))
+- Sync ([322e439](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/322e439))
+- V1 migration helpers ([a0f913b](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/a0f913b))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Migrate to `mdream` v1 ([931e6ef](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/931e6ef))
+- ⚠️  V1 breaking changes and quality improvements ([#15](https://github.com/nuxt-seo-pro/nuxt-ai-ready/pull/15))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v0.12.1...0.x
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v0.12.1...0.x)
