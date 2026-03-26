@@ -149,6 +149,11 @@ overrides:
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
 
+patchedDependencies:
+  nuxtseo-shared@0.9.0:
+    hash: 688f0f3ae23106776f8380923dbfe60f5300a91ebfc0cc76752187bc1569d5b2
+    path: patches/nuxtseo-shared@0.9.0.patch
+
 importers:
 
   .:
@@ -182,7 +187,7 @@ importers:
         version: 4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
       nuxtseo-shared:
         specifier: 'catalog:'
-        version: 0.9.0(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
+        version: 0.9.0(patch_hash=688f0f3ae23106776f8380923dbfe60f5300a91ebfc0cc76752187bc1569d5b2)(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
       pathe:
         specifier: 'catalog:'
         version: 2.0.3
@@ -10903,7 +10908,7 @@ snapshots:
       fast-xml-parser: 5.5.9
       nuxt-site-config: 4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
       nuxtseo-layer-devtools: 0.5.1(b27aaca50b57c3adebe5e07b6f1dd935)
-      nuxtseo-shared: 0.9.0(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
+      nuxtseo-shared: 0.9.0(patch_hash=688f0f3ae23106776f8380923dbfe60f5300a91ebfc0cc76752187bc1569d5b2)(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
       ofetch: 1.5.1
       pathe: 2.0.3
       pkg-types: 2.3.0
@@ -16380,7 +16385,7 @@ snapshots:
       '@shikijs/langs': 4.0.2
       '@shikijs/themes': 4.0.2
       '@vueuse/nuxt': 14.2.1(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vue@3.5.31(typescript@6.0.2))
-      nuxtseo-shared: 0.9.0(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
+      nuxtseo-shared: 0.9.0(patch_hash=688f0f3ae23106776f8380923dbfe60f5300a91ebfc0cc76752187bc1569d5b2)(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6)
       ofetch: 1.5.1
       shiki: 4.0.2
       ufo: 1.6.3
@@ -16489,7 +16494,7 @@ snapshots:
       - magicast
       - vite
 
-  nuxtseo-shared@0.9.0(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6):
+  nuxtseo-shared@0.9.0(patch_hash=688f0f3ae23106776f8380923dbfe60f5300a91ebfc0cc76752187bc1569d5b2)(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt-site-config@4.0.6(@nuxt/schema@4.4.2)(magicast@0.5.2)(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6))(nuxt@4.4.2(c18d10a972110e103a84f943d254838a))(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))(vue@3.5.31(typescript@6.0.2))(zod@4.3.6):
     dependencies:
       '@clack/prompts': 1.1.0
       '@nuxt/devtools-kit': 4.0.0-alpha.3(magicast@0.5.2)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.8.3))

@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v1.0.1...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.1...main)
+
+### 🏡 Chore
+
+- Bump deps ([6f79cb5](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/6f79cb5))
+- Bump deps ([b816c82](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/b816c82))
+- Sync ([6952abd](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/6952abd))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.0.0...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.0...main)

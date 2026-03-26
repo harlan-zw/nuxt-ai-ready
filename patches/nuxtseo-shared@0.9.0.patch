@@ -1,0 +1,13 @@
+diff --git a/dist/module.mjs b/dist/module.mjs
+index 1acffc1065bfe01dec35944776c19f24414ee018..97d7ea8a24ebcce8b1c22e41f41b489a94f2000c 100644
+--- a/dist/module.mjs
++++ b/dist/module.mjs
+@@ -16,7 +16,7 @@ const module$1 = defineNuxtModule({
+     }
+   },
+   setup() {
+-    hookNuxtSeoProLicense();
++    // hookNuxtSeoProLicense();
+   }
+ });
+ 
