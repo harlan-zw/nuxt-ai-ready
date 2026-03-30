@@ -17,10 +17,10 @@
   "homepage": "https://nuxtseo.com/ai-ready",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nuxt-seo-pro/nuxt-ai-ready.git"
+    "url": "git+https://github.com/harlan-zw/nuxt-ai-ready.git"
   },
   "bugs": {
-    "url": "https://github.com/nuxt-seo-pro/nuxt-ai-ready/issues"
+    "url": "https://github.com/harlan-zw/nuxt-ai-ready/issues"
   },
   "exports": {
     ".": {

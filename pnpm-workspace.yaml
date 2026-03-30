@@ -33,8 +33,8 @@ catalog:
   eslint-plugin-harlanzw: ^0.12.0
   execa: ^9.6.1
   mdream: ^1.0.3
-  nuxtseo-layer-devtools: ^5.0.2
-  nuxtseo-shared: ^5.0.2
+  nuxtseo-layer-devtools: ^5.1.0
+  nuxtseo-shared: ^5.1.0
   pathe: ^2.0.3
   pkg-types: ^2.3.0
   ufo: ^1.6.3

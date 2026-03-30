@@ -291,18 +291,12 @@ export default defineNuxtModule<ModuleOptions>({
       || process.env.NUXT_GENERATE === 'true'
     )
 
-    // Auto-derive runtimeSyncSecret: explicit config > env > license key > random
-    const license = (nuxt.options.runtimeConfig.seoProKey as string | undefined) || process.env.NUXT_SEO_PRO_KEY
+    // Auto-derive runtimeSyncSecret: explicit config > env > random
     let runtimeSyncSecret = config.runtimeSyncSecret || process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
     if (!runtimeSyncSecret && runtimeSyncEnabled) {
-      if (license) {
-        runtimeSyncSecret = license
-      }
-      else {
-        runtimeSyncSecret = randomBytes(32).toString('hex')
-        if (!nuxt.options.dev && !nuxt.options._prepare)
-          logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
-      }
+      runtimeSyncSecret = randomBytes(32).toString('hex')
+      if (!nuxt.options.dev && !nuxt.options._prepare)
+        logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
     }
 
     // Write secret to cache for CLI access

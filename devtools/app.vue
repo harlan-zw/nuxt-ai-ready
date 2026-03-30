@@ -54,7 +54,7 @@ const runtimeVersion = computed(() => globalData.value?.version || 'unknown')
     icon="carbon:bot"
     :version="runtimeVersion"
     :nav-items="navItems"
-    github-url="https://github.com/nuxt-seo-pro/nuxt-ai-ready"
+    github-url="https://github.com/harlan-zw/nuxt-ai-ready"
     :loading="status === 'pending'"
     :active-tab="currentTab"
     @refresh="refreshTime = Date.now()"

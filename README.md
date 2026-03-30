@@ -53,7 +53,7 @@ npx nuxi@latest module add nuxt-ai-ready
 
 ## License
 
-This module requires a [Nuxt SEO Pro license](https://nuxtseo.com/pro), see [LICENSE](https://github.com/harlan-zw/nuxt-ai-ready/blob/main/LICENSE) for full details.
+[MIT](https://github.com/harlan-zw/nuxt-ai-ready/blob/main/LICENSE).
 
 <!-- Badges -->
 [npm-version-src]: https://img.shields.io/npm/v/nuxt-ai-ready/latest.svg?style=flat&colorA=18181B&colorB=28CF8D
