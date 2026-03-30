@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v1.0.3...main
+
+[compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.3...main)
+
+### 🩹 Fixes
+
+- Allow sitemap v8 ([b3cffca](https://github.com/nuxt-seo-pro/nuxt-ai-ready/commit/b3cffca))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.0.2...main
 
 [compare changes](https://github.com/nuxt-seo-pro/nuxt-ai-ready/compare/v1.0.2...main)
