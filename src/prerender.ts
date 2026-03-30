@@ -314,7 +314,10 @@ async function crawlSitemapContent(
   sitemapContent: string,
 ): Promise<number> {
   logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
-  const result = await parseSitemapXml(sitemapContent)
+  const result = await parseSitemapXml(sitemapContent).catch((e) => {
+    logger.debug(`Skipping sitemap: ${e.message}`)
+    return null
+  })
   const urls = result?.urls || []
   logger.debug(`Found ${urls.length} URLs in sitemap`)
   return crawlSitemapEntries(state, nuxt, nitro, urls)
