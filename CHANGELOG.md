@@ -1,6 +1,19 @@
 # Changelog
 
 
+## v1.1.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.1.0...main)
+
+### 🏡 Chore
+
+- Bump ([f34c052](https://github.com/harlan-zw/nuxt-ai-ready/commit/f34c052))
+- Bump ([b787329](https://github.com/harlan-zw/nuxt-ai-ready/commit/b787329))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.0.4...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.0.4...main)
