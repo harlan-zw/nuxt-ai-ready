@@ -1,11 +1,19 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { withSiteUrl } from '#site-config/server/composables/utils'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
+
+// Always signal that response content varies by Accept so caches segment correctly
+function setNegotiationHeaders(event: any, path: string) {
+  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
+  // Advertise the markdown alternate so agents can discover it via Link header (RFC 8288)
+  const mdPath = path === '/' ? '/index.md' : `${path}.md`
+  setHeader(event, 'link', `<${mdPath}>; rel="alternate"; type="text/markdown"`)
+}
 
 export default defineEventHandler(async (event) => {
   // Skip internal requests to prevent infinite loop
@@ -16,8 +24,23 @@ export default defineEventHandler(async (event) => {
   if (!renderInfo)
     return
 
-  const { path, isExplicit } = renderInfo
+  // Accept header sent but no supported representation matched → 406
+  if ('notAcceptable' in renderInfo) {
+    throw createError({
+      statusCode: 406,
+      statusMessage: 'Not Acceptable',
+      message: 'Supported types: text/html, text/markdown, text/plain',
+    })
+  }
+
+  const { path, isExplicit, negotiation } = renderInfo
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+
+  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
+  if (negotiation === 'html') {
+    setNegotiationHeaders(event, path)
+    return
+  }
 
   // Runtime: fetch HTML with internal marker to prevent recursion
   // Use manual redirect to detect and forward redirects with .md suffix
@@ -90,6 +113,8 @@ export default defineEventHandler(async (event) => {
   )
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
+  // Advertise the HTML alternate for clients discovering representations (RFC 8288)
+  setHeader(event, 'link', `<${path}>; rel="alternate"; type="text/html"`)
 
   // Set cache headers
   if (config.markdownCacheHeaders) {
