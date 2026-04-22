@@ -1,6 +1,6 @@
-import { withSiteUrl } from '#site-config/server/composables/utils'
 import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { withSiteUrl } from '#site-config/server/composables/utils'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
 import { extractKeywords } from '../utils/keywords'
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const renderInfo = getMarkdownRenderInfo(event, true)
-  if (!renderInfo)
+  if (!renderInfo || 'notAcceptable' in renderInfo)
     return
 
   const { path } = renderInfo

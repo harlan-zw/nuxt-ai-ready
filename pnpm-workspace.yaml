@@ -22,7 +22,7 @@ patchedDependencies:
   nuxtseo-shared@0.9.0: patches/nuxtseo-shared@0.9.0.patch
 catalog:
   '@libsql/client': ^0.17.2
-  '@mdream/js': ^1.0.7
+  '@mdream/js': ^1.1.0
   '@types/better-sqlite3': ^7.6.13
   better-sqlite3: ^12.9.0
   bumpp: ^11.0.1
@@ -32,7 +32,7 @@ catalog:
   drizzle-orm: ^0.45.1
   eslint-plugin-harlanzw: ^0.12.1
   execa: ^9.6.1
-  mdream: ^1.0.7
+  mdream: ^1.1.0
   nuxtseo-layer-devtools: ^5.1.3
   nuxtseo-shared: ^5.1.3
   pathe: ^2.0.3

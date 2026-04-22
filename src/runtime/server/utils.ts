@@ -1,8 +1,9 @@
+import type { ContentNegotiationResult } from '@mdream/js/negotiate'
 import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
 import type { ModulePublicRuntimeConfig } from '../../module'
 import type { MarkdownContext } from '../types'
-import { shouldServeMarkdown } from '@mdream/js/negotiate'
+import { negotiateContent } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeader, getHeaders } from 'h3'
 import { htmlToMarkdown } from 'mdream'
@@ -62,10 +63,33 @@ function buildMdreamOptions(
   }
 }
 
+// H3 wrapper over @mdream/js/negotiate that layers AI bot detection (via
+// @nuxtjs/robots) on top of RFC 7231 Accept header negotiation. AI bots get
+// markdown regardless of what their Accept header says.
+export function negotiateRepresentation(event: H3Event): ContentNegotiationResult {
+  const secFetchDest = getHeader(event, 'sec-fetch-dest')
+
+  // Browser navigation always gets HTML (short-circuit before bot check so
+  // AI-categorized browsers don't get markdown pushed at them mid-navigation)
+  if (secFetchDest === 'document')
+    return 'html'
+
+  // AI bots always get markdown regardless of Accept
+  const botInfo = getBotInfo(getHeaders(event))
+  if (botInfo?.category === 'ai')
+    return 'markdown'
+
+  return negotiateContent(getHeader(event, 'accept'), secFetchDest)
+}
+
 // Check if request should be rendered as markdown
-// Returns normalized path and whether it's explicit (.md) or implicit (Accept header)
-// Use explicitOnly=true for prerender (only .md extension, no Accept header check)
-export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { path: string, isExplicit: boolean } | null {
+// Returns normalized path, whether it's explicit (.md) or implicit (Accept header),
+// or 'not-acceptable' if the Accept header cannot be satisfied.
+// Use explicitOnly=true for prerender (only .md extension, no Accept header check).
+export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false):
+  | { path: string, isExplicit: boolean, negotiation: ContentNegotiationResult }
+  | { notAcceptable: true }
+  | null {
   const originalPath = event.path
 
   // Never run on API routes or internal routes
@@ -90,38 +114,29 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false): { p
     return null
   }
 
-  const isImplicit = !explicitOnly && clientPrefersMarkdown(event)
+  const negotiation: ContentNegotiationResult = explicitOnly ? 'markdown' : negotiateRepresentation(event)
 
-  if (!isExplicit && !isImplicit) {
-    return null
+  // Explicit .md always serves markdown regardless of Accept
+  if (isExplicit) {
+    const path = normalizePath(originalPath.slice(0, -3))
+    return { path, isExplicit: true, negotiation: 'markdown' }
   }
 
-  // Normalize path
-  let path = isExplicit ? originalPath.slice(0, -3) : originalPath
-  if (path.endsWith('/index')) {
-    path = path.slice(0, -5) || '/'
-  }
+  if (negotiation === 'not-acceptable')
+    return { notAcceptable: true }
 
-  return { path, isExplicit }
+  return { path: normalizePath(originalPath), isExplicit: false, negotiation }
 }
 
-// Detect if client prefers markdown based on Accept header or AI bot detection
+function normalizePath(path: string): string {
+  if (path.endsWith('/index'))
+    return path.slice(0, -5) || '/'
+  return path
+}
+
+// Back-compat: detect if client prefers markdown
 export function clientPrefersMarkdown(event: H3Event): boolean {
-  const acceptHeader = getHeader(event, 'accept') || ''
-  const secFetchDest = getHeader(event, 'sec-fetch-dest') || ''
-
-  // Browsers send sec-fetch-dest header - if it's 'document', it's a browser navigation
-  if (secFetchDest === 'document') {
-    return false
-  }
-
-  // Check if it's an AI bot via nuxt/robots
-  const botInfo = getBotInfo(getHeaders(event))
-  if (botInfo?.category === 'ai') {
-    return true
-  }
-
-  return shouldServeMarkdown(acceptHeader, secFetchDest)
+  return negotiateRepresentation(event) === 'markdown'
 }
 
 interface ConvertHtmlOptions {
