@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { useAsyncData } from '#imports'
 import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { hasProductionUrl, isProductionMode, previewSource } from 'nuxtseo-layer-devtools/composables/state'
 import { computed, inject, ref } from 'vue'
+import { useAsyncData } from '#imports'
 import { GlobalDataKey } from '../composables/types'
 
 const globalData = inject(GlobalDataKey)

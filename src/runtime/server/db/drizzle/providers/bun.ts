@@ -1,10 +1,10 @@
 import type { H3Event } from 'h3'
 import { mkdir } from 'node:fs/promises'
-import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { dirname } from 'pathe'
+import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 

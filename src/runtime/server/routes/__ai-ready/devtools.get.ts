@@ -1,7 +1,7 @@
 import type { PageEntry } from '../../db/queries'
-import { getSiteConfig } from '#site-config/server/composables'
 import { eventHandler, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { getSiteConfig } from '#site-config/server/composables'
 import { countPages, queryPages } from '../../db/queries'
 
 export default eventHandler(async (event) => {

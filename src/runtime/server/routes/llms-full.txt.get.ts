@@ -1,6 +1,6 @@
-import { getSiteConfig } from '#site-config/server/composables'
 import { eventHandler, sendIterable, setHeader, setResponseHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { getSiteConfig } from '#site-config/server/composables'
 import { countPages, streamPages } from '../db/queries'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../utils/llms-full'
 

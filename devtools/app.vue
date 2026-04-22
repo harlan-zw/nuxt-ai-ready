@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import type { DevtoolsGlobalData } from './composables/types'
-import { computed, provide, useAsyncData, useNuxtApp, useRoute, watch } from '#imports'
 import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { productionUrl, refreshTime } from 'nuxtseo-layer-devtools/composables/state'
+import { computed, provide, useAsyncData, useNuxtApp, useRoute, watch } from '#imports'
 import { GlobalDataKey, GlobalDataStatusKey } from './composables/types'
 
 const nuxtApp = useNuxtApp()

@@ -1,11 +1,11 @@
 /* eslint-disable harlanzw/vue-no-faux-composables */
-import type * as schema from '#ai-ready-virtual/db-schema.mjs'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import type { H3Event } from 'h3'
+import type * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { closeDriver } from './raw'
 
 export type DatabaseDialect = 'sqlite' | 'postgres'

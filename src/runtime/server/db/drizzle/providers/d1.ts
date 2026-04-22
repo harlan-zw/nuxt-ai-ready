@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
-import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { drizzle } from 'drizzle-orm/d1'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 
