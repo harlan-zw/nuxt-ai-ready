@@ -50,10 +50,10 @@ describe('netlify build output', async () => {
     // Should have canonical origin
     expect(llmsTxt).toContain('Canonical Origin:')
 
-    // Should have page routes with descriptions
-    expect(llmsTxt).toContain('- /: ')
-    expect(llmsTxt).toContain('- /about: ')
-    expect(llmsTxt).toContain('- /docs/api: ')
-    expect(llmsTxt).toContain('- /docs/getting-started: ')
+    // Should have page routes with descriptions (titled or untitled)
+    expect(llmsTxt).toMatch(/- (?:\[[^\]]+\]\()?\/(?:\)|: )/)
+    expect(llmsTxt).toMatch(/- (?:\[[^\]]+\]\()?\/about(?:\)|: )/)
+    expect(llmsTxt).toMatch(/- (?:\[[^\]]+\]\()?\/docs\/api(?:\)|: )/)
+    expect(llmsTxt).toMatch(/- (?:\[[^\]]+\]\()?\/docs\/getting-started(?:\)|: )/)
   })
 })
