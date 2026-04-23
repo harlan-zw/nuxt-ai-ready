@@ -21,7 +21,7 @@ overrides:
 patchedDependencies:
   nuxtseo-shared@0.9.0: patches/nuxtseo-shared@0.9.0.patch
 catalog:
-  '@libsql/client': ^0.17.2
+  '@libsql/client': ^0.17.3
   '@mdream/js': ^1.1.0
   '@types/better-sqlite3': ^7.6.13
   better-sqlite3: ^12.9.0
@@ -53,12 +53,12 @@ catalogs:
     '@nuxt/test-utils': ^4.0.2
     '@vitest/coverage-v8': ^4.1.5
     '@vue/test-utils': ^2.4.6
-    happy-dom: ^20.8.9
+    happy-dom: ^20.9.0
     playwright: ^1.58.2
     playwright-core: ^1.58.2
     vitest: ^4.1.5
   nuxt:
-    '@nuxt/content': ^3.12.0
+    '@nuxt/content': ^3.13.0
     '@nuxt/kit': ^4.4.2
     '@nuxt/module-builder': ^1.0.2
     '@nuxt/ui': ^4.6.0
@@ -70,7 +70,7 @@ catalogs:
     nuxt-site-config: ^4.0.8
   vue:
     vue: ^3.5.33
-    vue-router: ^5.0.4
+    vue-router: ^5.0.6
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@parcel/watcher'
