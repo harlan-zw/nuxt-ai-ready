@@ -12,7 +12,6 @@ import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
-import { withFrontmatter } from './runtime/server/utils/frontmatter'
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 
@@ -436,15 +435,9 @@ export function setupPrerenderHandler(
       const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
       await processMarkdownRoute(state, nuxt, pageRoute, parsed)
 
-      const canonicalUrl = state.siteInfo?.url
-        ? `${state.siteInfo.url.replace(/\/$/, '')}${pageRoute}`
-        : pageRoute
-      route.contents = withFrontmatter(parsed.markdown, {
-        title: parsed.title,
-        description: parsed.description,
-        canonical_url: canonicalUrl,
-        last_updated: parsed.updatedAt || new Date().toISOString(),
-      })
+      // The prerender middleware already wrote frontmatter via mdream's
+      // additionalFields, so write the markdown straight to disk.
+      route.contents = parsed.markdown
       state.totalProcessingTime += Date.now() - pageStartTime
     })
 

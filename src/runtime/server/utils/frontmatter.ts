@@ -1,5 +1,6 @@
-// YAML frontmatter generation for markdown responses.
-// Format follows Vercel agent-readability spec: title, description, canonical_url, last_updated.
+// Standalone YAML frontmatter builder for cases where there is no HTML to feed
+// through mdream (e.g. the friendly 404 markdown response). For HTML-derived
+// pages, prefer mdream's `additionalFields` so the engine owns emission.
 
 interface FrontmatterFields {
   title?: string
@@ -7,8 +8,6 @@ interface FrontmatterFields {
   canonical_url?: string
   last_updated?: string
 }
-
-const RE_FRONTMATTER_LEADING = /^---\n[\s\S]*?\n---\n*/
 
 function escapeYamlString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -26,13 +25,4 @@ export function buildFrontmatter(fields: FrontmatterFields): string {
     lines.push(`last_updated: "${escapeYamlString(fields.last_updated)}"`)
   lines.push('---', '')
   return lines.join('\n')
-}
-
-export function stripLeadingFrontmatter(markdown: string): string {
-  return markdown.replace(RE_FRONTMATTER_LEADING, '')
-}
-
-export function withFrontmatter(markdown: string, fields: FrontmatterFields): string {
-  const stripped = stripLeadingFrontmatter(markdown)
-  return `${buildFrontmatter(fields)}\n${stripped.replace(/^\n+/, '')}`
 }

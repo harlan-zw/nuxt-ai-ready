@@ -2,9 +2,10 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { queryPages } from '../db/queries'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
-import { buildFrontmatter, withFrontmatter } from '../utils/frontmatter'
+import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
+import { buildFrontmatter } from '../utils/frontmatter'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 
@@ -133,20 +134,27 @@ export default defineEventHandler(async (event) => {
   const html = await response.text()
   logger.debug(`[markdown] Fetched HTML for ${path} (${html.length} bytes)`)
 
-  // Runtime: convert to markdown with hooks
+  // Resolve last_updated: DB (authoritative, set at index time) → page meta tags
+  // → request time. The DB lookup keeps the timestamp stable across requests.
+  const dbPage = await queryPages(event, { route: path }).catch(() => undefined) as { updatedAt?: string } | undefined
+  const lastUpdated = dbPage?.updatedAt || extractLastUpdated(html) || new Date().toISOString()
+
+  // Convert via mdream; pass canonical_url + last_updated through additionalFields
+  // so they land at the root of mdream's emitted YAML frontmatter, where
+  // Vercel's agent-readability audit looks for them.
   const result = await convertHtmlToMarkdown(
     html,
     canonicalUrl,
     config.mdreamOptions,
-    { hooks: { route: path, event }, extractUpdatedAt: true },
+    {
+      hooks: { route: path, event },
+      additionalFrontmatter: {
+        canonical_url: canonicalUrl,
+        last_updated: lastUpdated,
+      },
+    },
   )
 
   setMarkdownHeaders(event, path, config)
-
-  return withFrontmatter(result.markdown, {
-    title: result.title,
-    description: result.description,
-    canonical_url: canonicalUrl,
-    last_updated: result.updatedAt || new Date().toISOString(),
-  })
+  return result.markdown
 })
