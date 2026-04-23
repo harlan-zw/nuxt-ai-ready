@@ -178,10 +178,38 @@ describe('accept header content negotiation', async () => {
   })
 
   describe('error handling', () => {
-    it('returns 404 for non-existent .md route', async () => {
+    it('returns 200 with markdown body for non-existent .md route', async () => {
       const response = await fetch(url('/non-existent-page.md'))
 
-      expect(response.status).toBe(404)
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toContain('text/markdown')
+
+      const content = await response.text()
+      expect(content).toContain('---')
+      expect(content).toContain('Page not found')
+    })
+  })
+
+  describe('frontmatter', () => {
+    it('includes Vercel-spec frontmatter in markdown response', async () => {
+      const response = await fetch(url('/about.md'))
+      const content = await response.text()
+
+      expect(content.startsWith('---\n')).toBe(true)
+      expect(content).toMatch(/title:\s+"/)
+      expect(content).toMatch(/canonical_url:\s+"/)
+      expect(content).toMatch(/last_updated:\s+"/)
+    })
+  })
+
+  describe('html alternate hint', () => {
+    it('injects <link rel="alternate" type="text/markdown"> into HTML', async () => {
+      const response = await fetch(url('/about'), {
+        headers: { Accept: 'text/html' },
+      })
+
+      const html = await response.text()
+      expect(html).toMatch(/<link[^>]+rel="alternate"[^>]+type="text\/markdown"/)
     })
   })
 })

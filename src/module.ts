@@ -507,6 +507,12 @@ export const logger = createConsola({
         src: resolve('./runtime/app/plugins/md-hints.prerender'),
       })
     }
+
+    // Inject <link rel="alternate" type="text/markdown"> into HTML pages
+    addPlugin({
+      mode: 'server',
+      src: resolve('./runtime/app/plugins/md-alternate.server'),
+    })
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })

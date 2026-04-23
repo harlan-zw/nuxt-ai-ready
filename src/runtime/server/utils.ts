@@ -63,6 +63,28 @@ function buildMdreamOptions(
   }
 }
 
+// Parse leading YAML frontmatter from markdown to extract title/description.
+// mdream emits these reliably in minimal mode even when the `'title'` extraction
+// selector does not match (e.g. when the <title> sits in <head>).
+const RE_LEADING_FRONTMATTER = /^---\n([\s\S]*?)\n---/
+const RE_TITLE_LINE = /^title:\s*"((?:\\.|[^"\\])*)"\s*$/m
+const RE_DESC_LINE = /^\s*(?:description|"description"):\s*"((?:\\.|[^"\\])*)"\s*$/m
+function unescapeYaml(s: string): string {
+  return s.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+}
+function parseLeadingFrontmatter(markdown: string): { title?: string, description?: string } {
+  const match = markdown.match(RE_LEADING_FRONTMATTER)
+  if (!match || !match[1])
+    return {}
+  const block = match[1]
+  const titleMatch = block.match(RE_TITLE_LINE)
+  const descMatch = block.match(RE_DESC_LINE)
+  return {
+    title: titleMatch?.[1] ? unescapeYaml(titleMatch[1]) : undefined,
+    description: descMatch?.[1] ? unescapeYaml(descMatch[1]) : undefined,
+  }
+}
+
 // H3 wrapper over @mdream/js/negotiate that layers AI bot detection (via
 // @nuxtjs/robots) on top of RFC 7231 Accept header negotiation. AI bots get
 // markdown regardless of what their Accept header says.
@@ -175,6 +197,17 @@ export async function convertHtmlToMarkdown(
   }
   else {
     markdown = htmlToMarkdown(html, options)
+  }
+
+  // Fallback: parse mdream's emitted frontmatter for fields the extraction
+  // selectors did not capture (notably <title>, which the rust engine does not
+  // always surface via the extraction API).
+  if (!meta.title || !meta.description) {
+    const fm = parseLeadingFrontmatter(markdown)
+    if (!meta.title && fm.title)
+      meta.title = fm.title
+    if (!meta.description && fm.description)
+      meta.description = fm.description
   }
 
   return {
