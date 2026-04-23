@@ -32,9 +32,10 @@ function buildMdreamOptions(
   meta: ExtractedMeta,
   extractUpdatedAt = false,
 ): MdreamOptions {
+  // title and description come from mdream's frontmatter callback below; the
+  // extraction selectors below sometimes fire with empty textContent and would
+  // clobber the values, so we don't register them here.
   const extraction: MdreamOptions['extraction'] = {
-    'title': (el) => { meta.title = el.textContent },
-    'meta[name="description"]': (el) => { meta.description = el.attributes.content || '' },
     'meta[name="keywords"]': (el) => { meta.metaKeywords = el.attributes.content || '' },
     'h1, h2, h3, h4, h5, h6': (el) => {
       const text = el.textContent?.trim()
@@ -54,11 +55,23 @@ function buildMdreamOptions(
     }),
   }
 
+  // mdream's frontmatter callback reliably surfaces <title> and <meta> data
+  // from <head>, where the extraction selectors don't always match.
+  const frontmatter: MdreamOptions['frontmatter'] = {
+    onExtract: (fm) => {
+      if (fm.title)
+        meta.title = fm.title
+      if (fm.description)
+        meta.description = fm.description
+    },
+  }
+
   // Use just the origin (not full URL) so absolute paths like /docs/foo resolve correctly
   const origin = new URL(url).origin
   return {
     origin,
     ...mdreamOptions,
+    frontmatter,
     extraction: { ...extraction, ...mdreamOptions?.extraction },
   }
 }
