@@ -435,6 +435,8 @@ export function setupPrerenderHandler(
       const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
       await processMarkdownRoute(state, nuxt, pageRoute, parsed)
 
+      // The prerender middleware already wrote frontmatter via mdream's
+      // additionalFields, so write the markdown straight to disk.
       route.contents = parsed.markdown
       state.totalProcessingTime += Date.now() - pageStartTime
     })

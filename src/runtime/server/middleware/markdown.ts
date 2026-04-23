@@ -2,8 +2,10 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { queryPages } from '../db/queries'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
+import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
+import { buildFrontmatter } from '../utils/frontmatter'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 
@@ -13,6 +15,41 @@ function setNegotiationHeaders(event: any, path: string) {
   // Advertise the markdown alternate so agents can discover it via Link header (RFC 8288)
   const mdPath = path === '/' ? '/index.md' : `${path}.md`
   setHeader(event, 'link', `<${mdPath}>; rel="alternate"; type="text/markdown"`)
+}
+
+function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
+  setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
+  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
+  setHeader(event, 'link', `<${path}>; rel="alternate"; type="text/html"`)
+  if (config.markdownCacheHeaders) {
+    const { maxAge, swr } = config.markdownCacheHeaders
+    const cacheControl = swr
+      ? `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`
+      : `public, max-age=${maxAge}`
+    setHeader(event, 'cache-control', cacheControl)
+  }
+}
+
+function notFoundMarkdown(canonicalUrl: string, path: string): string {
+  const body = [
+    `# Page not found`,
+    ``,
+    `No content is available at \`${path}\`.`,
+    ``,
+    `Try one of these resources:`,
+    ``,
+    `- [Sitemap](/sitemap.xml)`,
+    `- [llms.txt](/llms.txt)`,
+    `- [llms-full.txt](/llms-full.txt)`,
+    ``,
+  ].join('\n')
+  const frontmatter = buildFrontmatter({
+    title: 'Page not found',
+    description: `No content is available at ${path}.`,
+    canonical_url: canonicalUrl,
+    last_updated: new Date().toISOString(),
+  })
+  return `${frontmatter}\n${body}`
 }
 
 export default defineEventHandler(async (event) => {
@@ -35,6 +72,7 @@ export default defineEventHandler(async (event) => {
 
   const { path, isExplicit, negotiation } = renderInfo
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const canonicalUrl = withSiteUrl(event, path)
 
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
@@ -55,11 +93,8 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     if (isExplicit) {
-      return createError({
-        statusCode: 500,
-        statusMessage: 'Internal Server Error',
-        message: `Failed to fetch HTML for ${path}`,
-      })
+      setMarkdownHeaders(event, path, config)
+      return notFoundMarkdown(canonicalUrl, path)
     }
     return
   }
@@ -79,12 +114,10 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!response.ok) {
+    // Agents discard 404 bodies; return 200 with helpful markdown so agents get useful info
     if (isExplicit) {
-      return createError({
-        statusCode: response.status,
-        statusMessage: response.statusText,
-        message: `Failed to fetch HTML for ${path}`,
-      })
+      setMarkdownHeaders(event, path, config)
+      return notFoundMarkdown(canonicalUrl, path)
     }
     return
   }
@@ -92,11 +125,8 @@ export default defineEventHandler(async (event) => {
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     if (isExplicit) {
-      return createError({
-        statusCode: 415,
-        statusMessage: 'Unsupported Media Type',
-        message: `Expected text/html but got ${contentType} for ${path}`,
-      })
+      setMarkdownHeaders(event, path, config)
+      return notFoundMarkdown(canonicalUrl, path)
     }
     return
   }
@@ -104,27 +134,27 @@ export default defineEventHandler(async (event) => {
   const html = await response.text()
   logger.debug(`[markdown] Fetched HTML for ${path} (${html.length} bytes)`)
 
-  // Runtime: convert to markdown with hooks
+  // Resolve last_updated: DB (authoritative, set at index time) → page meta tags
+  // → request time. The DB lookup keeps the timestamp stable across requests.
+  const dbPage = await queryPages(event, { route: path }).catch(() => undefined) as { updatedAt?: string } | undefined
+  const lastUpdated = dbPage?.updatedAt || extractLastUpdated(html) || new Date().toISOString()
+
+  // Convert via mdream; pass canonical_url + last_updated through additionalFields
+  // so they land at the root of mdream's emitted YAML frontmatter, where
+  // Vercel's agent-readability audit looks for them.
   const result = await convertHtmlToMarkdown(
     html,
-    withSiteUrl(event, path),
+    canonicalUrl,
     config.mdreamOptions,
-    { hooks: { route: path, event } },
+    {
+      hooks: { route: path, event },
+      additionalFrontmatter: {
+        canonical_url: canonicalUrl,
+        last_updated: lastUpdated,
+      },
+    },
   )
-  setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
-  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
-  // Advertise the HTML alternate for clients discovering representations (RFC 8288)
-  setHeader(event, 'link', `<${path}>; rel="alternate"; type="text/html"`)
 
-  // Set cache headers
-  if (config.markdownCacheHeaders) {
-    const { maxAge, swr } = config.markdownCacheHeaders
-    const cacheControl = swr
-      ? `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`
-      : `public, max-age=${maxAge}`
-    setHeader(event, 'cache-control', cacheControl)
-  }
-
-  // Return markdown
+  setMarkdownHeaders(event, path, config)
   return result.markdown
 })

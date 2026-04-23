@@ -2,7 +2,7 @@ import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, getMarkdownRenderInfo } from '../utils'
+import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
 import { extractKeywords } from '../utils/keywords'
 
 export default defineEventHandler(async (event) => {
@@ -38,11 +38,19 @@ export default defineEventHandler(async (event) => {
       message: `Page rendered as error: ${path}`,
     })
   }
+  const canonicalUrl = withSiteUrl(event, path)
+  const lastUpdated = extractLastUpdated(html) || new Date().toISOString()
   const result = await convertHtmlToMarkdown(
     html,
-    withSiteUrl(event, path),
+    canonicalUrl,
     runtimeConfig.mdreamOptions,
-    { extractUpdatedAt: true },
+    {
+      extractUpdatedAt: true,
+      additionalFrontmatter: {
+        canonical_url: canonicalUrl,
+        last_updated: lastUpdated,
+      },
+    },
   )
 
   // Extract keywords from content

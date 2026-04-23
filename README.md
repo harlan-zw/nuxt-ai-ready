@@ -4,7 +4,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![Nuxt][nuxt-src]][nuxt-href]
 
-> Best practice AI & LLM discoverability for Nuxt sites
+> Best practice AI & LLM discoverability for Nuxt sites. Score 100 on [`npx @vercel/agent-readability audit <URL>`](https://github.com/vercel-labs/agent-readability).
 
 ## Why Nuxt AI Ready?
 
