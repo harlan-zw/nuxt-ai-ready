@@ -12,6 +12,7 @@ import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
+import { detectI18n, hasCjkLocale } from './utils/i18n'
 
 export interface ModuleHooks {
   /**
@@ -57,6 +58,12 @@ export interface ModulePublicRuntimeConfig {
   runtimeSyncSecret?: string
   indexNow?: string
   sitemapPrerendered: boolean
+  i18n?: {
+    defaultLocale: string
+    strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
+    locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
+  } | null
+  ftsTokenizer?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -123,6 +130,15 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+
+    // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
+    const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
+    if (i18nConfig) {
+      logger.info(`i18n detected: ${i18nConfig.locales.length} locales (default: ${i18nConfig.defaultLocale}, strategy: ${i18nConfig.strategy})`)
+    }
+    const ftsTokenizer = i18nConfig && hasCjkLocale(i18nConfig)
+      ? 'trigram'
+      : 'unicode61 remove_diacritics 2'
 
     // Set up alias
     nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
@@ -404,13 +420,13 @@ export async function readPageDataFromFilesystem() {
   if (nodeVersion >= 22) {
     const { DatabaseSync } = await import('node' + ':sqlite')
     const db = new DatabaseSync(dbPath, { open: true })
-    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
+    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error, locale FROM ai_ready_pages').all()
     db.close()
   }
   else {
     const Database = (await import('better-sqlite3')).default
     const db = new Database(dbPath, { readonly: true })
-    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error FROM ai_ready_pages').all()
+    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error, locale FROM ai_ready_pages').all()
     db.close()
   }
 
@@ -422,6 +438,7 @@ export async function readPageDataFromFilesystem() {
     headings: r.headings,
     keywords: JSON.parse(r.keywords || '[]'),
     updatedAt: r.updated_at,
+    locale: r.locale || '',
   }))
   const errorRoutes = rows.filter(r => r.is_error).map(r => r.route)
 
@@ -490,6 +507,8 @@ export const logger = createConsola({
       runtimeSyncSecret,
       indexNow,
       sitemapPrerendered,
+      i18n: i18nConfig,
+      ftsTokenizer,
     } as any
 
     addServerHandler({
@@ -576,7 +595,7 @@ export const logger = createConsola({
         name: siteConfig.name,
         url: siteConfig.url,
         description: siteConfig.description,
-      }, mergedLlmsTxt, indexNow)
+      }, mergedLlmsTxt, indexNow, { ftsTokenizer, i18n: i18nConfig })
     }
 
     // Add lifecycle plugin to handle database connection cleanup

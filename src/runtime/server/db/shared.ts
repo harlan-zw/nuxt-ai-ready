@@ -1,6 +1,6 @@
 // Shared database utilities for build-time and runtime
 import { subtle } from 'uncrypto'
-import { ALL_SCHEMA_SQL, DROP_TABLES_SQL, SCHEMA_VERSION } from './schema-sql'
+import { buildSchemaSql, DROP_TABLES_SQL, SCHEMA_VERSION } from './schema-sql'
 
 /**
  * Compute content hash for change detection (first 16 chars of SHA-256)
@@ -20,11 +20,16 @@ export interface DatabaseAdapter {
   close?: () => Promise<void>
 }
 
+export interface InitSchemaOptions {
+  /** FTS5 tokenizer (default: 'unicode61 remove_diacritics 2'). Use 'trigram' for CJK locales. */
+  ftsTokenizer?: string
+}
+
 /**
  * Initialize database schema with version checking
  * Skips if schema is already at current version
  */
-export async function initSchema(db: DatabaseAdapter): Promise<void> {
+export async function initSchema(db: DatabaseAdapter, options: InitSchemaOptions = {}): Promise<void> {
   const currentVersion = await getSchemaVersion(db)
 
   // Skip if already initialized with current version
@@ -39,7 +44,7 @@ export async function initSchema(db: DatabaseAdapter): Promise<void> {
   }
 
   // Create all tables/indexes
-  for (const sql of ALL_SCHEMA_SQL) {
+  for (const sql of buildSchemaSql({ ftsTokenizer: options.ftsTokenizer })) {
     await db.exec(sql)
   }
 
@@ -107,6 +112,7 @@ export interface PageInput {
   updatedAt: string
   isError?: boolean
   source?: 'prerender' | 'runtime'
+  locale?: string
 }
 
 export interface PageOutput {
@@ -119,6 +125,7 @@ export interface PageOutput {
   contentHash?: string
   updatedAt: string
   isError: boolean
+  locale: string
 }
 
 export interface PageMetaOutput {
@@ -130,6 +137,7 @@ export interface PageMetaOutput {
   contentHash?: string
   updatedAt: string
   isError: boolean
+  locale: string
 }
 
 interface PageRow {
@@ -142,6 +150,7 @@ interface PageRow {
   content_hash: string | null
   updated_at: string
   is_error: number
+  locale: string
 }
 
 /**
@@ -151,8 +160,8 @@ export async function insertPage(db: DatabaseAdapter, page: PageInput): Promise<
   const now = Date.now()
   const source = page.source || 'prerender'
   await db.exec(`
-    INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     page.route,
     normalizeRouteKey(page.route),
@@ -168,6 +177,7 @@ export async function insertPage(db: DatabaseAdapter, page: PageInput): Promise<
     page.isError ? 0 : 1,
     source,
     now,
+    page.locale || '',
   ])
 }
 
@@ -188,8 +198,8 @@ export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPages
 export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPagesOptions): Promise<PageOutput[] | PageMetaOutput[]> {
   const where = options?.includeErrors ? '' : 'WHERE is_error = 0'
   const fields = options?.excludeMarkdown
-    ? 'route, title, description, headings, keywords, content_hash, updated_at, is_error'
-    : 'route, title, description, markdown, headings, keywords, content_hash, updated_at, is_error'
+    ? 'route, title, description, headings, keywords, content_hash, updated_at, is_error, locale'
+    : 'route, title, description, markdown, headings, keywords, content_hash, updated_at, is_error, locale'
   const rows = await db.all<PageRow>(`SELECT ${fields} FROM ai_ready_pages ${where}`)
 
   return rows.map(row => ({
@@ -202,6 +212,7 @@ export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPages
     contentHash: row.content_hash || undefined,
     updatedAt: row.updated_at,
     isError: row.is_error === 1,
+    locale: row.locale || '',
   })) as PageOutput[] | PageMetaOutput[]
 }
 
@@ -221,6 +232,7 @@ export interface DumpRow {
   source: string
   last_seen_at: number | null
   indexnow_synced_at: number | null
+  locale: string | null
 }
 
 const DUMP_BATCH_SIZE = 500
@@ -255,7 +267,7 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
 
   while (true) {
     const rows = await db.all<DumpRow>(`
-      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at
+      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale
       FROM ai_ready_pages
       ORDER BY route
       LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
@@ -299,8 +311,8 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
   for (const row of rows) {
     const source = row.source || 'prerender'
     await db.exec(`
-      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.content_hash || null, row.updated_at, row.indexed_at, row.is_error, source, row.indexed_at, row.indexed_at])
+      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.content_hash || null, row.updated_at, row.indexed_at, row.is_error, source, row.indexed_at, row.indexed_at, row.locale || ''])
   }
 }

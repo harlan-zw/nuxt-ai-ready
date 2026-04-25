@@ -84,6 +84,7 @@ async function getPrerenderDb(): Promise<RawExecutor> {
           updated_at: p.updatedAt,
           is_error: 1,
           indexed: 0,
+          locale: p.locale || '',
         })) as T[]
       }
 
@@ -98,6 +99,7 @@ async function getPrerenderDb(): Promise<RawExecutor> {
         updated_at: p.updatedAt,
         is_error: errorRoutes.has(p.route) ? 1 : 0,
         indexed: 1,
+        locale: p.locale || '',
       })) as T[]
     },
     first: async <T>(sql: string, params: unknown[] = []): Promise<T | undefined> => {
@@ -117,6 +119,7 @@ async function getPrerenderDb(): Promise<RawExecutor> {
           updated_at: page.updatedAt,
           is_error: errorRoutes.has(page.route) ? 1 : 0,
           indexed: 1,
+          locale: page.locale || '',
         } as T
       }
       return undefined
@@ -144,6 +147,7 @@ export interface PageRow {
   source: 'prerender' | 'runtime'
   last_seen_at: number | null
   indexnow_synced_at: number | null
+  locale: string | null
 }
 
 export interface PageEntry {
@@ -154,6 +158,7 @@ export interface PageEntry {
   keywords: string[]
   updatedAt: string
   isError: boolean
+  locale: string
 }
 
 export interface PageData extends PageEntry {
@@ -231,6 +236,7 @@ function rowToEntry(row: PageRow): PageEntry {
     keywords: safeJsonParse<string[]>(row.keywords, []),
     updatedAt: row.updated_at,
     isError: row.is_error === 1,
+    locale: row.locale || '',
   }
 }
 
@@ -433,6 +439,7 @@ export interface UpsertPageInput {
   updatedAt: string
   isError?: boolean
   source?: 'prerender' | 'runtime'
+  locale?: string
 }
 
 /**
@@ -448,10 +455,11 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
   const indexedAt = Date.now()
   const source = page.source || 'runtime'
   const lastSeenAt = source === 'runtime' ? indexedAt : null
+  const locale = page.locale || ''
 
   await db.exec(`
-    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
@@ -464,8 +472,9 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
       is_error = excluded.is_error,
       indexed = 1,
       source = excluded.source,
-      last_seen_at = excluded.last_seen_at
-  `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt])
+      last_seen_at = excluded.last_seen_at,
+      locale = excluded.locale
+  `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt, locale])
 }
 
 /**
@@ -506,20 +515,22 @@ export async function getPageHash(event: H3Event | undefined, route: string): Pr
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(event: H3Event | undefined, routes: string[]): Promise<number> {
+export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string }>): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
 
   const now = new Date().toISOString()
   const nowMs = Date.now()
-  for (const route of routes) {
+  for (const entry of routes) {
+    const route = typeof entry === 'string' ? entry : entry.route
+    const locale = typeof entry === 'string' ? '' : (entry.locale || '')
     const routeKey = normalizeRouteKey(route)
     await db.exec(`
-      INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
-      VALUES (?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?)
-      ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at
-    `, [route, routeKey, now, nowMs])
+      INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+      VALUES (?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)
+      ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
+    `, [route, routeKey, now, nowMs, locale])
   }
   return routes.length
 }

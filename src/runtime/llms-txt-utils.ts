@@ -1,10 +1,12 @@
 import type { H3Event } from 'h3'
 import type { PageEntry } from './server/db/queries'
+import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { normalizeLlmsTxtConfig } from './llms-txt-format'
 import { queryPages } from './server/db/queries'
+import { localePath, resolveLocaleFromRoute } from './server/utils/i18n'
 import { fetchSitemapUrls } from './server/utils/sitemap'
 
 export { normalizeLlmsTxtConfig }
@@ -13,6 +15,30 @@ interface PageItem {
   pathname: string
   title?: string
   description?: string
+  locale?: string
+}
+
+/**
+ * Build the "Available Languages" section per the Anthropic docs precedent
+ * (see platform.claude.com/docs/llms.txt). Lists every configured locale with
+ * its page count and URL prefix. The default locale is annotated to indicate
+ * its content is inlined below; other locales reference their site path.
+ */
+function formatAvailableLanguagesSection(i18n: RuntimeI18nConfig, pageCounts: Map<string, number>): string[] {
+  const lines: string[] = ['## Available Languages on Website', '']
+  for (const locale of i18n.locales) {
+    const isDefault = locale.code === i18n.defaultLocale
+    const prefix = localePath('/', locale.code, i18n)
+    const count = pageCounts.get(locale.code) ?? 0
+    const display = locale.nativeName
+      ? `${locale.nativeName} (${locale.code})`
+      : locale.name
+        ? `${locale.name} (${locale.code})`
+        : locale.code
+    const suffix = isDefault ? 'Content included below' : 'Visit website for content'
+    lines.push(`- ${display} - ${count} pages - ${prefix} - ${suffix}`)
+  }
+  return lines
 }
 
 /**
@@ -164,6 +190,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const sitemapConfig = runtimeConfig.sitemap as { sitemaps?: Record<string, { sitemapName: string }> } | undefined
   const siteConfig = getSiteConfig(event)
   const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
+  const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
 
   const parts: string[] = []
 
@@ -212,7 +239,7 @@ export async function buildLlmsTxt(event: H3Event) {
 
   for (const page of pages) {
     seenPaths.add(page.route)
-    prerendered.push({ pathname: page.route, title: page.title, description: page.description })
+    prerendered.push({ pathname: page.route, title: page.title, description: page.description, locale: page.locale })
   }
 
   const devModeHint = import.meta.dev && prerendered.length === 0 ? ' (dev mode - run `nuxi generate` for page titles)' : ''
@@ -224,14 +251,39 @@ export async function buildLlmsTxt(event: H3Event) {
     // Avoid URL parsing when possible - most sitemaps have relative paths
     const pathname = url.loc.startsWith('/') ? url.loc : new URL(url.loc).pathname
     if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
-      other.push({ pathname })
+      const locale = i18n ? resolveLocaleFromRoute(pathname, i18n).locale : undefined
+      other.push({ pathname, locale })
       seenPaths.add(pathname)
     }
   }
 
+  // i18n: filter to default-locale pages, then emit Available Languages header
+  if (i18n) {
+    const pageCounts = new Map<string, number>()
+    for (const locale of i18n.locales) pageCounts.set(locale.code, 0)
+    for (const p of [...prerendered, ...other]) {
+      const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n).locale
+      pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
+    }
+    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts))
+    parts.push('')
+  }
+
+  // When i18n active, default-locale pages are inlined; non-default-locale pages
+  // are referenced via the Available Languages section above (Anthropic precedent).
+  const isDefaultLocale = (item: PageItem): boolean => {
+    if (!i18n)
+      return true
+    const code = item.locale || resolveLocaleFromRoute(item.pathname, i18n).locale
+    return code === i18n.defaultLocale
+  }
+
+  const filteredPrerendered = i18n ? prerendered.filter(isDefaultLocale) : prerendered
+  const filteredOther = i18n ? other.filter(isDefaultLocale) : other
+
   // Sort and format pages
-  const sortedPrerendered = sortPagesByPath(prerendered)
-  const sortedOther = sortPagesByPath(other)
+  const sortedPrerendered = sortPagesByPath(filteredPrerendered)
+  const sortedOther = sortPagesByPath(filteredOther)
 
   if (sortedPrerendered.length > 0 && sortedOther.length > 0) {
     parts.push(`## Prerendered Pages${devModeHint}\n`)

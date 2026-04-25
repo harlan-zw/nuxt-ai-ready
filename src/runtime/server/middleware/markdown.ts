@@ -6,20 +6,47 @@ import { queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
 import { buildFrontmatter } from '../utils/frontmatter'
+import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 
+/**
+ * Build a comma-joined Link header value with the standard alternates plus i18n hreflang variants.
+ */
+function buildLinkHeader(
+  path: string,
+  variant: 'html' | 'markdown',
+  config: ModulePublicRuntimeConfig,
+): string {
+  const parts: string[] = []
+  if (variant === 'html') {
+    parts.push(`<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
+  }
+  else {
+    parts.push(`<${path}>; rel="alternate"; type="text/html"`)
+  }
+
+  if (config.i18n) {
+    const alternates = computeLocaleAlternates(path, config.i18n)
+    for (const alt of alternates) {
+      const href = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
+      parts.push(`<${href}>; rel="alternate"; hreflang="${alt.hreflang}"`)
+    }
+  }
+  return parts.join(', ')
+}
+
 // Always signal that response content varies by Accept so caches segment correctly
-function setNegotiationHeaders(event: any, path: string) {
+function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
-  // Advertise the markdown alternate so agents can discover it via Link header (RFC 8288)
-  setHeader(event, 'link', `<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
+  // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
+  setHeader(event, 'link', buildLinkHeader(path, 'html', config))
 }
 
 function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
-  setHeader(event, 'link', `<${path}>; rel="alternate"; type="text/html"`)
+  setHeader(event, 'link', buildLinkHeader(path, 'markdown', config))
   if (config.markdownCacheHeaders) {
     const { maxAge, swr } = config.markdownCacheHeaders
     const cacheControl = swr
@@ -29,7 +56,7 @@ function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntim
   }
 }
 
-function notFoundMarkdown(canonicalUrl: string, path: string): string {
+function notFoundMarkdown(canonicalUrl: string, path: string, config: ModulePublicRuntimeConfig): string {
   const body = [
     `# Page not found`,
     ``,
@@ -42,11 +69,20 @@ function notFoundMarkdown(canonicalUrl: string, path: string): string {
     `- [llms-full.txt](/llms-full.txt)`,
     ``,
   ].join('\n')
+
+  const i18n = config.i18n
+  const locale = i18n ? resolveLocaleFromRoute(path, i18n).locale : undefined
+  const alternates = i18n
+    ? computeLocaleAlternates(path, i18n).map(a => ({ hreflang: a.hreflang, href: a.path }))
+    : undefined
+
   const frontmatter = buildFrontmatter({
     title: 'Page not found',
     description: `No content is available at ${path}.`,
     canonical_url: canonicalUrl,
     last_updated: new Date().toISOString(),
+    locale,
+    alternates,
   })
   return `${frontmatter}\n${body}`
 }
@@ -75,7 +111,7 @@ export default defineEventHandler(async (event) => {
 
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
-    setNegotiationHeaders(event, path)
+    setNegotiationHeaders(event, path, config)
     return
   }
 
@@ -102,7 +138,7 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     setMarkdownHeaders(event, path, config)
-    return notFoundMarkdown(canonicalUrl, path)
+    return notFoundMarkdown(canonicalUrl, path, config)
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -121,13 +157,13 @@ export default defineEventHandler(async (event) => {
   // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
     setMarkdownHeaders(event, path, config)
-    return notFoundMarkdown(canonicalUrl, path)
+    return notFoundMarkdown(canonicalUrl, path, config)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     setMarkdownHeaders(event, path, config)
-    return notFoundMarkdown(canonicalUrl, path)
+    return notFoundMarkdown(canonicalUrl, path, config)
   }
 
   const html = await response.text()
@@ -141,16 +177,24 @@ export default defineEventHandler(async (event) => {
   // Convert via mdream; pass canonical_url + last_updated through additionalFields
   // so they land at the root of mdream's emitted YAML frontmatter, where
   // Vercel's agent-readability audit looks for them.
+  // Locale is a simple scalar; alternates are surfaced via the Link header
+  // (RFC 8288) since mdream's frontmatter only accepts string scalars.
+  const additionalFrontmatter: Record<string, string> = {
+    canonical_url: canonicalUrl,
+    last_updated: lastUpdated,
+  }
+
+  if (config.i18n) {
+    additionalFrontmatter.locale = resolveLocaleFromRoute(path, config.i18n).locale
+  }
+
   const result = await convertHtmlToMarkdown(
     html,
     canonicalUrl,
     config.mdreamOptions,
     {
       hooks: { route: path, event },
-      additionalFrontmatter: {
-        canonical_url: canonicalUrl,
-        last_updated: lastUpdated,
-      },
+      additionalFrontmatter,
     },
   )
 

@@ -152,6 +152,18 @@ export interface ModuleOptions {
   debugCron?: boolean
 
   /**
+   * Auto-detect @nuxtjs/i18n (or nuxt-i18n-micro) and integrate locale data into:
+   * - llms.txt "Available Languages" header
+   * - Markdown response Link headers (hreflang alternates) + frontmatter
+   * - Per-page locale persisted in DB for filtered queries
+   * - FTS5 tokenizer (auto-switches to trigram when CJK locales are present)
+   *
+   * Set to `false` to disable auto-detection even when an i18n module is installed.
+   * @default true
+   */
+  autoI18n?: boolean
+
+  /**
    * Runtime sync configuration (opt-in for dynamic content sites)
    * When enabled, pages are re-indexed at runtime from sitemap
    * Set to `true` for defaults or object to customize
@@ -204,6 +216,8 @@ export interface PageDocument {
   keywords?: string[]
   /** ISO 8601 timestamp of last content update */
   updatedAt?: string
+  /** Locale code (e.g. "en", "fr") when i18n is configured. Empty string when no i18n. */
+  locale?: string
 }
 
 /**
