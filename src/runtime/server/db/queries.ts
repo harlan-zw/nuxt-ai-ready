@@ -1,9 +1,27 @@
 import type { H3Event } from 'h3'
+import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { RawExecutor } from './drizzle/raw'
-import { useEvent } from 'nitropack/runtime'
+import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
+import { resolveLocaleFromRoute } from '../utils/i18n'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
 import { normalizeRouteKey } from './shared'
+
+/**
+ * Resolve a route's locale, deferring to the explicit value when supplied.
+ * Falls back to the runtime i18n config (set when @nuxtjs/i18n is detected at
+ * build time). Returns '' when no i18n is configured, matching the schema's
+ * default for non-i18n sites.
+ */
+function deriveLocale(event: H3Event | undefined, route: string, explicit?: string): string {
+  if (explicit !== undefined)
+    return explicit
+  const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
+  const i18n = cfg['nuxt-ai-ready']?.i18n
+  if (!i18n)
+    return ''
+  return resolveLocaleFromRoute(route, i18n).locale
+}
 
 /** Try to get the current H3Event from context or use provided event */
 function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
@@ -455,7 +473,7 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
   const indexedAt = Date.now()
   const source = page.source || 'runtime'
   const lastSeenAt = source === 'runtime' ? indexedAt : null
-  const locale = page.locale || ''
+  const locale = deriveLocale(event, page.route, page.locale)
 
   await db.exec(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
@@ -524,7 +542,8 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
   const nowMs = Date.now()
   for (const entry of routes) {
     const route = typeof entry === 'string' ? entry : entry.route
-    const locale = typeof entry === 'string' ? '' : (entry.locale || '')
+    const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
+    const locale = deriveLocale(event, route, explicitLocale)
     const routeKey = normalizeRouteKey(route)
     await db.exec(`
       INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)

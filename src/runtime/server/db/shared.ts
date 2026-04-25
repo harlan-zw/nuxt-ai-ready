@@ -1,6 +1,6 @@
 // Shared database utilities for build-time and runtime
 import { subtle } from 'uncrypto'
-import { buildSchemaSql, DROP_TABLES_SQL, SCHEMA_VERSION } from './schema-sql'
+import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql'
 
 /**
  * Compute content hash for change detection (first 16 chars of SHA-256)
@@ -26,31 +26,41 @@ export interface InitSchemaOptions {
 }
 
 /**
- * Initialize database schema with version checking
- * Skips if schema is already at current version
+ * Initialize database schema with version checking.
+ * Rebuilds when SCHEMA_VERSION changes or when the configured FTS5 tokenizer
+ * differs from the one baked into the existing virtual table (e.g. user added
+ * a CJK locale on a later deploy).
  */
 export async function initSchema(db: DatabaseAdapter, options: InitSchemaOptions = {}): Promise<void> {
+  const tokenizer = resolveFtsTokenizer(options.ftsTokenizer)
   const currentVersion = await getSchemaVersion(db)
+  const currentTokenizer = await getStoredTokenizer(db)
 
-  // Skip if already initialized with current version
-  if (currentVersion === SCHEMA_VERSION)
+  const versionMatches = currentVersion === SCHEMA_VERSION
+  const tokenizerMatches = !currentTokenizer || currentTokenizer === tokenizer
+
+  if (versionMatches && tokenizerMatches)
     return
 
-  // Drop and rebuild if version mismatch (migration)
-  if (currentVersion && currentVersion !== SCHEMA_VERSION) {
+  // Drop and rebuild on any mismatch (version bump or tokenizer change).
+  if (currentVersion) {
     for (const sql of DROP_TABLES_SQL) {
       await db.exec(sql)
     }
   }
 
   // Create all tables/indexes
-  for (const sql of buildSchemaSql({ ftsTokenizer: options.ftsTokenizer })) {
+  for (const sql of buildSchemaSql({ ftsTokenizer: tokenizer })) {
     await db.exec(sql)
   }
 
   await db.exec(
     'INSERT OR REPLACE INTO _ai_ready_info (id, version) VALUES (?, ?)',
     ['schema', SCHEMA_VERSION],
+  )
+  await db.exec(
+    'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
+    ['fts_tokenizer', tokenizer],
   )
 }
 
@@ -61,6 +71,15 @@ async function getSchemaVersion(db: DatabaseAdapter): Promise<string | null> {
   ).catch(() => null)
 
   return info?.version || null
+}
+
+async function getStoredTokenizer(db: DatabaseAdapter): Promise<string | null> {
+  const info = await db.first<{ value: string }>(
+    'SELECT value FROM _ai_ready_info WHERE id = ?',
+    ['fts_tokenizer'],
+  ).catch(() => null)
+
+  return info?.value || null
 }
 
 const RE_LEADING_SLASH = /^\//

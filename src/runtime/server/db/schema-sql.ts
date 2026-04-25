@@ -5,6 +5,28 @@
 
 export const SCHEMA_VERSION = 'v2.1.0'
 
+/**
+ * Allowed FTS5 tokenizer values. The configured value gets interpolated into the
+ * `CREATE VIRTUAL TABLE … tokenize='…'` DDL, so we restrict it to a known-safe
+ * set instead of escaping. Adding a new tokenizer requires extending this list.
+ */
+export const SUPPORTED_FTS_TOKENIZERS = [
+  'unicode61 remove_diacritics 2',
+  'trigram',
+] as const
+
+export type FtsTokenizer = typeof SUPPORTED_FTS_TOKENIZERS[number]
+
+export const DEFAULT_FTS_TOKENIZER: FtsTokenizer = 'unicode61 remove_diacritics 2'
+
+export function resolveFtsTokenizer(value: string | undefined): FtsTokenizer {
+  if (!value)
+    return DEFAULT_FTS_TOKENIZER
+  return (SUPPORTED_FTS_TOKENIZERS as readonly string[]).includes(value)
+    ? value as FtsTokenizer
+    : DEFAULT_FTS_TOKENIZER
+}
+
 export interface SchemaOptions {
   /**
    * FTS5 tokenizer to use. Defaults to `unicode61 remove_diacritics 2`.
@@ -13,10 +35,8 @@ export interface SchemaOptions {
   ftsTokenizer?: string
 }
 
-const DEFAULT_FTS_TOKENIZER = `unicode61 remove_diacritics 2`
-
 export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
-  const tokenizer = opts.ftsTokenizer || DEFAULT_FTS_TOKENIZER
+  const tokenizer = resolveFtsTokenizer(opts.ftsTokenizer)
   return [
     // Pages table
     `CREATE TABLE IF NOT EXISTS ai_ready_pages (

@@ -1,15 +1,15 @@
 import type { H3Event } from 'h3'
+import type { FtsTokenizer } from '../schema-sql'
 import type { DrizzleDatabase } from './client'
 import { and, count, desc, eq, gt, isNull, like, lt, or, sql } from 'drizzle-orm'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
+import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
 
-const DEFAULT_FTS_TOKENIZER = `unicode61 remove_diacritics 2`
-
-function resolveFtsTokenizer(event?: H3Event): string {
+function resolveFtsTokenizer(event?: H3Event): FtsTokenizer {
   const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
-  return cfg['nuxt-ai-ready']?.ftsTokenizer || DEFAULT_FTS_TOKENIZER
+  return validateFtsTokenizer(cfg['nuxt-ai-ready']?.ftsTokenizer)
 }
 
 // ============================================================================
@@ -411,18 +411,25 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 const SCHEMA_VERSION = 'v2.1.0-drizzle'
 
 /**
- * Initialize database schema
+ * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
+ * SQLite FTS5 tokenizer differs from the one baked into the existing virtual
+ * table (Postgres has no FTS5; tokenizer comparison is SQLite-only).
  */
 export async function initSchema(event?: H3Event): Promise<void> {
   const client = await useDrizzle(event)
+  const tokenizer = resolveFtsTokenizer(event)
 
-  // Check current version via raw SQL (table might not exist)
   const currentVersion = await getSchemaVersion(client)
-  if (currentVersion === SCHEMA_VERSION)
+  const currentTokenizer = client.dialect === 'postgres' ? null : await getStoredTokenizer(client)
+
+  const versionMatches = currentVersion === SCHEMA_VERSION
+  const tokenizerMatches = client.dialect === 'postgres' || !currentTokenizer || currentTokenizer === tokenizer
+
+  if (versionMatches && tokenizerMatches)
     return
 
-  // Drop tables on version mismatch (migration). Pages get re-indexed on next run.
-  if (currentVersion && currentVersion !== SCHEMA_VERSION) {
+  // Drop tables on any mismatch (version bump or tokenizer change). Pages get re-indexed on next run.
+  if (currentVersion) {
     if (client.dialect === 'postgres') {
       await dropPostgresTables(client)
     }
@@ -436,10 +443,10 @@ export async function initSchema(event?: H3Event): Promise<void> {
     await createPostgresTables(client)
   }
   else {
-    await createSQLiteTables(client, resolveFtsTokenizer(event))
+    await createSQLiteTables(client, tokenizer)
   }
 
-  // Update version
+  // Update version + tokenizer
   await (client.db as any)
     .insert(info)
     .values({ id: 'schema', version: SCHEMA_VERSION })
@@ -447,6 +454,16 @@ export async function initSchema(event?: H3Event): Promise<void> {
       target: info.id,
       set: { version: SCHEMA_VERSION },
     })
+
+  if (client.dialect !== 'postgres') {
+    await (client.db as any)
+      .insert(info)
+      .values({ id: 'fts_tokenizer', value: tokenizer })
+      .onConflictDoUpdate({
+        target: info.id,
+        set: { value: tokenizer },
+      })
+  }
 }
 
 async function getSchemaVersion(client: DrizzleDatabase): Promise<string | null> {
@@ -455,6 +472,18 @@ async function getSchemaVersion(client: DrizzleDatabase): Promise<string | null>
       sql`SELECT version FROM _ai_ready_info WHERE id = 'schema'`,
     )
     return result?.[0]?.version || null
+  }
+  catch {
+    return null
+  }
+}
+
+async function getStoredTokenizer(client: DrizzleDatabase): Promise<string | null> {
+  try {
+    const result = await (client.db as any).all(
+      sql`SELECT value FROM _ai_ready_info WHERE id = 'fts_tokenizer'`,
+    )
+    return result?.[0]?.value || null
   }
   catch {
     return null

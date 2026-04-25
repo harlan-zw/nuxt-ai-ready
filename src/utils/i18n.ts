@@ -33,12 +33,12 @@ export function toRuntimeI18nConfig(auto: AutoI18nConfig): RuntimeI18nConfig {
     defaultLocale: auto.defaultLocale,
     strategy: auto.strategy,
     locales: auto.locales.map((l) => {
-      const raw = l as typeof l & { name?: string, language?: string }
+      const raw = l as typeof l & { name?: string, nativeName?: string, language?: string }
       return {
         code: l.code,
         hreflang: l._hreflang || raw.language || l.code,
         name: raw.name,
-        nativeName: raw.name,
+        nativeName: raw.nativeName ?? raw.name,
       }
     }),
   }
