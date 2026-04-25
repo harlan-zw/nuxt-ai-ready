@@ -5,6 +5,7 @@ import { withSiteUrl } from '#site-config/server/composables/utils'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
+import { tryGetContentMarkdown } from '../utils/content'
 import { buildFrontmatter } from '../utils/frontmatter'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
@@ -87,6 +88,27 @@ export default defineEventHandler(async (event) => {
   // without honoring Vary: Accept.
   if (!isExplicit) {
     return sendRedirect(event, toMarkdownPath(path), 307)
+  }
+
+  // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
+  // pages as a structural AST (minimark) that round-trips to markdown without
+  // the lossiness of HTML parsing. Frontmatter is layered: our canonical_url +
+  // last_updated land at the top so Vercel's agent-readability audit picks
+  // them up, mirroring the HTML conversion path's behaviour.
+  const contentPage = await tryGetContentMarkdown(event, path).catch((e) => {
+    logger.debug(`[markdown] Content lookup failed for ${path}`, e)
+    return null
+  })
+  if (contentPage) {
+    logger.debug(`[markdown] Serving content source for ${path} (${contentPage.markdown.length} bytes)`)
+    const frontmatter = buildFrontmatter({
+      title: contentPage.title,
+      description: contentPage.description,
+      canonical_url: canonicalUrl,
+      last_updated: contentPage.updatedAt || new Date().toISOString(),
+    })
+    setMarkdownHeaders(event, path, config)
+    return `${frontmatter}\n${contentPage.markdown}`
   }
 
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert

@@ -7,6 +7,7 @@ import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNux
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
+import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
 import { readPackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
@@ -175,6 +176,12 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.nitro.scanDirs.push(
       resolve('./runtime/server/utils'),
     )
+
+    // Detect @nuxt/content v3 — if present, the markdown middleware will
+    // prefer raw markdown source from content collections over HTML→mdream
+    // conversion, eliminating round-trip lossiness for content-backed routes.
+    const contentVersion = await resolveNuxtContentVersion()
+    const hasNuxtContentV3 = !!(contentVersion && contentVersion.version === 3)
 
     if (typeof config.contentSignal === 'object') {
       const robotsOpts = (nuxt.options.robots !== false ? nuxt.options.robots : {}) as Record<string, unknown>
@@ -463,6 +470,41 @@ export const logger = createConsola({
         mcp: { enabled: hasMCP, tools: hasMCP && (config.mcp?.tools !== false), resources: hasMCP && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`
+
+      // Content lookup: when @nuxt/content v3 is installed, this virtual
+      // module bridges to its server APIs (queryCollection + minimark
+      // stringify). Otherwise it exports a no-op stub so middleware code can
+      // import unconditionally without bundling errors.
+      nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = hasNuxtContentV3
+        ? `
+import { queryCollection } from '@nuxt/content/server'
+import manifest from '#content/manifest'
+import { stringify } from 'minimark/stringify'
+
+const pageCollections = Object.entries(manifest)
+  .filter(([, info]) => info.type === 'page')
+  .map(([name]) => name)
+
+export async function lookupContentPage(event, path) {
+  if (!pageCollections.length) return null
+  const candidates = path === '/' ? ['/'] : [path, path.replace(/\\/$/, '')]
+  for (const collection of pageCollections) {
+    for (const candidate of candidates) {
+      const page = await queryCollection(event, collection).path(candidate).first().catch(() => null)
+      if (!page) continue
+      const markdown = stringify({ ...page.body, type: 'minimark' }, { format: 'markdown/html' })
+      return {
+        markdown,
+        title: page.title,
+        description: page.description,
+        updatedAt: page.seo?.articleModifiedTime || page.updatedAt,
+      }
+    }
+  }
+  return null
+}
+`
+        : `export async function lookupContentPage() { return null }`
     })
 
     // Resolve database config
