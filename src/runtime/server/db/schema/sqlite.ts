@@ -18,12 +18,14 @@ export const pages = sqliteTable('ai_ready_pages', {
   source: text('source').notNull().default('prerender'),
   lastSeenAt: integer('last_seen_at'),
   indexnowSyncedAt: integer('indexnow_synced_at'),
+  locale: text('locale').notNull().default(''),
 }, table => [
   index('idx_ai_ready_pages_route').on(table.route),
   index('idx_ai_ready_pages_is_error').on(table.isError),
   index('idx_ai_ready_pages_indexed').on(table.indexed),
   index('idx_ai_ready_pages_source').on(table.source),
   index('idx_ai_ready_pages_last_seen').on(table.lastSeenAt),
+  index('idx_ai_ready_pages_locale').on(table.locale),
 ])
 
 // Schema version tracking

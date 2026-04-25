@@ -109,6 +109,12 @@ async function submitIndexNow(
   }
 }
 
+export interface PrerenderI18nConfig {
+  defaultLocale: string
+  strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
+  locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
+}
+
 export interface CrawlerState {
   prerenderedRoutes: Set<string>
   errorRoutes: Set<string>
@@ -121,6 +127,8 @@ export interface CrawlerState {
   llmsTxtConfig?: LlmsTxtConfig
   indexNow?: string
   concurrency: number
+  ftsTokenizer?: string
+  i18n?: PrerenderI18nConfig | null
 }
 
 function createCrawlerState(
@@ -130,6 +138,8 @@ function createCrawlerState(
   llmsTxtConfig?: LlmsTxtConfig,
   indexNow?: string,
   concurrency = 10,
+  ftsTokenizer?: string,
+  i18n?: PrerenderI18nConfig | null,
 ): CrawlerState {
   return {
     prerenderedRoutes: new Set(),
@@ -142,6 +152,8 @@ function createCrawlerState(
     llmsTxtConfig,
     indexNow,
     concurrency,
+    ftsTokenizer,
+    i18n,
   }
 }
 
@@ -162,8 +174,8 @@ async function initCrawler(state: CrawlerState): Promise<void> {
       close: async () => { sqlite.close() },
     }
     state.db = db
-    await initSchema(db)
-    logger.debug(`Crawler initialized with SQLite at ${state.dbPath}`)
+    await initSchema(db, { ftsTokenizer: state.ftsTokenizer })
+    logger.debug(`Crawler initialized with SQLite at ${state.dbPath} (tokenizer: ${state.ftsTokenizer || 'default'})`)
   }
 
   // Initialize llms-full.txt with header
@@ -183,6 +195,22 @@ function flattenHeadings(headings: Array<Record<string, string>> | undefined): s
   return (headings || [])
     .map(h => Object.entries(h).map(([tag, text]) => `${tag}:${text}`).join(''))
     .join('|')
+}
+
+/**
+ * Resolve locale for a route given the i18n config.
+ * Mirrors the runtime helper in server/utils/i18n.ts but kept inline to avoid
+ * pulling runtime imports into the build entrypoint.
+ */
+function resolveRouteLocale(route: string, i18n: PrerenderI18nConfig | null | undefined): string {
+  if (!i18n)
+    return ''
+  if (i18n.strategy === 'no_prefix')
+    return i18n.defaultLocale
+  const segments = route.split('/').filter(Boolean)
+  const first = segments[0]
+  const matched = first ? i18n.locales.find(l => l.code === first) : undefined
+  return matched ? matched.code : i18n.defaultLocale
 }
 
 async function processMarkdownRoute(
@@ -216,6 +244,7 @@ async function processMarkdownRoute(
       keywords: keywords || [],
       contentHash,
       updatedAt,
+      locale: resolveRouteLocale(route, state.i18n),
     })
   }
 
@@ -394,19 +423,34 @@ async function prerenderRoute(nitro: Nitro, route: string) {
   return stat(filePath)
 }
 
+export interface PrerenderHandlerOptions {
+  ftsTokenizer?: string
+  i18n?: PrerenderI18nConfig | null
+}
+
 export function setupPrerenderHandler(
   options: ModuleOptions,
   dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
   indexNow?: string,
+  extras: PrerenderHandlerOptions = {},
 ) {
   const nuxt = useNuxt()
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
     const llmsFullTxtPath = join(nitro.options.output.publicDir, 'llms-full.txt')
-    const state = createCrawlerState(dbPath, llmsFullTxtPath, siteInfo, llmsTxtConfig, indexNow, options.prerender?.concurrency)
+    const state = createCrawlerState(
+      dbPath,
+      llmsFullTxtPath,
+      siteInfo,
+      llmsTxtConfig,
+      indexNow,
+      options.prerender?.concurrency,
+      extras.ftsTokenizer,
+      extras.i18n,
+    )
     let initPromise: Promise<void> | null = null
 
     nitro.hooks.hook('prerender:generate', async (route) => {
@@ -454,6 +498,7 @@ export function setupPrerenderHandler(
             keywords: [],
             updatedAt: new Date().toISOString(),
             isError: true,
+            locale: resolveRouteLocale(route, state.i18n),
           })
         }
         logger.debug(`Wrote ${state.errorRoutes.size} error routes to database`)

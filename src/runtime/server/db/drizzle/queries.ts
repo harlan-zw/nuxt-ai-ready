@@ -1,8 +1,16 @@
 import type { H3Event } from 'h3'
+import type { FtsTokenizer } from '../schema-sql'
 import type { DrizzleDatabase } from './client'
 import { and, count, desc, eq, gt, isNull, like, lt, or, sql } from 'drizzle-orm'
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
+import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
+
+function resolveFtsTokenizer(event?: H3Event): FtsTokenizer {
+  const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
+  return validateFtsTokenizer(cfg['nuxt-ai-ready']?.ftsTokenizer)
+}
 
 // ============================================================================
 // Types
@@ -400,28 +408,45 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // Schema Management
 // ============================================================================
 
-const SCHEMA_VERSION = 'v2.0.0-drizzle'
+const SCHEMA_VERSION = 'v2.1.0-drizzle'
 
 /**
- * Initialize database schema
+ * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
+ * SQLite FTS5 tokenizer differs from the one baked into the existing virtual
+ * table (Postgres has no FTS5; tokenizer comparison is SQLite-only).
  */
 export async function initSchema(event?: H3Event): Promise<void> {
   const client = await useDrizzle(event)
+  const tokenizer = resolveFtsTokenizer(event)
 
-  // Check current version via raw SQL (table might not exist)
   const currentVersion = await getSchemaVersion(client)
-  if (currentVersion === SCHEMA_VERSION)
+  const currentTokenizer = client.dialect === 'postgres' ? null : await getStoredTokenizer(client)
+
+  const versionMatches = currentVersion === SCHEMA_VERSION
+  const tokenizerMatches = client.dialect === 'postgres' || !currentTokenizer || currentTokenizer === tokenizer
+
+  if (versionMatches && tokenizerMatches)
     return
+
+  // Drop tables on any mismatch (version bump or tokenizer change). Pages get re-indexed on next run.
+  if (currentVersion) {
+    if (client.dialect === 'postgres') {
+      await dropPostgresTables(client)
+    }
+    else {
+      await dropSQLiteTables(client)
+    }
+  }
 
   // Create tables via raw SQL (Drizzle doesn't have push/migrate at runtime without CLI)
   if (client.dialect === 'postgres') {
     await createPostgresTables(client)
   }
   else {
-    await createSQLiteTables(client)
+    await createSQLiteTables(client, tokenizer)
   }
 
-  // Update version
+  // Update version + tokenizer
   await (client.db as any)
     .insert(info)
     .values({ id: 'schema', version: SCHEMA_VERSION })
@@ -429,6 +454,16 @@ export async function initSchema(event?: H3Event): Promise<void> {
       target: info.id,
       set: { version: SCHEMA_VERSION },
     })
+
+  if (client.dialect !== 'postgres') {
+    await (client.db as any)
+      .insert(info)
+      .values({ id: 'fts_tokenizer', value: tokenizer })
+      .onConflictDoUpdate({
+        target: info.id,
+        set: { value: tokenizer },
+      })
+  }
 }
 
 async function getSchemaVersion(client: DrizzleDatabase): Promise<string | null> {
@@ -443,7 +478,46 @@ async function getSchemaVersion(client: DrizzleDatabase): Promise<string | null>
   }
 }
 
-async function createSQLiteTables(client: DrizzleDatabase): Promise<void> {
+async function getStoredTokenizer(client: DrizzleDatabase): Promise<string | null> {
+  try {
+    const result = await (client.db as any).all(
+      sql`SELECT value FROM _ai_ready_info WHERE id = 'fts_tokenizer'`,
+    )
+    return result?.[0]?.value || null
+  }
+  catch {
+    return null
+  }
+}
+
+const SQLITE_DROP_STATEMENTS = [
+  sql`DROP TABLE IF EXISTS ai_ready_pages_fts`,
+  sql`DROP TABLE IF EXISTS ai_ready_pages`,
+  sql`DROP TABLE IF EXISTS _ai_ready_info`,
+  sql`DROP TABLE IF EXISTS ai_ready_cron_runs`,
+  sql`DROP TABLE IF EXISTS ai_ready_indexnow_log`,
+  sql`DROP TABLE IF EXISTS ai_ready_sitemaps`,
+]
+
+const POSTGRES_DROP_STATEMENTS = [
+  sql`DROP TABLE IF EXISTS ai_ready_pages CASCADE`,
+  sql`DROP TABLE IF EXISTS _ai_ready_info CASCADE`,
+  sql`DROP TABLE IF EXISTS ai_ready_cron_runs CASCADE`,
+  sql`DROP TABLE IF EXISTS ai_ready_indexnow_log CASCADE`,
+  sql`DROP TABLE IF EXISTS ai_ready_sitemaps CASCADE`,
+]
+
+async function dropSQLiteTables(client: DrizzleDatabase): Promise<void> {
+  for (const stmt of SQLITE_DROP_STATEMENTS)
+    await (client.db as any).run(stmt)
+}
+
+async function dropPostgresTables(client: DrizzleDatabase): Promise<void> {
+  for (const stmt of POSTGRES_DROP_STATEMENTS)
+    await (client.db as any).execute(stmt)
+}
+
+async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string): Promise<void> {
   const statements = [
     sql`CREATE TABLE IF NOT EXISTS ai_ready_pages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -461,7 +535,8 @@ async function createSQLiteTables(client: DrizzleDatabase): Promise<void> {
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
       last_seen_at INTEGER,
-      indexnow_synced_at INTEGER
+      indexnow_synced_at INTEGER,
+      locale TEXT NOT NULL DEFAULT ''
     )`,
     sql`CREATE TABLE IF NOT EXISTS _ai_ready_info (
       id TEXT PRIMARY KEY,
@@ -503,11 +578,12 @@ async function createSQLiteTables(client: DrizzleDatabase): Promise<void> {
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_indexed ON ai_ready_pages(indexed)`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_source ON ai_ready_pages(source)`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_last_seen ON ai_ready_pages(last_seen_at)`,
-    // FTS5 virtual table
-    sql`CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
+    sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_locale ON ai_ready_pages(locale)`,
+    // FTS5 virtual table — tokenizer chosen by runtime config (trigram for CJK locales)
+    sql.raw(`CREATE VIRTUAL TABLE IF NOT EXISTS ai_ready_pages_fts USING fts5(
       route, title, description, markdown, headings, keywords,
-      content=ai_ready_pages, content_rowid=id
-    )`,
+      content=ai_ready_pages, content_rowid=id, tokenize='${ftsTokenizer}'
+    )`),
     // FTS triggers
     sql`CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
@@ -548,7 +624,8 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
       last_seen_at INTEGER,
-      indexnow_synced_at INTEGER
+      indexnow_synced_at INTEGER,
+      locale TEXT NOT NULL DEFAULT ''
     )`,
     sql`CREATE TABLE IF NOT EXISTS _ai_ready_info (
       id TEXT PRIMARY KEY,
@@ -590,6 +667,7 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_indexed ON ai_ready_pages(indexed)`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_source ON ai_ready_pages(source)`,
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_last_seen ON ai_ready_pages(last_seen_at)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_locale ON ai_ready_pages(locale)`,
   ]
 
   for (const stmt of statements) {
