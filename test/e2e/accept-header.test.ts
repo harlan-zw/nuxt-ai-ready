@@ -35,6 +35,28 @@ describe('accept header content negotiation', async () => {
     })
   })
 
+  describe('redirect to .md', () => {
+    it('returns 307 redirect to .md when Accept is text/markdown', async () => {
+      const response = await fetch(url('/about'), {
+        headers: { Accept: 'text/markdown' },
+        redirect: 'manual',
+      })
+
+      expect(response.status).toBe(307)
+      expect(response.headers.get('location')).toBe('/about.md')
+    })
+
+    it('redirects root path to /index.md', async () => {
+      const response = await fetch(url('/'), {
+        headers: { Accept: 'text/markdown' },
+        redirect: 'manual',
+      })
+
+      expect(response.status).toBe(307)
+      expect(response.headers.get('location')).toBe('/index.md')
+    })
+  })
+
   describe('content negotiation without .md extension', () => {
     it('serves HTML to browsers (sec-fetch-dest: document)', async () => {
       const response = await fetch(url('/about'), {

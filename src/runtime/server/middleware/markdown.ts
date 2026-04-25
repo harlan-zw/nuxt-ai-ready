@@ -1,10 +1,11 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { createError, defineEventHandler, getHeader, setHeader } from 'h3'
+import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
+import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
+import { getCfEnv } from '../utils/cloudflare'
 import { buildFrontmatter } from '../utils/frontmatter'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
@@ -13,8 +14,7 @@ const INTERNAL_HEADER = 'x-ai-ready-internal'
 function setNegotiationHeaders(event: any, path: string) {
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
   // Advertise the markdown alternate so agents can discover it via Link header (RFC 8288)
-  const mdPath = path === '/' ? '/index.md' : `${path}.md`
-  setHeader(event, 'link', `<${mdPath}>; rel="alternate"; type="text/markdown"`)
+  setHeader(event, 'link', `<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
 }
 
 function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
@@ -74,14 +74,39 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const canonicalUrl = withSiteUrl(event, path)
 
-  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
+  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML.
+  // On Cloudflare Pages, the worker runs for prerendered HTML routes too (see
+  // _routes.json post-processor), so we proxy to env.ASSETS here to serve the
+  // prerendered file directly instead of re-rendering via SSR.
   if (negotiation === 'html') {
+    const cfEnv = getCfEnv(event)
+    if (cfEnv?.ASSETS?.fetch) {
+      const assetResponse = await cfEnv.ASSETS.fetch(
+        new Request(`https://assets.local${path}`),
+      ).catch(() => null)
+      if (assetResponse?.ok && assetResponse.headers.get('content-type')?.includes('text/html')) {
+        const headers = new Headers(assetResponse.headers)
+        headers.set('vary', 'Accept, Sec-Fetch-Dest')
+        headers.set('link', `<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
+        return new Response(assetResponse.body, { status: assetResponse.status, headers })
+      }
+    }
     setNegotiationHeaders(event, path)
     return
   }
 
-  // Runtime: fetch HTML with internal marker to prevent recursion
-  // Use manual redirect to detect and forward redirects with .md suffix
+  // Implicit markdown (Accept negotiation, not explicit .md): redirect to .md so
+  // the prerendered static .md file (or .md handler) serves the response. This
+  // avoids inline HTML→markdown conversion and keeps the URL space distinct so
+  // CDNs cache HTML and markdown variants under separate keys — critical for
+  // prerendered routes on Cloudflare Pages where HTML is served from edge cache
+  // without honoring Vary: Accept.
+  if (!isExplicit) {
+    return sendRedirect(event, toMarkdownPath(path), 307)
+  }
+
+  // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
+  // via mdream. Manual redirect so we can forward redirects with .md suffix.
   logger.debug(`[markdown] Fetching HTML for ${path}`)
   const response = await event.fetch(path, {
     headers: { [INTERNAL_HEADER]: '1' },
@@ -92,18 +117,14 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!response) {
-    if (isExplicit) {
-      setMarkdownHeaders(event, path, config)
-      return notFoundMarkdown(canonicalUrl, path)
-    }
-    return
+    setMarkdownHeaders(event, path, config)
+    return notFoundMarkdown(canonicalUrl, path)
   }
 
-  // Handle redirects - forward to .md version of redirect target
+  // Forward upstream redirects, adding .md suffix to the target
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get('location')
     if (location) {
-      // Add .md suffix to redirect target
       const redirectTarget = location.endsWith('/') ? `${location.slice(0, -1)}.md` : `${location}.md`
       setHeader(event, 'location', redirectTarget)
       return createError({
@@ -113,22 +134,16 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
-    // Agents discard 404 bodies; return 200 with helpful markdown so agents get useful info
-    if (isExplicit) {
-      setMarkdownHeaders(event, path, config)
-      return notFoundMarkdown(canonicalUrl, path)
-    }
-    return
+    setMarkdownHeaders(event, path, config)
+    return notFoundMarkdown(canonicalUrl, path)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
-    if (isExplicit) {
-      setMarkdownHeaders(event, path, config)
-      return notFoundMarkdown(canonicalUrl, path)
-    }
-    return
+    setMarkdownHeaders(event, path, config)
+    return notFoundMarkdown(canonicalUrl, path)
   }
 
   const html = await response.text()
