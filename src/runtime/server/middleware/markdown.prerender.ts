@@ -7,18 +7,14 @@ import { tryGetContentMarkdown } from '../utils/content'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
 
-const RE_MD_HEADING = /^(#{1,6}) ([^\n]+)$/gm
-
 // Pull headings out of source markdown for the page-data record. mdream
 // produces a similar list during HTML conversion; this mirrors that shape so
 // downstream consumers (search, MCP) don't need to special-case content
-// pages.
+// pages. Regex is constructed locally so concurrent prerender requests don't
+// share `lastIndex` state.
 function extractHeadingsFromMarkdown(markdown: string): Array<Record<string, string>> {
   const headings: Array<Record<string, string>> = []
-  RE_MD_HEADING.lastIndex = 0
-  let m: RegExpExecArray | null
-  // eslint-disable-next-line no-cond-assign
-  while ((m = RE_MD_HEADING.exec(markdown)) !== null) {
+  for (const m of markdown.matchAll(/^(#{1,6}) ([^\n]+)$/gm)) {
     const hashes = m[1]
     const text = m[2]?.trim()
     if (!hashes || !text)

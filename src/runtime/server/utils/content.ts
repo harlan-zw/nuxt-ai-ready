@@ -1,6 +1,4 @@
 import type { H3Event } from 'h3'
-// @ts-expect-error virtual module - resolved at build time to either real
-// @nuxt/content lookup or a stub that returns null when content isn't installed
 import { lookupContentPage } from '#ai-ready-virtual/content-lookup.mjs'
 
 export interface ContentPageResult {
