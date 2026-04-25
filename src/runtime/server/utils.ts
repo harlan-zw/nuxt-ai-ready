@@ -151,6 +151,15 @@ function normalizePath(path: string): string {
   return path
 }
 
+// Map a clean route to its markdown twin: '/' → '/index.md', '/foo' → '/foo.md',
+// '/foo/' → '/foo/index.md'. Used by the markdown middleware redirect and the
+// HTML Link alternate header.
+export function toMarkdownPath(path: string): string {
+  if (path === '/' || path.endsWith('/'))
+    return `${path}index.md`
+  return `${path}.md`
+}
+
 // Back-compat: detect if client prefers markdown
 export function clientPrefersMarkdown(event: H3Event): boolean {
   return negotiateRepresentation(event) === 'markdown'
