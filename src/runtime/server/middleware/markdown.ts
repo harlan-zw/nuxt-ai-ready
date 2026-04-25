@@ -5,7 +5,6 @@ import { withSiteUrl } from '#site-config/server/composables/utils'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
-import { getCfEnv } from '../utils/cloudflare'
 import { buildFrontmatter } from '../utils/frontmatter'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
@@ -74,23 +73,8 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const canonicalUrl = withSiteUrl(event, path)
 
-  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML.
-  // On Cloudflare Pages, the worker runs for prerendered HTML routes too (see
-  // _routes.json post-processor), so we proxy to env.ASSETS here to serve the
-  // prerendered file directly instead of re-rendering via SSR.
+  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
-    const cfEnv = getCfEnv(event)
-    if (cfEnv?.ASSETS?.fetch) {
-      const assetResponse = await cfEnv.ASSETS.fetch(
-        new Request(`https://assets.local${path}`),
-      ).catch(() => null)
-      if (assetResponse?.ok && assetResponse.headers.get('content-type')?.includes('text/html')) {
-        const headers = new Headers(assetResponse.headers)
-        headers.set('vary', 'Accept, Sec-Fetch-Dest')
-        headers.set('link', `<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
-        return new Response(assetResponse.body, { status: assetResponse.status, headers })
-      }
-    }
     setNegotiationHeaders(event, path)
     return
   }

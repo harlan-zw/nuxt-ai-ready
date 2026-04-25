@@ -152,22 +152,6 @@ export interface ModuleOptions {
   debugCron?: boolean
 
   /**
-   * Force prerendered HTML routes through the worker on Cloudflare Pages so the
-   * content-negotiation middleware can fire (and redirect `Accept: text/markdown`
-   * requests to the `.md` twin). Off by default because it changes Nitro's
-   * `_routes.json` and routes every HTML view through the worker (the middleware
-   * proxies to `env.ASSETS` so the prerendered file still serves it, but each
-   * view is now a worker invocation).
-   *
-   * Without this flag, AI agents discover the markdown URL via the
-   * `<link rel="alternate" type="text/markdown">` tag injected into the HTML
-   * head, or by requesting the `.md` URL directly.
-   *
-   * @default false
-   */
-  runtimeContentNegotiation?: boolean
-
-  /**
    * Runtime sync configuration (opt-in for dynamic content sites)
    * When enabled, pages are re-indexed at runtime from sitemap
    * Set to `true` for defaults or object to customize
