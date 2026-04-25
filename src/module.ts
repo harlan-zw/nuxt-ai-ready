@@ -618,8 +618,12 @@ export const logger = createConsola({
         // the HTML excludes so the worker runs and can redirect to .md. The
         // worker then proxies HTML accept to env.ASSETS to avoid SSR re-render
         // (see markdown middleware).
+        //
+        // Opt-in: this changes Nitro's default routing and turns every HTML
+        // view into a worker invocation. Without it, agents still discover the
+        // markdown URL via the <link rel="alternate"> tag in the HTML head.
         const cfPreset = String(nitro.options.preset || '')
-        if (cfPreset === 'cloudflare-pages' || cfPreset === 'cloudflare_pages') {
+        if (config.runtimeContentNegotiation && (cfPreset === 'cloudflare-pages' || cfPreset === 'cloudflare_pages')) {
           const routesPath = join(nitro.options.output.dir, '_routes.json')
           const routesExists = await access(routesPath).then(() => true).catch(() => false)
           if (routesExists) {
