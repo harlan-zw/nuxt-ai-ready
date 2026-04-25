@@ -64,6 +64,16 @@ declare module '#ai-ready-virtual/db-provider.mjs' {
 declare module '#ai-ready-virtual/db-schema.mjs' {
   export * from '#ai-ready/server/db/schema/sqlite'
 }
+
+declare module '#ai-ready-virtual/content-lookup.mjs' {
+  import type { H3Event } from 'h3'
+  export function lookupContentPage(event: H3Event, path: string): Promise<{
+    markdown: string
+    title?: string
+    description?: string
+    updatedAt?: string
+  } | null>
+}
 `,
   })
 }

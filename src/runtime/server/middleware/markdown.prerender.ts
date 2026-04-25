@@ -3,7 +3,26 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
+import { tryGetContentMarkdown } from '../utils/content'
+import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
+
+// Pull headings out of source markdown for the page-data record. mdream
+// produces a similar list during HTML conversion; this mirrors that shape so
+// downstream consumers (search, MCP) don't need to special-case content
+// pages. Regex is constructed locally so concurrent prerender requests don't
+// share `lastIndex` state.
+function extractHeadingsFromMarkdown(markdown: string): Array<Record<string, string>> {
+  const headings: Array<Record<string, string>> = []
+  for (const m of markdown.matchAll(/^(#{1,6}) ([^\n]+)$/gm)) {
+    const hashes = m[1]
+    const text = m[2]?.trim()
+    if (!hashes || !text)
+      continue
+    headings.push({ [`h${hashes.length}`]: text })
+  }
+  return headings
+}
 
 export default defineEventHandler(async (event) => {
   // Only run during prerender
@@ -17,6 +36,33 @@ export default defineEventHandler(async (event) => {
 
   const { path } = renderInfo
   const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any
+  const canonicalUrl = withSiteUrl(event, path)
+
+  // Prefer @nuxt/content source: skip HTML fetch + mdream when the route is
+  // backed by a content collection. Body comes from the AST, so headings and
+  // keywords come from the markdown itself rather than the rendered HTML.
+  const contentPage = await tryGetContentMarkdown(event, path).catch(() => null)
+  if (contentPage) {
+    logger.debug(`[markdown.prerender] Using content source for ${path} (${contentPage.markdown.length} bytes)`)
+    const lastUpdated = contentPage.updatedAt || new Date().toISOString()
+    const frontmatter = buildFrontmatter({
+      title: contentPage.title,
+      description: contentPage.description,
+      canonical_url: canonicalUrl,
+      last_updated: lastUpdated,
+    })
+    const markdown = `${frontmatter}\n${contentPage.markdown}`
+    const headings = extractHeadingsFromMarkdown(contentPage.markdown)
+    const keywords = extractKeywords(contentPage.markdown, '')
+    return JSON.stringify({
+      markdown,
+      title: contentPage.title || '',
+      description: contentPage.description || '',
+      headings,
+      keywords,
+      updatedAt: lastUpdated,
+    })
+  }
 
   logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
   const response = await event.fetch(path)
@@ -38,7 +84,6 @@ export default defineEventHandler(async (event) => {
       message: `Page rendered as error: ${path}`,
     })
   }
-  const canonicalUrl = withSiteUrl(event, path)
   const lastUpdated = extractLastUpdated(html) || new Date().toISOString()
   const result = await convertHtmlToMarkdown(
     html,
