@@ -84,7 +84,12 @@ function buildMdreamOptions(
 // @nuxtjs/robots) on top of RFC 7231 Accept header negotiation. AI bots get
 // markdown regardless of what their Accept header says.
 export function negotiateRepresentation(event: H3Event): ContentNegotiationResult {
+  const accept = getHeader(event, 'accept')
   const secFetchDest = getHeader(event, 'sec-fetch-dest')
+
+  // Honor a direct markdown preference
+  if (negotiateContent(accept) === 'markdown')
+    return 'markdown'
 
   // Browser navigation always gets HTML (short-circuit before bot check so
   // AI-categorized browsers don't get markdown pushed at them mid-navigation)
@@ -96,7 +101,7 @@ export function negotiateRepresentation(event: H3Event): ContentNegotiationResul
   if (botInfo?.category === 'ai')
     return 'markdown'
 
-  return negotiateContent(getHeader(event, 'accept'), secFetchDest)
+  return negotiateContent(accept, secFetchDest)
 }
 
 // Check if request should be rendered as markdown

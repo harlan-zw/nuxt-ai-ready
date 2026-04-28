@@ -55,6 +55,18 @@ describe('accept header content negotiation', async () => {
       expect(response.status).toBe(307)
       expect(response.headers.get('location')).toBe('/index.md')
     })
+
+    it('serves markdown for the root path', async () => {
+      const response = await fetch(url('/'), {
+        headers: { Accept: 'text/markdown' },
+      })
+
+      expect(response.ok).toBe(true)
+      expect(response.headers.get('content-type')).toContain('text/markdown')
+
+      const content = await response.text()
+      expect(content).toContain('# Welcome to Test Site')
+    })
   })
 
   describe('content negotiation without .md extension', () => {
