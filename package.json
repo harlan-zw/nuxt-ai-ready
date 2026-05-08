@@ -90,7 +90,9 @@
     "nuxtseo-shared": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
-    "ufo": "catalog:"
+    "site-config-stack": "catalog:",
+    "ufo": "catalog:",
+    "uncrypto": "catalog:"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-lint",
@@ -117,7 +119,9 @@
     "nuxt-site-config": "catalog:nuxt",
     "playwright": "catalog:dev-test",
     "playwright-core": "catalog:dev-test",
+    "tinyglobby": "catalog:",
     "typescript": "catalog:dev-build",
+    "unbuild": "catalog:",
     "vitest": "catalog:dev-test",
     "vue": "catalog:vue",
     "vue-router": "catalog:vue",
