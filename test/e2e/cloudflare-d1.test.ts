@@ -1,4 +1,3 @@
-import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -15,7 +14,7 @@ const RE_MD_H1 = /^# /
 // (requires __STATIC_CONTENT_MANIFEST which is only available in deployed workers)
 // This test is skipped - use cloudflare-pages preset for local wrangler testing
 describe.skip('cloudflare D1 runtime', async () => {
-  let wranglerProcess: ChildProcess | null = null
+  let wranglerProcess: ReturnType<typeof spawn> | null = null
   let baseUrl: string
   let symlinkCreated = false
 
