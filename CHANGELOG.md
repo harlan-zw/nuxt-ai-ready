@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.2.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.2.0...main)
+
+### 🚀 Enhancements
+
+- I18n integration ([#24](https://github.com/harlan-zw/nuxt-ai-ready/pull/24))
+- @nuxt/content integration ([#25](https://github.com/harlan-zw/nuxt-ai-ready/pull/25))
+
+### 🩹 Fixes
+
+- Redirect to .md on Accept negotiation; document CDN limitation ([#23](https://github.com/harlan-zw/nuxt-ai-ready/pull/23))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.1.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.1.1...main)
