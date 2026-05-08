@@ -197,6 +197,18 @@ describe('accept header content negotiation', async () => {
 
       expect(response.status).not.toBe(406)
     })
+
+    it('yields (does not 406) for application/json + text/event-stream (MCP/RPC clients)', async () => {
+      // MCP clients send `Accept: application/json, text/event-stream`. The
+      // middleware must not hijack these requests, otherwise non-content
+      // handlers mounted on / paths (e.g. /mcp via @nuxtjs/mcp-toolkit)
+      // become unreachable.
+      const response = await fetch(url('/about'), {
+        headers: { Accept: 'application/json, text/event-stream' },
+      })
+
+      expect(response.status).not.toBe(406)
+    })
   })
 
   describe('error handling', () => {

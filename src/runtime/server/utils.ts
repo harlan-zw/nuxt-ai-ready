@@ -114,6 +114,19 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false):
     return null
   }
 
+  // Step aside for unambiguous non-document Accept headers (MCP/SSE/JSON RPCs).
+  // If the client asks for application/json or text/event-stream and never
+  // text/html|markdown|plain, this middleware has nothing to offer; the
+  // underlying handler should respond instead of being hijacked with a 406.
+  // Synthetic probes / unknown media types still 406 below to preserve the
+  // RFC 7231 contract for content negotiation against document URLs.
+  const accept = getHeader(event, 'accept') || ''
+  if (!originalPath.endsWith('.md') && accept
+    && /\b(?:application\/json|text\/event-stream)\b/i.test(accept)
+    && !/text\/(?:html|markdown|plain)\b|\*\/\*/i.test(accept)) {
+    return null
+  }
+
   const isExplicit = originalPath.endsWith('.md')
 
   // For explicitOnly mode (prerender), only handle .md requests
