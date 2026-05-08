@@ -14,7 +14,7 @@ const RE_MD_H1 = /^# /
 // (requires __STATIC_CONTENT_MANIFEST which is only available in deployed workers)
 // This test is skipped - use cloudflare-pages preset for local wrangler testing
 describe.skip('cloudflare D1 runtime', async () => {
-  let wranglerProcess: ReturnType<typeof spawn> | null = null
+  let wranglerProcess: any = null
   let baseUrl: string
   let symlinkCreated = false
 
@@ -80,12 +80,12 @@ describe.skip('cloudflare D1 runtime', async () => {
         stderr += output
       })
 
-      wranglerProcess!.on('error', (err) => {
+      wranglerProcess!.on('error', (err: Error) => {
         clearTimeout(timeout)
         reject(err)
       })
 
-      wranglerProcess!.on('exit', (code) => {
+      wranglerProcess!.on('exit', (code: number | null) => {
         if (code !== null && code !== 0) {
           clearTimeout(timeout)
           console.error('Wrangler stdout:', stdout)
