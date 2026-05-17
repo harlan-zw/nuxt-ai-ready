@@ -87,15 +87,21 @@ async function countPagesNeedingIndexNowSync(db: TestDatabaseAdapter): Promise<n
   return row?.count || 0
 }
 
+// D1/SQLite caps prepared-statement params at 100; chunk to 99 routes + 1 ts.
+const D1_MAX_IN_ROUTES = 99
+
 async function markIndexNowSynced(db: TestDatabaseAdapter, routes: string[]): Promise<void> {
   if (routes.length === 0)
     return
   const now = Date.now()
-  const placeholders = routes.map(() => '?').join(',')
-  await db.exec(
-    `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-    [now, ...routes],
-  )
+  for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
+    const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
+    const placeholders = batch.map(() => '?').join(',')
+    await db.exec(
+      `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+      [now, ...batch],
+    )
+  }
 }
 
 describe('db-queries: stale route functions', () => {
@@ -447,6 +453,42 @@ describe('db-queries: stale route functions', () => {
     it('markIndexNowSynced handles empty array', async () => {
       // Should not throw
       await markIndexNowSynced(db, [])
+    })
+
+    it('markIndexNowSynced chunks IN clause to respect D1 100-param cap', async () => {
+      // D1 (and SQLite) error out at >100 bound params per statement. Use a
+      // mock adapter that asserts the cap, plus a real DB to confirm correctness.
+      const now = Date.now()
+      const routeCount = 250
+      const routes: string[] = []
+      for (let i = 1; i <= routeCount; i++) {
+        const route = `/r${i}`
+        routes.push(route)
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, '', '', '', '[]', '[]', ?, ?, 0, 1, 0)
+        `, [route, `r${i}`, new Date().toISOString(), now])
+      }
+
+      const calls: number[] = []
+      const wrapped: TestDatabaseAdapter = {
+        ...db,
+        async exec(sql, params) {
+          calls.push((params || []).length)
+          expect((params || []).length).toBeLessThanOrEqual(100)
+          await db.exec(sql, params)
+        },
+      }
+
+      await markIndexNowSynced(wrapped, routes)
+
+      // 250 routes -> ceil(250/99) = 3 batches
+      expect(calls).toHaveLength(3)
+
+      const synced = await db.first<{ count: number }>(
+        'SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexnow_synced_at IS NOT NULL',
+      )
+      expect(synced?.count).toBe(routeCount)
     })
 
     it('respects limit in getPagesNeedingIndexNowSync', async () => {

@@ -742,12 +742,16 @@ export async function markIndexNowSynced(
   const client = await useDrizzle(event)
   const now = Date.now()
 
-  // Drizzle doesn't support IN with array directly, use raw for now
-  const placeholders = routes.map(() => '?').join(',')
-  await (client.db as any).run(
-    sql.raw(`UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`),
-    [now, ...routes],
-  )
+  // D1/SQLite caps prepared-statement params at 100; chunk to 99 routes + ts.
+  const D1_MAX_IN_ROUTES = 99
+  for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
+    const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
+    const placeholders = batch.map(() => '?').join(',')
+    await (client.db as any).run(
+      sql.raw(`UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`),
+      [now, ...batch],
+    )
+  }
 }
 
 // ============================================================================

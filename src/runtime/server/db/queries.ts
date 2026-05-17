@@ -660,6 +660,33 @@ export async function countPagesNeedingIndexNowSync(
 }
 
 /**
+ * D1/SQLite caps prepared-statement parameters at 100. Chunk IN-clause routes
+ * so each UPDATE binds at most 100 vars (99 routes + 1 timestamp).
+ */
+const D1_MAX_IN_ROUTES = 99
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size))
+  return out
+}
+
+async function markRoutesSyncedChunked(
+  db: { exec: (sql: string, params: unknown[]) => Promise<unknown> },
+  routes: string[],
+  now: number,
+): Promise<void> {
+  for (const batch of chunk(routes, D1_MAX_IN_ROUTES)) {
+    const placeholders = batch.map(() => '?').join(',')
+    await db.exec(
+      `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+      [now, ...batch],
+    )
+  }
+}
+
+/**
  * Mark pages as synced to IndexNow
  */
 export async function markIndexNowSynced(
@@ -670,12 +697,7 @@ export async function markIndexNowSynced(
   if (!db || routes.length === 0)
     return
 
-  const now = Date.now()
-  const placeholders = routes.map(() => '?').join(',')
-  await db.exec(
-    `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-    [now, ...routes],
-  )
+  await markRoutesSyncedChunked(db, routes, Date.now())
 }
 
 /**
@@ -731,15 +753,11 @@ export async function batchIndexNowUpdate(
     return
 
   const now = Date.now()
-  const placeholders = routes.map(() => '?').join(',')
 
-  // Run all updates in parallel
+  // Run all updates in parallel; route IN-clause is chunked to respect D1's
+  // 100-parameter cap per prepared statement.
   await Promise.all([
-    // Mark pages as synced
-    db.exec(
-      `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-      [now, ...routes],
-    ),
+    markRoutesSyncedChunked(db, routes, now),
     // Atomic increment total submitted
     db.exec(`
       INSERT INTO _ai_ready_info (id, value) VALUES ('indexnow_total_submitted', ?)
