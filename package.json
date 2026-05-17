@@ -115,6 +115,7 @@
     "eslint-plugin-harlanzw": "catalog:",
     "execa": "catalog:",
     "happy-dom": "catalog:dev-test",
+    "nitropack": "catalog:",
     "nuxt": "catalog:nuxt",
     "nuxt-site-config": "catalog:nuxt",
     "playwright": "catalog:dev-test",
