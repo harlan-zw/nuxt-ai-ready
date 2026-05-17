@@ -8,34 +8,9 @@ import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMar
 import { tryGetContentMarkdown } from '../utils/content'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
+import { buildLinkHeader } from '../utils/link-header'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
-
-/**
- * Build a comma-joined Link header value with the standard alternates plus i18n hreflang variants.
- */
-function buildLinkHeader(
-  path: string,
-  variant: 'html' | 'markdown',
-  config: ModulePublicRuntimeConfig,
-): string {
-  const parts: string[] = []
-  if (variant === 'html') {
-    parts.push(`<${toMarkdownPath(path)}>; rel="alternate"; type="text/markdown"`)
-  }
-  else {
-    parts.push(`<${path}>; rel="alternate"; type="text/html"`)
-  }
-
-  if (config.i18n) {
-    const alternates = computeLocaleAlternates(path, config.i18n)
-    for (const alt of alternates) {
-      const href = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
-      parts.push(`<${href}>; rel="alternate"; hreflang="${alt.hreflang}"`)
-    }
-  }
-  return parts.join(', ')
-}
 
 // Always signal that response content varies by Accept so caches segment correctly
 function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
