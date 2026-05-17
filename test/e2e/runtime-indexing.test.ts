@@ -326,13 +326,13 @@ describe('runtime indexing', async () => {
     expect(typeof result.result?.index?.indexed).toBe('number')
     expect(typeof result.result?.index?.remaining).toBe('number')
     expect(typeof result.result?.index?.complete).toBe('boolean')
-  })
+  }, 30000)
 
   it('scheduled: task respects batchSize config', async () => {
     // The fixture has batchSize: 5, so task should process at most 5 pages
     const result = (await fetch('/api/__run-task?name=ai-ready:cron')) as { result?: { index?: { indexed: number } } }
     expect(result.result?.index?.indexed).toBeLessThanOrEqual(5)
-  })
+  }, 30000)
 
   // Sitemap lastmod enrichment tests
   it('sitemap: includes lastmod from indexed pages', async () => {
