@@ -55,12 +55,16 @@ export function buildIndexNowBody(
 export interface SubmitOptions {
   /** Custom fetch implementation (defaults to globalThis.fetch) */
   fetchFn?: typeof fetch
+  /** Per-request timeout in ms (default 10000) */
+  timeoutMs?: number
   /** Logger for debug/warn messages (optional) */
   logger?: {
     debug: (msg: string) => void
     warn: (msg: string) => void
   }
 }
+
+const DEFAULT_INDEXNOW_TIMEOUT_MS = 10000
 
 /**
  * Submit URLs to IndexNow API with fallback on rate limit
@@ -78,6 +82,7 @@ export async function submitToIndexNowShared(
 
   const fetchFn = options?.fetchFn ?? globalThis.fetch
   const log = options?.logger
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_INDEXNOW_TIMEOUT_MS
 
   const body = buildIndexNowBody(routes, key, siteUrl)
   const endpoints = getIndexNowEndpoints()
@@ -91,15 +96,16 @@ export async function submitToIndexNowShared(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     })
       .then(r => r.ok ? { ok: true as const } : { error: `HTTP ${r.status}` })
-      .catch((err: Error) => ({ error: err.message }))
+      .catch((err: Error) => ({ error: err.name === 'TimeoutError' ? `timeout after ${timeoutMs}ms` : err.message }))
 
     if ('error' in response) {
       lastError = response.error
 
-      // On 429/500, try next endpoint (may be transient)
-      if (lastError?.includes('429') || lastError?.includes('500')) {
+      // On 429/500/timeout, try next endpoint (may be transient)
+      if (lastError?.includes('429') || lastError?.includes('500') || lastError?.includes('timeout')) {
         log?.warn(`[indexnow] ${lastError} on ${endpoint}, trying fallback...`)
         continue
       }

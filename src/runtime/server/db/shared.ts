@@ -279,35 +279,44 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
     }
   })()
 
-  // Stream rows in batches
-  await writer.write(encoder.encode('['))
-  let offset = 0
-  let first = true
+  // Stream rows in batches. If anything throws mid-stream the writer must be
+  // aborted so the reader loop exits; otherwise `await readPromise` hangs forever.
+  try {
+    await writer.write(encoder.encode('['))
+    let offset = 0
+    let first = true
 
-  while (true) {
-    const rows = await db.all<DumpRow>(`
-      SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale
-      FROM ai_ready_pages
-      ORDER BY route
-      LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
-    `)
+    while (true) {
+      const rows = await db.all<DumpRow>(`
+        SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale
+        FROM ai_ready_pages
+        ORDER BY route
+        LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
+      `)
 
-    if (rows.length === 0)
-      break
+      if (rows.length === 0)
+        break
 
-    for (const row of rows) {
-      const prefix = first ? '' : ','
-      first = false
-      await writer.write(encoder.encode(prefix + JSON.stringify(row)))
+      for (const row of rows) {
+        const prefix = first ? '' : ','
+        first = false
+        await writer.write(encoder.encode(prefix + JSON.stringify(row)))
+      }
+
+      if (rows.length < DUMP_BATCH_SIZE)
+        break
+      offset += DUMP_BATCH_SIZE
     }
 
-    if (rows.length < DUMP_BATCH_SIZE)
-      break
-    offset += DUMP_BATCH_SIZE
+    await writer.write(encoder.encode(']'))
+    await writer.close()
   }
-
-  await writer.write(encoder.encode(']'))
-  await writer.close()
+  catch (err) {
+    // Best-effort teardown; original error is rethrown below regardless.
+    await writer.abort(err).catch(() => null)
+    await reader.cancel().catch(() => null)
+    throw err
+  }
   await readPromise
 
   // Combine chunks and convert to base64

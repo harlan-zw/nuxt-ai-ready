@@ -65,7 +65,16 @@ export default defineEventHandler(async (event) => {
   }
 
   logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-  const response = await event.fetch(path)
+  const response = await event.fetch(path, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw createError({
+        statusCode: 504,
+        statusMessage: 'Gateway Timeout',
+        message: `Timed out fetching HTML for ${path}`,
+      })
+    }
+    throw err
+  })
   if (!response.ok) {
     return createError({
       statusCode: response.status,

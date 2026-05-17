@@ -16,6 +16,7 @@ import { comparePageHashes, submitToIndexNowShared } from './runtime/server/util
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 
 const BUILD_FETCH_TIMEOUT = 15000 // 15s timeout for build-time fetches
+const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
 
 const RE_HTML_MD_EXT = /\.(html|md)$/
 const RE_INDEX_SUFFIX = /\/index$/
@@ -285,8 +286,12 @@ async function processSitemapEntry(
   // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
   const res = await globalThis.$fetch(mdUrl, {
     headers: { 'x-nitro-prerender': mdRoute },
+    signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
   }).catch((err) => {
-    logger.debug(`Skipping ${route}: ${err.message}`)
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError')
+      logger.warn(`Timeout (${PRERENDER_PAGE_TIMEOUT}ms) fetching markdown for ${route}`)
+    else
+      logger.debug(`Skipping ${route}: ${err.message}`)
     return null
   }) as string | null
 
@@ -634,6 +639,7 @@ export function setupPrerenderHandler(
 
         const sitemapContent = await globalThis.$fetch('/sitemap.xml', {
           headers: { 'x-nitro-prerender': '/sitemap.xml' },
+          signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
         }).catch(() => null) as string | null
 
         if (sitemapContent)

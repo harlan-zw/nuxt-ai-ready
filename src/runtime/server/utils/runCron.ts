@@ -58,151 +58,157 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
     logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNow})`)
   }
 
+  try {
   // Fast path: single query to check if any work is needed
-  if (config.runtimeSync.enabled) {
-    const status = await getCronFastPathStatus(event)
-    if (status) {
-      const now = Date.now()
-      const staleCheckNeeded = !status.lastStaleCheck || (now - status.lastStaleCheck) >= STALE_CHECK_INTERVAL_MS
-      const inBackoff = status.indexNowBackoff && now < status.indexNowBackoff.until
-      const hasWork = staleCheckNeeded
-        || status.pendingPages > 0
-        || status.sitemapsNeedCrawl > 0
-        || (config.indexNow && status.indexNowPending > 0 && !inBackoff)
+    if (config.runtimeSync.enabled) {
+      const status = await getCronFastPathStatus(event)
+      if (status) {
+        const now = Date.now()
+        const staleCheckNeeded = !status.lastStaleCheck || (now - status.lastStaleCheck) >= STALE_CHECK_INTERVAL_MS
+        const inBackoff = status.indexNowBackoff && now < status.indexNowBackoff.until
+        const hasWork = staleCheckNeeded
+          || status.pendingPages > 0
+          || status.sitemapsNeedCrawl > 0
+          || (config.indexNow && status.indexNowPending > 0 && !inBackoff)
 
-      if (!hasWork) {
+        if (!hasWork) {
+          if (debug) {
+            const duration = Date.now() - startTime
+            logger.info(`[cron] Fast path: no work needed (${duration}ms)`)
+          }
+          return {
+            stale: { action: 'none', dbCount: status.totalPages, reason: 'fast_path_no_work' },
+            index: { indexed: 0, remaining: 0, complete: true },
+            indexNow: config.indexNow ? { submitted: 0, remaining: status.indexNowPending } : undefined,
+          }
+        }
+
         if (debug) {
-          const duration = Date.now() - startTime
-          logger.info(`[cron] Fast path: no work needed (${duration}ms)`)
-        }
-        return {
-          stale: { action: 'none', dbCount: status.totalPages, reason: 'fast_path_no_work' },
-          index: { indexed: 0, remaining: 0, complete: true },
-          indexNow: config.indexNow ? { submitted: 0, remaining: status.indexNowPending } : undefined,
+          logger.info(`[cron] Work needed: stale=${staleCheckNeeded}, pending=${status.pendingPages}, sitemaps=${status.sitemapsNeedCrawl}, indexNow=${status.indexNowPending}`)
         }
       }
+    }
 
+    // Check for stale data and handle restore/mark-pending
+    // This runs before indexing to ensure data is ready
+    if (config.runtimeSync.enabled) {
+      results.stale = await checkAndHandleStale(event).catch((err) => {
+        logger.warn('[ai-ready:cron] Stale check failed:', err.message)
+        allErrors.push(`stale-check: ${err.message}`)
+        return { action: 'none' as const, dbCount: 0, reason: err.message }
+      })
+      if (debug && results.stale) {
+        logger.info(`[cron] Stale check: ${results.stale.action} (db: ${results.stale.dbCount}, dump: ${results.stale.dumpCount ?? 'n/a'})`)
+      }
+    }
+
+    // Ping next sitemap to trigger seeding via sitemap:resolved hook
+    // The sitemap-seeder plugin handles actual route insertion
+    if (config.runtimeSync.enabled) {
+      const sitemapResult = await pingSitemap(event, config, debug).catch((err): { name?: string, pinged: boolean, pruned: number, error?: string } => {
+        const msg = err instanceof Error ? err.message : String(err)
+        logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
+        allErrors.push(`sitemap: ${msg}`)
+        return { pinged: false, pruned: 0, error: msg }
+      })
+      results.sitemap = sitemapResult
       if (debug) {
-        logger.info(`[cron] Work needed: stale=${staleCheckNeeded}, pending=${status.pendingPages}, sitemaps=${status.sitemapsNeedCrawl}, indexNow=${status.indexNowPending}`)
+        if (sitemapResult.name) {
+          logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.error ? ` (error: ${sitemapResult.error})` : ''}`)
+        }
+        if (sitemapResult.pruned > 0) {
+          logger.info(`[cron] Sitemap: pruned ${sitemapResult.pruned} stale routes`)
+        }
       }
     }
-  }
 
-  // Check for stale data and handle restore/mark-pending
-  // This runs before indexing to ensure data is ready
-  if (config.runtimeSync.enabled) {
-    results.stale = await checkAndHandleStale(event).catch((err) => {
-      logger.warn('[ai-ready:cron] Stale check failed:', err.message)
-      allErrors.push(`stale-check: ${err.message}`)
-      return { action: 'none' as const, dbCount: 0, reason: err.message }
-    })
-    if (debug && results.stale) {
-      logger.info(`[cron] Stale check: ${results.stale.action} (db: ${results.stale.dbCount}, dump: ${results.stale.dumpCount ?? 'n/a'})`)
-    }
-  }
+    // Start logging this cron run (only if debugCron enabled)
+    const runId = config.debugCron ? await startCronRun(event) : null
+    results.runId = runId
 
-  // Ping next sitemap to trigger seeding via sitemap:resolved hook
-  // The sitemap-seeder plugin handles actual route insertion
-  if (config.runtimeSync.enabled) {
-    const sitemapResult = await pingSitemap(event, config, debug).catch((err): { name?: string, pinged: boolean, pruned: number, error?: string } => {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
-      allErrors.push(`sitemap: ${msg}`)
-      return { pinged: false, pruned: 0, error: msg }
-    })
-    results.sitemap = sitemapResult
-    if (debug) {
-      if (sitemapResult.name) {
-        logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.error ? ` (error: ${sitemapResult.error})` : ''}`)
+    // Run runtime indexing if enabled
+    if (config.runtimeSync.enabled) {
+      const limit = options?.batchSize ?? config.runtimeSync.batchSize
+      const indexResult = await batchIndexPages(event, {
+        limit,
+        all: false,
+      })
+      results.index = {
+        indexed: indexResult.indexed,
+        remaining: indexResult.remaining,
+        errors: indexResult.errors.length > 0 ? indexResult.errors : undefined,
+        complete: indexResult.complete,
       }
-      if (sitemapResult.pruned > 0) {
-        logger.info(`[cron] Sitemap: pruned ${sitemapResult.pruned} stale routes`)
+      if (indexResult.errors.length > 0) {
+        allErrors.push(...indexResult.errors)
+      }
+      if (debug) {
+        logger.info(`[cron] Index: ${indexResult.indexed} pages (${indexResult.remaining} remaining${indexResult.errors.length > 0 ? `, ${indexResult.errors.length} errors` : ''})`)
       }
     }
-  }
 
-  // Start logging this cron run (only if debugCron enabled)
-  const runId = config.debugCron ? await startCronRun(event) : null
-  results.runId = runId
+    // Run IndexNow sync if key is configured
+    if (config.indexNow) {
+      const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
+        logger.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
+        return { success: false, submitted: 0, remaining: 0, error: err.message }
+      })
+      results.indexNow = {
+        submitted: indexNowResult.submitted,
+        remaining: indexNowResult.remaining,
+        error: indexNowResult.error,
+      }
+      if (indexNowResult.error) {
+        allErrors.push(`IndexNow: ${indexNowResult.error}`)
+      }
+      if (debug) {
+        const status = indexNowResult.error
+          ? `error: ${indexNowResult.error}`
+          : `${indexNowResult.submitted} submitted (${indexNowResult.remaining} remaining)`
+        logger.info(`[cron] IndexNow: ${status}`)
+      }
+    }
 
-  // Run runtime indexing if enabled
-  if (config.runtimeSync.enabled) {
-    const limit = options?.batchSize ?? config.runtimeSync.batchSize
-    const indexResult = await batchIndexPages(event, {
-      limit,
-      all: false,
-    })
-    results.index = {
-      indexed: indexResult.indexed,
-      remaining: indexResult.remaining,
-      errors: indexResult.errors.length > 0 ? indexResult.errors : undefined,
-      complete: indexResult.complete,
+    // Complete the cron run log (only if debugCron enabled)
+    if (runId && config.debugCron) {
+      await completeCronRun(event, runId, {
+        pagesIndexed: results.index?.indexed || 0,
+        pagesRemaining: results.index?.remaining || 0,
+        indexNowSubmitted: results.indexNow?.submitted || 0,
+        indexNowRemaining: results.indexNow?.remaining || 0,
+        errors: allErrors,
+      })
+
+      // Prune cron logs older than 24 hours
+      await pruneCronRunsByAge(event)
     }
-    if (indexResult.errors.length > 0) {
-      allErrors.push(...indexResult.errors)
-    }
+
+    // Summary log
     if (debug) {
-      logger.info(`[cron] Index: ${indexResult.indexed} pages (${indexResult.remaining} remaining${indexResult.errors.length > 0 ? `, ${indexResult.errors.length} errors` : ''})`)
+      const duration = Date.now() - startTime
+      const parts = []
+      if (results.stale?.action !== 'none')
+        parts.push(results.stale?.action)
+      if (results.sitemap?.name)
+        parts.push(`pinged ${results.sitemap.name}`)
+      if (results.index?.indexed)
+        parts.push(`${results.index.indexed} indexed`)
+      if (results.indexNow?.submitted)
+        parts.push(`${results.indexNow.submitted} submitted to IndexNow`)
+      if (allErrors.length > 0)
+        parts.push(`${allErrors.length} errors`)
+      logger.info(`[cron] Complete in ${duration}ms${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`)
     }
-  }
 
-  // Run IndexNow sync if key is configured
-  if (config.indexNow) {
-    const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
-      logger.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
-      return { success: false, submitted: 0, remaining: 0, error: err.message }
+    return results
+  }
+  finally {
+    // Always release lock; a throw between acquire and release would
+    // otherwise strand it for CRON_LOCK_TTL_MS, blocking subsequent runs.
+    await releaseCronLock(event).catch((err) => {
+      logger.warn(`[cron] Failed to release lock: ${err?.message || err}`)
     })
-    results.indexNow = {
-      submitted: indexNowResult.submitted,
-      remaining: indexNowResult.remaining,
-      error: indexNowResult.error,
-    }
-    if (indexNowResult.error) {
-      allErrors.push(`IndexNow: ${indexNowResult.error}`)
-    }
-    if (debug) {
-      const status = indexNowResult.error
-        ? `error: ${indexNowResult.error}`
-        : `${indexNowResult.submitted} submitted (${indexNowResult.remaining} remaining)`
-      logger.info(`[cron] IndexNow: ${status}`)
-    }
   }
-
-  // Complete the cron run log (only if debugCron enabled)
-  if (runId && config.debugCron) {
-    await completeCronRun(event, runId, {
-      pagesIndexed: results.index?.indexed || 0,
-      pagesRemaining: results.index?.remaining || 0,
-      indexNowSubmitted: results.indexNow?.submitted || 0,
-      indexNowRemaining: results.indexNow?.remaining || 0,
-      errors: allErrors,
-    })
-
-    // Prune cron logs older than 24 hours
-    await pruneCronRunsByAge(event)
-  }
-
-  // Release cron lock
-  await releaseCronLock(event)
-
-  // Summary log
-  if (debug) {
-    const duration = Date.now() - startTime
-    const parts = []
-    if (results.stale?.action !== 'none')
-      parts.push(results.stale?.action)
-    if (results.sitemap?.name)
-      parts.push(`pinged ${results.sitemap.name}`)
-    if (results.index?.indexed)
-      parts.push(`${results.index.indexed} indexed`)
-    if (results.indexNow?.submitted)
-      parts.push(`${results.indexNow.submitted} submitted to IndexNow`)
-    if (allErrors.length > 0)
-      parts.push(`${allErrors.length} errors`)
-    logger.info(`[cron] Complete in ${duration}ms${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`)
-  }
-
-  return results
 }
 
 /**

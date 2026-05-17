@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.3.4...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.4...main)
+
+### 🩹 Fixes
+
+- **markdown:** URL-encode paths in Link header to keep ASCII-only ([60b1616](https://github.com/harlan-zw/nuxt-ai-ready/commit/60b1616))
+
+### 🏡 Chore
+
+- Lint ([bb75337](https://github.com/harlan-zw/nuxt-ai-ready/commit/bb75337))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.2...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.2...main)
