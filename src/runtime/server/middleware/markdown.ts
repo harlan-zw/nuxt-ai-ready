@@ -193,7 +193,10 @@ export default defineEventHandler(async (event) => {
 
   // Resolve last_updated: DB (authoritative, set at index time) → page meta tags
   // → request time. The DB lookup keeps the timestamp stable across requests.
-  const dbPage = await queryPages(event, { route: path }).catch(() => undefined) as { updatedAt?: string } | undefined
+  const dbPage = await queryPages(event, { route: path }).catch((err) => {
+    logger.debug(`[markdown] DB lookup failed for ${path}:`, err)
+    return undefined
+  }) as { updatedAt?: string } | undefined
   const lastUpdated = dbPage?.updatedAt || extractLastUpdated(html) || new Date().toISOString()
 
   // Convert via mdream; pass canonical_url + last_updated through additionalFields

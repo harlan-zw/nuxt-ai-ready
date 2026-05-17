@@ -136,8 +136,8 @@ describe('static IndexNow flow (integration)', () => {
     mockIndexNowServer?.close()
     staticServer?.close()
     // Clean up temp dir
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {})
-    await rm(join(tempDir, '../.pages-layer'), { recursive: true, force: true }).catch(() => {})
+    await rm(tempDir, { recursive: true, force: true })
+    await rm(join(tempDir, '../.pages-layer'), { recursive: true, force: true })
   })
 
   it('first build skips IndexNow (no previous meta)', async () => {
@@ -222,8 +222,8 @@ export default defineNuxtConfig({
     indexNowRequests = []
 
     // Clear Nuxt build cache to ensure fresh compilation
-    await rm(join(tempDir, 'node_modules/.cache/nuxt'), { recursive: true, force: true }).catch(() => {})
-    await rm(join(tempDir, '.nuxt'), { recursive: true, force: true }).catch(() => {})
+    await rm(join(tempDir, 'node_modules/.cache/nuxt'), { recursive: true, force: true })
+    await rm(join(tempDir, '.nuxt'), { recursive: true, force: true })
 
     try {
       // Run second build with test endpoint override

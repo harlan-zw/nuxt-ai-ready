@@ -16,7 +16,10 @@ export default eventHandler(async (event) => {
     const m = await import('#ai-ready-virtual/devtools-meta.mjs')
     devtoolsMeta = m.devtoolsMeta
   }
-  catch {}
+  catch {
+    // Virtual devtools-meta is only emitted when the module sets it up;
+    // absence just means we fall back to the default disabled metadata above.
+  }
 
   const response: Record<string, unknown> = {
     version: runtimeConfig.version,
@@ -54,7 +57,10 @@ export default eventHandler(async (event) => {
         updatedAt: p.updatedAt,
       }))
     }
-    catch {}
+    catch {
+      // Stats/page listing is best-effort for the devtools panel; if the DB
+      // is unavailable in production we just omit the stats fields.
+    }
   }
 
   setHeader(event, 'Content-Type', 'application/json; charset=utf-8')

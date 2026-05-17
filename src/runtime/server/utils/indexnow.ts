@@ -36,7 +36,10 @@ interface BackoffInfo {
 }
 
 async function getBackoffInfo(event: H3Event | undefined): Promise<BackoffInfo | null> {
-  const value = await getInfoValue(event, 'indexnow_backoff').catch(() => null)
+  const value = await getInfoValue(event, 'indexnow_backoff').catch((err) => {
+    logger.debug('[indexnow] Failed to read backoff state:', err)
+    return null
+  })
   if (!value)
     return null
 
@@ -45,10 +48,14 @@ async function getBackoffInfo(event: H3Event | undefined): Promise<BackoffInfo |
 
 async function setBackoffInfo(event: H3Event | undefined, info: BackoffInfo | null): Promise<void> {
   if (info) {
-    await setInfoValue(event, 'indexnow_backoff', JSON.stringify(info)).catch(() => {})
+    await setInfoValue(event, 'indexnow_backoff', JSON.stringify(info)).catch((err) => {
+      logger.debug('[indexnow] Failed to persist backoff state:', err)
+    })
   }
   else {
-    await deleteInfoValue(event, 'indexnow_backoff').catch(() => {})
+    await deleteInfoValue(event, 'indexnow_backoff').catch((err) => {
+      logger.debug('[indexnow] Failed to clear backoff state:', err)
+    })
   }
 }
 

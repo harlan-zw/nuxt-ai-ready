@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v1.3.1...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.1...main)
+
+### 🩹 Fixes
+
+- Honor markdown header ([#26](https://github.com/harlan-zw/nuxt-ai-ready/pull/26))
+
+### ❤️ Contributors
+
+- Divine ([@divine](https://github.com/divine))
+
 ## v1.2.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.2.0...main)

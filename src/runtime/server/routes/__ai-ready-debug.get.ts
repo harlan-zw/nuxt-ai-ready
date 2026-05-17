@@ -283,7 +283,10 @@ export default eventHandler(async (event) => {
           try {
             parsed = JSON.parse(backoffRow.value)
           }
-          catch {}
+          catch {
+            // Malformed backoff JSON in the info table is treated as no backoff;
+            // the next setBackoffInfo() call will overwrite it.
+          }
           const now = Date.now()
           if (parsed && parsed.until > now) {
             backoffInfo = {
