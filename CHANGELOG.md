@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.3.2...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.2...main)
+
+### 🩹 Fixes
+
+- **indexnow:** Chunk route IN clause to respect D1 100-param cap ([16257d6](https://github.com/harlan-zw/nuxt-ai-ready/commit/16257d6))
+
+### 🏡 Chore
+
+- Bump ([3f9e01f](https://github.com/harlan-zw/nuxt-ai-ready/commit/3f9e01f))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.1...main)

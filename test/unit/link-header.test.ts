@@ -5,17 +5,25 @@ import { buildLinkHeader } from '../../src/runtime/server/utils/link-header'
 
 const baseConfig = {} as ModulePublicRuntimeConfig
 
+function isAscii(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 127)
+      return false
+  }
+  return true
+}
+
 describe('buildLinkHeader', () => {
   it('emits ASCII-only Link header for paths with non-Latin characters (html variant)', () => {
     const header = buildLinkHeader('/gh/owner/repo/skill:中文.md', 'html', baseConfig)
-    expect(/[^\x00-\x7F]/.test(header)).toBe(false)
+    expect(isAscii(header)).toBe(true)
     expect(header).toContain('rel="alternate"')
     expect(header).toContain('type="text/markdown"')
   })
 
   it('emits ASCII-only Link header for paths with non-Latin characters (markdown variant)', () => {
     const header = buildLinkHeader('/gh/luoyuweidu1/podcastcut-skills/podcastcut:后期', 'markdown', baseConfig)
-    expect(/[^\x00-\x7F]/.test(header)).toBe(false)
+    expect(isAscii(header)).toBe(true)
     expect(header).toContain('rel="alternate"')
     expect(header).toContain('type="text/html"')
   })
@@ -36,6 +44,6 @@ describe('buildLinkHeader', () => {
     }
     const config = { i18n } as ModulePublicRuntimeConfig
     const header = buildLinkHeader('/page:日本.md', 'html', config)
-    expect(/[^\x00-\x7F]/.test(header)).toBe(false)
+    expect(isAscii(header)).toBe(true)
   })
 })
