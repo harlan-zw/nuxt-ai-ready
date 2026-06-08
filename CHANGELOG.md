@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.3.6...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.6...main)
+
+### 🩹 Fixes
+
+- Possible CI hang ([60fd4c6](https://github.com/harlan-zw/nuxt-ai-ready/commit/60fd4c6))
+
+### 🏡 Chore
+
+- Bump ([07b3cf9](https://github.com/harlan-zw/nuxt-ai-ready/commit/07b3cf9))
+- Bump ([8bee5c8](https://github.com/harlan-zw/nuxt-ai-ready/commit/8bee5c8))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.4...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.4...main)
