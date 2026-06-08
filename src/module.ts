@@ -8,7 +8,7 @@ import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
-import { readPackageJSON } from 'pkg-types'
+import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
@@ -180,6 +180,24 @@ export default defineNuxtModule<ModuleOptions>({
       }
     }
     // Database type is passed to runtime config - the drizzle client handles provider selection
+
+    // The sqlite provider drives drizzle through better-sqlite3, but it's an
+    // optional peer (drizzle has no node:sqlite driver), so package managers
+    // won't auto-install it. Resolve it from the app now and fail fast with an
+    // actionable message instead of a cryptic runtime "Cannot find package
+    // 'better-sqlite3'" during indexing in production builds (#557).
+    if (dbType === 'sqlite') {
+      const hasBetterSqlite3 = await resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
+        .then(() => true)
+        .catch(() => false)
+      if (!hasBetterSqlite3) {
+        throw new Error(
+          `[nuxt-ai-ready] The SQLite database driver requires "better-sqlite3", which isn't installed. `
+          + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
+          + `For serverless/edge deployments set \`aiReady.database.type\` to 'd1' (Cloudflare), 'neon' (Postgres), 'libsql' (Turso), or 'bun' instead.`,
+        )
+      }
+    }
 
     // set default MCP name
     if (nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
