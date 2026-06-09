@@ -117,6 +117,7 @@
     "nitropack": "catalog:",
     "nuxt": "catalog:nuxt",
     "nuxt-site-config": "catalog:nuxt",
+    "nuxtseo-layer-devtools": "catalog:",
     "playwright": "catalog:dev-test",
     "playwright-core": "catalog:dev-test",
     "tinyglobby": "catalog:",

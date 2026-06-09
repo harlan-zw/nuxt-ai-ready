@@ -2,6 +2,9 @@
 
 catalogMode: prefer
 cleanupUnusedCatalogs: true
+minimumReleaseAgeExclude:
+  - nuxtseo-layer-devtools@5.2.0
+  - nuxtseo-shared@5.2.0
 shellEmulator: true
 
 trustPolicy: no-downgrade
@@ -32,6 +35,7 @@ catalog:
   execa: ^9.6.1
   mdream: ^1.2.2
   nitropack: ^2.13.4
+  nuxtseo-layer-devtools: ^5.2.0
   nuxtseo-shared: ^5.2.0
   pathe: ^2.0.3
   pkg-types: ^2.3.1
@@ -93,5 +97,3 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
-minimumReleaseAgeExclude:
-  - nuxtseo-shared@5.2.0
