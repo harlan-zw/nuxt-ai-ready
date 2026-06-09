@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed, inject } from 'vue'
-import { GlobalDataKey } from '../composables/types'
+import { GlobalDataKey } from '../../lib/ai-ready/types'
 
 const globalData = inject(GlobalDataKey)
 const config = computed(() => globalData?.value?.config)

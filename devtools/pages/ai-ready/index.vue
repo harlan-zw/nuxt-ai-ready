@@ -3,7 +3,8 @@ import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { hasProductionUrl, isProductionMode, previewSource } from 'nuxtseo-layer-devtools/composables/state'
 import { computed, inject, ref } from 'vue'
 import { useAsyncData } from '#imports'
-import { GlobalDataKey } from '../composables/types'
+import AiReadyPanel from '../../components/ai-ready/AiReadyPanel.vue'
+import { GlobalDataKey } from '../../lib/ai-ready/types'
 
 const globalData = inject(GlobalDataKey)
 const isDev = computed(() => globalData?.value?.isDev ?? true)
@@ -157,7 +158,7 @@ const { data: markdownContent, status: mdStatus } = useAsyncData('page-markdown'
       />
 
       <!-- Markdown preview panel -->
-      <DevtoolsPanel
+      <AiReadyPanel
         v-if="selectedRoute"
         :title="`${selectedRoute}.md`"
         icon="carbon:document"
@@ -172,7 +173,7 @@ const { data: markdownContent, status: mdStatus } = useAsyncData('page-markdown'
         <p v-else class="text-xs text-[var(--color-text-muted)] p-4">
           Could not load markdown for this route.
         </p>
-      </DevtoolsPanel>
+      </AiReadyPanel>
     </template>
   </div>
 </template>
