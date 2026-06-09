@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.3.7...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.7...main)
+
+### 🩹 Fixes
+
+- Fail fast when better-sqlite3 is missing for the sqlite driver ([#27](https://github.com/harlan-zw/nuxt-ai-ready/pull/27))
+
+### 🏡 Chore
+
+- Bump ([e5a096b](https://github.com/harlan-zw/nuxt-ai-ready/commit/e5a096b))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.6...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.6...main)
