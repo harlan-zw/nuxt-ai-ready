@@ -6,6 +6,7 @@ import { useRuntimeConfig } from 'nitropack/runtime'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { normalizeLlmsTxtConfig } from './llms-txt-format'
 import { queryPages } from './server/db/queries'
+import { logger } from './server/logger'
 import { localePath, resolveLocaleFromRoute } from './server/utils/i18n'
 import { fetchSitemapUrls } from './server/utils/sitemap'
 
@@ -225,12 +226,25 @@ export async function buildLlmsTxt(event: H3Event) {
   }
 
   // Pages section - combine prerendered pages + sitemap (SSR)
-  // Fetch pages (excludes errors by default) and sitemap URLs in parallel
-  const [pages, errorPages, urls] = await Promise.all([
-    queryPages(event) as Promise<PageEntry[]>,
-    queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
-    fetchSitemapUrls(event),
-  ])
+  // Fetch pages (excludes errors by default) and sitemap URLs in parallel.
+  // A database failure (e.g. read-only filesystem) must not 500 the route:
+  // degrade to sitemap-only pages so llms.txt still lists discoverable URLs.
+  const urlsPromise = fetchSitemapUrls(event)
+  let pages: PageEntry[] = []
+  let errorPages: PageEntry[] = []
+  try {
+    ;[pages, errorPages] = await Promise.all([
+      queryPages(event) as Promise<PageEntry[]>,
+      queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
+    ])
+  }
+  catch (err) {
+    logger.warn(
+      `[ai-ready] Database unavailable for llms.txt, falling back to sitemap-only pages: `
+      + `${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+  const urls = await urlsPromise
 
   // Build prerendered list and track seen/error paths
   const seenPaths = new Set<string>()

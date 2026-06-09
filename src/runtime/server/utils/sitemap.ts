@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
+import { isSitemapIndex, parseSitemapIndex, parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
 import { logger } from '../logger'
@@ -80,6 +80,7 @@ function normalizeUrls(urls: unknown[]): SitemapUrl[] {
 export async function fetchSitemapByRoute(
   event: H3Event | undefined,
   route: string,
+  depth = 0,
 ): Promise<{ urls: SitemapUrl[], error?: string }> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const fetchRoute = withLeadingSlash(route)
@@ -119,6 +120,37 @@ export async function fetchSitemapByRoute(
   }
 
   logger.debug(`[sitemap] Parsing sitemap XML (${sitemapXml.length} bytes)`)
+
+  // Sitemap index (i18n / multi-sitemap sites): /sitemap.xml points to child
+  // sitemaps rather than listing <url> entries. Follow the children so llms.txt
+  // and runtime indexing see the actual page URLs.
+  if (isSitemapIndex(sitemapXml)) {
+    if (depth >= 3) {
+      logger.warn(`[sitemap] Sitemap index nesting too deep at ${fetchRoute}, stopping`)
+      return { urls: [] }
+    }
+    let index: { entries: { loc: string }[] }
+    try {
+      index = await parseSitemapIndex(sitemapXml)
+    }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      logger.warn(`[sitemap] Failed to parse sitemap index ${fetchRoute}: ${msg}`)
+      return { urls: [], error: msg }
+    }
+
+    logger.debug(`[sitemap] ${fetchRoute} is a sitemap index with ${index.entries.length} children`)
+    const allUrls: SitemapUrl[] = []
+    for (const entry of index.entries) {
+      const childRoute = entry.loc.startsWith('http') ? new URL(entry.loc).pathname : entry.loc
+      // Avoid re-fetching the index itself (self-referencing or normalised duplicate)
+      if (withLeadingSlash(childRoute) === fetchRoute)
+        continue
+      const { urls } = await fetchSitemapByRoute(event, childRoute, depth + 1)
+      allUrls.push(...urls)
+    }
+    return { urls: allUrls }
+  }
 
   let result: { urls?: unknown[] }
   try {
