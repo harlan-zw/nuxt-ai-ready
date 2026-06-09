@@ -1,8 +1,0 @@
-{
-  "name": "nuxt-ai-ready-devtools",
-  "type": "module",
-  "private": true,
-  "dependencies": {
-    "nuxtseo-layer-devtools": "catalog:"
-  }
-}

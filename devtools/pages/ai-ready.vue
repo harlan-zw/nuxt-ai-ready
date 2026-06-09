@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import type { DevtoolsGlobalData } from './composables/types'
+import type { DevtoolsGlobalData } from '../lib/ai-ready/types'
 import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { productionUrl, refreshTime } from 'nuxtseo-layer-devtools/composables/state'
 import { computed, provide, useAsyncData, useNuxtApp, useRoute, watch } from '#imports'
-import { GlobalDataKey, GlobalDataStatusKey } from './composables/types'
+import { GlobalDataKey, GlobalDataStatusKey } from '../lib/ai-ready/types'
 
 const nuxtApp = useNuxtApp()
 nuxtApp.payload.data = nuxtApp.payload.data || {}
 
-const { data: globalData, status } = useAsyncData<DevtoolsGlobalData | null>('global-data', () => {
+const { data: globalData, status } = useAsyncData<DevtoolsGlobalData | null>('ai-ready-global-data', () => {
   if (!appFetch.value)
     return Promise.resolve(null)
   return appFetch.value('/__ai-ready/devtools', { responseType: 'json' })
@@ -28,20 +28,20 @@ provide(GlobalDataStatusKey, status)
 const route = useRoute()
 const currentTab = computed(() => {
   const path = route.path
-  if (path === '/llms-txt')
+  if (path === '/ai-ready/llms-txt')
     return 'llms-txt'
-  if (path === '/debug')
+  if (path === '/ai-ready/debug')
     return 'debug'
-  if (path === '/docs')
+  if (path === '/ai-ready/docs')
     return 'docs'
   return 'pages'
 })
 
 const navItems = [
-  { value: 'pages', to: '/', icon: 'carbon:list', label: 'Pages' },
-  { value: 'llms-txt', to: '/llms-txt', icon: 'carbon:document', label: 'llms.txt' },
-  { value: 'debug', to: '/debug', icon: 'carbon:debug', label: 'Debug' },
-  { value: 'docs', to: '/docs', icon: 'carbon:book', label: 'Docs' },
+  { value: 'pages', to: '/ai-ready', icon: 'carbon:list', label: 'Pages' },
+  { value: 'llms-txt', to: '/ai-ready/llms-txt', icon: 'carbon:document', label: 'llms.txt' },
+  { value: 'debug', to: '/ai-ready/debug', icon: 'carbon:debug', label: 'Debug' },
+  { value: 'docs', to: '/ai-ready/docs', icon: 'carbon:book', label: 'Docs' },
 ]
 
 const runtimeVersion = computed(() => globalData.value?.version || 'unknown')

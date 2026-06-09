@@ -1,36 +1,7 @@
 import { resolve } from 'pathe'
 
+// Nuxt SEO devtools panel, shipped as a layer (Model C). Components flat-registered
+// so intra-panel references resolve by name.
 export default defineNuxtConfig({
-  extends: ['nuxtseo-layer-devtools'],
-
-  aiReady: false,
-  robots: false,
-  sitemap: false,
-  site: false,
-  mcp: false,
-
-  imports: {
-    autoImport: true,
-  },
-
-  nitro: {
-    prerender: {
-      routes: ['/', '/llms-txt', '/pages', '/docs'],
-    },
-    output: {
-      publicDir: resolve(__dirname, '../dist/devtools'),
-    },
-  },
-
-  vite: {
-    optimizeDeps: {
-      include: [
-        '@vueuse/core',
-      ],
-    },
-  },
-
-  app: {
-    baseURL: '/__nuxt-ai-ready',
-  },
+  components: [{ path: resolve(__dirname, './components'), pathPrefix: false }],
 })
