@@ -76,6 +76,25 @@ describe('fetchSitemapByRoute', () => {
     ])
   })
 
+  it('returns an error (with partial urls) when a child sitemap fails', async () => {
+    // en.xml is served, fr.xml 404s -> we keep en's urls but surface the failure
+    // so the cron path does not record a clean crawl and prune on partial data.
+    const event = mockEvent({
+      '/sitemap.xml': INDEX,
+      '/__sitemap__/en.xml': URLSET,
+      // fr.xml intentionally missing
+    })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(error).toBeDefined()
+    expect(error).toContain('/__sitemap__/fr.xml')
+    expect(urls.map(u => u.loc)).toEqual([
+      'https://example.com/about',
+      'https://example.com/contact',
+    ])
+  })
+
   it('does not recurse into itself', async () => {
     // Index whose only child resolves to the same route it was fetched from
     const selfIndex = `<?xml version="1.0" encoding="UTF-8"?>

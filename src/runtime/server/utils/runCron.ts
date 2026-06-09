@@ -266,9 +266,12 @@ async function pingSitemap(
     await markSitemapCrawled(event, nextSitemap.name, urls.length)
   }
 
-  // Prune stale routes if configured
+  // Prune stale routes if configured, but only after a clean crawl. A failed or
+  // partial crawl (e.g. a child sitemap 404'd) means some routes' last_seen_at
+  // wasn't refreshed; pruning on that incomplete evidence could delete live
+  // routes whose sitemap simply failed to load this run.
   let pruned = 0
-  if (pruneTtl > 0) {
+  if (pruneTtl > 0 && !error) {
     pruned = await pruneStaleRoutes(event, pruneTtl)
   }
 
