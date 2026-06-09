@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
+import { isSitemapIndex, parseSitemapIndex, parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
 import { logger } from '../logger'
@@ -80,6 +80,7 @@ function normalizeUrls(urls: unknown[]): SitemapUrl[] {
 export async function fetchSitemapByRoute(
   event: H3Event | undefined,
   route: string,
+  depth = 0,
 ): Promise<{ urls: SitemapUrl[], error?: string }> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const fetchRoute = withLeadingSlash(route)
@@ -120,6 +121,48 @@ export async function fetchSitemapByRoute(
 
   logger.debug(`[sitemap] Parsing sitemap XML (${sitemapXml.length} bytes)`)
 
+  // Sitemap index (i18n / multi-sitemap sites): /sitemap.xml points to child
+  // sitemaps rather than listing <url> entries. Follow the children so llms.txt
+  // and runtime indexing see the actual page URLs.
+  if (isSitemapIndex(sitemapXml)) {
+    if (depth >= 3) {
+      logger.warn(`[sitemap] Sitemap index nesting too deep at ${fetchRoute}, stopping`)
+      return { urls: [] }
+    }
+    let index: { entries: { loc: string }[] }
+    try {
+      index = await parseSitemapIndex(sitemapXml)
+    }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      logger.warn(`[sitemap] Failed to parse sitemap index ${fetchRoute}: ${msg}`)
+      return { urls: [], error: msg }
+    }
+
+    logger.debug(`[sitemap] ${fetchRoute} is a sitemap index with ${index.entries.length} children`)
+    const allUrls: SitemapUrl[] = []
+    const childErrors: string[] = []
+    for (const entry of index.entries) {
+      const childRoute = entry.loc.startsWith('http') ? new URL(entry.loc).pathname : entry.loc
+      // Avoid re-fetching the index itself (self-referencing or normalised duplicate)
+      if (withLeadingSlash(childRoute) === fetchRoute)
+        continue
+      // Keep any URLs we did get, but record child failures so the caller does
+      // not treat a partial/empty crawl as a clean, complete one (which would
+      // let stale-route pruning act on incomplete evidence).
+      const { urls, error } = await fetchSitemapByRoute(event, childRoute, depth + 1)
+      allUrls.push(...urls)
+      if (error)
+        childErrors.push(`${withLeadingSlash(childRoute)}: ${error}`)
+    }
+    if (childErrors.length > 0) {
+      const msg = `${childErrors.length}/${index.entries.length} child sitemaps failed (${childErrors.join('; ')})`
+      logger.warn(`[sitemap] Sitemap index ${fetchRoute}: ${msg}`)
+      return { urls: allUrls, error: msg }
+    }
+    return { urls: allUrls }
+  }
+
   let result: { urls?: unknown[] }
   try {
     result = await parseSitemapXml(sitemapXml)
@@ -149,10 +192,11 @@ export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
     const allUrls: SitemapUrl[] = []
 
     for (const sitemap of sitemaps) {
-      const { urls, error } = await fetchSitemapByRoute(event, sitemap.route)
-      if (!error) {
-        allUrls.push(...urls)
-      }
+      // Include whatever URLs we got even on a partial failure: for llms.txt a
+      // partial page list beats none. The error is already logged downstream and
+      // matters to the cron crawl-status path, not to URL aggregation here.
+      const { urls } = await fetchSitemapByRoute(event, sitemap.route)
+      allUrls.push(...urls)
     }
 
     return allUrls
