@@ -1,5 +1,3 @@
-import type { InjectionKey, Ref } from 'vue'
-
 export interface DevtoolsConfig {
   database: { type: string }
   runtimeSync: { enabled: boolean, ttl: number, batchSize: number, pruneTtl: number }
@@ -50,6 +48,3 @@ export interface DevtoolsGlobalData {
   }
   pages?: PageSummary[]
 }
-
-export const GlobalDataKey: InjectionKey<Ref<DevtoolsGlobalData | null | undefined>> = Symbol('GlobalData')
-export const GlobalDataStatusKey: InjectionKey<Ref<string>> = Symbol('GlobalDataStatus')

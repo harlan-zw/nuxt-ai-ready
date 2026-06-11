@@ -1,29 +1,9 @@
 <script lang="ts" setup>
-import type { DevtoolsGlobalData } from '../lib/ai-ready/types'
-import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
-import { productionUrl, refreshTime } from 'nuxtseo-layer-devtools/composables/state'
-import { computed, provide, useAsyncData, useNuxtApp, useRoute, watch } from '#imports'
-import { GlobalDataKey, GlobalDataStatusKey } from '../lib/ai-ready/types'
-
-const nuxtApp = useNuxtApp()
-nuxtApp.payload.data = nuxtApp.payload.data || {}
-
-const { data: globalData, status } = useAsyncData<DevtoolsGlobalData | null>('ai-ready-global-data', () => {
-  if (!appFetch.value)
-    return Promise.resolve(null)
-  return appFetch.value('/__ai-ready/devtools', { responseType: 'json' })
-}, {
-  watch: [appFetch, refreshTime],
-})
-
-// Set production URL from site config for the production toggle
-watch(globalData, (val) => {
-  if (val?.siteConfigUrl)
-    productionUrl.value = val.siteConfigUrl
-}, { immediate: true })
-
-provide(GlobalDataKey, globalData)
-provide(GlobalDataStatusKey, status)
+import { isProductionMode } from 'nuxtseo-layer-devtools/composables/state'
+import { computed, watch } from 'vue'
+import { navigateTo, useRoute } from '#imports'
+import { data, loading, refreshSources } from '../lib/ai-ready/state'
+import '../lib/ai-ready/rpc'
 
 const route = useRoute()
 const currentTab = computed(() => {
@@ -38,13 +18,19 @@ const currentTab = computed(() => {
 })
 
 const navItems = [
-  { value: 'pages', to: '/ai-ready', icon: 'carbon:list', label: 'Pages' },
-  { value: 'llms-txt', to: '/ai-ready/llms-txt', icon: 'carbon:document', label: 'llms.txt' },
-  { value: 'debug', to: '/ai-ready/debug', icon: 'carbon:debug', label: 'Debug' },
-  { value: 'docs', to: '/ai-ready/docs', icon: 'carbon:book', label: 'Docs' },
+  { value: 'pages', to: '/ai-ready', icon: 'carbon:list', label: 'Pages', devOnly: false },
+  { value: 'llms-txt', to: '/ai-ready/llms-txt', icon: 'carbon:document', label: 'llms.txt', devOnly: false },
+  { value: 'debug', to: '/ai-ready/debug', icon: 'carbon:debug', label: 'Debug', devOnly: true },
+  { value: 'docs', to: '/ai-ready/docs', icon: 'carbon:book', label: 'Docs', devOnly: false },
 ]
 
-const runtimeVersion = computed(() => globalData.value?.version || 'unknown')
+const runtimeVersion = computed(() => data.value?.version || 'unknown')
+
+// Debug data is dev-only; leave the debug tab when the header switches to Production
+watch(isProductionMode, (isProd) => {
+  if (isProd && currentTab.value === 'debug')
+    return navigateTo('/ai-ready')
+})
 </script>
 
 <template>
@@ -55,9 +41,9 @@ const runtimeVersion = computed(() => globalData.value?.version || 'unknown')
     :version="runtimeVersion"
     :nav-items="navItems"
     github-url="https://github.com/harlan-zw/nuxt-ai-ready"
-    :loading="status === 'pending'"
+    :loading="loading"
     :active-tab="currentTab"
-    @refresh="refreshTime = Date.now()"
+    @refresh="refreshSources"
   >
     <NuxtPage />
   </DevtoolsLayout>

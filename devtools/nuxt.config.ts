@@ -1,7 +1,3 @@
-import { resolve } from 'pathe'
-
-// Nuxt SEO devtools panel, shipped as a layer (Model C). Components flat-registered
-// so intra-panel references resolve by name.
-export default defineNuxtConfig({
-  components: [{ path: resolve(__dirname, './components'), pathPrefix: false }],
-})
+// Nuxt SEO devtools panel, shipped as a layer (Model C). The unified devtools client
+// (assembled by nuxtseo-shared in the user's project) extends this to render /ai-ready.
+export default defineNuxtConfig({})
