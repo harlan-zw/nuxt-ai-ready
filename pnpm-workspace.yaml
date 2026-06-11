@@ -5,6 +5,10 @@ cleanupUnusedCatalogs: true
 minimumReleaseAgeExclude:
   - nuxtseo-layer-devtools
   - nuxtseo-shared
+  - '@nuxtjs/sitemap@8.2.0'
+  - nuxt-site-config-kit@4.1.0
+  - nuxt-site-config@4.1.0
+  - site-config-stack@4.1.0
 shellEmulator: true
 
 trustPolicy: no-downgrade
@@ -23,7 +27,7 @@ overrides:
   schema-utils>ajv: 8.14.0
 catalog:
   '@libsql/client': ^0.17.3
-  '@mdream/js': ^1.2.2
+  '@mdream/js': ^1.3.0
   '@types/better-sqlite3': ^7.6.13
   better-sqlite3: ^12.10.0
   bumpp: ^11.1.0
@@ -33,7 +37,7 @@ catalog:
   drizzle-orm: ^0.45.2
   eslint-plugin-harlanzw: ^0.17.0
   execa: ^9.6.1
-  mdream: ^1.2.2
+  mdream: ^1.3.0
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.2.6
   nuxtseo-shared: ^5.2.6
@@ -44,13 +48,13 @@ catalog:
   ufo: ^1.6.4
   unbuild: ^3.6.1
   uncrypto: ^0.1.3
-  wrangler: ^4.98.0
+  wrangler: ^4.99.0
   zod: ^4.4.3
 catalogs:
   dev-build:
     '@arethetypeswrong/cli': ^0.18.3
     typescript: ^6.0.3
-    vue-tsc: ^3.3.3
+    vue-tsc: ^3.3.4
   dev-lint:
     '@antfu/eslint-config': ^9.0.0
     '@nuxtjs/eslint-config-typescript': ^12.1.0
@@ -65,15 +69,15 @@ catalogs:
     vitest: ^4.1.8
   nuxt:
     '@nuxt/content': ^3.14.0
-    '@nuxt/kit': ^4.4.7
+    '@nuxt/kit': ^4.4.8
     '@nuxt/module-builder': ^1.0.2
     '@nuxt/ui': ^4.8.2
     '@nuxtjs/mcp-toolkit': ^0.17.2
     '@nuxtjs/robots': ^6.0.9
-    '@nuxtjs/sitemap': ^8.0.15
+    '@nuxtjs/sitemap': ^8.2.0
     '@vueuse/nuxt': ^14.3.0
-    nuxt: ^4.4.7
-    nuxt-site-config: ^4.0.8
+    nuxt: ^4.4.8
+    nuxt-site-config: ^4.1.0
   vue:
     vue: ^3.5.35
     vue-router: ^5.1.0
