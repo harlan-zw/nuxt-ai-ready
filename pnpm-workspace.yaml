@@ -35,8 +35,8 @@ catalog:
   execa: ^9.6.1
   mdream: ^1.2.2
   nitropack: ^2.13.4
-  nuxtseo-layer-devtools: ^5.2.4
-  nuxtseo-shared: ^5.2.4
+  nuxtseo-layer-devtools: ^5.2.5
+  nuxtseo-shared: ^5.2.5
   pathe: ^2.0.3
   pkg-types: ^2.3.1
   site-config-stack: ^4.0.8
