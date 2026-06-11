@@ -46,11 +46,11 @@ catalogs:
       specifier: ^2.13.4
       version: 2.13.4
     nuxtseo-layer-devtools:
-      specifier: ^5.2.5
-      version: 5.2.5
+      specifier: ^5.2.6
+      version: 5.2.6
     nuxtseo-shared:
-      specifier: ^5.2.5
-      version: 5.2.5
+      specifier: ^5.2.6
+      version: 5.2.6
     pathe:
       specifier: ^2.0.3
       version: 2.0.3
@@ -197,7 +197,7 @@ importers:
         version: 4.0.8(4b22a0528b8e121c1fc95c5476c53687)
       nuxtseo-shared:
         specifier: 'catalog:'
-        version: 5.2.5(08161ff555d90e96dd686325506cf8d9)
+        version: 5.2.6(08161ff555d90e96dd686325506cf8d9)
       pathe:
         specifier: 'catalog:'
         version: 2.0.3
@@ -282,7 +282,7 @@ importers:
         version: 4.4.7(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@libsql/client@0.17.3)(@parcel/watcher@2.5.6)(@types/node@25.5.0)(@vue/compiler-sfc@3.5.35)(better-sqlite3@12.10.0)(cac@6.7.14)(db0@0.3.4(@libsql/client@0.17.3)(better-sqlite3@12.10.0)(drizzle-orm@0.45.2(@libsql/client@0.17.3)(@neondatabase/serverless@1.0.2)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.10.0)))(drizzle-orm@0.45.2(@libsql/client@0.17.3)(@neondatabase/serverless@1.0.2)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.10.0))(eslint@10.4.1(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.3))(rollup@4.60.3)(terser@5.46.1)(typescript@6.0.3)(vite@7.3.3(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.9.0))(vue-tsc@3.3.3(typescript@6.0.3))(yaml@2.9.0)
       nuxtseo-layer-devtools:
         specifier: 'catalog:'
-        version: 5.2.5(7d5dabf02bfdef2ad219155109e12e4d)
+        version: 5.2.6(7d5dabf02bfdef2ad219155109e12e4d)
       playwright:
         specifier: catalog:dev-test
         version: 1.60.0
@@ -7015,11 +7015,11 @@ packages:
       '@types/node':
         optional: true
 
-  nuxtseo-layer-devtools@5.2.5:
-    resolution: {integrity: sha512-qKV2oUfH+NgZHTGfhGPv9vDFnhay6wtdmH468am5zi3etP4B4sA2SS3TLTHcraZ6+LKofLAIZS7m4Ny3EOJdKg==}
+  nuxtseo-layer-devtools@5.2.6:
+    resolution: {integrity: sha512-10DH8fDa7xMVD+YyTK2pT7XGBZcWskiiUU5zMgvFNDjKrag+ajT+R91ulCIMsiv0lw4YEI3cdX82Q0TzbHCdzA==}
 
-  nuxtseo-shared@5.2.4:
-    resolution: {integrity: sha512-BGlPZcj3brZxeNrfWZpiiECJDj5Jh8x8UR+f1BuXWgJ14xAnHca0QsBm/dZ1tqrw4HkvJGA9C5pvyrdQ7CRtDw==}
+  nuxtseo-shared@5.2.5:
+    resolution: {integrity: sha512-ZE/daHUgOGzxfPNLPK/BE07itpInUuWDi+70Ut1nCtuMqsGEJer7X51oYDdMW3E75Gazjkfb8PkYcHwNhp3uiw==}
     peerDependencies:
       '@nuxt/schema': ^3.16.0 || ^4.0.0
       nuxt: ^3.16.0 || ^4.0.0
@@ -7032,8 +7032,8 @@ packages:
       zod:
         optional: true
 
-  nuxtseo-shared@5.2.5:
-    resolution: {integrity: sha512-ZE/daHUgOGzxfPNLPK/BE07itpInUuWDi+70Ut1nCtuMqsGEJer7X51oYDdMW3E75Gazjkfb8PkYcHwNhp3uiw==}
+  nuxtseo-shared@5.2.6:
+    resolution: {integrity: sha512-l64OFIN+uSCTQtKeirV4n6xhcZx6g8kf775Ma7wo1G/aVWwKOGLur+Giqhfle9bDKDDCrNzTidObovgEoq9f6Q==}
     peerDependencies:
       '@nuxt/schema': ^3.16.0 || ^4.0.0
       nuxt: ^3.16.0 || ^4.0.0
@@ -11402,7 +11402,7 @@ snapshots:
       defu: 6.1.7
       h3: 1.15.11
       nuxt-site-config: 4.0.8(4b22a0528b8e121c1fc95c5476c53687)
-      nuxtseo-shared: 5.2.4(08161ff555d90e96dd686325506cf8d9)
+      nuxtseo-shared: 5.2.5(08161ff555d90e96dd686325506cf8d9)
       pathe: 2.0.3
       pkg-types: 2.3.1
       ufo: 1.6.4
@@ -11422,7 +11422,7 @@ snapshots:
       defu: 6.1.7
       fast-xml-parser: 5.7.3
       nuxt-site-config: 4.0.8(4b22a0528b8e121c1fc95c5476c53687)
-      nuxtseo-shared: 5.2.4(08161ff555d90e96dd686325506cf8d9)
+      nuxtseo-shared: 5.2.5(08161ff555d90e96dd686325506cf8d9)
       ofetch: 1.5.1
       pathe: 2.0.3
       pkg-types: 2.3.1
@@ -16725,7 +16725,7 @@ snapshots:
       '@nuxt/kit': 4.4.5(magicast@0.5.2)
       h3: 1.15.11
       nuxt-site-config-kit: 4.0.8(magicast@0.5.2)(vue@3.5.35(typescript@6.0.3))
-      nuxtseo-shared: 5.2.4(08161ff555d90e96dd686325506cf8d9)
+      nuxtseo-shared: 5.2.5(08161ff555d90e96dd686325506cf8d9)
       pathe: 2.0.3
       pkg-types: 2.3.0
       site-config-stack: 4.0.8(vue@3.5.35(typescript@6.0.3))
@@ -16866,7 +16866,7 @@ snapshots:
       - xml2js
       - yaml
 
-  nuxtseo-layer-devtools@5.2.5(7d5dabf02bfdef2ad219155109e12e4d):
+  nuxtseo-layer-devtools@5.2.6(7d5dabf02bfdef2ad219155109e12e4d):
     dependencies:
       '@iconify-json/carbon': 1.2.23
       '@nuxt/devtools-kit': 4.0.0-alpha.3(magicast@0.5.2)(vite@7.3.3(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.9.0))
@@ -16876,7 +16876,7 @@ snapshots:
       '@shikijs/themes': 4.2.0
       '@vueuse/core': 14.3.0(vue@3.5.35(typescript@6.0.3))
       '@vueuse/nuxt': 14.3.0(magicast@0.5.2)(nuxt@4.4.7(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@libsql/client@0.17.3)(@parcel/watcher@2.5.6)(@types/node@25.5.0)(@vue/compiler-sfc@3.5.35)(better-sqlite3@12.10.0)(cac@6.7.14)(db0@0.3.4(@libsql/client@0.17.3)(better-sqlite3@12.10.0)(drizzle-orm@0.45.2(@libsql/client@0.17.3)(@neondatabase/serverless@1.0.2)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.10.0)))(drizzle-orm@0.45.2(@libsql/client@0.17.3)(@neondatabase/serverless@1.0.2)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.10.0))(eslint@10.4.1(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.3))(rollup@4.60.3)(terser@5.46.1)(typescript@6.0.3)(vite@7.3.3(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.9.0))(vue-tsc@3.3.3(typescript@6.0.3))(yaml@2.9.0))(vue@3.5.35(typescript@6.0.3))
-      nuxtseo-shared: 5.2.5(08161ff555d90e96dd686325506cf8d9)
+      nuxtseo-shared: 5.2.6(08161ff555d90e96dd686325506cf8d9)
       ofetch: 1.5.1
       shiki: 4.2.0
       tailwindcss: 4.3.0
@@ -16937,7 +16937,7 @@ snapshots:
       - yup
       - zod
 
-  nuxtseo-shared@5.2.4(08161ff555d90e96dd686325506cf8d9):
+  nuxtseo-shared@5.2.5(08161ff555d90e96dd686325506cf8d9):
     dependencies:
       '@clack/prompts': 1.5.1
       '@nuxt/devtools-kit': 4.0.0-alpha.3(magicast@0.5.2)(vite@7.3.3(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.9.0))
@@ -16962,7 +16962,7 @@ snapshots:
       - magicast
       - vite
 
-  nuxtseo-shared@5.2.5(08161ff555d90e96dd686325506cf8d9):
+  nuxtseo-shared@5.2.6(08161ff555d90e96dd686325506cf8d9):
     dependencies:
       '@clack/prompts': 1.5.1
       '@nuxt/devtools-kit': 4.0.0-alpha.3(magicast@0.5.2)(vite@7.3.3(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.1)(yaml@2.9.0))
