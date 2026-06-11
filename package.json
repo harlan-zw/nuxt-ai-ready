@@ -50,7 +50,7 @@
     "prepare:fixtures": "nuxt prepare playground && nuxt prepare playground && nuxt prepare test/fixtures/basic",
     "dev:build": "nuxt build playground",
     "dev:build:minimal": "nuxt build playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground && pnpm run build:devtools",
     "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",

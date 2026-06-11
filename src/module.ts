@@ -597,7 +597,7 @@ export async function lookupContentPage(event, path) {
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
 
     // Devtools API endpoint
-    addServerHandler({ route: '/__ai-ready/devtools', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
+    addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {

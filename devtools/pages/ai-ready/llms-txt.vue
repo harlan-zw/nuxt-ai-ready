@@ -1,12 +1,10 @@
 <script lang="ts" setup>
 import { appFetch } from 'nuxtseo-layer-devtools/composables/rpc'
 import { isProductionMode, refreshTime } from 'nuxtseo-layer-devtools/composables/state'
-import { computed, inject, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useAsyncData } from '#imports'
-import AiReadyPanel from '../../components/ai-ready/AiReadyPanel.vue'
-import { GlobalDataKey } from '../../lib/ai-ready/types'
+import { data as globalData } from '../../lib/ai-ready/state'
 
-const globalData = inject(GlobalDataKey)
 const isDev = computed(() => globalData?.value?.isDev ?? true)
 const llmsTxtConfig = computed(() => globalData?.value?.llmsTxt)
 
@@ -110,7 +108,7 @@ const templatePreview = computed(() => {
     </DevtoolsAlert>
 
     <!-- Content display -->
-    <AiReadyPanel :title="activeTab === 'llms-txt' ? 'llms.txt' : 'llms-full.txt'">
+    <DevtoolsPanel :title="activeTab === 'llms-txt' ? 'llms.txt' : 'llms-full.txt'">
       <!-- Loading state for llms-full.txt -->
       <div v-if="activeTab === 'llms-full' && fullStatus === 'pending'" class="py-8 text-center">
         <DevtoolsLoading />
@@ -135,7 +133,7 @@ const templatePreview = computed(() => {
           description="llms.txt content is generated during prerendering. Run `nuxi generate` or switch to production mode."
         />
       </template>
-    </AiReadyPanel>
+    </DevtoolsPanel>
 
     <!-- llms.txt Structure (always visible) -->
     <DevtoolsSection text="Configured Sections" icon="carbon:list-boxes">
