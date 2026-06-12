@@ -124,7 +124,7 @@
     "typescript": "catalog:dev-build",
     "unbuild": "catalog:",
     "vitest": "catalog:dev-test",
-    "vue": "catalog:vue",
+    "vue": "^3.5.38",
     "vue-router": "catalog:vue",
     "vue-tsc": "catalog:dev-build",
     "wrangler": "catalog:",
