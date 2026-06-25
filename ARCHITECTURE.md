@@ -501,6 +501,7 @@ The `contentSignal` option configures robots.txt directives for AI crawlers:
 ```typescript
 contentSignal: {
   aiTrain: true,   // Allow AI model training
+  contentUsage: true, // Emit Content-Usage directive
   search: true,    // Allow search indexing
   aiInput: true,   // Allow RAG/grounding
 }
@@ -512,6 +513,8 @@ User-agent: *
 Content-Usage: train-ai=y
 Content-Signal: ai-train=yes, search=yes, ai-input=yes
 ```
+
+Set `contentUsage: false` to omit the draft `Content-Usage` directive.
 
 ## MCP Integration
 
@@ -554,7 +557,7 @@ interface ModuleOptions {
   mdreamOptions?: MdreamOptions
   markdownCacheHeaders?: { maxAge?: number, swr?: boolean }
   llmsTxt?: LlmsTxtConfig
-  contentSignal?: false | { aiTrain?: boolean, search?: boolean, aiInput?: boolean }
+  contentSignal?: false | { aiTrain?: boolean, contentUsage?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
   llmsTxtCacheSeconds?: number
   database?: {
