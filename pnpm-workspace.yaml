@@ -32,15 +32,15 @@ packages:
   - playground
   - devtools
 overrides:
-  vue: ^3.5.38
   h3: ^1.15.11
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
+  vue: ^3.5.38
 catalog:
-  '@libsql/client': ^0.17.3
-  '@mdream/js': ^1.3.0
+  '@libsql/client': ^0.17.4
+  '@mdream/js': ^1.4.1
   '@types/better-sqlite3': ^7.6.13
-  better-sqlite3: ^12.10.0
+  better-sqlite3: ^12.11.1
   bumpp: ^11.1.0
   citty: ^0.2.2
   consola: ^3.4.2
@@ -48,7 +48,7 @@ catalog:
   drizzle-orm: ^0.45.2
   eslint-plugin-harlanzw: ^0.17.0
   execa: ^9.6.1
-  mdream: ^1.3.0
+  mdream: ^1.4.1
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.0
   nuxtseo-shared: ^5.3.0
@@ -59,33 +59,33 @@ catalog:
   ufo: ^1.6.4
   unbuild: ^3.6.1
   uncrypto: ^0.1.3
-  wrangler: ^4.99.0
+  wrangler: ^4.104.0
   zod: ^4.4.3
 catalogs:
   dev-build:
-    '@arethetypeswrong/cli': ^0.18.3
+    '@arethetypeswrong/cli': ^0.18.4
     typescript: ^6.0.3
-    vue-tsc: ^3.3.4
+    vue-tsc: ^3.3.5
   dev-lint:
-    '@antfu/eslint-config': ^9.0.0
+    '@antfu/eslint-config': ^9.1.0
     '@nuxtjs/eslint-config-typescript': ^12.1.0
-    eslint: ^10.4.1
+    eslint: ^10.5.0
   dev-test:
     '@nuxt/test-utils': ^4.0.3
-    '@vitest/coverage-v8': ^4.1.8
+    '@vitest/coverage-v8': ^4.1.9
     '@vue/test-utils': ^2.4.11
-    happy-dom: ^20.10.2
-    playwright: ^1.60.0
-    playwright-core: ^1.60.0
-    vitest: ^4.1.8
+    happy-dom: ^20.10.6
+    playwright: ^1.61.1
+    playwright-core: ^1.61.1
+    vitest: ^4.1.9
   nuxt:
     '@nuxt/content': ^3.14.0
     '@nuxt/kit': ^4.4.8
     '@nuxt/module-builder': ^1.0.2
-    '@nuxt/ui': ^4.8.2
+    '@nuxt/ui': ^4.9.0
     '@nuxtjs/mcp-toolkit': ^0.17.2
-    '@nuxtjs/robots': ^6.0.9
-    '@nuxtjs/sitemap': ^8.2.0
+    '@nuxtjs/robots': ^6.1.1
+    '@nuxtjs/sitemap': ^8.2.1
     '@vueuse/nuxt': ^14.3.0
     nuxt: ^4.4.8
     nuxt-site-config: ^4.1.0
@@ -111,3 +111,4 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
   workerd: true
+ workerd: true

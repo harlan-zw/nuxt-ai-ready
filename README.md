@@ -41,6 +41,8 @@ npx nuxi@latest module add nuxt-ai-ready
 > npx skilld add nuxt-ai-ready
 > ```
 
+💡 Made your site AI-ready? Preview how a page converts to LLM-readable markdown with the free [HTML→Markdown tool](https://nuxtseo.com/tools/html-to-markdown), or track how AI engines index, rank and cite your site with [Nuxt SEO Pro](https://nuxtseo.com/pro).
+
 ## Documentation
 
 [📖 Read the full documentation](https://nuxtseo.com/ai-ready) for more information.

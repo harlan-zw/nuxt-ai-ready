@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "1.4.0",
-  "packageManager": "pnpm@11.5.3",
+  "packageManager": "pnpm@11.9.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",
@@ -124,7 +124,7 @@
     "typescript": "catalog:dev-build",
     "unbuild": "catalog:",
     "vitest": "catalog:dev-test",
-    "vue": "^3.5.38",
+    "vue": "catalog:",
     "vue-router": "catalog:vue",
     "vue-tsc": "catalog:dev-build",
     "wrangler": "catalog:",

@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v1.3.9...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.9...main)
+
+### 🚀 Enhancements
+
+- **devtools:** Ship devtools as a layer ([#29](https://github.com/harlan-zw/nuxt-ai-ready/pull/29))
+
+### 💅 Refactors
+
+- **devtools:** State.ts/rpc.ts pattern + dedupe panel + ^5.2.4 ([#30](https://github.com/harlan-zw/nuxt-ai-ready/pull/30))
+
+### 🏡 Chore
+
+- Bump deps ([05d15a3](https://github.com/harlan-zw/nuxt-ai-ready/commit/05d15a3))
+- Bump deps ([09a90e8](https://github.com/harlan-zw/nuxt-ai-ready/commit/09a90e8))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.7...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.7...main)
