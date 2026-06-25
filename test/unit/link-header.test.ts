@@ -14,6 +14,8 @@ function isAscii(s: string): boolean {
 }
 
 describe('buildLinkHeader', () => {
+  const resolveExampleUrl = (path: string) => new URL(path, 'https://example.com').href
+
   it('emits ASCII-only Link header for paths with non-Latin characters (html variant)', () => {
     const header = buildLinkHeader('/gh/owner/repo/skill:中文.md', 'html', baseConfig)
     expect(isAscii(header)).toBe(true)
@@ -45,5 +47,53 @@ describe('buildLinkHeader', () => {
     const config = { i18n } as ModulePublicRuntimeConfig
     const header = buildLinkHeader('/page:日本.md', 'html', config)
     expect(isAscii(header)).toBe(true)
+  })
+
+  it('emits absolute i18n hreflang alternates when a base URL is provided', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
+    }
+    const config = { i18n } as ModulePublicRuntimeConfig
+    const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl)
+
+    expect(header).toContain('<https://example.com/about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://example.com/fr/about>; rel="alternate"; hreflang="fr"')
+  })
+
+  it('emits absolute markdown i18n hreflang alternates when a base URL is provided', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
+    }
+    const config = { i18n } as ModulePublicRuntimeConfig
+    const header = buildLinkHeader('/about', 'markdown', config, resolveExampleUrl)
+
+    expect(header).toContain('<https://example.com/about.md>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://example.com/fr/about.md>; rel="alternate"; hreflang="fr"')
+  })
+
+  it('keeps i18n hreflang alternates relative without a base URL', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
+    }
+    const config = { i18n } as ModulePublicRuntimeConfig
+    const header = buildLinkHeader('/about', 'html', config)
+
+    expect(header).toContain('</about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('</fr/about>; rel="alternate"; hreflang="fr"')
   })
 })

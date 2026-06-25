@@ -20,6 +20,19 @@ function toMarkdownPath(path: string): string {
   return `${path}.md`
 }
 
+type LinkUrlResolver = (path: string) => string
+
+function resolveHeaderUrl(path: string, resolveUrl?: LinkUrlResolver): string {
+  if (!resolveUrl)
+    return path
+  try {
+    return resolveUrl(path)
+  }
+  catch {
+    return path
+  }
+}
+
 /**
  * Build a comma-joined Link header value with the standard alternates plus i18n hreflang variants.
  */
@@ -27,6 +40,7 @@ export function buildLinkHeader(
   path: string,
   variant: 'html' | 'markdown',
   config: ModulePublicRuntimeConfig,
+  resolveUrl?: LinkUrlResolver,
 ): string {
   const parts: string[] = []
   if (variant === 'html') {
@@ -40,7 +54,7 @@ export function buildLinkHeader(
     const alternates = computeLocaleAlternates(path, config.i18n)
     for (const alt of alternates) {
       const href = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
-      parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; hreflang="${alt.hreflang}"`)
+      parts.push(`<${encodePathForHeader(resolveHeaderUrl(href, resolveUrl))}>; rel="alternate"; hreflang="${alt.hreflang}"`)
     }
   }
   return parts.join(', ')

@@ -11,18 +11,19 @@ import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { buildLinkHeader } from '../utils/link-header'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
+type LinkUrlResolver = (path: string) => string
 
 // Always signal that response content varies by Accept so caches segment correctly
-function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
+function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
   // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
-  setHeader(event, 'link', buildLinkHeader(path, 'html', config))
+  setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl))
 }
 
-function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig) {
+function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
   setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
-  setHeader(event, 'link', buildLinkHeader(path, 'markdown', config))
+  setHeader(event, 'link', buildLinkHeader(path, 'markdown', config, resolveUrl))
   if (config.markdownCacheHeaders) {
     const { maxAge, swr } = config.markdownCacheHeaders
     const cacheControl = swr
@@ -83,11 +84,12 @@ export default defineEventHandler(async (event) => {
 
   const { path, isExplicit, negotiation } = renderInfo
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  const canonicalUrl = withSiteUrl(event, path)
+  const resolveUrl = (path: string) => withSiteUrl(event, path)
+  const canonicalUrl = resolveUrl(path)
 
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
-    setNegotiationHeaders(event, path, config)
+    setNegotiationHeaders(event, path, config, resolveUrl)
     return
   }
 
@@ -118,7 +120,7 @@ export default defineEventHandler(async (event) => {
       canonical_url: canonicalUrl,
       last_updated: contentPage.updatedAt || new Date().toISOString(),
     })
-    setMarkdownHeaders(event, path, config)
+    setMarkdownHeaders(event, path, config, resolveUrl)
     return `${frontmatter}\n${contentPage.markdown}`
   }
 
@@ -134,7 +136,7 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!response) {
-    setMarkdownHeaders(event, path, config)
+    setMarkdownHeaders(event, path, config, resolveUrl)
     return notFoundMarkdown(canonicalUrl, path, config)
   }
 
@@ -153,13 +155,13 @@ export default defineEventHandler(async (event) => {
 
   // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
-    setMarkdownHeaders(event, path, config)
+    setMarkdownHeaders(event, path, config, resolveUrl)
     return notFoundMarkdown(canonicalUrl, path, config)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
-    setMarkdownHeaders(event, path, config)
+    setMarkdownHeaders(event, path, config, resolveUrl)
     return notFoundMarkdown(canonicalUrl, path, config)
   }
 
@@ -198,6 +200,6 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  setMarkdownHeaders(event, path, config)
+  setMarkdownHeaders(event, path, config, resolveUrl)
   return result.markdown
 })
