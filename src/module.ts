@@ -222,11 +222,13 @@ export default defineNuxtModule<ModuleOptions>({
       nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
       const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
       robotsOpts.groups = groups
-      groups.push({
+      const group: Record<string, unknown> = {
         userAgent: '*',
-        contentUsage: [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`],
         contentSignal: [`ai-train=${config.contentSignal.aiTrain ? 'yes' : 'no'}`, `search=${config.contentSignal.search ? 'yes' : 'no'}`, `ai-input=${config.contentSignal.aiInput ? 'yes' : 'no'}`],
-      })
+      }
+      if (config.contentSignal.contentUsage !== false)
+        group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
+      groups.push(group)
     }
 
     // Register type templates for Nitro hooks and virtual modules

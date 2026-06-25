@@ -49,6 +49,12 @@ export interface ModuleOptions {
      */
     aiTrain?: boolean
     /**
+     * Emit the draft Content-Usage robots.txt directive.
+     * Set to false to avoid robots.txt validators that do not support it yet.
+     * @default true
+     */
+    contentUsage?: boolean
+    /**
      * Allow building a search index and providing search results (e.g., returning hyperlinks and short excerpts from your website's contents).
      * Search does not include providing AI-generated search summaries.
      */
