@@ -84,6 +84,15 @@ function buildMdreamOptions(
 // @nuxtjs/robots) on top of RFC 7231 Accept header negotiation. AI bots get
 // markdown regardless of what their Accept header says.
 export function negotiateRepresentation(event: H3Event): ContentNegotiationResult {
+  // Nitro prerender requests must always resolve to HTML. Negotiating them to
+  // markdown makes the middleware 307 redirect the route to its `.md` twin, and
+  // Nitro bakes that redirect's meta-refresh stub into the canonical
+  // `index.html`, destroying the prerendered page (issue #36). `import.meta.prerender`
+  // covers the whole prerender bundle; the `x-nitro-prerender` header is the
+  // per-request signal carried even when the constant isn't inlined.
+  if (import.meta.prerender || getHeader(event, 'x-nitro-prerender'))
+    return 'html'
+
   const accept = getHeader(event, 'accept')
   const secFetchDest = getHeader(event, 'sec-fetch-dest')
 
