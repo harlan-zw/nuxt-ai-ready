@@ -9,6 +9,8 @@ import { getHeader, getHeaders } from 'h3'
 import { htmlToMarkdown } from 'mdream'
 import { useNitroApp } from 'nitropack/runtime'
 
+export { toMarkdownPath } from '../markdown-path'
+
 const RE_NBSP = /\u00A0/g
 
 // Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
@@ -176,15 +178,6 @@ function normalizePath(path: string): string {
   if (path.endsWith('/index'))
     return path.slice(0, -5) || '/'
   return path
-}
-
-// Map a clean route to its markdown twin: '/' → '/index.md', '/foo' → '/foo.md',
-// '/foo/' → '/foo/index.md'. Used by the markdown middleware redirect and the
-// HTML Link alternate header.
-export function toMarkdownPath(path: string): string {
-  if (path === '/' || path.endsWith('/'))
-    return `${path}index.md`
-  return `${path}.md`
 }
 
 // Back-compat: detect if client prefers markdown

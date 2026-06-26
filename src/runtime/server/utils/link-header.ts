@@ -1,4 +1,5 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import { toMarkdownPath } from '../../markdown-path'
 import { computeLocaleAlternates } from './i18n'
 
 /**
@@ -10,14 +11,6 @@ import { computeLocaleAlternates } from './i18n'
  */
 export function encodePathForHeader(path: string): string {
   return encodeURI(path)
-}
-
-// Map a clean route to its markdown twin. Inlined from ../utils to keep this
-// module free of h3/nitro imports so it stays unit-testable.
-function toMarkdownPath(path: string): string {
-  if (path === '/' || path.endsWith('/'))
-    return `${path}index.md`
-  return `${path}.md`
 }
 
 type LinkUrlResolver = (path: string) => string

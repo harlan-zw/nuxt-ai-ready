@@ -1,24 +1,34 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
-import { $fetch, setup } from '@nuxt/test-utils'
+import { $fetch, setup, useTestContext } from '@nuxt/test-utils'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
+const fixtureRoot = resolve('../fixtures/basic')
 
 const RE_MD_H1 = /^# /
 const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
 const RE_MD_SOURCE_URL = /Source: https?:\/\//
 const RE_MD_H1_M = /^# /m
 
+function getPublicDir() {
+  const buildDir = useTestContext().nuxt?.options.buildDir
+  if (!buildDir)
+    throw new Error('nuxt.options.buildDir not available in test context')
+  return join(buildDir, 'output/public')
+}
+
 describe('nuxt generate (static build)', async () => {
   await setup({
-    rootDir: resolve('../fixtures/basic'),
+    rootDir: fixtureRoot,
     build: true,
     server: true,
     nuxtConfig: {
       nitro: {
         prerender: {
           crawlLinks: true,
-          routes: ['/', '/about', '/docs/getting-started', '/docs/api'],
+          routes: ['/', '/about/', '/docs/getting-started', '/docs/api'],
           failOnError: false,
         },
       },
@@ -133,6 +143,13 @@ describe('nuxt generate (static build)', async () => {
       // h1 and h2 headings converted
       expect(indexMd).toMatch(RE_MD_H1_M)
       expect(indexMd).toContain('## Features')
+    })
+
+    it('does not generate in-directory index.md twins for trailing-slash routes', () => {
+      const publicDir = getPublicDir()
+      expect(existsSync(join(publicDir, 'about.md'))).toBe(true)
+      expect(existsSync(join(publicDir, 'about/index.html'))).toBe(true)
+      expect(existsSync(join(publicDir, 'about/index.md'))).toBe(false)
     })
   })
 
