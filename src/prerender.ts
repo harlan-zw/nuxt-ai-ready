@@ -11,6 +11,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
+import { toMarkdownPath } from './runtime/markdown-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
@@ -279,7 +280,7 @@ async function processSitemapEntry(
     return { crawled: false, skipped: true }
   }
 
-  const mdRoute = route.endsWith('/') ? `${route}index.md` : `${route}.md`
+  const mdRoute = toMarkdownPath(route)
   const mdUrl = withBase(mdRoute, nitro.options.baseURL)
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 

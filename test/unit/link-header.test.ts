@@ -65,6 +65,13 @@ describe('buildLinkHeader', () => {
     expect(header).toContain('<https://example.com/fr/about>; rel="alternate"; hreflang="fr"')
   })
 
+  it('advertises sibling markdown for trailing-slash routes', () => {
+    const header = buildLinkHeader('/about/', 'html', baseConfig)
+
+    expect(header).toContain('</about.md>; rel="alternate"; type="text/markdown"')
+    expect(header).not.toContain('/about/index.md')
+  })
+
   it('emits absolute markdown i18n hreflang alternates when a base URL is provided', () => {
     const i18n: RuntimeI18nConfig = {
       defaultLocale: 'en',

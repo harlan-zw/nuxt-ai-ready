@@ -1,4 +1,5 @@
 import { defineNuxtPlugin, useHead, useRequestURL } from 'nuxt/app'
+import { toMarkdownPath } from '../../markdown-path'
 
 export default defineNuxtPlugin({
   setup() {
@@ -10,11 +11,9 @@ export default defineNuxtPlugin({
     if (lastSegment.includes('.'))
       return
 
-    const mdPath = path === '/' ? '/index.md' : `${path.replace(/\/$/, '')}.md`
-
     useHead({
       link: [
-        { rel: 'alternate', type: 'text/markdown', href: mdPath },
+        { rel: 'alternate', type: 'text/markdown', href: toMarkdownPath(path) },
       ],
     })
   },
