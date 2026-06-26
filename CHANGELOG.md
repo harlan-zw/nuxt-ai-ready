@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v1.4.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.4.0...main)
+
+### 🚀 Enhancements
+
+- Allow omitting Content-Usage from robots.txt ([#33](https://github.com/harlan-zw/nuxt-ai-ready/pull/33))
+
+### 🩹 Fixes
+
+- Repair pnpm workspace catalog ([c2713be](https://github.com/harlan-zw/nuxt-ai-ready/commit/c2713be))
+- **db:** Fall back to writable temp dir for read-only libsql file db ([#35](https://github.com/harlan-zw/nuxt-ai-ready/pull/35))
+- **i18n:** Use absolute hreflang link URLs ([#34](https://github.com/harlan-zw/nuxt-ai-ready/pull/34))
+
+### 🏡 Chore
+
+- Bump deps ([ea07a64](https://github.com/harlan-zw/nuxt-ai-ready/commit/ea07a64))
+- Bump deps ([c780b2b](https://github.com/harlan-zw/nuxt-ai-ready/commit/c780b2b))
+- Bump deps ([3da8ce3](https://github.com/harlan-zw/nuxt-ai-ready/commit/3da8ce3))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.3.9...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.3.9...main)

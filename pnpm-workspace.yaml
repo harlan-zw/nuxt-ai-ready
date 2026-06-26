@@ -6,9 +6,9 @@ minimumReleaseAgeExclude:
   - nuxtseo-layer-devtools
   - nuxtseo-shared
   - '@nuxtjs/sitemap@8.2.0'
-  - nuxt-site-config-kit@4.1.0
-  - nuxt-site-config@4.1.0
-  - site-config-stack@4.1.0
+  - nuxt-site-config-kit@4.1.1
+  - nuxt-site-config@4.1.1
+  - site-config-stack@4.1.1
   - '@vue/compiler-core@3.5.38'
   - '@vue/compiler-dom@3.5.38'
   - '@vue/compiler-sfc@3.5.38'
@@ -50,11 +50,11 @@ catalog:
   execa: ^9.6.1
   mdream: ^1.4.1
   nitropack: ^2.13.4
-  nuxtseo-layer-devtools: ^5.3.0
-  nuxtseo-shared: ^5.3.0
+  nuxtseo-layer-devtools: ^5.3.1
+  nuxtseo-shared: ^5.3.1
   pathe: ^2.0.3
   pkg-types: ^2.3.1
-  site-config-stack: ^4.1.0
+  site-config-stack: ^4.1.1
   tinyglobby: ^0.2.17
   ufo: ^1.6.4
   unbuild: ^3.6.1
@@ -89,7 +89,7 @@ catalogs:
     '@nuxtjs/sitemap': ^8.2.1
     '@vueuse/nuxt': ^14.3.0
     nuxt: ^4.4.8
-    nuxt-site-config: ^4.1.0
+    nuxt-site-config: ^4.1.1
   vue:
     vue-router: ^5.1.0
 onlyBuiltDependencies:
