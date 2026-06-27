@@ -535,23 +535,40 @@ export async function getPageHash(event: H3Event | undefined, route: string): Pr
  */
 export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string }>): Promise<number> {
   const db = await getDb(event)
-  if (!db)
+  if (!db || routes.length === 0)
     return 0
 
   const now = new Date().toISOString()
   const nowMs = Date.now()
+
+  // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
+  // SQLite's "ON CONFLICT cannot affect row a second time" error when a
+  // multi-row INSERT contains the same route twice.
+  const byRoute = new Map<string, { route: string, routeKey: string, locale: string }>()
   for (const entry of routes) {
     const route = typeof entry === 'string' ? entry : entry.route
     const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
-    const locale = deriveLocale(event, route, explicitLocale)
-    const routeKey = normalizeRouteKey(route)
+    byRoute.set(route, {
+      route,
+      routeKey: normalizeRouteKey(route),
+      locale: deriveLocale(event, route, explicitLocale),
+    })
+  }
+
+  // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
+  // call on D1), so one INSERT per route times out large sitemaps. 5 bind
+  // params per row keeps each statement within D1's 100-parameter cap.
+  const ROWS_PER_INSERT = 20
+  for (const batch of chunk([...byRoute.values()], ROWS_PER_INSERT)) {
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
+    const params = batch.flatMap(r => [r.route, r.routeKey, now, nowMs, r.locale])
     await db.exec(`
       INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
-      VALUES (?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)
+      VALUES ${valuesSql}
       ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
-    `, [route, routeKey, now, nowMs, locale])
+    `, params)
   }
-  return routes.length
+  return byRoute.size
 }
 
 /**
@@ -1335,6 +1352,26 @@ export async function getNextSitemapToCrawl(
     LIMIT 1
   `, [threshold])
   return row ? rowToSitemapEntry(row) : null
+}
+
+/**
+ * Get the last crawl timestamp for a single sitemap. Used to throttle runtime
+ * re-seeding (the sitemap:resolved hook fires on every sitemap request).
+ * Returns null when the sitemap row doesn't exist yet.
+ */
+export async function getSitemapLastCrawledAt(
+  event: H3Event | undefined,
+  name: string,
+): Promise<number | null> {
+  const db = await getDb(event)
+  if (!db)
+    return null
+
+  const row = await db.first<{ last_crawled_at: number | null }>(
+    'SELECT last_crawled_at FROM ai_ready_sitemaps WHERE name = ?',
+    [name],
+  )
+  return row?.last_crawled_at ?? null
 }
 
 /**
