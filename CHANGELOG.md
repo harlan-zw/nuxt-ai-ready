@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.5.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.0...main)
+
+### 🩹 Fixes
+
+- **prerender:** Always render HTML for prerender requests ([#36](https://github.com/harlan-zw/nuxt-ai-ready/pull/36), [#37](https://github.com/harlan-zw/nuxt-ai-ready/pull/37))
+- Write markdown twins beside trailing slash routes ([#39](https://github.com/harlan-zw/nuxt-ai-ready/pull/39))
+
+### 🏡 Chore
+
+- Bump deps ([e2ef857](https://github.com/harlan-zw/nuxt-ai-ready/commit/e2ef857))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.4.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.4.0...main)
