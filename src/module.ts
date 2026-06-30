@@ -218,7 +218,8 @@ export default defineNuxtModule<ModuleOptions>({
     const hasNuxtContentV3 = !!(contentVersion && contentVersion.version === 3)
 
     if (typeof config.contentSignal === 'object') {
-      const robotsOpts = (nuxt.options.robots !== false ? nuxt.options.robots : {}) as Record<string, unknown>
+      // robots may be undefined (no explicit `robots` key) or `false` (disabled); fall back to {} so we can attach groups
+      const robotsOpts = (nuxt.options.robots || {}) as Record<string, unknown>
       nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
       const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
       robotsOpts.groups = groups
