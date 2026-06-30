@@ -70,7 +70,7 @@ catalogs:
   dev-lint:
     '@antfu/eslint-config': ^9.1.0
     '@nuxtjs/eslint-config-typescript': ^12.1.0
-    eslint: ^10.5.0
+    eslint: ^10.6.0
   dev-test:
     '@nuxt/test-utils': ^4.0.3
     '@vitest/coverage-v8': ^4.1.9
@@ -85,8 +85,8 @@ catalogs:
     '@nuxt/module-builder': ^1.0.2
     '@nuxt/ui': ^4.9.0
     '@nuxtjs/mcp-toolkit': ^0.17.2
-    '@nuxtjs/robots': ^6.1.1
-    '@nuxtjs/sitemap': ^8.2.1
+    '@nuxtjs/robots': ^6.1.2
+    '@nuxtjs/sitemap': ^8.2.2
     '@vueuse/nuxt': ^14.3.0
     nuxt: ^4.4.8
     nuxt-site-config: ^4.1.1
