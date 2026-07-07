@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.5.2...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.2...main)
+
+### 🩹 Fixes
+
+- Avoid crash when robots config is not explicitly set ([#41](https://github.com/harlan-zw/nuxt-ai-ready/pull/41))
+
+### 🏡 Chore
+
+- Bump ([10035c1](https://github.com/harlan-zw/nuxt-ai-ready/commit/10035c1))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.5.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.0...main)

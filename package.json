@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "1.5.3",
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.10.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",

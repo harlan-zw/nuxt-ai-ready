@@ -86,6 +86,34 @@ describe('resolveWritableDbPath', () => {
     expect(result).toBe(expectedFallback(dbPath))
   })
 
+  it('falls back when the configured dir cannot be created (ENOENT, e.g. Vercel cwd is gone)', async () => {
+    // On Vercel serverless the build cwd (/vercel/path0) does not exist at
+    // runtime, so a relative '.data/...' mkdir rejects with ENOENT (seen live
+    // on scripts.nuxt.com as "ENOENT: no such file or directory, mkdir '.data'").
+    const dbPath = '.enoent/ai-ready/pages.db'
+    mkdir.mockImplementation(async (dir: string) =>
+      dir.startsWith(tmpdir()) ? undefined : Promise.reject(Object.assign(new Error('no such file or directory'), { code: 'ENOENT' })))
+    writeFile.mockResolvedValue(undefined)
+    rm.mockResolvedValue(undefined)
+
+    const result = await resolveWritableDbPath(dbPath)
+
+    expect(result).toBe(expectedFallback(dbPath))
+    expect(warn).toHaveBeenCalledOnce()
+  })
+
+  it('falls back when a path segment is a file (ENOTDIR)', async () => {
+    const dbPath = '.enotdir/ai-ready/pages.db'
+    mkdir.mockImplementation(async (dir: string) =>
+      dir.startsWith(tmpdir()) ? undefined : Promise.reject(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' })))
+    writeFile.mockResolvedValue(undefined)
+    rm.mockResolvedValue(undefined)
+
+    const result = await resolveWritableDbPath(dbPath)
+
+    expect(result).toBe(expectedFallback(dbPath))
+  })
+
   it('gives distinct fallback dirs to distinct configured paths', async () => {
     mkdir.mockImplementation(async (dir: string) =>
       dir.startsWith(tmpdir()) ? undefined : Promise.reject(rofs()))
