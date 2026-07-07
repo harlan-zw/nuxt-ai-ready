@@ -32,8 +32,12 @@ async function ensureWritableDir(dir: string): Promise<NodeJS.ErrnoException | n
   return null
 }
 
-function isReadOnly(err: NodeJS.ErrnoException): boolean {
-  return err.code === 'EROFS' || err.code === 'EACCES'
+function isRecoverable(err: NodeJS.ErrnoException): boolean {
+  // EROFS/EACCES: read-only or permission-denied filesystem.
+  // ENOENT/ENOTDIR: the configured path cannot exist at runtime — e.g. on Vercel
+  // serverless the build cwd (/vercel/path0) is gone, so a relative '.data/...'
+  // mkdir rejects with ENOENT even with recursive: true.
+  return err.code === 'EROFS' || err.code === 'EACCES' || err.code === 'ENOENT' || err.code === 'ENOTDIR'
 }
 
 /**
@@ -61,8 +65,7 @@ export async function resolveWritableDbPath(dbPath: string): Promise<string> {
     return dbPath
   }
 
-  // Only the read-only / permission cases are recoverable via the temp dir.
-  if (!isReadOnly(err))
+  if (!isRecoverable(err))
     throw err
 
   const key = createHash('sha256').update(resolve(dbPath)).digest('hex').slice(0, 16)
@@ -70,7 +73,7 @@ export async function resolveWritableDbPath(dbPath: string): Promise<string> {
   const fallbackErr = await ensureWritableDir(fallbackDir)
   if (fallbackErr) {
     throw new Error(
-      `[ai-ready] Database directory '${dir}' is read-only and the temp dir fallback `
+      `[ai-ready] Database directory '${dir}' is not writable (${err.code}) and the temp dir fallback `
       + `('${fallbackDir}') also failed: ${fallbackErr.message}. Set database.filename to a `
       + `writable path, or use a serverless driver: database.type 'd1' (Cloudflare), `
       + `'neon' (Vercel/Postgres), or 'libsql' (Turso).`,
@@ -79,7 +82,7 @@ export async function resolveWritableDbPath(dbPath: string): Promise<string> {
 
   const fallback = join(fallbackDir, 'pages.db')
   logger.warn(
-    `[ai-ready] Database directory '${dir}' is read-only; falling back to '${fallback}'. `
+    `[ai-ready] Database directory '${dir}' is not writable (${err.code}); falling back to '${fallback}'. `
     + `This database is ephemeral and reseeded on cold start. Set database.filename to a `
     + `writable persistent path (or a volume) to silence this warning.`,
   )
