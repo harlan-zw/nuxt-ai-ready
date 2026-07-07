@@ -421,7 +421,10 @@ async function prerenderRoute(nitro: Nitro, route: string) {
 
   const _route: PrerenderRoute = {
     route,
-    fileName: filePath,
+    // fileName is relative to the output public dir (nitro core convention);
+    // presets key overrides/route exclusions off it, so an absolute path here
+    // breaks e.g. the Vercel config.json overrides map.
+    fileName: route,
     generateTimeMS: Date.now() - start,
   }
   nitro._prerenderedRoutes!.push(_route)
@@ -605,6 +608,10 @@ export function setupPrerenderHandler(
       // Only prerender llms.txt - llms-full.txt is already streamed
       const llmsStats = await prerenderRoute(nitro, '/llms.txt')
       const llmsFullStats = await stat(state.llmsFullTxtPath!)
+      // The streamed file must still be registered as a prerendered route:
+      // otherwise presets keep the runtime handler's route, and on Vercel that
+      // function output shadows the static file (nuxt/scripts#825).
+      nitro._prerenderedRoutes!.push({ route: '/llms-full.txt', fileName: '/llms-full.txt' })
 
       const kb = (b: number) => (b / 1024).toFixed(1)
       const totalKb = kb(llmsStats.size + llmsFullStats.size)
