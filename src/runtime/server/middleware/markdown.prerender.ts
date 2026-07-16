@@ -6,7 +6,7 @@ import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from
 import { tryGetContentMarkdown } from '../utils/content'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
-import { readPrerenderedHtml } from '../utils/prerendered-html'
+import { consumePrerenderedHtml } from '../utils/prerender-html'
 
 // Pull headings out of source markdown for the page-data record. mdream
 // produces a similar list during HTML conversion; this mirrors that shape so
@@ -65,14 +65,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // The .md route is queued via prerenderRoutes() while the page's HTML render
-  // is in flight, so by the time this handler runs the page has already been
-  // rendered and written to the static output dir. Reuse that file instead of
-  // triggering a full second SSR render via event.fetch — this halves the
-  // prerender render load on large sites and avoids re-writing Nuxt's internal
-  // prerender payload cache for the page (see nuxt/nuxt#35590). Falls back to
-  // event.fetch when the file isn't there (e.g. non-static file mapping).
-  let html = await readPrerenderedHtml(runtimeConfig.prerenderOutputDir, path)
+  // The page always renders before its .md twin (the .md route is queued via
+  // prerenderRoutes() during that render), so the html-capture plugin has the
+  // rendered HTML in memory. Reusing it avoids a full second SSR render per
+  // page and the prerender payload-cache rewrite that render triggers (see
+  // nuxt/nuxt#35590). Misses (e.g. sitemap-crawled pages that were never
+  // prerendered) fall back to event.fetch.
+  let html = consumePrerenderedHtml(path)
   if (html) {
     logger.debug(`[markdown.prerender] Reusing prerendered HTML for ${path} (${html.length} bytes)`)
   }
@@ -98,6 +97,9 @@ export default defineEventHandler(async (event) => {
 
     html = await response.text()
     logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
+    // the fetch above re-rendered the page, which the capture plugin stored
+    // again; nothing will consume that copy, so drop it
+    consumePrerenderedHtml(path)
   }
 
   // Skip error pages that returned 200 (e.g., Vue Router "no match" pages)
