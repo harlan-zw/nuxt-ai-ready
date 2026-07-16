@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useSeoMeta } from '#imports'
+import { incrementRenderCount } from '../utils/render-counts'
 
 useSeoMeta({
   title: 'Render Count',
