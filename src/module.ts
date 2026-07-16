@@ -41,6 +41,8 @@ export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
   version: string
+  /** Resolved static output dir; lets the prerender middleware reuse written HTML. */
+  prerenderOutputDir?: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   database: {
@@ -573,6 +575,20 @@ export async function lookupContentPage(event, path) {
       i18n: i18nConfig,
       ftsTokenizer,
     } as any
+
+    // The static output dir is only resolved once nitro is configured; expose
+    // it to the prerender middleware so it can reuse already-written HTML
+    // files instead of re-rendering every page for markdown generation.
+    // Mutate both the resolved options and the raw _config: nitro's internal
+    // prerender instance is spawned from `nitro.options._config`, which may
+    // not share the runtimeConfig object with `nitro.options`.
+    nuxt.hooks.hook('nitro:build:before', (nitro) => {
+      for (const runtimeConfig of [nitro.options.runtimeConfig, nitro.options._config?.runtimeConfig]) {
+        const rc = runtimeConfig?.['nuxt-ai-ready'] as any
+        if (rc)
+          rc.prerenderOutputDir = nitro.options.output.publicDir
+      }
+    })
 
     addServerHandler({
       middleware: true,
