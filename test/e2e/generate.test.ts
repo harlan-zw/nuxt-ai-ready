@@ -28,7 +28,7 @@ describe('nuxt generate (static build)', async () => {
       nitro: {
         prerender: {
           crawlLinks: true,
-          routes: ['/', '/about/', '/docs/getting-started', '/docs/api'],
+          routes: ['/', '/about/', '/docs/getting-started', '/docs/api', '/render-count'],
           failOnError: false,
         },
       },
@@ -150,6 +150,17 @@ describe('nuxt generate (static build)', async () => {
       expect(existsSync(join(publicDir, 'about.md'))).toBe(true)
       expect(existsSync(join(publicDir, 'about/index.html'))).toBe(true)
       expect(existsSync(join(publicDir, 'about/index.md'))).toBe(false)
+    })
+  })
+
+  describe('single render per page', () => {
+    it('reuses the page render for its .md twin instead of re-rendering', async () => {
+      // The page bakes its SSR render count into the body; the .md twin is
+      // converted from the captured first render, so a second render (the old
+      // event.fetch double-render path) would surface here as ssr-renders:2.
+      const md = await $fetch('/render-count.md', { responseType: 'text' })
+      expect(md).toContain('ssr-renders:1')
+      expect(md).not.toContain('ssr-renders:2')
     })
   })
 
