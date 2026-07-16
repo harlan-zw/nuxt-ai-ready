@@ -11,6 +11,15 @@ rmSync(join(rootDir, 'node_modules/.cache/nuxt-seo/ai-ready'), { recursive: true
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   hooks: {
+    // Test ai-ready:page:markdown hook
+    'ai-ready:page:markdown': (payload: { route: string, markdown: string }) => {
+      // Empty markdown excludes the page from llms-full.txt while preserving its metadata in llms.txt.
+      if (payload.route === '/docs/api') {
+        payload.markdown = ''
+        return
+      }
+      payload.markdown += '\n\nBuild-time Markdown hook was here.'
+    },
     // Test ai-ready:llms-txt hook
     // @ts-expect-error hook registered by nuxt-ai-ready module
     'ai-ready:llms-txt': (payload: { sections: Array<Record<string, unknown>>, notes: string[] }) => {
