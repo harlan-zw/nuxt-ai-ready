@@ -574,6 +574,9 @@ export async function lookupContentPage(event, path) {
       ftsTokenizer,
     } as any
 
+    // Captures rendered HTML during prerendering so markdown.prerender can
+    // reuse it instead of re-rendering each page
+    addServerPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
     addServerHandler({
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown.prerender'),

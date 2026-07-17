@@ -6,6 +6,7 @@ import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from
 import { tryGetContentMarkdown } from '../utils/content'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
+import { consumePrerenderedHtml } from '../utils/prerender-html'
 
 // Pull headings out of source markdown for the page-data record. mdream
 // produces a similar list during HTML conversion; this mirrors that shape so
@@ -64,27 +65,42 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-  const response = await event.fetch(path, { signal: AbortSignal.timeout(30000) }).catch((err) => {
-    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
-      throw createError({
-        statusCode: 504,
-        statusMessage: 'Gateway Timeout',
-        message: `Timed out fetching HTML for ${path}`,
+  // The page always renders before its .md twin (the .md route is queued via
+  // prerenderRoutes() during that render), so the html-capture plugin has the
+  // rendered HTML in memory. Reusing it avoids a full second SSR render per
+  // page and the prerender payload-cache rewrite that render triggers (see
+  // nuxt/nuxt#35590). Misses (e.g. sitemap-crawled pages that were never
+  // prerendered) fall back to event.fetch.
+  let html = consumePrerenderedHtml(path)
+  if (html) {
+    logger.debug(`[markdown.prerender] Reusing prerendered HTML for ${path} (${html.length} bytes)`)
+  }
+  else {
+    logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
+    const response = await event.fetch(path, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        throw createError({
+          statusCode: 504,
+          statusMessage: 'Gateway Timeout',
+          message: `Timed out fetching HTML for ${path}`,
+        })
+      }
+      throw err
+    })
+    if (!response.ok) {
+      return createError({
+        statusCode: response.status,
+        statusMessage: response.statusText,
+        message: `Failed to fetch HTML for ${path}`,
       })
     }
-    throw err
-  })
-  if (!response.ok) {
-    return createError({
-      statusCode: response.status,
-      statusMessage: response.statusText,
-      message: `Failed to fetch HTML for ${path}`,
-    })
-  }
 
-  const html = await response.text()
-  logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
+    html = await response.text()
+    logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
+    // the fetch above re-rendered the page, which the capture plugin stored
+    // again; nothing will consume that copy, so drop it
+    consumePrerenderedHtml(path)
+  }
 
   // Skip error pages that returned 200 (e.g., Vue Router "no match" pages)
   if (html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')) {
