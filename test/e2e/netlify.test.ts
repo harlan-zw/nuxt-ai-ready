@@ -7,6 +7,13 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/netlify')
 
+function getHeaderBlock(contents: string, route: string) {
+  const lines = contents.split(/\r?\n/)
+  const start = lines.lastIndexOf(route)
+  const end = lines.findIndex((line, index) => index > start && line.length > 0 && !/^\s/.test(line))
+  return lines.slice(start, end === -1 ? undefined : end).join('\n')
+}
+
 describe('netlify build output', async () => {
   await setup({
     server: false,
@@ -24,8 +31,14 @@ describe('netlify build output', async () => {
     const headers = await readFile(headersPath, 'utf-8')
 
     // Netlify _headers format uses glob patterns for .md files
-    expect(headers).toContain('/*.md')
-    expect(headers).toContain('Content-Type: text/markdown; charset=utf-8')
+    const markdownBlock = getHeaderBlock(headers, '/*.md')
+    expect(headers.match(/^\/\*\.md$/gm)).toHaveLength(1)
+    expect(markdownBlock).toContain('Content-Type: text/markdown; charset=utf-8')
+    expect(markdownBlock).toContain('X-Robots-Tag: noindex')
+
+    const llmsBlock = getHeaderBlock(headers, '/llms.txt')
+    expect(llmsBlock).toContain('Content-Type: text/plain; charset=utf-8')
+    expect(llmsBlock).toContain('X-Robots-Tag: noindex')
   })
 
   it('has expected output structure', async () => {

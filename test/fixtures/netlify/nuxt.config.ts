@@ -4,6 +4,10 @@ export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   nitro: {
     preset: 'netlify',
+    routeRules: {
+      '/*.md': { headers: { 'X-Robots-Tag': 'noindex' } },
+      '/llms.txt': { headers: { 'X-Robots-Tag': 'noindex' } },
+    },
     prerender: {
       crawlLinks: true,
       routes: ['/', '/about', '/docs/getting-started', '/docs/api'],

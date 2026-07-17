@@ -1,7 +1,7 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { createHash, randomBytes } from 'node:crypto'
-import { access, appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
@@ -14,6 +14,7 @@ import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { ensureStaticHeader } from './utils/static-headers'
 
 export interface ModuleHooks {
   /**
@@ -677,10 +678,14 @@ export async function lookupContentPage(event, path) {
 
     // Add route rules for static files with proper charset
     nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
-    nuxt.options.nitro.routeRules['/llms.txt'] = { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
-    nuxt.options.nitro.routeRules['/llms-full.txt'] = { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    for (const route of ['/llms.txt', '/llms-full.txt']) {
+      nuxt.options.nitro.routeRules[route] = defu(
+        nuxt.options.nitro.routeRules[route],
+        { headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
+      )
+    }
 
-    // Append charset header for .md files to _headers (Cloudflare Pages)
+    // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
       nitro.hooks.hook('compiled', async () => {
@@ -688,12 +693,17 @@ export async function lookupContentPage(event, path) {
         logger.debug(`Checking for _headers file: ${headersPath}`)
         const exists = await access(headersPath).then(() => true).catch(() => false)
         if (exists) {
-          logger.debug(`Appending .md charset header to _headers`)
-          await appendFile(headersPath, `
-/*.md
-  Content-Type: text/markdown; charset=utf-8
-`)
-          logger.debug('Appended .md charset header to _headers')
+          const headers = await readFile(headersPath, 'utf8')
+          const mergedHeaders = ensureStaticHeader(
+            headers,
+            '/*.md',
+            'Content-Type',
+            'text/markdown; charset=utf-8',
+          )
+          if (mergedHeaders !== headers) {
+            await writeFile(headersPath, mergedHeaders)
+            logger.debug('Merged .md charset header into _headers')
+          }
         }
       })
     })
