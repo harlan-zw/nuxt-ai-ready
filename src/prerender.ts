@@ -223,7 +223,7 @@ async function processMarkdownRoute(
   lastmod?: string | Date,
   options?: { skipLlmsFullTxt?: boolean },
 ): Promise<void> {
-  const { markdown, title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
+  const { title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
 
   let updatedAt = (lastmod instanceof Date ? lastmod.toISOString() : lastmod) || new Date().toISOString()
   if (metaUpdatedAt) {
@@ -232,7 +232,11 @@ async function processMarkdownRoute(
       updatedAt = parsedDate.toISOString()
   }
 
-  await nuxt.hooks.callHook('ai-ready:page:markdown' as any, { route, markdown, title, description, headings })
+  const hookContext = { ...parsed, route }
+  await nuxt.hooks.callHook('ai-ready:page:markdown' as any, hookContext)
+  // Persist the hook's Markdown mutation for all downstream outputs.
+  const { markdown } = hookContext
+  parsed.markdown = markdown
 
   // Insert into SQLite database
   if (state.db) {
@@ -250,8 +254,8 @@ async function processMarkdownRoute(
     })
   }
 
-  // Stream-append to llms-full.txt (skip for sitemap-only crawled pages)
-  if (state.llmsFullTxtPath && !options?.skipLlmsFullTxt) {
+  // Stream-append to llms-full.txt (skip sitemap-only pages and hook-filtered content)
+  if (state.llmsFullTxtPath && !options?.skipLlmsFullTxt && markdown.trim()) {
     const pageContent = formatPageForLlmsFullTxt(route, title, description, markdown, state.siteInfo?.url)
     logger.debug(`Appending to llms-full.txt: ${route} (${(pageContent.length / 1024).toFixed(1)}kb)`)
     await appendFile(state.llmsFullTxtPath, pageContent, 'utf-8')
