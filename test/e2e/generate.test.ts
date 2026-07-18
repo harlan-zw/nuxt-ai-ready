@@ -25,6 +25,11 @@ describe('nuxt generate (static build)', async () => {
     build: true,
     server: true,
     nuxtConfig: {
+      sitemap: {
+        // Reproduces sitemap sites that emit canonical trailing slashes. The
+        // prerender route itself is stored without one.
+        urls: ['/render-count/'],
+      },
       nitro: {
         prerender: {
           crawlLinks: true,
@@ -161,6 +166,12 @@ describe('nuxt generate (static build)', async () => {
       const md = await $fetch('/render-count.md', { responseType: 'text' })
       expect(md).toContain('ssr-renders:1')
       expect(md).not.toContain('ssr-renders:2')
+    })
+
+    it('does not re-render trailing-slash sitemap entries for llms.txt', async () => {
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
+      expect(llmsTxt).toContain('ssr-renders:1')
+      expect(llmsTxt).not.toContain('ssr-renders:2')
     })
   })
 

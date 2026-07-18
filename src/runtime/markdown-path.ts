@@ -1,7 +1,12 @@
 const RE_TRAILING_SLASHES = /\/+$/
 
+export function normalizePagePath(path: string): string {
+  return path.replace(RE_TRAILING_SLASHES, '') || '/'
+}
+
 export function toMarkdownPath(path: string): string {
-  if (path === '/')
+  const normalizedPath = normalizePagePath(path)
+  if (normalizedPath === '/')
     return '/index.md'
-  return `${path.replace(RE_TRAILING_SLASHES, '')}.md`
+  return `${normalizedPath}.md`
 }

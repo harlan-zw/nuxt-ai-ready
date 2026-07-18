@@ -2,15 +2,15 @@
 import { useRoute, useSeoMeta } from '#imports'
 import { incrementRenderCount } from '../utils/render-counts'
 
+// Bakes the SSR render count into the page body and metadata. The static .md
+// file verifies the initial HTML handoff, while llms.txt verifies the sitemap
+// crawl did not render the page again after that handoff was consumed.
+const renders = import.meta.server ? incrementRenderCount(useRoute().path) : 0
+
 useSeoMeta({
   title: 'Render Count',
-  description: 'Embeds how many times this page was SSR rendered.',
+  description: `Embeds how many times this page was SSR rendered: ssr-renders:${renders}.`,
 })
-
-// Bakes the SSR render count into the page body: the .md twin is converted
-// from the first render's HTML, so it must say ssr-renders:1. A second render
-// (the pre-reuse double-render behavior) would produce ssr-renders:2.
-const renders = import.meta.server ? incrementRenderCount(useRoute().path) : 0
 </script>
 
 <template>

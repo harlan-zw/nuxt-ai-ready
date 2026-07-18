@@ -11,7 +11,7 @@ import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { withBase } from 'ufo'
 import { logger } from './logger'
-import { toMarkdownPath } from './runtime/markdown-path'
+import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
@@ -223,6 +223,7 @@ async function processMarkdownRoute(
   lastmod?: string | Date,
   options?: { skipLlmsFullTxt?: boolean },
 ): Promise<void> {
+  route = normalizePagePath(route)
   const { title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
 
   let updatedAt = (lastmod instanceof Date ? lastmod.toISOString() : lastmod) || new Date().toISOString()
@@ -273,7 +274,7 @@ async function processSitemapEntry(
   const loc = typeof entry === 'string' ? entry : entry.loc
   const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
   // Handle both absolute URLs and relative paths
-  const route = loc.startsWith('http') ? new URL(loc).pathname : loc
+  const route = normalizePagePath(loc.startsWith('http') ? new URL(loc).pathname : loc)
 
   // Skip internal/special files (e.g., _headers, _redirects)
   if (route.split('/').some(segment => segment.startsWith('_'))) {
