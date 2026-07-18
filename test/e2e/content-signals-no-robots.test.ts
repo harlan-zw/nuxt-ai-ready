@@ -22,5 +22,6 @@ describe('robots.txt content signals without explicit robots config', async () =
     expect(robotsTxt).toContain('search=yes')
     expect(robotsTxt).toContain('ai-input=no')
     expect(robotsTxt).toContain('train-ai=y')
+    expect(robotsTxt).toMatch(/^Disallow:\s*$/m)
   })
 })

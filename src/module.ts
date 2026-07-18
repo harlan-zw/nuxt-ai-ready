@@ -225,6 +225,8 @@ export default defineNuxtModule<ModuleOptions>({
       robotsOpts.groups = groups
       const group: Record<string, unknown> = {
         userAgent: '*',
+        // Preserve nuxt-robots' default wildcard rule so the injected group remains valid.
+        disallow: [''],
         contentSignal: [`ai-train=${config.contentSignal.aiTrain ? 'yes' : 'no'}`, `search=${config.contentSignal.search ? 'yes' : 'no'}`, `ai-input=${config.contentSignal.aiInput ? 'yes' : 'no'}`],
       }
       if (config.contentSignal.contentUsage !== false)
