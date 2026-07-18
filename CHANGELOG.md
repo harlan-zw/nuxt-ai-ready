@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.5.3...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.3...main)
+
+### 🩹 Fixes
+
+- Avoid empty `/llms-full.txt` ([6f5c23c](https://github.com/harlan-zw/nuxt-ai-ready/commit/6f5c23c))
+- Better db errors ([a20f178](https://github.com/harlan-zw/nuxt-ai-ready/commit/a20f178))
+
+### 🏡 Chore
+
+- Bump ([b595564](https://github.com/harlan-zw/nuxt-ai-ready/commit/b595564))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.5.2...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.2...main)
