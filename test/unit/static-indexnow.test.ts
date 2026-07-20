@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { buildIndexNowBody } from '../../src/runtime/server/utils/indexnow-shared'
 
 interface PageHashMeta {
   route: string
@@ -455,5 +456,23 @@ describe('static-indexnow: URL construction', () => {
       'https://my-site.com/docs/guide',
       'https://my-site.com/blog/post-1',
     ])
+  })
+
+  it('joins routes and key locations under an app base URL', () => {
+    expect(buildIndexNowBody(
+      ['/', '/about', '/docs/api', 'https://external.example/page'],
+      'my-key',
+      'https://my-site.com/docs/',
+    )).toEqual({
+      host: 'my-site.com',
+      key: 'my-key',
+      keyLocation: 'https://my-site.com/docs/my-key.txt',
+      urlList: [
+        'https://my-site.com/docs/',
+        'https://my-site.com/docs/about',
+        'https://my-site.com/docs/docs/api',
+        'https://external.example/page',
+      ],
+    })
   })
 })

@@ -240,7 +240,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Build default llms.txt config with API endpoints
     const defaultLlmsTxtSections: LlmsTxtConfig['sections'] = []
-    const llmsFullRoute = withSiteUrl('llms-full.txt')
+    const llmsFullRoute = withSiteUrl('llms-full.txt', { withBase: true })
     defaultLlmsTxtSections.push({
       title: 'LLM Resources',
       links: [
@@ -267,7 +267,7 @@ export default defineNuxtModule<ModuleOptions>({
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
       const mcpLink = {
         title: 'MCP',
-        href: withSiteUrl((nuxt.options.mcp !== false && nuxt.options.mcp?.route) || '/mcp'),
+        href: withSiteUrl((nuxt.options.mcp !== false && nuxt.options.mcp?.route) || '/mcp', { withBase: true }),
         description: 'Model Context Protocol server endpoint for AI agent integration.',
       }
 
@@ -662,7 +662,7 @@ export async function lookupContentPage(event, path) {
       const siteConfig = useSiteConfig()
       setupPrerenderHandler(config, buildDbPath, {
         name: siteConfig.name,
-        url: siteConfig.url,
+        url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
         description: siteConfig.description,
       }, mergedLlmsTxt, indexNow, { ftsTokenizer, i18n: i18nConfig })
     }

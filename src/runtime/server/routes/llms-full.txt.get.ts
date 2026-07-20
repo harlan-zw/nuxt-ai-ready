@@ -1,6 +1,8 @@
 import { eventHandler, sendIterable, setHeader, setResponseHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { getSiteConfig } from '#site-config/server/composables'
+import { withSiteUrl } from '#site-config/server/composables/utils'
+import { toDeployedRoute } from '../../route-path'
 import { countPages, streamPages } from '../db/queries'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../utils/llms-full'
 
@@ -13,16 +15,19 @@ export default eventHandler(async (event) => {
     return '# llms-full.txt\n\nThis file is generated during prerender.'
   }
 
-  const config = useRuntimeConfig()['nuxt-ai-ready'] as {
+  const runtimeConfig = useRuntimeConfig(event)
+  const config = runtimeConfig['nuxt-ai-ready'] as {
     llmsTxt?: { sections?: unknown[], notes?: unknown }
   }
   const siteConfig = getSiteConfig(event)
+  const baseURL = runtimeConfig.app.baseURL
+  const canonicalSiteUrl = siteConfig.url ? withSiteUrl(event, toDeployedRoute('/', baseURL)) : undefined
 
   // Build header
   const header = buildLlmsFullTxtHeader(
     {
       name: siteConfig.name,
-      url: siteConfig.url,
+      url: canonicalSiteUrl,
       description: siteConfig.description,
     },
     config.llmsTxt as Parameters<typeof buildLlmsFullTxtHeader>[1],

@@ -61,6 +61,7 @@ describe('buildLinkHeader', () => {
     const config = { i18n } as ModulePublicRuntimeConfig
     const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl)
 
+    expect(header).toContain('<https://example.com/about.md>; rel="alternate"; type="text/markdown"')
     expect(header).toContain('<https://example.com/about>; rel="alternate"; hreflang="en"')
     expect(header).toContain('<https://example.com/fr/about>; rel="alternate"; hreflang="fr"')
   })
@@ -84,6 +85,7 @@ describe('buildLinkHeader', () => {
     const config = { i18n } as ModulePublicRuntimeConfig
     const header = buildLinkHeader('/about', 'markdown', config, resolveExampleUrl)
 
+    expect(header).toContain('<https://example.com/about>; rel="alternate"; type="text/html"')
     expect(header).toContain('<https://example.com/about.md>; rel="alternate"; hreflang="en"')
     expect(header).toContain('<https://example.com/fr/about.md>; rel="alternate"; hreflang="fr"')
   })
