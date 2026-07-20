@@ -3,6 +3,8 @@
  * This module has no Nuxt/Nitro dependencies so it can be used in both contexts
  */
 
+import { joinURL } from 'ufo'
+
 // Endpoints to try in order (fallback on 429/500)
 // Can be overridden via INDEXNOW_TEST_ENDPOINT env var for testing
 export const INDEXNOW_HOSTS = ['api.indexnow.org', 'www.bing.com']
@@ -41,13 +43,13 @@ export function buildIndexNowBody(
 ): IndexNowRequestBody {
   // Convert routes to absolute URLs
   const urlList = routes.map(route =>
-    route.startsWith('http') ? route : `${siteUrl}${route}`,
+    route.startsWith('http') ? route : joinURL(siteUrl, route),
   )
 
   return {
     host: new URL(siteUrl).host,
     key,
-    keyLocation: `${siteUrl}/${key}.txt`,
+    keyLocation: joinURL(siteUrl, `${key}.txt`),
     urlList,
   }
 }
