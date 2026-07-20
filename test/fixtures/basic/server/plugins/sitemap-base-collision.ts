@@ -6,6 +6,8 @@ export default defineNitroPlugin((nitroApp) => {
 
   nitroApp.hooks.hook('sitemap:resolved', (ctx) => {
     ctx.urls = ctx.urls.map((entry) => {
+      if (entry.loc.endsWith('/about'))
+        return { ...entry, loc: `${entry.loc}/` }
       if (!entry.loc.endsWith('/docs/api'))
         return entry
       return { ...entry, loc: entry.loc.replace('/docs/', '/docs/docs/') }

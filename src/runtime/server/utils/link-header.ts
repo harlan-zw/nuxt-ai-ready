@@ -37,10 +37,12 @@ export function buildLinkHeader(
 ): string {
   const parts: string[] = []
   if (variant === 'html') {
-    parts.push(`<${encodePathForHeader(toMarkdownPath(path))}>; rel="alternate"; type="text/markdown"`)
+    const href = resolveHeaderUrl(toMarkdownPath(path), resolveUrl)
+    parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; type="text/markdown"`)
   }
   else {
-    parts.push(`<${encodePathForHeader(path)}>; rel="alternate"; type="text/html"`)
+    const href = resolveHeaderUrl(path, resolveUrl)
+    parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; type="text/html"`)
   }
 
   if (config.i18n) {

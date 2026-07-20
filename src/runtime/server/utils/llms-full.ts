@@ -3,9 +3,9 @@
  */
 
 import type { LlmsTxtConfig } from '../../types'
+import { joinURL } from 'ufo'
 import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
 
-const RE_TRAILING_SLASH = /\/$/
 const RE_FRONTMATTER = /^---\n[\s\S]*?\n---\n*/
 const RE_HEADING = /^(#{1,6}) ([^\n]+)$/gm
 
@@ -16,7 +16,7 @@ export function formatPageForLlmsFullTxt(
   markdown: string,
   siteUrl?: string,
 ): string {
-  const canonicalUrl = siteUrl ? `${siteUrl.replace(RE_TRAILING_SLASH, '')}${route}` : route
+  const canonicalUrl = siteUrl ? joinURL(siteUrl, route) : route
   const heading = title && title !== route ? `### ${title}` : `### ${route}`
 
   // Strip frontmatter and normalize headings (h1 → h1., etc)

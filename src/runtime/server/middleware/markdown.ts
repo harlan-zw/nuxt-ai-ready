@@ -1,8 +1,8 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { joinURL } from 'ufo'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
@@ -34,7 +34,12 @@ function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntim
   }
 }
 
-function notFoundMarkdown(canonicalUrl: string, path: string, config: ModulePublicRuntimeConfig): string {
+function notFoundMarkdown(
+  canonicalUrl: string,
+  path: string,
+  config: ModulePublicRuntimeConfig,
+  resolveUrl: LinkUrlResolver,
+): string {
   const body = [
     `# Page not found`,
     ``,
@@ -42,16 +47,16 @@ function notFoundMarkdown(canonicalUrl: string, path: string, config: ModulePubl
     ``,
     `Try one of these resources:`,
     ``,
-    `- [Sitemap](/sitemap.xml)`,
-    `- [llms.txt](/llms.txt)`,
-    `- [llms-full.txt](/llms-full.txt)`,
+    `- [Sitemap](${resolveUrl('/sitemap.xml')})`,
+    `- [llms.txt](${resolveUrl('/llms.txt')})`,
+    `- [llms-full.txt](${resolveUrl('/llms-full.txt')})`,
     ``,
   ].join('\n')
 
   const i18n = config.i18n
   const locale = i18n ? resolveLocaleFromRoute(path, i18n).locale : undefined
   const alternates = i18n
-    ? computeLocaleAlternates(path, i18n).map(a => ({ hreflang: a.hreflang, href: a.path }))
+    ? computeLocaleAlternates(path, i18n).map(a => ({ hreflang: a.hreflang, href: resolveUrl(a.path) }))
     : undefined
 
   const frontmatter = buildFrontmatter({
@@ -87,7 +92,8 @@ export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig(event)
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const baseURL = runtimeConfig.app.baseURL
-  const resolveUrl = (path: string) => withSiteUrl(event, path)
+  const resolvePath = (path: string) => toDeployedRoute(path, baseURL)
+  const resolveUrl = (path: string) => withSiteUrl(event, resolvePath(path))
   const canonicalUrl = resolveUrl(path)
 
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
@@ -103,7 +109,7 @@ export default defineEventHandler(async (event) => {
   // prerendered routes on Cloudflare Pages where HTML is served from edge cache
   // without honoring Vary: Accept.
   if (!isExplicit) {
-    return sendRedirect(event, joinURL(baseURL, toMarkdownPath(path)), 307)
+    return sendRedirect(event, resolvePath(toMarkdownPath(path)), 307)
   }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
@@ -130,7 +136,7 @@ export default defineEventHandler(async (event) => {
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
   // via mdream. Manual redirect so we can forward redirects with .md suffix.
   logger.debug(`[markdown] Fetching HTML for ${path}`)
-  const response = await event.fetch(joinURL(baseURL, path), {
+  const response = await event.fetch(resolvePath(path), {
     headers: { [INTERNAL_HEADER]: '1' },
     redirect: 'manual',
   }).catch((e) => {
@@ -140,7 +146,7 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -159,13 +165,13 @@ export default defineEventHandler(async (event) => {
   // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
   }
 
   const html = await response.text()

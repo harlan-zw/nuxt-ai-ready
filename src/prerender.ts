@@ -9,9 +9,10 @@ import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
-import { joinURL, withBase, withLeadingSlash, withoutBase } from 'ufo'
+import { withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
+import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
@@ -46,7 +47,7 @@ async function fetchPreviousMeta(
   indexNow: string,
 ): Promise<BuildMeta | null> {
   // Fetch previous build meta from live site
-  const metaUrl = `${siteUrl}/__ai-ready/pages.meta.json`
+  const metaUrl = withBase('/__ai-ready/pages.meta.json', siteUrl)
   logger.info(`Fetching previous build meta from ${metaUrl}`)
 
   const controller = new AbortController()
@@ -71,7 +72,7 @@ async function fetchPreviousMeta(
 
   // Verify key file is live (required for IndexNow to work)
   if (indexNow) {
-    const keyUrl = `${siteUrl}/${indexNow}.txt`
+    const keyUrl = withBase(`/${indexNow}.txt`, siteUrl)
     const keyLive = await fetch(keyUrl, { signal: AbortSignal.timeout(5000) })
       .then(r => r.ok)
       .catch(() => false)
@@ -274,10 +275,7 @@ async function processSitemapEntry(
   const loc = typeof entry === 'string' ? entry : entry.loc
   const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
   // Handle both absolute URLs and relative paths
-  const route = normalizePagePath(withoutBase(
-    loc.startsWith('http') ? new URL(loc).pathname : loc,
-    nitro.options.baseURL,
-  ))
+  const route = toLogicalRoute(loc, nitro.options.baseURL)
 
   // Skip internal/special files (e.g., _headers, _redirects)
   if (route.split('/').some(segment => segment.startsWith('_'))) {
@@ -289,7 +287,7 @@ async function processSitemapEntry(
   }
 
   const mdRoute = toMarkdownPath(route)
-  const mdUrl = joinURL(nitro.options.baseURL, mdRoute)
+  const mdUrl = toDeployedRoute(mdRoute, nitro.options.baseURL)
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
   // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)

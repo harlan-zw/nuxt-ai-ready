@@ -24,9 +24,18 @@ describe('ai-ready routes beneath an app base URL', async () => {
     const llmsTxt = await $fetch('/docs/llms.txt') as string
 
     expect(llmsTxt).toContain('- /docs/about')
+    expect(llmsTxt).not.toContain('- /docs/about/')
     expect(llmsTxt).toContain('- /docs/docs/api')
     expect(llmsTxt).not.toContain('- /about')
     expect(llmsTxt).not.toContain('.md')
+    expect(llmsTxt).toContain('Canonical Origin: https://test.example.com/docs')
+    expect(llmsTxt).toContain('[Full Content](https://test.example.com/docs/llms-full.txt)')
+    expect(llmsTxt).toContain('[sitemap.xml](https://test.example.com/docs/sitemap.xml)')
+    expect(llmsTxt).toContain('[robots.txt](https://test.example.com/docs/robots.txt)')
+
+    const secondLlmsTxt = await $fetch('/docs/llms.txt') as string
+    expect(secondLlmsTxt.match(/\[sitemap\.xml\]/g)).toHaveLength(1)
+    expect(secondLlmsTxt.match(/\[robots\.txt\]/g)).toHaveLength(1)
   })
 
   it('normalizes persisted routes that already include the app base', async () => {
@@ -70,5 +79,32 @@ describe('ai-ready routes beneath an app base URL', async () => {
 
     expect(markdown).toContain('Technology Stack')
     expect(markdown).not.toContain('# Page not found')
+    expect(markdown).toContain('canonical_url: "https://test.example.com/docs/about"')
+  })
+
+  it('preserves a logical route whose first segment matches the app base', async () => {
+    const markdown = await $fetch('/docs/docs/api.md') as string
+
+    expect(markdown).toContain('API Reference')
+    expect(markdown).toContain('canonical_url: "https://test.example.com/docs/docs/api"')
+  })
+
+  it('advertises base-aware representation links', async () => {
+    const htmlResponse = await fetch(url('/docs/about'), {
+      headers: { accept: 'text/html' },
+    })
+    expect(htmlResponse.headers.get('link')).toContain('<https://test.example.com/docs/about.md>')
+
+    const markdownResponse = await fetch(url('/docs/about.md'))
+    expect(markdownResponse.headers.get('link')).toContain('<https://test.example.com/docs/about>')
+  })
+
+  it('uses deployed URLs in fallback Markdown and llms-full.txt', async () => {
+    const notFound = await $fetch('/docs/not-found.md') as string
+    expect(notFound).toContain('[Sitemap](https://test.example.com/docs/sitemap.xml)')
+    expect(notFound).toContain('[llms.txt](https://test.example.com/docs/llms.txt)')
+
+    const llmsFullTxt = await $fetch('/docs/llms-full.txt') as string
+    expect(llmsFullTxt).toContain('Canonical Origin: https://test.example.com/docs')
   })
 })

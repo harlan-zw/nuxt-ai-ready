@@ -25,8 +25,18 @@ describe('static generation beneath an app base URL', async () => {
     const llmsTxt = await readFile(join(publicDir, 'llms.txt'), 'utf8')
 
     expect(llmsTxt).toContain('[API Reference - Docs](/docs/docs/api)')
+    expect(llmsTxt).toContain('[About · Test Site — UTF-8 Support](/docs/about)')
     expect(llmsTxt).not.toContain('](/docs/api)')
+    expect(llmsTxt).not.toContain('](/docs/about/)')
     expect(llmsTxt).not.toContain('/docs/missing')
+    expect(llmsTxt).toContain('Canonical Origin: https://test.example.com/docs')
+    expect(llmsTxt).toContain('[Full Content](https://test.example.com/docs/llms-full.txt)')
+    expect(llmsTxt).toContain('[sitemap.xml](https://test.example.com/docs/sitemap.xml)')
+    expect(llmsTxt).toContain('[robots.txt](https://test.example.com/docs/robots.txt)')
+
+    const llmsFullTxt = await readFile(join(publicDir, 'llms-full.txt'), 'utf8')
+    expect(llmsFullTxt).toContain('Canonical Origin: https://test.example.com/docs')
+    expect(llmsFullTxt).toContain('Source: https://test.example.com/docs/about')
 
     const pageData = JSON.parse(await readFile(join(publicDir, '__ai-ready/pages.json'), 'utf8')) as { pages: Array<{ route: string }> }
     expect(pageData.pages).toContainEqual(expect.objectContaining({ route: '/docs/api' }))

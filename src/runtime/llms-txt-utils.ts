@@ -3,9 +3,10 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { joinURL, withoutBase } from 'ufo'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
+import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { normalizeLlmsTxtConfig } from './llms-txt-format'
+import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
 import { localePath, resolveLocaleFromRoute } from './server/utils/i18n'
@@ -27,11 +28,15 @@ interface PageItem {
  * its page count and URL prefix. The default locale is annotated to indicate
  * its content is inlined below; other locales reference their site path.
  */
-function formatAvailableLanguagesSection(i18n: RuntimeI18nConfig, pageCounts: Map<string, number>): string[] {
+function formatAvailableLanguagesSection(
+  i18n: RuntimeI18nConfig,
+  pageCounts: Map<string, number>,
+  resolvePath: (path: string) => string,
+): string[] {
   const lines: string[] = ['## Available Languages on Website', '']
   for (const locale of i18n.locales) {
     const isDefault = locale.code === i18n.defaultLocale
-    const prefix = localePath('/', locale.code, i18n)
+    const prefix = resolvePath(localePath('/', locale.code, i18n))
     const count = pageCounts.get(locale.code) ?? 0
     const display = locale.nativeName
       ? `${locale.nativeName} (${locale.code})`
@@ -178,7 +183,7 @@ function formatPagesWithGroups(pages: PageItem[]): string[] {
 
     // Format page line
     const descText = page.description ? `: ${page.description.substring(0, 160)}${page.description.length > 160 ? '...' : ''}` : ''
-    const href = page.href || page.pathname
+    const href = page.href ?? page.pathname
     if (page.title && page.title !== page.pathname)
       lines.push(`- [${page.title}](${href})${descText}`)
     else
@@ -196,30 +201,46 @@ export async function buildLlmsTxt(event: H3Event) {
   const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
   const baseURL = runtimeConfig.app.baseURL
+  const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
+  const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL))
+  const canonicalSiteUrl = siteConfig.url
+    ? resolveUrl('/')
+    : undefined
 
   const parts: string[] = []
 
   // Header
-  parts.push(`# ${siteConfig.name || siteConfig.url}`)
+  parts.push(`# ${siteConfig.name || canonicalSiteUrl}`)
   if (siteConfig.description) {
     parts.push(`\n> ${siteConfig.description}`)
   }
-  if (siteConfig.url) {
-    parts.push(`\nCanonical Origin: ${siteConfig.url}`)
+  if (canonicalSiteUrl) {
+    parts.push(`\nCanonical Origin: ${canonicalSiteUrl}`)
   }
 
   parts.push('')
 
   // Add sitemap and robots.txt to the first section (LLM Resources)
-  const sections = llmsTxtConfig.sections ? [...llmsTxtConfig.sections] : []
+  const sections = llmsTxtConfig.sections?.map(section => ({
+    ...section,
+    links: section.links ? [...section.links] : undefined,
+  })) ?? []
   if (sections[0]?.links) {
-    if (sitemapConfig?.sitemaps) {
-      const sitemapRoutes = Object.values(sitemapConfig.sitemaps).map(s => s.sitemapName)
-      for (const name of sitemapRoutes) {
-        sections[0].links.push({ title: name, href: `/${name}`, description: 'XML sitemap for search engines and crawlers.' })
-      }
+    const sitemapRoutes = sitemapConfig?.sitemaps
+      ? Object.values(sitemapConfig.sitemaps).map(s => s.sitemapName)
+      : ['sitemap.xml']
+    for (const name of sitemapRoutes) {
+      sections[0].links.push({
+        title: name,
+        href: resolveUrl(`/${name}`),
+        description: 'XML sitemap for search engines and crawlers.',
+      })
     }
-    sections[0].links.push({ title: 'robots.txt', href: '/robots.txt', description: 'Crawler rules and permissions.' })
+    sections[0].links.push({
+      title: 'robots.txt',
+      href: resolveUrl('/robots.txt'),
+      description: 'Crawler rules and permissions.',
+    })
   }
 
   // Sections (LLM Resources, etc)
@@ -249,28 +270,16 @@ export async function buildLlmsTxt(event: H3Event) {
     )
   }
   const urls = await urlsPromise
-  const sitemapPaths = urls.map(url => withoutBase(
-    url.loc.startsWith('/') ? url.loc : new URL(url.loc).pathname,
-    baseURL,
-  ))
+  const sitemapPaths = urls.map(url => toLogicalRoute(url.loc, baseURL))
   const sitemapPathSet = new Set(sitemapPaths)
-
-  // Older persistent rows stored deployed paths. Strip the base only when the
-  // sitemap confirms the corresponding logical route, preserving real /base/* routes.
-  const normalizePersistedPath = (route: string): string => {
-    if (sitemapPathSet.has(route))
-      return route
-    const logicalRoute = withoutBase(route, baseURL)
-    return sitemapPathSet.has(logicalRoute) ? logicalRoute : route
-  }
 
   // Build prerendered list and track seen/error paths
   const seenPaths = new Set<string>()
-  const errorSet = new Set(errorPages.map(p => normalizePersistedPath(p.route)))
+  const errorSet = new Set(errorPages.map(p => normalizePersistedRoute(p.route, sitemapPathSet, baseURL)))
   const prerendered: PageItem[] = []
 
   for (const page of pages) {
-    const pathname = normalizePersistedPath(page.route)
+    const pathname = normalizePersistedRoute(page.route, sitemapPathSet, baseURL)
     if (seenPaths.has(pathname))
       continue
     seenPaths.add(pathname)
@@ -291,7 +300,7 @@ export async function buildLlmsTxt(event: H3Event) {
   }
 
   for (const page of [...prerendered, ...other])
-    page.href = joinURL(baseURL, page.pathname)
+    page.href = resolvePath(page.pathname)
 
   // i18n: filter to default-locale pages, then emit Available Languages header
   if (i18n) {
@@ -301,7 +310,7 @@ export async function buildLlmsTxt(event: H3Event) {
       const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n).locale
       pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
     }
-    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts))
+    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePath))
     parts.push('')
   }
 
