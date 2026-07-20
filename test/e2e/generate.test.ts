@@ -11,6 +11,30 @@ const RE_MD_H1 = /^# /
 const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
 const RE_MD_SOURCE_URL = /Source: https?:\/\//
 const RE_MD_H1_M = /^# /m
+const RE_LLMS_LINK = /^- \[[^\]]+\]\([^)]+\)(?:: .*)?$/
+
+function expectStrictFileListSections(markdown: string) {
+  let section: string | undefined
+  let linkCount = 0
+  const expectSectionLinks = () => {
+    if (section)
+      expect(linkCount, `${section} must contain at least one file-list link`).toBeGreaterThan(0)
+  }
+
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('## ')) {
+      expectSectionLinks()
+      section = line
+      linkCount = 0
+      continue
+    }
+    if (section && line.trim()) {
+      expect(line, `Invalid entry beneath ${section}`).toMatch(RE_LLMS_LINK)
+      linkCount++
+    }
+  }
+  expectSectionLinks()
+}
 
 function getPublicDir() {
   const buildDir = useTestContext().nuxt?.options.buildDir
@@ -74,6 +98,12 @@ describe('nuxt generate (static build)', async () => {
 
       expect(llmsTxt).toContain('## LLM Resources')
       expect(llmsTxt).toContain('llms-full.txt')
+    })
+
+    it('contains only file-list links beneath H2 sections', async () => {
+      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' }) as string
+
+      expectStrictFileListSections(llmsTxt)
     })
   })
 

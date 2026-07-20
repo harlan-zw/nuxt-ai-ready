@@ -43,8 +43,9 @@ describe('ai-ready hooks e2e', async () => {
       expect(llmsTxt).toBeTruthy()
       expect(typeof llmsTxt).toBe('string')
 
-      // Should contain the custom section added by the hook
-      expect(llmsTxt).toContain('## Custom Hook Section')
+      // Description-only sections belong in the heading-free preamble.
+      expect(llmsTxt).toContain('**Custom Hook Section:**')
+      expect(llmsTxt).not.toContain('## Custom Hook Section')
       expect(llmsTxt).toContain('This was added by a hook!')
       expect(llmsTxt).toContain('(/docs/api)')
     })
@@ -55,7 +56,8 @@ describe('ai-ready hooks e2e', async () => {
       expect(typeof llmsFullTxt).toBe('string')
 
       // Should contain both llms-txt and page Markdown hook modifications
-      expect(llmsFullTxt).toContain('## Custom Hook Section')
+      expect(llmsFullTxt).toContain('**Custom Hook Section:**')
+      expect(llmsFullTxt).not.toContain('## Custom Hook Section')
       expect(llmsFullTxt).toContain('This was added by a hook!')
       expect(llmsFullTxt).toContain('Custom Hook Section (Full)')
       expect(llmsFullTxt).toContain('Build-time Markdown hook was here.')

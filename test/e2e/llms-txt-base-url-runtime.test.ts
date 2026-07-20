@@ -23,10 +23,10 @@ describe('ai-ready routes beneath an app base URL', async () => {
 
     const llmsTxt = await $fetch('/docs/llms.txt') as string
 
-    expect(llmsTxt).toContain('- /docs/about')
-    expect(llmsTxt).not.toContain('- /docs/about/')
-    expect(llmsTxt).toContain('- /docs/docs/api')
-    expect(llmsTxt).not.toContain('- /about')
+    expect(llmsTxt).toContain('[/about](/docs/about)')
+    expect(llmsTxt).not.toContain('[/about](/docs/about/)')
+    expect(llmsTxt).toContain('[/docs/api](/docs/docs/api)')
+    expect(llmsTxt).not.toContain('[/about](/about)')
     expect(llmsTxt).not.toContain('.md')
     expect(llmsTxt).toContain('Canonical Origin: https://test.example.com/docs')
     expect(llmsTxt).toContain('[Full Content](https://test.example.com/docs/llms-full.txt)')

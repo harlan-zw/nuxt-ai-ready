@@ -5,11 +5,11 @@ import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
-import { normalizeLlmsTxtConfig } from './llms-txt-format'
+import { formatAvailableLanguagesSection, formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
-import { localePath, resolveLocaleFromRoute } from './server/utils/i18n'
+import { resolveLocaleFromRoute } from './server/utils/i18n'
 import { fetchSitemapUrls } from './server/utils/sitemap'
 
 export { normalizeLlmsTxtConfig }
@@ -20,33 +20,6 @@ interface PageItem {
   title?: string
   description?: string
   locale?: string
-}
-
-/**
- * Build the "Available Languages" section per the Anthropic docs precedent
- * (see platform.claude.com/docs/llms.txt). Lists every configured locale with
- * its page count and URL prefix. The default locale is annotated to indicate
- * its content is inlined below; other locales reference their site path.
- */
-function formatAvailableLanguagesSection(
-  i18n: RuntimeI18nConfig,
-  pageCounts: Map<string, number>,
-  resolvePath: (path: string) => string,
-): string[] {
-  const lines: string[] = ['## Available Languages on Website', '']
-  for (const locale of i18n.locales) {
-    const isDefault = locale.code === i18n.defaultLocale
-    const prefix = resolvePath(localePath('/', locale.code, i18n))
-    const count = pageCounts.get(locale.code) ?? 0
-    const display = locale.nativeName
-      ? `${locale.nativeName} (${locale.code})`
-      : locale.name
-        ? `${locale.name} (${locale.code})`
-        : locale.code
-    const suffix = isDefault ? 'Content included below' : 'Visit website for content'
-    lines.push(`- ${display} - ${count} pages - ${prefix} - ${suffix}`)
-  }
-  return lines
 }
 
 /**
@@ -181,13 +154,7 @@ function formatPagesWithGroups(pages: PageItem[]): string[] {
 
     urlsInCurrentGroup++
 
-    // Format page line
-    const descText = page.description ? `: ${page.description.substring(0, 160)}${page.description.length > 160 ? '...' : ''}` : ''
-    const href = page.href ?? page.pathname
-    if (page.title && page.title !== page.pathname)
-      lines.push(`- [${page.title}](${href})${descText}`)
-    else
-      lines.push(`- ${href}${descText}`)
+    lines.push(formatLlmsTxtPageLink(page))
   }
 
   return lines
