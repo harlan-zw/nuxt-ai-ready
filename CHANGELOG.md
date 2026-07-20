@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v1.5.4...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.4...main)
+
+### 🔥 Performance
+
+- Reuse already-prerendered HTML instead of re-rendering pages for markdown ([#44](https://github.com/harlan-zw/nuxt-ai-ready/pull/44))
+- Avoid duplicate sitemap markdown renders ([#49](https://github.com/harlan-zw/nuxt-ai-ready/pull/49))
+
+### 🩹 Fixes
+
+- Propagate prerender markdown hook mutations ([#45](https://github.com/harlan-zw/nuxt-ai-ready/pull/45))
+- Preserve user headers for markdown assets ([#47](https://github.com/harlan-zw/nuxt-ai-ready/pull/47))
+- Preserve default robots rule with content signals ([#48](https://github.com/harlan-zw/nuxt-ai-ready/pull/48))
+
+### 📖 Documentation
+
+- Content audit sweep (grammar, links, structure) ([#42](https://github.com/harlan-zw/nuxt-ai-ready/pull/42))
+
+### 🏡 Chore
+
+- Bump ([9fe3de7](https://github.com/harlan-zw/nuxt-ai-ready/commit/9fe3de7))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+- Domenico Pata ([@domeOo](https://github.com/domeOo))
+- MicroHoffman ([@microHoffman](https://github.com/microHoffman))
+
 ## v1.5.3...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.3...main)
