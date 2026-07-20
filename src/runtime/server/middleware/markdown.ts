@@ -1,6 +1,7 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { joinURL } from 'ufo'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
@@ -83,7 +84,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const { path, isExplicit, negotiation } = renderInfo
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const runtimeConfig = useRuntimeConfig(event)
+  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const baseURL = runtimeConfig.app.baseURL
   const resolveUrl = (path: string) => withSiteUrl(event, path)
   const canonicalUrl = resolveUrl(path)
 
@@ -100,7 +103,7 @@ export default defineEventHandler(async (event) => {
   // prerendered routes on Cloudflare Pages where HTML is served from edge cache
   // without honoring Vary: Accept.
   if (!isExplicit) {
-    return sendRedirect(event, toMarkdownPath(path), 307)
+    return sendRedirect(event, joinURL(baseURL, toMarkdownPath(path)), 307)
   }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
@@ -127,7 +130,7 @@ export default defineEventHandler(async (event) => {
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
   // via mdream. Manual redirect so we can forward redirects with .md suffix.
   logger.debug(`[markdown] Fetching HTML for ${path}`)
-  const response = await event.fetch(path, {
+  const response = await event.fetch(joinURL(baseURL, path), {
     headers: { [INTERNAL_HEADER]: '1' },
     redirect: 'manual',
   }).catch((e) => {

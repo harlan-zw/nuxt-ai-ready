@@ -3,6 +3,7 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { joinURL, withoutBase } from 'ufo'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { normalizeLlmsTxtConfig } from './llms-txt-format'
 import { queryPages } from './server/db/queries'
@@ -14,6 +15,7 @@ export { normalizeLlmsTxtConfig }
 
 interface PageItem {
   pathname: string
+  href?: string
   title?: string
   description?: string
   locale?: string
@@ -176,10 +178,11 @@ function formatPagesWithGroups(pages: PageItem[]): string[] {
 
     // Format page line
     const descText = page.description ? `: ${page.description.substring(0, 160)}${page.description.length > 160 ? '...' : ''}` : ''
+    const href = page.href || page.pathname
     if (page.title && page.title !== page.pathname)
-      lines.push(`- [${page.title}](${page.pathname})${descText}`)
+      lines.push(`- [${page.title}](${href})${descText}`)
     else
-      lines.push(`- ${page.pathname}${descText}`)
+      lines.push(`- ${href}${descText}`)
   }
 
   return lines
@@ -192,6 +195,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const siteConfig = getSiteConfig(event)
   const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
+  const baseURL = runtimeConfig.app.baseURL
 
   const parts: string[] = []
 
@@ -245,15 +249,32 @@ export async function buildLlmsTxt(event: H3Event) {
     )
   }
   const urls = await urlsPromise
+  const sitemapPaths = urls.map(url => withoutBase(
+    url.loc.startsWith('/') ? url.loc : new URL(url.loc).pathname,
+    baseURL,
+  ))
+  const sitemapPathSet = new Set(sitemapPaths)
+
+  // Older persistent rows stored deployed paths. Strip the base only when the
+  // sitemap confirms the corresponding logical route, preserving real /base/* routes.
+  const normalizePersistedPath = (route: string): string => {
+    if (sitemapPathSet.has(route))
+      return route
+    const logicalRoute = withoutBase(route, baseURL)
+    return sitemapPathSet.has(logicalRoute) ? logicalRoute : route
+  }
 
   // Build prerendered list and track seen/error paths
   const seenPaths = new Set<string>()
-  const errorSet = new Set(errorPages.map(p => p.route))
+  const errorSet = new Set(errorPages.map(p => normalizePersistedPath(p.route)))
   const prerendered: PageItem[] = []
 
   for (const page of pages) {
-    seenPaths.add(page.route)
-    prerendered.push({ pathname: page.route, title: page.title, description: page.description, locale: page.locale })
+    const pathname = normalizePersistedPath(page.route)
+    if (seenPaths.has(pathname))
+      continue
+    seenPaths.add(pathname)
+    prerendered.push({ pathname, title: page.title, description: page.description, locale: page.locale })
   }
 
   const devModeHint = import.meta.dev && prerendered.length === 0 ? ' (dev mode - run `nuxi generate` for page titles)' : ''
@@ -261,15 +282,16 @@ export async function buildLlmsTxt(event: H3Event) {
   // Collect SSR pages from sitemap that weren't prerendered
   // Filter out error routes detected during prerender
   const other: PageItem[] = []
-  for (const url of urls) {
-    // Avoid URL parsing when possible - most sitemaps have relative paths
-    const pathname = url.loc.startsWith('/') ? url.loc : new URL(url.loc).pathname
+  for (const pathname of sitemapPaths) {
     if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
       const locale = i18n ? resolveLocaleFromRoute(pathname, i18n).locale : undefined
       other.push({ pathname, locale })
       seenPaths.add(pathname)
     }
   }
+
+  for (const page of [...prerendered, ...other])
+    page.href = joinURL(baseURL, page.pathname)
 
   // i18n: filter to default-locale pages, then emit Available Languages header
   if (i18n) {

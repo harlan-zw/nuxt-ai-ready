@@ -92,17 +92,17 @@ async function getPrerenderDb(): Promise<RawExecutor> {
       const includeMarkdown = wantsMarkdown(sql)
 
       if (isErrorQuery) {
-        return pages.filter(p => errorRoutes.has(p.route)).map(p => ({
-          route: p.route,
-          title: p.title,
-          description: p.description,
-          ...(includeMarkdown ? { markdown: p.markdown } : {}),
-          headings: p.headings,
-          keywords: JSON.stringify(p.keywords),
-          updated_at: p.updatedAt,
+        return [...errorRoutes].map(route => ({
+          route,
+          title: '',
+          description: '',
+          ...(includeMarkdown ? { markdown: '' } : {}),
+          headings: '[]',
+          keywords: '[]',
+          updated_at: '',
           is_error: 1,
           indexed: 0,
-          locale: p.locale || '',
+          locale: '',
         })) as T[]
       }
 

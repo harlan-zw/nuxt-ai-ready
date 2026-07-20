@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path'
 import { useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
-import { withBase } from 'ufo'
+import { joinURL, withBase, withLeadingSlash, withoutBase } from 'ufo'
 import { logger } from './logger'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
@@ -274,7 +274,10 @@ async function processSitemapEntry(
   const loc = typeof entry === 'string' ? entry : entry.loc
   const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
   // Handle both absolute URLs and relative paths
-  const route = normalizePagePath(loc.startsWith('http') ? new URL(loc).pathname : loc)
+  const route = normalizePagePath(withoutBase(
+    loc.startsWith('http') ? new URL(loc).pathname : loc,
+    nitro.options.baseURL,
+  ))
 
   // Skip internal/special files (e.g., _headers, _redirects)
   if (route.split('/').some(segment => segment.startsWith('_'))) {
@@ -286,7 +289,7 @@ async function processSitemapEntry(
   }
 
   const mdRoute = toMarkdownPath(route)
-  const mdUrl = withBase(mdRoute, nitro.options.baseURL)
+  const mdUrl = joinURL(nitro.options.baseURL, mdRoute)
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
   // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
@@ -470,7 +473,13 @@ export function setupPrerenderHandler(
     nitro.hooks.hook('prerender:generate', async (route) => {
       // Track error routes for filtering in llms.txt
       if (route.error) {
-        const pageRoute = route.route.replace(RE_HTML_MD_EXT, '').replace(RE_INDEX_SUFFIX, '') || '/'
+        // Nitro file names are relative to the public output and already have
+        // app.baseURL removed, unlike crawled route names which may be deployed.
+        const routePath = route.fileName || route.route
+        const pageRoute = withLeadingSlash(routePath)
+          .replace(RE_HTML_MD_EXT, '')
+          .replace(RE_INDEX_SUFFIX, '')
+          .replace(RE_HTML_MD_EXT, '') || '/'
         state.errorRoutes.add(pageRoute)
         logger.debug(`Detected error page: ${pageRoute}`)
         return

@@ -1,5 +1,6 @@
 import { createError, defineEventHandler } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { joinURL } from 'ufo'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
@@ -36,7 +37,8 @@ export default defineEventHandler(async (event) => {
     return
 
   const { path } = renderInfo
-  const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any
+  const fullRuntimeConfig = useRuntimeConfig(event)
+  const runtimeConfig = fullRuntimeConfig['nuxt-ai-ready'] as any
   const canonicalUrl = withSiteUrl(event, path)
 
   // Prefer @nuxt/content source: skip HTML fetch + mdream when the route is
@@ -77,7 +79,7 @@ export default defineEventHandler(async (event) => {
   }
   else {
     logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-    const response = await event.fetch(path, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    const response = await event.fetch(joinURL(fullRuntimeConfig.app.baseURL, path), { signal: AbortSignal.timeout(30000) }).catch((err) => {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         throw createError({
           statusCode: 504,
