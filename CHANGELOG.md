@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.5.5...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.5...main)
+
+### 🩹 Fixes
+
+- Handle app base URLs in AI-ready routes ([#50](https://github.com/harlan-zw/nuxt-ai-ready/pull/50))
+
+### 🏡 Chore
+
+- Bump deps ([fee04b2](https://github.com/harlan-zw/nuxt-ai-ready/commit/fee04b2))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+- MicroHoffman ([@microHoffman](https://github.com/microHoffman))
+
 ## v1.5.4...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.4...main)
