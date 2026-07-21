@@ -76,6 +76,22 @@ describe('normalizeLlmsTxtConfig', () => {
     expect(result).not.toContain('## Notes')
   })
 
+  it('escapes headings embedded in preamble content', () => {
+    const result = normalizeLlmsTxtConfig({
+      notes: '## Important\nRead this first.',
+      sections: [{
+        title: 'Documentation',
+        description: '# Overview\nPrimary resources.',
+        links: [{ title: 'Guide', href: '/guide.md' }],
+      }],
+    })
+
+    expect(result).toContain('\\## Important')
+    expect(result).toContain('\\# Overview')
+    expect(result).not.toMatch(/^## Important$/m)
+    expect(() => parseFileSections(result)).not.toThrow()
+  })
+
   it('preserves Markdown preamble content outside file-list sections', () => {
     const result = normalizeLlmsTxtConfig({
       sections: [{
@@ -106,8 +122,38 @@ describe('normalizeLlmsTxtConfig', () => {
 
     expect(result.match(/^## Optional$/gm)).toHaveLength(1)
     expect(result).not.toMatch(/^### /m)
-    expect(result).toContain('- [Debug Route](/debug.md): Debug Endpoints — Internal diagnostics')
+    expect(result).toContain('- [Debug Route](/debug.md): Debug Endpoints; Internal diagnostics')
     expect(result).toContain('- [Version 1](/v1.md): Legacy API')
+  })
+
+  it('keeps optional section descriptions inside the optional file list', () => {
+    const result = normalizeLlmsTxtConfig({
+      sections: [{
+        title: 'Debug Endpoints',
+        description: ['Internal debugging tools.', 'May expose implementation details.'],
+        optional: true,
+        links: [{ title: 'Debug Route', href: '/debug.md', description: 'Runtime diagnostics' }],
+      }],
+    })
+
+    const optionalIndex = result.indexOf('## Optional')
+    expect(result.indexOf('Internal debugging tools.')).toBeGreaterThan(optionalIndex)
+    expect(result).toContain('- [Debug Route](/debug.md): Debug Endpoints; Internal debugging tools.; May expose implementation details.; Runtime diagnostics')
+  })
+
+  it('emits parser-safe Markdown links for reserved title and URL characters', () => {
+    const result = normalizeLlmsTxtConfig({
+      sections: [{
+        title: 'Documentation',
+        links: [{
+          title: 'Array[T]',
+          href: '/guides/(typed arrays).md',
+        }],
+      }],
+    })
+
+    expect(result).toContain('- [Array&#91;T&#93;](/guides/%28typed%20arrays%29.md)')
+    expect(() => parseFileSections(result)).not.toThrow()
   })
 
   it('omits an empty optional file-list section', () => {
@@ -154,7 +200,7 @@ describe('normalizeLlmsTxtConfig', () => {
         { title: 'API', url: '/api.md' },
       ],
       Optional: [
-        { title: 'Demo', url: '/demo.md', description: 'Examples — Runnable project' },
+        { title: 'Demo', url: '/demo.md', description: 'Examples; Runnable project' },
       ],
     })
   })

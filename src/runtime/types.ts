@@ -283,7 +283,7 @@ export interface LlmsTxtLink {
 export interface LlmsTxtSection {
   /** The title of the section */
   title: string
-  /** Description rendered in the heading-free preamble before file-list sections (can be array for multiple paragraphs) */
+  /** Description rendered in the heading-free preamble, or in each optional link note (can be array for multiple paragraphs) */
   description?: string | string[]
   /** The links of the section */
   links?: LlmsTxtLink[]
