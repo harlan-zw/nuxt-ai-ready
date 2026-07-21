@@ -1,6 +1,7 @@
+import type { SitemapUrlInput, SitemapXmlInput } from '@nuxtjs/sitemap/utils'
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { isSitemapIndex, parseSitemapIndex, parseSitemapXml } from '@nuxtjs/sitemap/utils'
+import { parseSitemapStream } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
 import { logger } from '../logger'
@@ -61,16 +62,19 @@ export function hasMultipleSitemaps(event: H3Event): boolean {
 /**
  * Normalize sitemap URL entries to SitemapUrl[]
  */
-function normalizeUrls(urls: unknown[]): SitemapUrl[] {
-  return urls.map((entry) => {
-    if (typeof entry === 'string')
-      return { loc: entry }
-    const e = entry as { loc: string, lastmod?: string | Date }
-    return {
-      loc: e.loc,
-      lastmod: e.lastmod instanceof Date ? e.lastmod.toISOString() : e.lastmod,
-    }
-  })
+function normalizeUrl(entry: SitemapUrlInput): SitemapUrl {
+  if (typeof entry === 'string')
+    return { loc: entry }
+  return {
+    loc: entry.loc,
+    lastmod: entry.lastmod instanceof Date ? entry.lastmod.toISOString() : entry.lastmod,
+  }
+}
+
+function isSitemapXmlInput(value: unknown): value is SitemapXmlInput {
+  return typeof value === 'string'
+    || value instanceof Uint8Array
+    || (typeof value === 'object' && value !== null && 'getReader' in value)
 }
 
 /**
@@ -89,11 +93,11 @@ export async function fetchSitemapByRoute(
   const usePublicAsset = config.sitemapPrerendered && hasAssets(event)
   logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.$fetch' : 'globalThis.$fetch'}`)
 
-  let sitemapXml: string | null = null
+  let sitemapInput: SitemapXmlInput | null = null
 
   if (usePublicAsset) {
-    sitemapXml = await fetchPublicAsset<string>(event, fetchRoute, { responseType: 'text' })
-    if (!sitemapXml) {
+    sitemapInput = await fetchPublicAsset<SitemapXmlInput>(event, fetchRoute, { responseType: 'stream' })
+    if (!sitemapInput) {
       logger.warn(`[sitemap] Not found in ASSETS: ${fetchRoute}`)
       return { urls: [], error: 'Not found in ASSETS' }
     }
@@ -102,15 +106,19 @@ export async function fetchSitemapByRoute(
     try {
       // Use event.$fetch when available, fallback to globalThis.$fetch for cron
       const $fetch = event?.$fetch ?? globalThis.$fetch
-      const res = await $fetch<string>(fetchRoute, {
-        responseType: 'text',
+      const res: unknown = await $fetch(fetchRoute, {
+        responseType: 'stream',
         timeout: FETCH_TIMEOUT,
       })
-      if (!res || typeof res !== 'string') {
+      if (!res) {
         logger.warn(`[sitemap] Empty response from ${fetchRoute}`)
         return { urls: [], error: 'Empty response' }
       }
-      sitemapXml = res
+      if (!isSitemapXmlInput(res)) {
+        logger.warn(`[sitemap] Invalid response body from ${fetchRoute}`)
+        return { urls: [], error: 'Invalid response body' }
+      }
+      sitemapInput = res
     }
     catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -119,30 +127,40 @@ export async function fetchSitemapByRoute(
     }
   }
 
-  logger.debug(`[sitemap] Parsing sitemap XML (${sitemapXml.length} bytes)`)
+  logger.debug(`[sitemap] Parsing sitemap XML stream`)
 
-  // Sitemap index (i18n / multi-sitemap sites): /sitemap.xml points to child
-  // sitemaps rather than listing <url> entries. Follow the children so llms.txt
-  // and runtime indexing see the actual page URLs.
-  if (isSitemapIndex(sitemapXml)) {
+  const urls: SitemapUrl[] = []
+  const indexEntries: Array<{ loc: string }> = []
+  let kind: 'urlset' | 'index' | undefined
+  try {
+    for await (const parsed of parseSitemapStream(sitemapInput)) {
+      if (parsed._tag === 'kind')
+        kind = parsed.kind
+      else if (parsed._tag === 'url')
+        urls.push(normalizeUrl(parsed.url))
+      else if (parsed._tag === 'sitemap')
+        indexEntries.push(parsed.sitemap)
+      else
+        logger.warn(`[sitemap] ${fetchRoute}: ${parsed.warning.message}`)
+    }
+  }
+  catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    logger.warn(`[sitemap] Failed to parse ${fetchRoute}: ${msg}`)
+    return { urls: [], error: msg }
+  }
+
+  // Sitemap index (i18n / multi-sitemap sites): follow child sitemaps so
+  // llms.txt and runtime indexing receive page URLs rather than index entries.
+  if (kind === 'index') {
     if (depth >= 3) {
       logger.warn(`[sitemap] Sitemap index nesting too deep at ${fetchRoute}, stopping`)
       return { urls: [] }
     }
-    let index: { entries: { loc: string }[] }
-    try {
-      index = await parseSitemapIndex(sitemapXml)
-    }
-    catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      logger.warn(`[sitemap] Failed to parse sitemap index ${fetchRoute}: ${msg}`)
-      return { urls: [], error: msg }
-    }
-
-    logger.debug(`[sitemap] ${fetchRoute} is a sitemap index with ${index.entries.length} children`)
+    logger.debug(`[sitemap] ${fetchRoute} is a sitemap index with ${indexEntries.length} children`)
     const allUrls: SitemapUrl[] = []
     const childErrors: string[] = []
-    for (const entry of index.entries) {
+    for (const entry of indexEntries) {
       const childRoute = entry.loc.startsWith('http') ? new URL(entry.loc).pathname : entry.loc
       // Avoid re-fetching the index itself (self-referencing or normalised duplicate)
       if (withLeadingSlash(childRoute) === fetchRoute)
@@ -156,24 +174,13 @@ export async function fetchSitemapByRoute(
         childErrors.push(`${withLeadingSlash(childRoute)}: ${error}`)
     }
     if (childErrors.length > 0) {
-      const msg = `${childErrors.length}/${index.entries.length} child sitemaps failed (${childErrors.join('; ')})`
+      const msg = `${childErrors.length}/${indexEntries.length} child sitemaps failed (${childErrors.join('; ')})`
       logger.warn(`[sitemap] Sitemap index ${fetchRoute}: ${msg}`)
       return { urls: allUrls, error: msg }
     }
     return { urls: allUrls }
   }
 
-  let result: { urls?: unknown[] }
-  try {
-    result = await parseSitemapXml(sitemapXml)
-  }
-  catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    logger.warn(`[sitemap] Failed to parse ${fetchRoute}: ${msg}`)
-    return { urls: [], error: msg }
-  }
-
-  const urls = normalizeUrls(result?.urls || [])
   logger.debug(`[sitemap] Found ${urls.length} URLs in ${fetchRoute}`)
 
   return { urls }

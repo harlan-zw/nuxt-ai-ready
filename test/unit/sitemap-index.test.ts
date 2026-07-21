@@ -33,13 +33,29 @@ const INDEX = `<?xml version="1.0" encoding="UTF-8"?>
   <sitemap><loc>https://example.com/__sitemap__/fr.xml</loc></sitemap>
 </sitemapindex>`
 
+function toChunkedStream(xml: string, chunkSize = 7): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(xml)
+  let offset = 0
+
+  return new ReadableStream({
+    pull(controller) {
+      if (offset >= bytes.length) {
+        controller.close()
+        return
+      }
+      controller.enqueue(bytes.slice(offset, offset + chunkSize))
+      offset += chunkSize
+    },
+  })
+}
+
 function mockEvent(routes: Record<string, string>): H3Event {
   return {
-    $fetch: vi.fn(async (route: string) => {
+    $fetch: vi.fn(async (route: string, options?: { responseType?: string }) => {
       const body = routes[route]
       if (body == null)
         throw new Error(`404 ${route}`)
-      return body
+      return options?.responseType === 'stream' ? toChunkedStream(body) : body
     }),
   } as unknown as H3Event
 }
@@ -57,6 +73,9 @@ describe('fetchSitemapByRoute', () => {
       'https://example.com/about',
       'https://example.com/contact',
     ])
+    expect(event.$fetch).toHaveBeenCalledWith('/sitemap.xml', expect.objectContaining({
+      responseType: 'stream',
+    }))
   })
 
   it('follows a sitemap index and aggregates child urls', async () => {

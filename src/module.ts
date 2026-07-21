@@ -81,7 +81,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=6.0.0',
     },
     '@nuxtjs/sitemap': {
-      version: '>=8.0.0',
+      version: '>=8.3.0',
     },
     'nuxt-site-config': {
       version: '>=3.2',
