@@ -41,3 +41,9 @@ declare module '#ai-ready-virtual/db-schema.mjs' {
   // Types match sqlite schema - postgres schema has identical structure
   export { cronRuns, indexnowLog, info, pages, schema, sitemaps } from './runtime/server/db/schema/sqlite'
 }
+
+declare module '#ai-ready-virtual/sitemap-parser.mjs' {
+  import type { ParseSitemap } from './runtime/server/compat/sitemap-parser'
+
+  export const parseSitemap: ParseSitemap
+}

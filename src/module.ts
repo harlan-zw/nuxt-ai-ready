@@ -14,6 +14,7 @@ import { setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { supportsSitemapStreamingParser } from './utils/sitemap-version'
 import { ensureStaticHeader } from './utils/static-headers'
 
 export interface ModuleHooks {
@@ -81,7 +82,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=6.0.0',
     },
     '@nuxtjs/sitemap': {
-      version: '>=8.0.0',
+      version: '>=7.6.0',
     },
     'nuxt-site-config': {
       version: '>=3.2',
@@ -112,6 +113,10 @@ export default defineNuxtModule<ModuleOptions>({
   async setup(config, nuxt) {
     const { resolve } = createResolver(import.meta.url)
     const { version } = await readPackageJSON(resolve('../package.json'))
+    const sitemapPackagePath = await resolvePackageJSON('@nuxtjs/sitemap', { from: nuxt.options.rootDir })
+    const sitemapPackage = sitemapPackagePath ? await readPackageJSON(sitemapPackagePath) : undefined
+    const sitemapVersion = sitemapPackage?.version
+    const useStreamingSitemapParser = supportsSitemapStreamingParser(sitemapVersion)
 
     logger.level = (config.debug || nuxt.options.debug) ? 4 : 3
 
@@ -426,6 +431,11 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
+
+      const sitemapParserAdapter = useStreamingSitemapParser
+        ? '#ai-ready/server/compat/sitemap-parser-stream'
+        : '#ai-ready/server/compat/sitemap-parser-buffered'
+      nitroConfig.virtual['#ai-ready-virtual/sitemap-parser.mjs'] = `export { parseSitemap } from ${JSON.stringify(sitemapParserAdapter)}`
 
       // Helper to read from SQLite database during prerender
       // Uses node:sqlite or better-sqlite3 directly since we're in Node.js context

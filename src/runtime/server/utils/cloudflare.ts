@@ -28,7 +28,7 @@ export function hasAssets(event?: H3Event): boolean {
 export async function fetchPublicAsset<T = unknown>(
   event: H3Event | undefined,
   path: string,
-  options?: { responseType?: 'json' | 'text' | 'arrayBuffer' },
+  options?: { responseType?: 'json' | 'text' | 'arrayBuffer' | 'stream' },
 ): Promise<T | null> {
   const responseType = options?.responseType ?? 'json'
   const cfEnv = getCfEnv(event)
@@ -46,6 +46,8 @@ export async function fetchPublicAsset<T = unknown>(
         return response.text().catch(() => null) as T
       if (responseType === 'arrayBuffer')
         return response.arrayBuffer().catch(() => null) as T
+      if (responseType === 'stream')
+        return response.body as T | null
     }
     // ASSETS exists but file not found - don't fall back
     return null
@@ -58,7 +60,7 @@ export async function fetchPublicAsset<T = unknown>(
   return globalThis.$fetch(path, {
     baseURL: '/',
     signal: controller.signal,
-    responseType: responseType === 'arrayBuffer' ? 'arrayBuffer' : undefined,
+    responseType: responseType === 'arrayBuffer' || responseType === 'stream' ? responseType : undefined,
   })
     .catch(() => null)
     .finally(() => clearTimeout(timeout)) as Promise<T | null>
