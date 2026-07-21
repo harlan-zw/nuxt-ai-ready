@@ -1,9 +1,9 @@
+import type { SitemapUrlInput, SitemapXmlInput } from '@nuxtjs/sitemap/utils'
 import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import type { ParsedSitemapUrl, SitemapXmlInput } from '../compat/sitemap-parser'
+import { parseSitemapStream } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
-import { parseSitemap } from '#ai-ready-virtual/sitemap-parser.mjs'
 import { logger } from '../logger'
 import { fetchPublicAsset, hasAssets } from './cloudflare'
 
@@ -62,7 +62,7 @@ export function hasMultipleSitemaps(event: H3Event): boolean {
 /**
  * Normalize sitemap URL entries to SitemapUrl[]
  */
-function normalizeUrl(entry: string | ParsedSitemapUrl): SitemapUrl {
+function normalizeUrl(entry: SitemapUrlInput): SitemapUrl {
   if (typeof entry === 'string')
     return { loc: entry }
   return {
@@ -133,7 +133,7 @@ export async function fetchSitemapByRoute(
   const indexEntries: Array<{ loc: string }> = []
   let kind: 'urlset' | 'index' | undefined
   try {
-    for await (const parsed of parseSitemap(sitemapInput)) {
+    for await (const parsed of parseSitemapStream(sitemapInput)) {
       if (parsed._tag === 'kind')
         kind = parsed.kind
       else if (parsed._tag === 'url')

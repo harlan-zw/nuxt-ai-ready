@@ -74,11 +74,6 @@ declare module '#ai-ready-virtual/content-lookup.mjs' {
     updatedAt?: string
   } | null>
 }
-
-declare module '#ai-ready-virtual/sitemap-parser.mjs' {
-  import type { ParseSitemap } from '#ai-ready/server/compat/sitemap-parser'
-  export const parseSitemap: ParseSitemap
-}
 `,
   })
 }
