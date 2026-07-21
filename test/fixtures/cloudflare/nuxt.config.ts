@@ -19,6 +19,9 @@ export default defineNuxtConfig({
     description: 'Test site for Nuxt AI Ready',
   },
   aiReady: {
+    llmsTxt: {
+      markdownLinks: true,
+    },
     database: {
       type: 'd1',
       bindingName: 'DB',

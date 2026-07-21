@@ -295,6 +295,13 @@ export interface LlmsTxtSection {
  * Structured llms.txt configuration
  */
 export interface LlmsTxtConfig {
+  /**
+   * Rewrite automatically generated page links to their Markdown representation
+   * when the final static output contains the file or the deployment retains
+   * the runtime Markdown handler.
+   * @default false
+   */
+  markdownLinks?: boolean
   /** The sections of the documentation */
   sections?: LlmsTxtSection[]
   /** Additional heading-free preamble notes rendered before file-list sections */

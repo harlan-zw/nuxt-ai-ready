@@ -32,6 +32,10 @@ export {}
   addTemplate({
     filename: 'types/ai-ready-virtual.d.ts',
     getContents: () => `declare module '#ai-ready-virtual/read-page-data.mjs' {
+  export function readMarkdownLinkAvailabilityFromFilesystem(): Promise<{
+    runtimeMarkdownAvailable: boolean
+    paths: string[]
+  }>
   export function readPageDataFromFilesystem(): Promise<{
     pages: Array<{
       route: string

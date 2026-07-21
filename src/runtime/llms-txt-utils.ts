@@ -3,9 +3,11 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { isPathFile } from 'nuxt-site-config/urls'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { formatAvailableLanguagesSection, formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
+import { toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
@@ -20,6 +22,34 @@ interface PageItem {
   title?: string
   description?: string
   locale?: string
+}
+
+function hasRuntimeMarkdownHandler(pathname: string): boolean {
+  return !pathname.startsWith('/api')
+    && !pathname.startsWith('/_')
+    && !pathname.startsWith('/@')
+    && !isPathFile(pathname)
+}
+
+interface MarkdownLinkAvailability {
+  runtimeMarkdownAvailable: boolean
+  paths: Set<string>
+}
+
+async function findMarkdownLinkAvailability(): Promise<MarkdownLinkAvailability> {
+  if (!import.meta.prerender) {
+    return {
+      runtimeMarkdownAvailable: true,
+      paths: new Set(),
+    }
+  }
+
+  const { readMarkdownLinkAvailabilityFromFilesystem } = await import('#ai-ready-virtual/read-page-data.mjs')
+  const availability = await readMarkdownLinkAvailabilityFromFilesystem()
+  return {
+    runtimeMarkdownAvailable: availability.runtimeMarkdownAvailable,
+    paths: new Set(availability.paths),
+  }
 }
 
 /**
@@ -266,8 +296,22 @@ export async function buildLlmsTxt(event: H3Event) {
     }
   }
 
+  let resolvePageHref = resolvePath
+  if (llmsTxtConfig.markdownLinks) {
+    const markdownLinkAvailability = await findMarkdownLinkAvailability()
+    resolvePageHref = (pathname: string): string => {
+      const deployedPathname = resolvePath(pathname)
+      const markdownPath = resolvePath(toMarkdownPath(pathname))
+      if (markdownLinkAvailability.paths.has(markdownPath)
+        || (markdownLinkAvailability.runtimeMarkdownAvailable && hasRuntimeMarkdownHandler(pathname))) {
+        return markdownPath
+      }
+      return deployedPathname
+    }
+  }
+
   for (const page of [...prerendered, ...other])
-    page.href = resolvePath(page.pathname)
+    page.href = resolvePageHref(page.pathname)
 
   // i18n: filter to default-locale pages, then emit Available Languages header
   if (i18n) {
@@ -277,7 +321,7 @@ export async function buildLlmsTxt(event: H3Event) {
       const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n).locale
       pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
     }
-    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePath))
+    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePageHref))
     parts.push('')
   }
 

@@ -2,7 +2,7 @@ import type { ParsedMarkdownResult } from './prerender'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
@@ -10,7 +10,7 @@ import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
-import { setupPrerenderHandler } from './prerender'
+import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
@@ -285,13 +285,14 @@ export default defineNuxtModule<ModuleOptions>({
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
+          markdownLinks: config.llmsTxt.markdownLinks ?? false,
           sections: [
             ...defaultLlmsTxtSections,
             ...(config.llmsTxt.sections || []),
           ],
           notes: config.llmsTxt.notes,
         }
-      : { sections: defaultLlmsTxtSections }
+      : { markdownLinks: false, sections: defaultLlmsTxtSections }
 
     // Allow other modules to extend llms.txt content via hook
     const llmsTxtPayload = {
@@ -426,13 +427,35 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
+      const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
       // Uses node:sqlite or better-sqlite3 directly since we're in Node.js context
       // In dev mode, provide a stub to avoid rollup warnings about node:sqlite
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = nuxt.options.dev
-        ? `export async function readPageDataFromFilesystem() { return { pages: [], errorRoutes: [] } }`
+        ? `
+export async function readPageDataFromFilesystem() { return { pages: [], errorRoutes: [] } }
+export async function readMarkdownLinkAvailabilityFromFilesystem() { return { runtimeMarkdownAvailable: false, paths: [] } }
+`
         : `
+export async function readMarkdownLinkAvailabilityFromFilesystem() {
+  if (!import.meta.prerender) {
+    return { runtimeMarkdownAvailable: false, paths: [] }
+  }
+
+  const { readFile } = await import('node:fs/promises')
+  try {
+    const availability = JSON.parse(await readFile(${JSON.stringify(markdownLinkAvailabilityPath)}, 'utf8'))
+    return {
+      runtimeMarkdownAvailable: availability?.runtimeMarkdownAvailable === true,
+      paths: Array.isArray(availability?.paths) ? availability.paths.filter(path => typeof path === 'string') : [],
+    }
+  }
+  catch {
+    return { runtimeMarkdownAvailable: false, paths: [] }
+  }
+}
+
 export async function readPageDataFromFilesystem() {
   if (!import.meta.prerender) {
     return { pages: [], errorRoutes: [] }
