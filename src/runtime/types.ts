@@ -283,11 +283,11 @@ export interface LlmsTxtLink {
 export interface LlmsTxtSection {
   /** The title of the section */
   title: string
-  /** The description of the section (can be array for multiple paragraphs) */
+  /** Description rendered in the heading-free preamble, or in each optional link note (can be array for multiple paragraphs) */
   description?: string | string[]
   /** The links of the section */
   links?: LlmsTxtLink[]
-  /** Mark section as optional per llms.txt spec. Optional sections appear under `## Optional` and LLMs may skip them with shorter context windows. */
+  /** Mark links as optional per llms.txt spec. Links from all optional sections are flattened under `## Optional`. */
   optional?: boolean
 }
 
@@ -297,7 +297,7 @@ export interface LlmsTxtSection {
 export interface LlmsTxtConfig {
   /** The sections of the documentation */
   sections?: LlmsTxtSection[]
-  /** Notes section (always appears at the end) */
+  /** Additional heading-free preamble notes rendered before file-list sections */
   notes?: string | string[]
 }
 
