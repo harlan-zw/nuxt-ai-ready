@@ -6,7 +6,7 @@ import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
-import { resolveFiles, useNuxt } from '@nuxt/kit'
+import { hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
@@ -436,9 +436,7 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   const prerenderedRoutes = (nuxt.options.nitro.prerender?.routes || []) as string[]
 
   // Check if @nuxtjs/sitemap module is installed - it auto-prerenders sitemap.xml
-  const hasSitemapModule = nuxt.options._installedModules?.some(
-    m => m.meta?.name === '@nuxtjs/sitemap',
-  )
+  const hasSitemapModule = hasNuxtModule('@nuxtjs/sitemap', nuxt)
 
   let prerenderSitemap = hasSitemapModule || isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
 
