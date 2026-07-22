@@ -15,7 +15,7 @@ export default defineNuxtConfig({
   },
   sitemap: {
     // One /docs segment is the app base; the other belongs to the logical route.
-    urls: ['/guide.html', '/legacy/', '/docs/docs/ignored/', '/docs/docs/published/'],
+    urls: ['/guide.html', '/legacy/', '/docs/docs/ignored/', '/docs/docs/published/', '/docs/docs/space route/'],
   },
   nitro: {
     static: true,

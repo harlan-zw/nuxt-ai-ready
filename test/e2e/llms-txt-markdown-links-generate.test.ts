@@ -30,6 +30,7 @@ describe('llms.txt Markdown links in a static build', async () => {
     expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/index\.md\): /)
     expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/about\.md\): /)
     expect(llmsTxt).toContain('(/docs/docs/published.md)')
+    expect(llmsTxt).toContain('(/docs/docs/space%20route.md)')
     expect(llmsTxt.match(/\]\(\/docs\/about\.md\)/g)).toHaveLength(1)
   })
 
@@ -50,6 +51,7 @@ describe('llms.txt Markdown links in a static build', async () => {
     await expect(access(getPublicPath('index.md'))).resolves.toBeUndefined()
     await expect(access(getPublicPath('about.md'))).resolves.toBeUndefined()
     await expect(access(getPublicPath('docs/published.md'))).resolves.toBeUndefined()
+    await expect(access(getPublicPath('docs/space route.md'))).resolves.toBeUndefined()
     await expect(access(getPublicPath('docs/ignored.md'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(access(getPublicPath('docs/api.md'))).rejects.toMatchObject({ code: 'ENOENT' })
   })

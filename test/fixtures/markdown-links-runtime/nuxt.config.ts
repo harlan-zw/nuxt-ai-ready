@@ -11,6 +11,6 @@ export default defineNuxtConfig({
     robotsTxt: false,
   },
   sitemap: {
-    urls: ['/api/status', '/_internal', '/guide.pdf'],
+    urls: ['/api/status', '/_internal', '/guide.pdf', '/image.avif'],
   },
 })

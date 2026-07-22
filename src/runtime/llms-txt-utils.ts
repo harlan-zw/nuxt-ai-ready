@@ -3,7 +3,7 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { isPathFile } from 'nuxt-site-config/urls'
+import { decodePath } from 'ufo'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { formatAvailableLanguagesSection, formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
@@ -25,10 +25,11 @@ interface PageItem {
 }
 
 function hasRuntimeMarkdownHandler(pathname: string): boolean {
+  const lastSegment = pathname.split('/').pop() || ''
   return !pathname.startsWith('/api')
     && !pathname.startsWith('/_')
     && !pathname.startsWith('/@')
-    && !isPathFile(pathname)
+    && !lastSegment.includes('.')
 }
 
 interface MarkdownLinkAvailability {
@@ -48,7 +49,7 @@ async function findMarkdownLinkAvailability(): Promise<MarkdownLinkAvailability>
   const availability = await readMarkdownLinkAvailabilityFromFilesystem()
   return {
     runtimeMarkdownAvailable: availability.runtimeMarkdownAvailable,
-    paths: new Set(availability.paths),
+    paths: new Set(availability.paths.map(decodePath)),
   }
 }
 
@@ -302,7 +303,7 @@ export async function buildLlmsTxt(event: H3Event) {
     resolvePageHref = (pathname: string): string => {
       const deployedPathname = resolvePath(pathname)
       const markdownPath = resolvePath(toMarkdownPath(pathname))
-      if (markdownLinkAvailability.paths.has(markdownPath)
+      if (markdownLinkAvailability.paths.has(decodePath(markdownPath))
         || (markdownLinkAvailability.runtimeMarkdownAvailable && hasRuntimeMarkdownHandler(pathname))) {
         return markdownPath
       }

@@ -451,7 +451,8 @@ export async function readMarkdownLinkAvailabilityFromFilesystem() {
       paths: Array.isArray(availability?.paths) ? availability.paths.filter(path => typeof path === 'string') : [],
     }
   }
-  catch {
+  catch (error) {
+    console.warn('[nuxt-ai-ready] Failed to read Markdown link availability; keeping canonical links.', error)
     return { runtimeMarkdownAvailable: false, paths: [] }
   }
 }
