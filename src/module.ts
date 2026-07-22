@@ -3,7 +3,7 @@ import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, hasNuxtModule } from '@nuxt/kit'
+import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
@@ -143,7 +143,6 @@ export default defineNuxtModule<ModuleOptions>({
       : 'unicode61 remove_diacritics 2'
 
     // Set up alias
-    nuxt.options.nitro.alias = nuxt.options.nitro.alias || {}
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
 
     // Auto-detect database type based on deployment preset
@@ -703,12 +702,8 @@ export async function lookupContentPage(event, path) {
     }, resolve, nuxt)
 
     // Add route rules for static files with proper charset
-    nuxt.options.nitro.routeRules = nuxt.options.nitro.routeRules || {}
     for (const route of ['/llms.txt', '/llms-full.txt']) {
-      nuxt.options.nitro.routeRules[route] = defu(
-        nuxt.options.nitro.routeRules[route],
-        { headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
-      )
+      extendRouteRules(route, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     }
 
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs

@@ -19,6 +19,23 @@ function authHeaders(secret: string): Record<string, string> {
   return { Authorization: `Bearer ${secret}` }
 }
 
+async function requireSecret(cwd: string, hint = ''): Promise<string | null> {
+  const secret = await getSecret(cwd)
+  if (!secret) {
+    consola.error(`No secret found. Run \`nuxi dev\` or \`nuxi build\` first${hint}.`)
+  }
+  return secret
+}
+
+async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T | null> {
+  return fetch(url, init)
+    .then(r => r.json())
+    .catch((err) => {
+      consola.error(`${errorLabel}: ${err.message}`)
+      return null
+    })
+}
+
 const main = defineCommand({
   meta: {
     name: 'nuxt-ai-ready',
@@ -46,23 +63,14 @@ const main = defineCommand({
       },
       async run({ args }) {
         const cwd = resolve(args.cwd || '.')
-        const secret = await getSecret(cwd)
-
-        if (!secret) {
-          consola.error('No secret found. Run `nuxi dev` or `nuxi build` first to generate one.')
+        const secret = await requireSecret(cwd, ' to generate one')
+        if (!secret)
           return
-        }
 
         const url = `${args.url}/__ai-ready/status`
         consola.info(`Fetching status from ${args.url}...`)
 
-        const res = await fetch(url, { headers: authHeaders(secret) })
-          .then(r => r.json())
-          .catch((err) => {
-            consola.error(`Failed to connect: ${err.message}`)
-            return null
-          })
-
+        const res = await fetchJson(url, { headers: authHeaders(secret) }, 'Failed to connect')
         if (!res)
           return
 
@@ -161,12 +169,9 @@ const main = defineCommand({
       },
       async run({ args }) {
         const cwd = resolve(args.cwd || '.')
-        const secret = await getSecret(cwd)
-
-        if (!secret) {
-          consola.error('No secret found. Run `nuxi dev` or `nuxi build` first.')
+        const secret = await requireSecret(cwd)
+        if (!secret)
           return
-        }
 
         const params = new URLSearchParams()
         if (args.all) {
@@ -179,13 +184,7 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/poll?${params}`
         consola.info(`Triggering poll at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
-          .then(r => r.json())
-          .catch((err) => {
-            consola.error(`Failed: ${err.message}`)
-            return null
-          })
-
+        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
         if (!res)
           return
 
@@ -226,12 +225,9 @@ const main = defineCommand({
       },
       async run({ args }) {
         const cwd = resolve(args.cwd || '.')
-        const secret = await getSecret(cwd)
-
-        if (!secret) {
-          consola.error('No secret found. Run `nuxi dev` or `nuxi build` first.')
+        const secret = await requireSecret(cwd)
+        if (!secret)
           return
-        }
 
         const params = new URLSearchParams()
         if (!args.clear) {
@@ -241,13 +237,7 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/restore?${params}`
         consola.info(`Restoring database at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
-          .then(r => r.json())
-          .catch((err) => {
-            consola.error(`Failed: ${err.message}`)
-            return null
-          })
-
+        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
         if (!res)
           return
 
@@ -303,15 +293,10 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/prune?${params}`
         consola.info(`${args.dry ? 'Previewing' : 'Pruning'} stale routes at ${args.url}...`)
 
-        const res = await fetch(url, {
+        const res = await fetchJson(url, {
           method: 'POST',
           headers: secret ? authHeaders(secret) : undefined,
         })
-          .then(r => r.json())
-          .catch((err) => {
-            consola.error(`Failed: ${err.message}`)
-            return null
-          })
 
         if (!res)
           return
@@ -359,12 +344,9 @@ const main = defineCommand({
       },
       async run({ args }) {
         const cwd = resolve(args.cwd || '.')
-        const secret = await getSecret(cwd)
-
-        if (!secret) {
-          consola.error('No secret found. Run `nuxi dev` or `nuxi build` first.')
+        const secret = await requireSecret(cwd)
+        if (!secret)
           return
-        }
 
         const params = new URLSearchParams({
           limit: args.limit || '100',
@@ -373,13 +355,7 @@ const main = defineCommand({
         const url = `${args.url}/__ai-ready/indexnow?${params}`
         consola.info(`Triggering IndexNow sync at ${args.url}...`)
 
-        const res = await fetch(url, { method: 'POST', headers: authHeaders(secret) })
-          .then(r => r.json())
-          .catch((err) => {
-            consola.error(`Failed: ${err.message}`)
-            return null
-          })
-
+        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
         if (!res)
           return
 
