@@ -19,4 +19,9 @@ export default defineNuxtConfig({
     name: 'Test Site',
     description: 'Test site for Nuxt AI Ready',
   },
+  aiReady: {
+    llmsTxt: {
+      markdownLinks: true,
+    },
+  },
 })

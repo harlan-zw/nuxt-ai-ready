@@ -7,14 +7,18 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 const fixtureDir = resolve('../fixtures/vercel')
 
-function getOutputDir() {
+function getBuildDir() {
   const ctx = useTestContext()
-  // test-utils outputs to nuxt.options.buildDir + /output/ instead of .vercel/output/
   const buildDir = ctx.nuxt?.options.buildDir
   if (!buildDir) {
     throw new Error('nuxt.options.buildDir not available in test context')
   }
-  return join(buildDir, 'output')
+  return buildDir
+}
+
+function getOutputDir() {
+  // test-utils outputs to nuxt.options.buildDir + /output/ instead of .vercel/output/
+  return join(getBuildDir(), 'output')
 }
 
 async function readConfig() {
@@ -38,6 +42,11 @@ describe('vercel build output', async () => {
     for (const file of ['llms.txt', 'llms-full.txt']) {
       await expect(access(join(getOutputDir(), 'static', file))).resolves.toBeUndefined()
     }
+  })
+
+  it('skips Markdown-link availability discovery when Markdown links are disabled', async () => {
+    const availabilityPath = join(getBuildDir(), '.data/ai-ready/markdown-link-availability.json')
+    await expect(access(availabilityPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   // Regression test for nuxt/scripts#825: the runtime /llms-full.txt handler

@@ -4,12 +4,12 @@ import type { DatabaseAdapter } from './runtime/server/db/shared'
 import type { BuildMeta, BuildMetaChanges } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { useNuxt } from '@nuxt/kit'
+import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
+import { resolveFiles, useNuxt } from '@nuxt/kit'
 import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
-import { withBase, withLeadingSlash } from 'ufo'
+import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
@@ -23,6 +23,10 @@ const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-
 const RE_HTML_MD_EXT = /\.(html|md)$/
 const RE_INDEX_SUFFIX = /\/index$/
 const RE_MD_EXT = /\.md$/
+const RE_NEGATED_GLOB = /^(!?)(.*)$/
+const RE_PARENT_DIR_GLOB = /!?\.\.\//
+
+export const MARKDOWN_LINK_AVAILABILITY_FILE = 'markdown-link-availability.json'
 
 export interface ParsedMarkdownResult {
   markdown: string
@@ -36,6 +40,57 @@ export interface ParsedMarkdownResult {
 interface SitemapEntry {
   loc: string
   lastmod?: string | Date
+}
+
+interface PublicAssetSource {
+  dir: string
+  baseURL?: string
+}
+
+async function findOutputMarkdownPaths(
+  publicDir: string,
+  baseURL: string,
+  srcDir: string,
+  ignoredPaths: string[],
+  publicAssets: PublicAssetSource[],
+): Promise<string[]> {
+  const paths = new Set<string>()
+
+  async function visit(directory: string, urlBase: string, relativeDirectory = ''): Promise<void> {
+    const entries = await readdir(directory, { withFileTypes: true })
+    await Promise.all(entries.map(async (entry) => {
+      const relativePath = join(relativeDirectory, entry.name)
+      if (entry.isDirectory()) {
+        await visit(join(directory, entry.name), urlBase, relativePath)
+      }
+      else if (entry.isFile() && entry.name.endsWith('.md')) {
+        const urlPath = joinURL(urlBase, relativePath.replaceAll('\\', '/'))
+        paths.add(joinURL(baseURL, urlPath))
+      }
+    }))
+  }
+
+  await visit(publicDir, '/')
+
+  for (const asset of publicAssets) {
+    const patterns = [
+      '**/*.md',
+      ...ignoredPaths.map((ignoredPath) => {
+        const [, negated = '', pattern = ''] = ignoredPath.match(RE_NEGATED_GLOB) || []
+        const assetPattern = pattern.startsWith('*')
+          ? pattern
+          : relative(asset.dir, resolve(srcDir, pattern)).replaceAll('\\', '/')
+        return `${negated ? '' : '!'}${assetPattern}`
+      }).filter(pattern => !RE_PARENT_DIR_GLOB.test(pattern)),
+    ]
+    const files = await resolveFiles(asset.dir, patterns)
+    for (const file of files) {
+      const urlPath = joinURL(asset.baseURL || '/', relative(asset.dir, file).replaceAll('\\', '/'))
+      paths.add(joinURL(baseURL, urlPath))
+    }
+  }
+
+  return [...paths].sort()
 }
 
 /**
@@ -615,6 +670,23 @@ export function setupPrerenderHandler(
         if (state.indexNow && state.siteInfo?.url && prevMeta) {
           await submitIndexNow(changed, added, state.siteInfo.url, state.indexNow)
         }
+      }
+
+      // Record only Markdown URLs that will actually be available after
+      // deployment. The prerendered llms.txt route reads this build-only file.
+      if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
+        const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
+        const paths = await findOutputMarkdownPaths(
+          nitro.options.output.publicDir,
+          nitro.options.baseURL,
+          nitro.options.srcDir,
+          nitro.options.ignore,
+          nitro.options.publicAssets,
+        )
+        await writeFile(availabilityFile, JSON.stringify({
+          runtimeMarkdownAvailable: !nitro.options.static,
+          paths,
+        }), 'utf-8')
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed

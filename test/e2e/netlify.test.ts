@@ -64,9 +64,9 @@ describe('netlify build output', async () => {
     expect(llmsTxt).toContain('Canonical Origin:')
 
     // Should have page routes with titles and descriptions
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/\): /)
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/about\): /)
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/api\): /)
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/getting-started\): /)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/index\.md\): /)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/about\.md\): /)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/api\.md\): /)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/getting-started\.md\): /)
   })
 })
