@@ -78,6 +78,39 @@ export interface ModuleOptions {
   }
 
   /**
+   * WebMCP: register tools with in-browser AI agents via `document.modelContext`,
+   * so an agent on the page can search and read content without crawling it.
+   *
+   * Enabling this also auto-imports the `useWebMcpTool()` composable for your
+   * own tools. Set `siteTools: false` to register nothing but your own.
+   * @see https://developer.chrome.com/docs/ai/webmcp
+   * @default false
+   */
+  webmcp?: boolean | {
+    /**
+     * Register the built-in `list_pages`, `search_pages` and `get_page_markdown` tools
+     * @default true
+     */
+    siteTools?: boolean
+    /**
+     * Characters a single tool response may return before it is truncated
+     * @default 1500
+     */
+    maxOutputChars?: number
+    /**
+     * Results returned by `search_pages` by default
+     * @default 10
+     */
+    searchLimit?: number
+    /**
+     * Secure origins allowed to discover the built-in tools.
+     * Only list origins you trust — they gain read access to your page index.
+     * @default undefined (same-origin only)
+     */
+    exposedTo?: string[]
+  }
+
+  /**
    * Cache duration for llms.txt in seconds (runtime generation)
    * Set to 0 to disable caching
    * @default 600 (10 minutes)

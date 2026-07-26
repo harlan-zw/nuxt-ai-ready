@@ -22,6 +22,7 @@ Nuxt AI Ready implements both. It converts your pages to markdown, generates llm
 - 📡 **Content Signals**: Configure AI training/search/input permissions via [Nuxt Robots](https://nuxtseo.com/robots)
 - 🌐 **Sitemap Integration**: Index AI-allowed pages via [Nuxt Sitemap](https://nuxtseo.com/sitemap)
 - ⚡ **MCP Server**: `list_pages` and `search_pages` tools with FTS5 full-text search
+- 🧩 **[WebMCP](https://nuxtseo.com/ai-ready/guides/webmcp)**: Register tools with in-browser AI agents via `document.modelContext`, with a `useWebMcpTool()` composable for your own
 - 🗄️ **Runtime Indexing**: Index pages on-demand without prerendering, with SQLite/D1/LibSQL support
 - 🔔 **[IndexNow](https://nuxtseo.com/ai-ready/guides/indexnow)**: Instantly notify Bing, Yandex, and other search engines when pages change
 - 🌏 **[i18n Aware](https://nuxtseo.com/ai-ready/guides/i18n)**: Auto-detects [`@nuxtjs/i18n`](https://i18n.nuxtjs.org/) for hreflang `Link` headers, locale-tagged frontmatter, and an Available Languages section in `llms.txt`

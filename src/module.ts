@@ -3,7 +3,7 @@ import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
+import { addImports, addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
@@ -66,6 +66,15 @@ export interface ModulePublicRuntimeConfig {
     locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
   } | null
   ftsTokenizer?: string
+}
+
+/** Runtime config exposed to the browser, only set when WebMCP is enabled. */
+export interface ModuleAppRuntimeConfig {
+  webmcp: {
+    maxOutputChars: number
+    searchLimit: number
+    exposedTo?: string[]
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -310,6 +319,9 @@ export default defineNuxtModule<ModuleOptions>({
     const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
+    // WebMCP exposes tools to in-browser agents via document.modelContext
+    const webmcpConfig = config.webmcp === true ? {} : (config.webmcp || null)
+
     // IndexNow: auto-read key from env, derive from site URL if true
     const indexNow = config.indexNow === true
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
@@ -320,6 +332,7 @@ export default defineNuxtModule<ModuleOptions>({
       if (mod) {
         mod.features = {
           mcp: hasMCP,
+          webmcp: !!webmcpConfig,
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           indexNow: !!indexNow,
@@ -624,6 +637,27 @@ export async function lookupContentPage(event, path) {
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+
+    if (webmcpConfig) {
+      addImports(['isWebMcpSupported', 'useWebMcpTool'].map(name => ({
+        name,
+        from: resolve('./runtime/app/composables/webmcp'),
+      })))
+
+      if (webmcpConfig.siteTools !== false) {
+        nuxt.options.runtimeConfig.public['nuxt-ai-ready'] = {
+          webmcp: {
+            maxOutputChars: webmcpConfig.maxOutputChars ?? 1500,
+            searchLimit: webmcpConfig.searchLimit ?? 10,
+            // omitted when empty so the browser never sees a null sequence
+            ...(webmcpConfig.exposedTo?.length ? { exposedTo: webmcpConfig.exposedTo } : {}),
+          },
+        } satisfies ModuleAppRuntimeConfig as any
+
+        addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
+        addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get') })
+      }
+    }
 
     // Devtools API endpoint
     addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })

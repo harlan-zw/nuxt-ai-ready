@@ -7,7 +7,37 @@ interface TemplateContext {
   config: ModuleOptions
 }
 
-export function registerTypeTemplates(_ctx: TemplateContext) {
+/**
+ * Types for the WebMCP declarative API, which turns an annotated form into a
+ * tool. Only emitted when WebMCP is enabled so the attributes stay out of
+ * autocomplete for everyone else.
+ * @see https://developer.chrome.com/docs/ai/webmcp/declarative-api
+ */
+const declarativeWebMcpTypes = `
+declare module '@vue/runtime-dom' {
+  interface HTMLAttributes {
+    /** Names the tool this form exposes to agents. */
+    toolname?: string
+    /** Describes what submitting this form does. */
+    tooldescription?: string
+    /** Describes this field as a tool parameter. */
+    toolparamdescription?: string
+    /** Submit the form as soon as an agent fills it in. */
+    toolautosubmit?: boolean | ''
+  }
+}
+
+declare global {
+  interface SubmitEvent {
+    /** Whether an agent triggered this submit through a tool call. */
+    readonly agentInvoked?: boolean
+    /** Return a result to the agent. Call preventDefault() first. */
+    respondWith?: (result: Promise<unknown>) => void
+  }
+}
+`
+
+export function registerTypeTemplates(ctx: TemplateContext) {
   // Type augmentations for existing modules
   addTypeTemplate({
     filename: 'types/nuxt-ai-ready-augments.d.ts',
@@ -23,7 +53,7 @@ declare module 'nitropack/types' {
     'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>
   }
 }
-
+${ctx.config.webmcp ? declarativeWebMcpTypes : ''}
 export {}
 `,
   })

@@ -1,0 +1,24 @@
+import { createResolver } from '@nuxt/kit'
+import Module from '../../../src/module'
+
+const resolve = createResolver(import.meta.url)
+
+export default defineNuxtConfig({
+  extends: ['../.pages-layer'],
+  modules: [Module, 'nuxt-site-config', '@nuxtjs/sitemap', '@nuxtjs/robots'],
+  alias: {
+    'nuxt-ai-index': resolve.resolve('../../../src/module.ts'),
+  },
+  compatibilityDate: '2025-10-15',
+  site: {
+    url: 'https://test.example.com',
+    name: 'Test Site',
+    description: 'Test site for WebMCP',
+  },
+  aiReady: {
+    webmcp: {
+      maxOutputChars: 500,
+      searchLimit: 5,
+    },
+  },
+})
