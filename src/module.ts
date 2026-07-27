@@ -504,11 +504,8 @@ export async function readPageDataFromFilesystem() {
 
       // Logger with debug level configured from module options
       nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
-import { createConsola } from 'consola'
-export const logger = createConsola({
-  defaults: { tag: 'nuxt-ai-ready' },
-  level: ${config.debug ? 4 : 3},
-})
+import { createModuleLogger } from 'nuxtseo-shared/utils'
+export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
 `
 
       // Database provider - tree-shakeable by aliasing to configured provider at build time
