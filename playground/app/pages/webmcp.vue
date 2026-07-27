@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useSeoMeta, useWebMcpTool } from '#imports'
+import { onMounted, ref, useHead, useSeoMeta, useWebMcpTool } from '#imports'
 
 interface RegisteredTool {
   name: string
@@ -14,6 +14,7 @@ useSeoMeta({
   title: 'WebMCP harness',
   description: 'Inspect and run the WebMCP tools this site registers with in-browser AI agents, including the built-in page tools.',
 })
+useHead({ htmlAttrs: { lang: 'en' } })
 
 const supported = ref<boolean | null>(null)
 const tools = ref<RegisteredTool[]>([])
