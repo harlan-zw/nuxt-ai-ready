@@ -25,6 +25,11 @@ describe('webmcp', async () => {
     expect(res.limit).toBe(50)
   })
 
+  it('checks whether an exact route is indexed', async () => {
+    const res = await $fetch('/__ai-ready/pages?route=/definitely-not-indexed') as any
+    expect(res).toEqual({ page: null })
+  })
+
   it('returns search results for a query', async () => {
     const res = await $fetch('/__ai-ready/pages?q=getting+started') as any
 

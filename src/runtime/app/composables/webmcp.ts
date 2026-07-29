@@ -43,6 +43,8 @@ export function useWebMcpTool<Input extends Record<string, any> = Record<string,
   const modelContext = getModelContext()
   if (!modelContext)
     return { supported: false, unregister: () => {} }
+  if (options.signal?.aborted)
+    return { supported: true, unregister: () => {} }
 
   if (import.meta.dev) {
     for (const warning of checkToolBudget(tool))
@@ -52,7 +54,13 @@ export function useWebMcpTool<Input extends Record<string, any> = Record<string,
   const controller = new AbortController()
   const unregister = () => controller.abort()
 
-  options.signal?.addEventListener('abort', unregister, { once: true })
+  if (options.signal) {
+    const callerSignal = options.signal
+    const abortFromCaller = () => controller.abort(callerSignal.reason)
+    const removeCallerListener = () => callerSignal.removeEventListener('abort', abortFromCaller)
+    callerSignal.addEventListener('abort', abortFromCaller, { once: true })
+    controller.signal.addEventListener('abort', removeCallerListener, { once: true })
+  }
 
   // Only send exposedTo when it holds origins: WebIDL rejects a null or
   // non-iterable value where it expects a sequence.

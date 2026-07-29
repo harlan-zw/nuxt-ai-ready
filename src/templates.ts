@@ -34,6 +34,15 @@ declare global {
     /** Return a result to the agent. Call preventDefault() first. */
     respondWith?: (result: Promise<unknown>) => void
   }
+
+  interface WebMcpToolEvent extends Event {
+    readonly toolName: string
+  }
+
+  interface WindowEventMap {
+    toolactivated: WebMcpToolEvent
+    toolcancel: WebMcpToolEvent
+  }
 }
 `
 

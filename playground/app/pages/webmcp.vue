@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useHead, useSeoMeta, useWebMcpTool } from '#imports'
+import { onMounted, onUnmounted, ref, useHead, useSeoMeta, useWebMcpTool } from '#imports'
 
 interface RegisteredTool {
   name: string
@@ -8,6 +8,11 @@ interface RegisteredTool {
   inputSchema?: string
   origin: string
   annotations?: Record<string, boolean>
+}
+
+interface ModelContext extends EventTarget {
+  getTools: () => Promise<RegisteredTool[]>
+  executeTool: (tool: RegisteredTool, input: string) => Promise<unknown>
 }
 
 useSeoMeta({
@@ -24,8 +29,8 @@ const counter = ref(0)
 const formStatus = ref('Waiting for a submit.')
 const greeting = ref('')
 
-function modelContext(): any {
-  return (globalThis.document as any)?.modelContext
+function modelContext(): ModelContext | undefined {
+  return (globalThis.document as Document & { modelContext?: ModelContext })?.modelContext
 }
 
 useWebMcpTool({
@@ -75,20 +80,52 @@ async function refresh() {
     inputs.value[tool.name] ??= '{}'
 }
 
-async function runTool(tool: RegisteredTool) {
+function runTool(tool: RegisteredTool) {
   outputs.value[tool.name] = 'Running...'
-  try {
-    const result = await modelContext().executeTool(tool, inputs.value[tool.name] || '{}')
-    outputs.value[tool.name] = typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+  const context = modelContext()
+  if (!context) {
+    outputs.value[tool.name] = 'Error: WebMCP is unavailable.'
+    return
   }
-  catch (error) {
-    outputs.value[tool.name] = `Error: ${(error as Error).message}`
-  }
+  context.executeTool(tool, inputs.value[tool.name] || '{}')
+    .then((result) => {
+      outputs.value[tool.name] = typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+    })
+    .catch((error: unknown) => {
+      outputs.value[tool.name] = `Error: ${error instanceof Error ? error.message : String(error)}`
+    })
+}
+
+let registeredContext: ModelContext | undefined
+
+function refreshTools() {
+  refresh().catch((error: unknown) => {
+    console.error('[nuxt-ai-ready] Failed to inspect WebMCP tools.', error)
+  })
+}
+
+function onToolActivated(event: Event) {
+  const { toolName } = event as Event & { toolName: string }
+  formStatus.value = `An agent activated ${toolName}.`
+}
+
+function onToolCancel(event: Event) {
+  const { toolName } = event as Event & { toolName: string }
+  formStatus.value = `The agent cancelled ${toolName}.`
 }
 
 onMounted(() => {
-  refresh()
-  modelContext()?.addEventListener('toolchange', refresh)
+  registeredContext = modelContext()
+  refreshTools()
+  registeredContext?.addEventListener('toolchange', refreshTools)
+  window.addEventListener('toolactivated', onToolActivated)
+  window.addEventListener('toolcancel', onToolCancel)
+})
+
+onUnmounted(() => {
+  registeredContext?.removeEventListener('toolchange', refreshTools)
+  window.removeEventListener('toolactivated', onToolActivated)
+  window.removeEventListener('toolcancel', onToolCancel)
 })
 </script>
 
@@ -130,8 +167,6 @@ onMounted(() => {
       toolname="say_hello"
       tooldescription="Greets a person by name and shows the greeting on the page."
       @submit="onGreetSubmit"
-      @toolactivated="formStatus = 'An agent filled in the form.'"
-      @toolcancel="formStatus = 'The agent cancelled.'"
     >
       <label for="greet-name">Name to greet</label>
       <input

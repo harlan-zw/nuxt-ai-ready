@@ -11,7 +11,8 @@ export default defineNuxtPlugin({
     if (!modelContext)
       return
 
-    const { webmcp } = useRuntimeConfig().public['nuxt-ai-ready'] as ModuleAppRuntimeConfig
+    const runtimeConfig = useRuntimeConfig()
+    const { webmcp } = runtimeConfig.public['nuxt-ai-ready'] as ModuleAppRuntimeConfig
 
     // Omit exposedTo unless it holds origins: runtime config round-trips an
     // unset value as null, which WebIDL cannot convert to a sequence.
@@ -21,7 +22,7 @@ export default defineNuxtPlugin({
 
     // Static registration: tools stay available for the whole document, the
     // work only happens when an agent calls one.
-    for (const tool of createSiteTools(webmcp))
+    for (const tool of createSiteTools({ ...webmcp, baseURL: runtimeConfig.app.baseURL }))
       registerTool(modelContext, tool, options)
   },
 })
