@@ -42,9 +42,9 @@ declare module '#ai-ready-virtual/db-schema.mjs' {
   export { cronRuns, indexnowLog, info, pages, schema, sitemaps } from './runtime/server/db/schema/sqlite'
 }
 
-declare module '#ai-ready-virtual/sitemap-sources.mjs' {
-  import type { SitemapSourceInput } from '@nuxtjs/sitemap'
+declare module '#ai-ready-virtual/site-tools.mjs' {
+  import type { ResolvedSiteToolsConfig } from './runtime/site-tool-config'
 
-  const sources: SitemapSourceInput[]
-  export default sources
+  const config: ResolvedSiteToolsConfig
+  export default config
 }

@@ -1,21 +1,30 @@
-import type { SiteToolName } from '../runtime/site-tool-catalog'
+import type {
+  ResolvedSiteToolsConfig,
+  ResolvedWebMcpSiteToolAttachment,
+  ResolvedWebMcpToolsConfig,
+  SiteToolsConfig,
+  WebMcpSiteToolAttachmentOptions,
+} from '../runtime/site-tool-config'
 import type { ModuleOptions } from '../runtime/types'
-import { SITE_TOOL_NAMES } from '../runtime/site-tool-catalog'
 
 const DEFAULT_MAX_OUTPUT_CHARS = 1500
+const DEFAULT_LIST_LIMIT = 20
 const DEFAULT_SEARCH_LIMIT = 10
-const MAX_SEARCH_LIMIT = 50
+const MAX_TOOL_LIMIT = 50
 
 export interface ResolvedWebMcpConfig {
-  siteTools: SiteToolName[]
-  maxOutputChars: number
-  searchLimit: number
+  tools: ResolvedWebMcpToolsConfig
   exposedTo?: string[]
+}
+
+export interface ResolveSiteToolsConfigResult {
+  config: ResolvedSiteToolsConfig
+  warnings: string[]
 }
 
 export type ResolveWebMcpConfigResult
   = | { _tag: 'Disabled' }
-    | { _tag: 'Enabled', config: ResolvedWebMcpConfig, warnings: string[] }
+    | { _tag: 'Enabled', config: ResolvedWebMcpConfig }
 
 function parsePositiveInteger(
   value: number | undefined,
@@ -29,59 +38,109 @@ function parsePositiveInteger(
 
   const integer = Math.trunc(value)
   if (!Number.isFinite(value) || integer < 1) {
-    warnings.push(`\`webmcp.${name}\` must be a positive finite integer. Using ${fallback}.`)
+    warnings.push(`\`aiReady.${name}\` must be a positive finite integer. Using ${fallback}.`)
     return fallback
   }
   if (max && integer > max) {
-    warnings.push(`\`webmcp.${name}\` cannot exceed ${max}. Using ${max}.`)
+    warnings.push(`\`aiReady.${name}\` cannot exceed ${max}. Using ${max}.`)
     return max
   }
   if (integer !== value)
-    warnings.push(`\`webmcp.${name}\` must be an integer. Using ${integer}.`)
+    warnings.push(`\`aiReady.${name}\` must be an integer. Using ${integer}.`)
   return integer
 }
 
-function resolveSiteTools(
-  value: Exclude<ModuleOptions['webmcp'], boolean | undefined>['siteTools'],
+function resolveWebMcpAttachment(
+  options: WebMcpSiteToolAttachmentOptions | undefined,
+  path: string,
   warnings: string[],
-): SiteToolName[] {
-  if (value === false)
-    return []
-  if (!Array.isArray(value))
-    return [...SITE_TOOL_NAMES]
+): ResolvedWebMcpSiteToolAttachment {
+  if (options?.enabled === false)
+    return { enabled: false }
 
-  const selected = new Set(value)
-  const unknown = value.filter(name => !SITE_TOOL_NAMES.includes(name as SiteToolName))
-  if (unknown.length)
-    warnings.push(`Unknown \`webmcp.siteTools\`: ${unknown.join(', ')}.`)
-  return SITE_TOOL_NAMES.filter(name => selected.has(name))
+  return {
+    enabled: true,
+    maxOutputChars: parsePositiveInteger(
+      options?.maxOutputChars,
+      DEFAULT_MAX_OUTPUT_CHARS,
+      `${path}.webmcp.maxOutputChars`,
+      warnings,
+    ),
+    exposedTo: options?.exposedTo === undefined ? undefined : [...options.exposedTo],
+  }
 }
 
-export function resolveWebMcpConfig(input: ModuleOptions['webmcp']): ResolveWebMcpConfigResult {
+export function resolveSiteToolsConfig(input: SiteToolsConfig | undefined): ResolveSiteToolsConfigResult {
+  const warnings: string[] = []
+  return {
+    config: {
+      listPages: {
+        defaultLimit: parsePositiveInteger(
+          input?.listPages?.defaultLimit,
+          DEFAULT_LIST_LIMIT,
+          'tools.listPages.defaultLimit',
+          warnings,
+          MAX_TOOL_LIMIT,
+        ),
+        mcp: { enabled: input?.listPages?.mcp?.enabled !== false },
+        webmcp: resolveWebMcpAttachment(input?.listPages?.webmcp, 'tools.listPages', warnings),
+      },
+      searchPages: {
+        defaultLimit: parsePositiveInteger(
+          input?.searchPages?.defaultLimit,
+          DEFAULT_SEARCH_LIMIT,
+          'tools.searchPages.defaultLimit',
+          warnings,
+          MAX_TOOL_LIMIT,
+        ),
+        mcp: { enabled: input?.searchPages?.mcp?.enabled !== false },
+        webmcp: resolveWebMcpAttachment(input?.searchPages?.webmcp, 'tools.searchPages', warnings),
+      },
+      getPageMarkdown: {
+        mcp: { enabled: input?.getPageMarkdown?.mcp?.enabled !== false },
+        webmcp: resolveWebMcpAttachment(input?.getPageMarkdown?.webmcp, 'tools.getPageMarkdown', warnings),
+      },
+    },
+    warnings,
+  }
+}
+
+export function resolveWebMcpConfig(
+  input: ModuleOptions['webmcp'],
+  toolsConfig: ResolvedSiteToolsConfig,
+): ResolveWebMcpConfigResult {
   if (!input)
     return { _tag: 'Disabled' }
 
   const options = input === true ? {} : input
-  const warnings: string[] = []
+  const tools: ResolvedWebMcpToolsConfig = {}
+  if (options.tools !== false) {
+    if (toolsConfig.listPages.webmcp.enabled) {
+      tools.listPages = {
+        defaultLimit: toolsConfig.listPages.defaultLimit,
+        maxOutputChars: toolsConfig.listPages.webmcp.maxOutputChars,
+        exposedTo: toolsConfig.listPages.webmcp.exposedTo,
+      }
+    }
+    if (toolsConfig.searchPages.webmcp.enabled) {
+      tools.searchPages = {
+        defaultLimit: toolsConfig.searchPages.defaultLimit,
+        maxOutputChars: toolsConfig.searchPages.webmcp.maxOutputChars,
+        exposedTo: toolsConfig.searchPages.webmcp.exposedTo,
+      }
+    }
+    if (toolsConfig.getPageMarkdown.webmcp.enabled) {
+      tools.getPageMarkdown = {
+        maxOutputChars: toolsConfig.getPageMarkdown.webmcp.maxOutputChars,
+        exposedTo: toolsConfig.getPageMarkdown.webmcp.exposedTo,
+      }
+    }
+  }
   return {
     _tag: 'Enabled',
     config: {
-      siteTools: resolveSiteTools(options.siteTools, warnings),
-      maxOutputChars: parsePositiveInteger(
-        options.maxOutputChars,
-        DEFAULT_MAX_OUTPUT_CHARS,
-        'maxOutputChars',
-        warnings,
-      ),
-      searchLimit: parsePositiveInteger(
-        options.searchLimit,
-        DEFAULT_SEARCH_LIMIT,
-        'searchLimit',
-        warnings,
-        MAX_SEARCH_LIMIT,
-      ),
+      tools,
       exposedTo: options.exposedTo?.length ? [...options.exposedTo] : undefined,
     },
-    warnings,
   }
 }

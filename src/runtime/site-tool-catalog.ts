@@ -12,7 +12,7 @@ export const SITE_TOOL_CATALOG = {
     title: 'List pages',
     description: 'Lists pages on this site with their route, title and description. Use it to see what the site covers before reading a page.',
     parameters: {
-      limit: 'How many pages to return. Defaults to 20.',
+      limit: 'How many pages to return.',
       offset: 'How many pages to skip, for paging through long sites.',
     },
   },
@@ -22,7 +22,7 @@ export const SITE_TOOL_CATALOG = {
     description: 'Searches the full content of this site and returns the best matching pages with their route, title and description. Takes a plain language query.',
     parameters: {
       query: 'Words or a phrase to search for, such as "refund policy".',
-      limit: 'How many results to return. Defaults to 10.',
+      limit: 'How many results to return.',
     },
   },
   get_page_markdown: {

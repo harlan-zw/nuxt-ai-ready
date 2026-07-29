@@ -1,19 +1,31 @@
-import type { SiteToolName } from './site-tool-catalog'
 import type { WebMcpTool, WebMcpToolResult } from './webmcp'
 import { toMarkdownPath } from './markdown-path'
 import { toDeployedRoute } from './route-path'
 import { normalizeSiteRoute, SITE_TOOL_CATALOG } from './site-tool-catalog'
 import { toolError, toolText, truncateToolOutput, WEB_MCP_BUDGET } from './webmcp'
 
+export interface WebMcpSiteToolOptions {
+  enabled?: boolean
+  /** Characters a response may return before truncation. */
+  maxOutputChars?: number
+}
+
+export interface WebMcpPagedSiteToolOptions extends WebMcpSiteToolOptions {
+  /** Results returned when the caller omits `limit`. */
+  defaultLimit?: number
+}
+
+export interface WebMcpSiteToolsConfig {
+  listPages?: WebMcpPagedSiteToolOptions
+  searchPages?: WebMcpPagedSiteToolOptions
+  getPageMarkdown?: WebMcpSiteToolOptions
+}
+
 export interface SiteToolsOptions {
   /** Nuxt application base URL. */
   baseURL?: string
-  /** Characters a single tool response may return before truncation. */
-  maxOutputChars?: number
-  /** Results returned by `search_pages` when the agent does not ask for a count. */
-  searchLimit?: number
-  /** Built-in tools to create. */
-  tools?: readonly SiteToolName[]
+  /** Per-tool WebMCP behavior. Omitted tools use their defaults. */
+  tools?: WebMcpSiteToolsConfig
 }
 
 interface PageSummary {
@@ -160,6 +172,11 @@ function clamp(input: unknown, fallback: number, max: number): number {
   return Math.min(value, max)
 }
 
+function positiveInteger(input: unknown, fallback: number): number {
+  const value = Math.trunc(Number(input))
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
 function cleanSummaryPart(input: string): string {
   return input.replace(RE_WHITESPACE, ' ').trim()
 }
@@ -170,8 +187,14 @@ function cleanSummaryPart(input: string): string {
  */
 export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
   const baseURL = options.baseURL || '/'
-  const maxOutputChars = options.maxOutputChars ?? WEB_MCP_BUDGET.output
-  const searchLimit = clamp(options.searchLimit, 10, 50)
+  const listPagesOptions = options.tools?.listPages
+  const searchPagesOptions = options.tools?.searchPages
+  const getPageMarkdownOptions = options.tools?.getPageMarkdown
+  const listPagesLimit = clamp(listPagesOptions?.defaultLimit, 20, 50)
+  const searchPagesLimit = clamp(searchPagesOptions?.defaultLimit, 10, 50)
+  const listPagesMaxOutputChars = positiveInteger(listPagesOptions?.maxOutputChars, WEB_MCP_BUDGET.output)
+  const searchPagesMaxOutputChars = positiveInteger(searchPagesOptions?.maxOutputChars, WEB_MCP_BUDGET.output)
+  const getPageMarkdownMaxOutputChars = positiveInteger(getPageMarkdownOptions?.maxOutputChars, WEB_MCP_BUDGET.output)
   const pagesPath = toDeployedRoute('/__ai-ready/pages', baseURL)
   const indexPath = toDeployedRoute('/__ai-ready/pages.json', baseURL)
 
@@ -183,6 +206,7 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
     pages: PageSummary[],
     summaryForCount: (count: number) => string,
     recovery: string,
+    maxOutputChars: number,
   ): WebMcpToolResult {
     const pageLines = pages.map(page => `\n${
       [page.route, page.title, page.description]
@@ -260,13 +284,16 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
       inputSchema: {
         type: 'object',
         properties: {
-          limit: { type: 'number', description: SITE_TOOL_CATALOG.list_pages.parameters.limit },
+          limit: {
+            type: 'number',
+            description: `${SITE_TOOL_CATALOG.list_pages.parameters.limit} Defaults to ${listPagesLimit}.`,
+          },
           offset: { type: 'number', description: SITE_TOOL_CATALOG.list_pages.parameters.offset },
         },
       },
       annotations: READ_ONLY,
       async execute({ limit, offset }) {
-        const size = clamp(limit, 20, 50)
+        const size = clamp(limit, listPagesLimit, 50)
         const start = Math.max(0, Math.trunc(Number(offset)) || 0)
 
         const runtime = await fetchPages({ limit: size, offset: start })
@@ -295,6 +322,7 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
             ? `Pages ${start + 1} to ${start + count} of ${total || pages.length}.`
             : `Pages from offset ${start} of ${total || pages.length}.`,
           'use a higher offset',
+          listPagesMaxOutputChars,
         )
       },
     },
@@ -306,7 +334,7 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
         type: 'object',
         properties: {
           query: { type: 'string', description: SITE_TOOL_CATALOG.search_pages.parameters.query },
-          limit: { type: 'number', description: `How many results to return. Defaults to ${searchLimit}.` },
+          limit: { type: 'number', description: `How many results to return. Defaults to ${searchPagesLimit}.` },
         },
         required: ['query'],
       },
@@ -316,7 +344,7 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
         if (!q)
           return toolError('A search query is required. Pass the words to search for as `query`.')
 
-        const size = clamp(limit, searchLimit, 50)
+        const size = clamp(limit, searchPagesLimit, 50)
         const runtime = await fetchPages({ q, limit: size })
         reportFetchError('page search', runtime)
         let results = runtime._tag === 'Ok' ? runtime.value.results || [] : []
@@ -339,6 +367,7 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
             ? `${count} result${count === 1 ? '' : 's'} for "${q}".`
             : `Results for "${q}".`,
           'narrow the query',
+          searchPagesMaxOutputChars,
         )
       },
     },
@@ -377,14 +406,16 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
 
         return toolText(truncateToolOutput(
           markdown.value,
-          maxOutputChars,
+          getPageMarkdownMaxOutputChars,
           `Read ${markdownPath} directly for the full page.`,
         ))
       },
     },
   ]
-  if (!options.tools)
-    return tools
-  const selected = new Set(options.tools)
-  return tools.filter(tool => selected.has(tool.name as SiteToolName))
+  const enabled = new Set([
+    ...(listPagesOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.list_pages.name]),
+    ...(searchPagesOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.search_pages.name]),
+    ...(getPageMarkdownOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.get_page_markdown.name]),
+  ])
+  return tools.filter(tool => enabled.has(tool.name as typeof SITE_TOOL_CATALOG[keyof typeof SITE_TOOL_CATALOG]['name']))
 }

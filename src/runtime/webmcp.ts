@@ -141,6 +141,8 @@ export interface WebMcpToolsContext {
   tools: WebMcpTool<any, any>[]
   /** Registration defaults shared by the built-in tools. */
   registerOptions: WebMcpRegisterOptions
+  /** Per-tool registration options, keyed by the registered tool name. */
+  toolRegisterOptions: Record<string, WebMcpRegisterOptions>
 }
 
 export function defineWebMcpTool<

@@ -24,10 +24,20 @@ export default defineNuxtConfig({
     },
   },
   aiReady: {
-    webmcp: {
-      siteTools: ['search_pages', 'get_page_markdown'],
-      maxOutputChars: 500,
-      searchLimit: 5,
+    tools: {
+      listPages: {
+        defaultLimit: 7,
+        webmcp: { enabled: false },
+      },
+      searchPages: {
+        defaultLimit: 5,
+        mcp: { enabled: false },
+        webmcp: { maxOutputChars: 500 },
+      },
+      getPageMarkdown: {
+        webmcp: { maxOutputChars: 500 },
+      },
     },
+    webmcp: true,
   },
 })

@@ -144,7 +144,11 @@ describe('site tools', () => {
   })
 
   it('creates only the selected built-in tools', () => {
-    expect(createSiteTools({ tools: ['search_pages', 'get_page_markdown'] }).map(tool => tool.name))
+    expect(createSiteTools({
+      tools: {
+        listPages: { enabled: false },
+      },
+    }).map(tool => tool.name))
       .toEqual(['search_pages', 'get_page_markdown'])
   })
 
@@ -172,7 +176,11 @@ describe('site tools', () => {
       pages: Array.from({ length: 20 }, (_, i) => ({ route: `/page-${i}`, title: `Page ${i}` })),
       total: 20,
     }))
-    const tool = createSiteTools({ maxOutputChars: 80 }).find(t => t.name === 'list_pages')!
+    const tool = createSiteTools({
+      tools: {
+        listPages: { maxOutputChars: 80 },
+      },
+    }).find(t => t.name === 'list_pages')!
     const text = ((await tool.execute({})) as WebMcpToolResult).content[0]!.text
 
     expect(text.length).toBeLessThanOrEqual(80)
@@ -199,9 +207,13 @@ describe('site tools', () => {
     expect(fetch).toHaveBeenCalledWith('/docs/about.md', { responseType: 'text' })
   })
 
-  it('passes the search query through and honours searchLimit', async () => {
+  it('passes the search query through and honours its default limit', async () => {
     const fetch = mockFetch(() => ({ results: [{ route: '/refunds', title: 'Refunds' }] }))
-    const tool = createSiteTools({ searchLimit: 3 }).find(t => t.name === 'search_pages')!
+    const tool = createSiteTools({
+      tools: {
+        searchPages: { defaultLimit: 3 },
+      },
+    }).find(t => t.name === 'search_pages')!
     const result = await tool.execute({ query: '  refund policy  ' }) as WebMcpToolResult
 
     expect(fetch).toHaveBeenCalledWith('/__ai-ready/pages', { query: { q: 'refund policy', limit: 3 } })
@@ -386,7 +398,11 @@ describe('site tools', () => {
         return { page: { route: '/long', title: 'Long' } }
       return 'x'.repeat(5000)
     })
-    const tool = createSiteTools({ maxOutputChars: 100 }).find(t => t.name === 'get_page_markdown')!
+    const tool = createSiteTools({
+      tools: {
+        getPageMarkdown: { maxOutputChars: 100 },
+      },
+    }).find(t => t.name === 'get_page_markdown')!
     const result = await tool.execute({ route: '/long' }) as WebMcpToolResult
     expect(result.content[0]!.text).toHaveLength(100)
     expect(result.content[0]!.text).toContain('[Truncated at 100 characters. Read /long.md directly for the full page.]')

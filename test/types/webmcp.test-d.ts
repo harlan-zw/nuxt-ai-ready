@@ -1,3 +1,4 @@
+import type { ModuleOptions } from '../../src/module'
 import { expectTypeOf, test } from 'vitest'
 import { useWebMcpTool } from '../../src/runtime/app/composables/webmcp'
 import { defineWebMcpTool } from '../../src/runtime/webmcp'
@@ -55,4 +56,38 @@ test('infers composable tool input directly from its JSON schema', () => {
       return input.count
     },
   })
+})
+
+test('types shared tool behavior and transport attachments', () => {
+  const options = {
+    tools: {
+      listPages: {
+        defaultLimit: 7,
+        webmcp: { enabled: false },
+      },
+      searchPages: {
+        defaultLimit: 5,
+        mcp: { enabled: false },
+        webmcp: {
+          maxOutputChars: 3000,
+          exposedTo: ['https://agent.example.com'],
+        },
+      },
+    },
+    webmcp: true,
+  } satisfies ModuleOptions
+
+  expectTypeOf(options.tools.searchPages.defaultLimit).toEqualTypeOf<number>()
+})
+
+test('rejects WebMCP options on a disabled attachment', () => {
+  const options: ModuleOptions = {
+    tools: {
+      searchPages: {
+        // @ts-expect-error disabled attachments cannot carry active options
+        webmcp: { enabled: false, maxOutputChars: 3000 },
+      },
+    },
+  }
+  expectTypeOf(options).toMatchTypeOf<ModuleOptions>()
 })

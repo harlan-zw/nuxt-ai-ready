@@ -12,13 +12,12 @@ import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
-import { collectSitemapFallbackSources } from './runtime/sitemap-source-fallback'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import { ensureStaticHeader } from './utils/static-headers'
-import { resolveWebMcpConfig } from './utils/webmcp'
+import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
   /**
@@ -138,6 +137,12 @@ export default defineNuxtModule<ModuleOptions>({
     if (rawConfig.mdreamOptions?.preset) {
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
+
+    const siteToolsResult = resolveSiteToolsConfig(config.tools)
+    for (const warning of siteToolsResult.warnings)
+      logger.warn(warning)
+    const siteToolsConfig = siteToolsResult.config
+    const hasMcpSiteTools = Object.values(siteToolsConfig).some(tool => tool.mcp.enabled)
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
@@ -278,7 +283,7 @@ export default defineNuxtModule<ModuleOptions>({
       nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
         const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
         const mcpConfig = config.mcp || {}
-        if (mcpConfig.tools !== false)
+        if (mcpConfig.tools !== false && hasMcpSiteTools)
           (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
         if (mcpConfig.resources !== false)
           (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
@@ -332,11 +337,7 @@ export default defineNuxtModule<ModuleOptions>({
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
     // WebMCP exposes tools to in-browser agents via document.modelContext
-    const webmcpResult = resolveWebMcpConfig(config.webmcp)
-    if (webmcpResult._tag === 'Enabled') {
-      for (const warning of webmcpResult.warnings)
-        logger.warn(warning)
-    }
+    const webmcpResult = resolveWebMcpConfig(config.webmcp, siteToolsConfig)
     const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
 
     // IndexNow: auto-read key from env, derive from site URL if true
@@ -359,15 +360,7 @@ export default defineNuxtModule<ModuleOptions>({
     })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
-    const sitemapConfig = nuxt.options.sitemap as {
-      zeroRuntime?: boolean
-      urls?: unknown
-      sources?: unknown
-    } | undefined
-    const sitemapFallback = collectSitemapFallbackSources(sitemapConfig)
-    for (const warning of sitemapFallback.warnings)
-      logger.warn(warning)
-    const sitemapFallbackSources = sitemapFallback.sources
+    const sitemapConfig = nuxt.options.sitemap as { zeroRuntime?: boolean } | undefined
     const sitemapRouteRule = nuxt.options.nitro?.routeRules?.['/sitemap.xml'] as { prerender?: boolean } | undefined
     const sitemapPrerendered = !!(
       sitemapConfig?.zeroRuntime
@@ -464,7 +457,7 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
-      nitroConfig.virtual['#ai-ready-virtual/sitemap-sources.mjs'] = `export default ${JSON.stringify(sitemapFallbackSources)}`
+      nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
@@ -567,7 +560,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
         contentSignal: config.contentSignal || false,
-        mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false), resources: mcpAvailable && (config.mcp?.resources !== false) },
+        mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false) && hasMcpSiteTools, resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`
 
@@ -675,7 +668,7 @@ export async function lookupContentPage(event, path) {
       } satisfies ModuleAppRuntimeConfig as any
 
       addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
-      if (webmcpConfig.siteTools.length) {
+      if (Object.keys(webmcpConfig.tools).length) {
         addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get') })
       }
     }
@@ -698,9 +691,6 @@ export async function lookupContentPage(event, path) {
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
       addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
     }
-
-    if (sitemapFallbackSources.length)
-      addServerPlugin(resolve('./runtime/server/plugins/sitemap-source-fallback'))
 
     // IndexNow endpoints (only if key is configured)
     if (indexNow) {
@@ -786,4 +776,13 @@ export async function lookupContentPage(event, path) {
   },
 })
 
+export type {
+  GetPageMarkdownToolOptions,
+  ListPagesToolOptions,
+  McpSiteToolAttachmentOptions,
+  SearchPagesToolOptions,
+  SiteToolOptions,
+  SiteToolsConfig,
+  WebMcpSiteToolAttachmentOptions,
+} from './runtime/site-tool-config'
 export type { ModuleOptions } from './runtime/types'

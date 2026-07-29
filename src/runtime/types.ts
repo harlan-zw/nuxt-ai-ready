@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
-import type { SiteToolName } from './site-tool-catalog'
+import type { SiteToolsConfig } from './site-tool-config'
 
 export interface ModuleOptions {
   /**
@@ -72,37 +72,33 @@ export interface ModuleOptions {
    * @default All enabled when @nuxtjs/mcp-toolkit is installed
    */
   mcp?: {
-    /** Enable MCP tools (list-pages) @default true */
+    /** Attach enabled site tools to MCP Toolkit. @default true */
     tools?: boolean
     /** Enable MCP resources (pages) @default true */
     resources?: boolean
   }
 
   /**
+   * Configure the built-in site tools once, then attach them to MCP, WebMCP,
+   * or both through each tool's transport options.
+   */
+  tools?: SiteToolsConfig
+
+  /**
    * WebMCP: register tools with in-browser AI agents via `document.modelContext`,
    * so an agent on the page can search and read content without crawling it.
    *
    * Enabling this also auto-imports the `useWebMcpTool()` composable for your
-   * own tools. Set `siteTools: false` to register nothing but your own.
+   * own tools. Set `tools: false` to register nothing but your own.
    * @see https://developer.chrome.com/docs/ai/webmcp
    * @default false
    */
   webmcp?: boolean | {
     /**
-     * Register the built-in `list_pages`, `search_pages` and `get_page_markdown` tools
+     * Attach enabled built-in tools to WebMCP.
      * @default true
      */
-    siteTools?: boolean | SiteToolName[]
-    /**
-     * Characters a single tool response may return before it is truncated
-     * @default 1500
-     */
-    maxOutputChars?: number
-    /**
-     * Results returned by `search_pages` by default
-     * @default 10
-     */
-    searchLimit?: number
+    tools?: boolean
     /**
      * Default trusted origins for built-in and custom tools.
      * Per-tool composable options take precedence.

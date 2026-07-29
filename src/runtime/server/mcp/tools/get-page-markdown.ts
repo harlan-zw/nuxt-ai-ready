@@ -1,6 +1,7 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
 import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
+import siteTools from '#ai-ready-virtual/site-tools.mjs'
 import { normalizeSiteRoute, SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { queryPages } from '../../db/queries'
 
@@ -14,6 +15,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   description: SITE_TOOL_CATALOG.get_page_markdown.description,
   inputSchema,
   annotations: { readOnlyHint: true, openWorldHint: false },
+  enabled: () => siteTools.getPageMarkdown.mcp.enabled,
   cache: '5m',
   async handler({ route }) {
     const path = normalizeSiteRoute(route)
