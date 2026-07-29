@@ -47,5 +47,78 @@ describe('webmcp', async () => {
 
     expect(html).toContain('maxOutputChars')
     expect(html).toContain('500')
+    expect(html).toContain('search_pages')
+    expect(html).toContain('get_page_markdown')
+    expect(html).not.toContain('&quot;list_pages&quot;')
+  })
+
+  it('discovers all AI Ready tools through MCP Toolkit', async () => {
+    const response = await fetch('/mcp', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json, text/event-stream',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+        params: {},
+      }),
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as any
+    expect(body.result.tools.map((tool: any) => tool.name)).toEqual([
+      'get_page_markdown',
+      'list_pages',
+      'search_pages',
+    ])
+    expect(body.result.tools.every((tool: any) =>
+      tool.annotations?.readOnlyHint === true
+      && tool.annotations?.openWorldHint === false,
+    )).toBe(true)
+  })
+
+  it('discovers the pages resource through MCP Toolkit', async () => {
+    const response = await fetch('/mcp', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json, text/event-stream',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'resources/list',
+        params: {},
+      }),
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as any
+    expect(body.result.resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ uri: 'resource://nuxt-ai-ready/pages' }),
+    ]))
+  })
+
+  it('reads indexed markdown through MCP Toolkit', async () => {
+    const response = await fetch('/mcp', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json, text/event-stream',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'get_page_markdown',
+          arguments: { route: '/about' },
+        },
+      }),
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as any
+    expect(body.result.content[0].text).toContain('About')
   })
 })

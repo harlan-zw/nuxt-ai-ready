@@ -1,7 +1,7 @@
 /**
  * WebMCP lets a page register tools that in-browser AI agents can discover and
- * call through `document.modelContext`. The API is an origin trial from Chrome
- * 149 and has no lib.dom typings yet, so the surface is declared here.
+ * call through `document.modelContext`. The experimental API has no lib.dom
+ * typings yet, so the surface is declared here.
  *
  * @see https://developer.chrome.com/docs/ai/webmcp
  */
@@ -18,23 +18,85 @@ export interface WebMcpToolResult {
   isError?: boolean
 }
 
-export interface WebMcpInputSchema {
-  type: 'object'
-  properties?: Record<string, Record<string, unknown>>
-  required?: string[]
+export interface WebMcpJsonSchema {
+  type?: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null' | readonly string[]
+  title?: string
+  description?: string
+  enum?: readonly unknown[]
+  const?: unknown
+  items?: WebMcpJsonSchema
+  properties?: WebMcpSchemaProperties
+  required?: readonly string[]
+  additionalProperties?: boolean | WebMcpJsonSchema
+  [key: string]: unknown
 }
 
-export interface WebMcpTool<Input = Record<string, any>> {
-  /** Unique identifier, snake_case and 30 characters or fewer. */
+export type WebMcpSchemaProperties = Record<string, WebMcpJsonSchema>
+
+export type WebMcpInputSchema<
+  Properties extends WebMcpSchemaProperties = WebMcpSchemaProperties,
+  Required extends readonly (keyof Properties & string)[] = readonly (keyof Properties & string)[],
+> = WebMcpJsonSchema & {
+  type: 'object'
+  properties?: Properties
+  required?: Required
+}
+
+type Simplify<T> = { -readonly [Key in keyof T]: T[Key] }
+
+export type InferWebMcpSchema<Schema>
+  = Schema extends { enum: readonly (infer Value)[] }
+    ? Value
+    : Schema extends { const: infer Value }
+      ? Value
+      : Schema extends { type: 'string' }
+        ? string
+        : Schema extends { type: 'number' | 'integer' }
+          ? number
+          : Schema extends { type: 'boolean' }
+            ? boolean
+            : Schema extends { type: 'null' }
+              ? null
+              : Schema extends { type: 'array', items: infer Item }
+                ? InferWebMcpSchema<Item>[]
+                : Schema extends WebMcpInputSchema
+                  ? InferWebMcpInput<Schema>
+                  : unknown
+
+export type InferWebMcpInput<Schema>
+  = Schema extends { properties: infer Properties extends WebMcpSchemaProperties }
+    ? Simplify<
+      & {
+        [Key in keyof Properties as Key extends (
+          Schema extends { required: readonly (infer Required)[] } ? Required : never
+        ) ? Key : never]-?: InferWebMcpSchema<Properties[Key]>
+      }
+      & {
+        [Key in keyof Properties as Key extends (
+          Schema extends { required: readonly (infer Required)[] } ? Required : never
+        ) ? never : Key]?: InferWebMcpSchema<Properties[Key]>
+      }
+    >
+    : Record<string, unknown>
+
+export interface WebMcpTool<
+  Input = Record<string, unknown>,
+  Output = unknown,
+  Schema extends WebMcpInputSchema | undefined = WebMcpInputSchema | undefined,
+> {
+  /**
+   * Unique identifier of 1 to 128 ASCII letters, digits, underscores, hyphens
+   * or dots. Chrome recommends staying within 30 characters.
+   */
   name: string
   /** Human readable label shown in agent UIs. */
   title?: string
   /** What the tool does, 500 characters or fewer. */
   description: string
   /** JSON Schema describing the input object. */
-  inputSchema?: WebMcpInputSchema
+  inputSchema?: Schema
   annotations?: WebMcpToolAnnotations
-  execute: (input: Input) => WebMcpToolResult | string | Promise<WebMcpToolResult | string>
+  execute: (input: Input) => Output | Promise<Output>
 }
 
 export interface WebMcpRegisterOptions {
@@ -50,14 +112,48 @@ export interface WebMcpRegisteredTool {
   description: string
   /** Serialised JSON Schema. */
   inputSchema?: string
+  window: Window
   origin: string
   annotations?: WebMcpToolAnnotations
 }
 
 export interface WebMcpModelContext extends EventTarget {
-  registerTool: (tool: WebMcpTool<any>, options?: WebMcpRegisterOptions) => Promise<void>
+  registerTool: (tool: WebMcpTool<any, any>, options?: WebMcpRegisterOptions) => Promise<void>
   getTools: (options?: { fromOrigins?: string[] }) => Promise<WebMcpRegisteredTool[]>
+  /** Chrome API for testing and in-page agents. */
   executeTool: (tool: WebMcpRegisteredTool, input: string, options?: { signal?: AbortSignal }) => Promise<unknown>
+  ontoolchange: ((this: WebMcpModelContext, event: Event) => unknown) | null
+}
+
+export type WebMcpRegistrationResult
+  = | { _tag: 'Registered' }
+    | { _tag: 'Error', error: unknown }
+
+export type WebMcpToolRegistrationState
+  = | { _tag: 'Unsupported' }
+    | { _tag: 'Inactive' }
+    | { _tag: 'Registering' }
+    | { _tag: 'Registered' }
+    | { _tag: 'Failed', error: unknown }
+
+export interface WebMcpToolsContext {
+  /** Built-in tools. Mutate this array to add, remove or replace definitions. */
+  tools: WebMcpTool<any, any>[]
+  /** Registration defaults shared by the built-in tools. */
+  registerOptions: WebMcpRegisterOptions
+}
+
+export function defineWebMcpTool<
+  const Schema extends WebMcpInputSchema | undefined,
+  Output,
+>(
+  tool: WebMcpTool<
+    Schema extends WebMcpInputSchema ? InferWebMcpInput<NoInfer<Schema>> : Record<string, unknown>,
+    Output,
+    Schema
+  >,
+): typeof tool {
+  return tool
 }
 
 /**
@@ -71,6 +167,8 @@ export const WEB_MCP_BUDGET = {
   output: 1500,
 } as const
 
+const RE_WEB_MCP_TOOL_NAME = /^[\w.-]{1,128}$/
+
 /** The page's model context, or undefined when the browser has no WebMCP support. */
 export function getModelContext(): WebMcpModelContext | undefined {
   if (typeof document === 'undefined')
@@ -79,33 +177,30 @@ export function getModelContext(): WebMcpModelContext | undefined {
 }
 
 /**
- * Register a tool without assuming the browser follows the spec's return type.
- * Chrome's origin trial build reports argument errors by throwing and returns
- * nothing where the IDL promises a Promise.
+ * Register a tool and expose expected browser rejections as a tagged result.
  */
-export function registerTool(
+export async function registerTool(
   modelContext: WebMcpModelContext,
-  tool: WebMcpTool<any>,
+  tool: WebMcpTool<any, any>,
   options: WebMcpRegisterOptions = {},
-): void {
-  const onError = (error: unknown) => {
-    console.error(`[nuxt-ai-ready] Failed to register WebMCP tool "${tool.name}".`, error)
-  }
-  try {
-    const result = modelContext.registerTool(tool, options) as Promise<void> | undefined
-    if (typeof result?.then === 'function')
-      result.then(undefined, onError)
-  }
-  catch (error) {
-    onError(error)
-  }
+): Promise<WebMcpRegistrationResult> {
+  return Promise.resolve()
+    .then(() => modelContext.registerTool(tool, options))
+    .then(
+      () => ({ _tag: 'Registered' }) as const,
+      error => ({ _tag: 'Error', error }) as const,
+    )
 }
 
 /** Collect budget violations for a tool. Used to warn during development. */
-export function checkToolBudget(tool: WebMcpTool<any>): string[] {
+export function checkToolBudget(tool: WebMcpTool<any, any>): string[] {
   const warnings: string[] = []
+  if (!RE_WEB_MCP_TOOL_NAME.test(tool.name))
+    warnings.push(`Tool name "${tool.name}" must use 1 to 128 ASCII letters, digits, underscores, hyphens or dots.`)
   if (tool.name.length > WEB_MCP_BUDGET.name)
     warnings.push(`Tool name "${tool.name}" is ${tool.name.length} characters, over the ${WEB_MCP_BUDGET.name} character budget.`)
+  if (!tool.description)
+    warnings.push(`Description for "${tool.name}" cannot be empty.`)
   if (tool.description.length > WEB_MCP_BUDGET.description)
     warnings.push(`Description for "${tool.name}" is ${tool.description.length} characters, over the ${WEB_MCP_BUDGET.description} character budget.`)
   for (const [param, schema] of Object.entries(tool.inputSchema?.properties || {})) {

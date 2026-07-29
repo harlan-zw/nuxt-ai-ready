@@ -1,5 +1,6 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -14,7 +15,9 @@ import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './preren
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import { ensureStaticHeader } from './utils/static-headers'
+import { resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
   /**
@@ -70,11 +73,7 @@ export interface ModulePublicRuntimeConfig {
 
 /** Runtime config exposed to the browser, only set when WebMCP is enabled. */
 export interface ModuleAppRuntimeConfig {
-  webmcp: {
-    maxOutputChars: number
-    searchLimit: number
-    exposedTo?: string[]
-  }
+  webmcp: ResolvedWebMcpConfig
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -208,8 +207,17 @@ export default defineNuxtModule<ModuleOptions>({
       }
     }
 
-    // set default MCP name
-    if (nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
+    const mcpToolkitState = resolveMcpToolkitState({
+      installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
+        || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
+      options: nuxt.options.mcp,
+      static: nuxt.options.nitro.static === true,
+      generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
+    })
+    const mcpAvailable = mcpToolkitState._tag === 'Enabled'
+
+    // Set the Toolkit name only when it will register a server.
+    if (mcpAvailable && nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
       nuxt.options.mcp = nuxt.options.mcp || {} as Record<string, unknown>
       ;(nuxt.options.mcp as Record<string, unknown>).name = useSiteConfig().name
     }
@@ -260,8 +268,11 @@ export default defineNuxtModule<ModuleOptions>({
       ],
     })
 
-    const hasMCP = hasNuxtModule('@nuxtjs/mcp-toolkit')
-    if (hasMCP) {
+    if (mcpAvailable) {
+      // Hydrate the runtime database from build artifacts before Toolkit
+      // resolves definitions for its first request.
+      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
+
       // Register MCP definitions from runtime directory
       nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
         const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
@@ -275,7 +286,7 @@ export default defineNuxtModule<ModuleOptions>({
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
       const mcpLink = {
         title: 'MCP',
-        href: withSiteUrl((nuxt.options.mcp !== false && nuxt.options.mcp?.route) || '/mcp', { withBase: true }),
+        href: withSiteUrl(mcpToolkitState.route, { withBase: true }),
         description: 'Model Context Protocol server endpoint for AI agent integration.',
       }
 
@@ -320,7 +331,12 @@ export default defineNuxtModule<ModuleOptions>({
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
     // WebMCP exposes tools to in-browser agents via document.modelContext
-    const webmcpConfig = config.webmcp === true ? {} : (config.webmcp || null)
+    const webmcpResult = resolveWebMcpConfig(config.webmcp)
+    if (webmcpResult._tag === 'Enabled') {
+      for (const warning of webmcpResult.warnings)
+        logger.warn(warning)
+    }
+    const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
 
     // IndexNow: auto-read key from env, derive from site URL if true
     const indexNow = config.indexNow === true
@@ -331,7 +347,7 @@ export default defineNuxtModule<ModuleOptions>({
       const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
       if (mod) {
         mod.features = {
-          mcp: hasMCP,
+          mcp: mcpAvailable,
           webmcp: !!webmcpConfig,
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
@@ -541,7 +557,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
         contentSignal: config.contentSignal || false,
-        mcp: { enabled: hasMCP, tools: hasMCP && (config.mcp?.tools !== false), resources: hasMCP && (config.mcp?.resources !== false) },
+        mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false), resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`
 
@@ -639,22 +655,17 @@ export async function lookupContentPage(event, path) {
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
 
     if (webmcpConfig) {
-      addImports(['isWebMcpSupported', 'useWebMcpTool'].map(name => ({
+      addImports(['useWebMcpSupported', 'useWebMcpTool'].map(name => ({
         name,
         from: resolve('./runtime/app/composables/webmcp'),
       })))
 
-      if (webmcpConfig.siteTools !== false) {
-        nuxt.options.runtimeConfig.public['nuxt-ai-ready'] = {
-          webmcp: {
-            maxOutputChars: webmcpConfig.maxOutputChars ?? 1500,
-            searchLimit: webmcpConfig.searchLimit ?? 10,
-            // omitted when empty so the browser never sees a null sequence
-            ...(webmcpConfig.exposedTo?.length ? { exposedTo: webmcpConfig.exposedTo } : {}),
-          },
-        } satisfies ModuleAppRuntimeConfig as any
+      nuxt.options.runtimeConfig.public['nuxt-ai-ready'] = {
+        webmcp: webmcpConfig,
+      } satisfies ModuleAppRuntimeConfig as any
 
-        addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
+      addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
+      if (webmcpConfig.siteTools.length) {
         addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get') })
       }
     }

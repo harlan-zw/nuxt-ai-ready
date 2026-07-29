@@ -2,21 +2,24 @@ import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
 import type { PageEntry } from '../../db/queries'
 import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
+import { SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { countPages, queryPages } from '../../db/queries'
 
 const inputSchema = {
-  limit: z.number().optional().default(100).describe('Max pages to return (default: 100)'),
-  offset: z.number().optional().default(0).describe('Skip first N pages (for pagination)'),
+  limit: z.number().int().min(1).max(50).optional().default(20).describe(SITE_TOOL_CATALOG.list_pages.parameters.limit),
+  offset: z.number().int().min(0).optional().default(0).describe(SITE_TOOL_CATALOG.list_pages.parameters.offset),
 }
 
-const tool: McpToolDefinition = {
-  name: 'list_pages',
-  description: 'Lists all available pages with titles, descriptions and routes. Supports pagination via limit/offset.',
+const tool: McpToolDefinition<typeof inputSchema> = {
+  name: SITE_TOOL_CATALOG.list_pages.name,
+  title: SITE_TOOL_CATALOG.list_pages.title,
+  description: SITE_TOOL_CATALOG.list_pages.description,
   inputSchema,
+  annotations: { readOnlyHint: true, openWorldHint: false },
   cache: '1h',
   async handler({ limit, offset }) {
     const event = useEvent()
-    const pages = await queryPages(event, { limit: limit as number, offset: offset as number }) as PageEntry[]
+    const pages = await queryPages(event, { limit, offset }) as PageEntry[]
     const total = await countPages(event)
 
     return {
@@ -33,7 +36,7 @@ const tool: McpToolDefinition = {
           total,
           limit,
           offset,
-          hasMore: (offset as number) + pages.length < total,
+          hasMore: offset + pages.length < total,
         }),
       }],
     }

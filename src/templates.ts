@@ -14,6 +14,15 @@ interface TemplateContext {
  * @see https://developer.chrome.com/docs/ai/webmcp/declarative-api
  */
 const declarativeWebMcpTypes = `
+import type { WebMcpToolsContext } from 'nuxt-ai-ready/webmcp'
+
+declare module '#app' {
+  interface RuntimeNuxtHooks {
+    /** Mutate built-in browser tools and their registration options before registration. */
+    'ai-ready:webmcp:tools': (context: WebMcpToolsContext) => void | Promise<void>
+  }
+}
+
 declare module '@vue/runtime-dom' {
   interface HTMLAttributes {
     /** Names the tool this form exposes to agents. */

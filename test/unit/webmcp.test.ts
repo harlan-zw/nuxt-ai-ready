@@ -53,6 +53,17 @@ describe('tool budget', () => {
     expect(warnings[2]).toContain('Parameter name')
     expect(warnings[3]).toContain('characters, over')
   })
+
+  it('flags definitions the browser will reject', () => {
+    expect(checkToolBudget({
+      name: 'invalid name',
+      description: '',
+      execute: () => '',
+    })).toEqual([
+      'Tool name "invalid name" must use 1 to 128 ASCII letters, digits, underscores, hyphens or dots.',
+      'Description for "invalid name" cannot be empty.',
+    ])
+  })
 })
 
 describe('tool registration', () => {
@@ -62,29 +73,21 @@ describe('tool registration', () => {
     return { registerTool: vi.fn(impl) } as unknown as WebMcpModelContext
   }
 
-  it('tolerates a browser that returns nothing instead of a promise', () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => registerTool(contextReturning(() => undefined), tool)).not.toThrow()
-    expect(errors).not.toHaveBeenCalled()
-    errors.mockRestore()
+  it('normalizes a browser that returns nothing into a registered result', async () => {
+    await expect(registerTool(contextReturning(() => undefined), tool)).resolves.toEqual({ _tag: 'Registered' })
   })
 
-  it('reports a synchronous throw without breaking the caller', () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('returns synchronous registration failures as values', async () => {
+    const error = new Error('bad exposedTo')
     const throwing = contextReturning(() => {
-      throw new Error('bad exposedTo')
+      throw error
     })
-    expect(() => registerTool(throwing, tool)).not.toThrow()
-    expect(errors).toHaveBeenCalled()
-    errors.mockRestore()
+    await expect(registerTool(throwing, tool)).resolves.toEqual({ _tag: 'Error', error })
   })
 
-  it('reports a rejected promise without an unhandled rejection', async () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    registerTool(contextReturning(() => Promise.reject(new Error('nope'))), tool)
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(errors).toHaveBeenCalled()
-    errors.mockRestore()
+  it('returns rejected registration promises as values', async () => {
+    const error = new Error('nope')
+    await expect(registerTool(contextReturning(() => Promise.reject(error)), tool)).resolves.toEqual({ _tag: 'Error', error })
   })
 })
 
@@ -138,6 +141,11 @@ describe('site tools', () => {
       expect(checkToolBudget(tool)).toEqual([])
       expect(tool.annotations).toMatchObject({ readOnlyHint: true, untrustedContentHint: true })
     }
+  })
+
+  it('creates only the selected built-in tools', () => {
+    expect(createSiteTools({ tools: ['search_pages', 'get_page_markdown'] }).map(tool => tool.name))
+      .toEqual(['search_pages', 'get_page_markdown'])
   })
 
   it('clamps list_pages paging to the endpoint limits', async () => {

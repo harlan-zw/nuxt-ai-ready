@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, useHead, useSeoMeta, useWebMcpTool } from '#imports'
+import { onMounted, onUnmounted, ref, useHead, useSeoMeta, useWebMcpSupported, useWebMcpTool } from '#imports'
 
 interface RegisteredTool {
   name: string
@@ -21,7 +21,7 @@ useSeoMeta({
 })
 useHead({ htmlAttrs: { lang: 'en' } })
 
-const supported = ref<boolean | null>(null)
+const supported = useWebMcpSupported()
 const tools = ref<RegisteredTool[]>([])
 const inputs = ref<Record<string, string>>({})
 const outputs = ref<Record<string, string>>({})
@@ -72,7 +72,6 @@ function onGreetSubmit(event: SubmitEvent) {
 
 async function refresh() {
   const ctx = modelContext()
-  supported.value = !!ctx
   if (!ctx)
     return
   tools.value = await ctx.getTools()
@@ -140,16 +139,14 @@ onUnmounted(() => {
     <!-- fixed height: this flips after hydration and must not move the page -->
     <h2>Browser support</h2>
     <p class="status">
-      <template v-if="supported === null">
-        Checking for <code>document.modelContext</code>...
-      </template>
-      <template v-else-if="supported">
+      <template v-if="supported">
         <strong>Available.</strong> {{ tools.length }} tools registered.
       </template>
-      <template v-else>
-        <strong>Not available.</strong> Use Chrome 149+ with
-        <code>chrome://flags/#enable-webmcp-testing</code> enabled, then reload.
-      </template>
+      <span v-else>
+        <strong>Not available.</strong> This browser does not expose
+        <code>document.modelContext</code>. Check the
+        <a href="https://developer.chrome.com/docs/ai/webmcp" rel="noopener">current WebMCP setup guide</a>.
+      </span>
     </p>
 
     <h2>Page-scoped tool</h2>

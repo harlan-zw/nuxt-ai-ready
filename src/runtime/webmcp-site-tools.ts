@@ -1,6 +1,8 @@
+import type { SiteToolName } from './site-tool-catalog'
 import type { WebMcpTool, WebMcpToolResult } from './webmcp'
 import { toMarkdownPath } from './markdown-path'
 import { toDeployedRoute } from './route-path'
+import { normalizeSiteRoute, SITE_TOOL_CATALOG } from './site-tool-catalog'
 import { toolError, toolText, truncateToolOutput, WEB_MCP_BUDGET } from './webmcp'
 
 export interface SiteToolsOptions {
@@ -10,6 +12,8 @@ export interface SiteToolsOptions {
   maxOutputChars?: number
   /** Results returned by `search_pages` when the agent does not ask for a count. */
   searchLimit?: number
+  /** Built-in tools to create. */
+  tools?: readonly SiteToolName[]
 }
 
 interface PageSummary {
@@ -39,9 +43,6 @@ interface FetchOptions {
 const READ_ONLY = { readOnlyHint: true, untrustedContentHint: true }
 
 const RE_FTS_CHARS = /[*:^"()]/g
-const RE_LEADING_SLASHES = /^\/+/
-const RE_MARKDOWN_SUFFIX = /\.md$/
-const RE_QUERY_OR_FRAGMENT = /[?#].*$/
 const RE_WHITESPACE = /\s+/
 
 /** Field weights matching the server-side FTS query, excluding unavailable markdown. */
@@ -152,25 +153,6 @@ function searchIndex(pages: PageSummary[], query: string, limit: number): PageSu
  * Coerce whatever the agent passed into a site route. Schemas stay loose so the
  * model is not penalised for sending `about` or `/about.md` instead of `/about`.
  */
-function normalizeRoute(input: unknown): string | undefined {
-  const value = String(input ?? '').trim().replace(RE_QUERY_OR_FRAGMENT, '')
-  if (!value || value.includes('://') || value.includes('\\'))
-    return undefined
-
-  const route = `/${value.replace(RE_LEADING_SLASHES, '').replace(RE_MARKDOWN_SUFFIX, '')}`
-  const decodedRoute = (() => {
-    try {
-      return decodeURIComponent(route)
-    }
-    catch {
-      return ''
-    }
-  })()
-  if (!decodedRoute || decodedRoute.split('/').some(segment => segment === '.' || segment === '..'))
-    return undefined
-  return route
-}
-
 function clamp(input: unknown, fallback: number, max: number): number {
   const value = Math.trunc(Number(input))
   if (!Number.isFinite(value) || value < 1)
@@ -270,16 +252,16 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
     return { _tag: 'Ok', value: false }
   }
 
-  return [
+  const tools: WebMcpTool[] = [
     {
-      name: 'list_pages',
-      title: 'List pages',
-      description: 'Lists pages on this site with their route, title and description. Use it to see what the site covers before reading a page.',
+      name: SITE_TOOL_CATALOG.list_pages.name,
+      title: SITE_TOOL_CATALOG.list_pages.title,
+      description: SITE_TOOL_CATALOG.list_pages.description,
       inputSchema: {
         type: 'object',
         properties: {
-          limit: { type: 'number', description: 'How many pages to return. Defaults to 20.' },
-          offset: { type: 'number', description: 'How many pages to skip, for paging through long sites.' },
+          limit: { type: 'number', description: SITE_TOOL_CATALOG.list_pages.parameters.limit },
+          offset: { type: 'number', description: SITE_TOOL_CATALOG.list_pages.parameters.offset },
         },
       },
       annotations: READ_ONLY,
@@ -317,13 +299,13 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
       },
     },
     {
-      name: 'search_pages',
-      title: 'Search pages',
-      description: 'Searches the full content of this site and returns the best matching pages with their route, title and description. Takes a plain language query.',
+      name: SITE_TOOL_CATALOG.search_pages.name,
+      title: SITE_TOOL_CATALOG.search_pages.title,
+      description: SITE_TOOL_CATALOG.search_pages.description,
       inputSchema: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Words or a phrase to search for, such as "refund policy".' },
+          query: { type: 'string', description: SITE_TOOL_CATALOG.search_pages.parameters.query },
           limit: { type: 'number', description: `How many results to return. Defaults to ${searchLimit}.` },
         },
         required: ['query'],
@@ -361,19 +343,19 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
       },
     },
     {
-      name: 'get_page_markdown',
-      title: 'Read page',
-      description: 'Reads a page of this site as markdown. Pass a route returned by list_pages or search_pages, such as /about.',
+      name: SITE_TOOL_CATALOG.get_page_markdown.name,
+      title: SITE_TOOL_CATALOG.get_page_markdown.title,
+      description: SITE_TOOL_CATALOG.get_page_markdown.description,
       inputSchema: {
         type: 'object',
         properties: {
-          route: { type: 'string', description: 'Site route to read, such as /blog/hello-world.' },
+          route: { type: 'string', description: SITE_TOOL_CATALOG.get_page_markdown.parameters.route },
         },
         required: ['route'],
       },
       annotations: READ_ONLY,
       async execute({ route }) {
-        const path = normalizeRoute(route)
+        const path = normalizeSiteRoute(route)
         if (!path)
           return toolError('A site route is required, such as /about. Call list_pages to see the available routes.')
 
@@ -401,4 +383,8 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
       },
     },
   ]
+  if (!options.tools)
+    return tools
+  const selected = new Set(options.tools)
+  return tools.filter(tool => selected.has(tool.name as SiteToolName))
 }

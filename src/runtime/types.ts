@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
+import type { SiteToolName } from './site-tool-catalog'
 
 export interface ModuleOptions {
   /**
@@ -91,7 +92,7 @@ export interface ModuleOptions {
      * Register the built-in `list_pages`, `search_pages` and `get_page_markdown` tools
      * @default true
      */
-    siteTools?: boolean
+    siteTools?: boolean | SiteToolName[]
     /**
      * Characters a single tool response may return before it is truncated
      * @default 1500
@@ -103,8 +104,8 @@ export interface ModuleOptions {
      */
     searchLimit?: number
     /**
-     * Trusted origins allowed to discover the built-in tools.
-     * Each listed origin gains read access to your page index.
+     * Default trusted origins for built-in and custom tools.
+     * Per-tool composable options take precedence.
      * @default undefined (same-origin only)
      */
     exposedTo?: string[]

@@ -435,10 +435,11 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   const nuxt = useNuxt()
   const prerenderedRoutes = (nuxt.options.nitro.prerender?.routes || []) as string[]
 
-  // Check if @nuxtjs/sitemap module is installed - it auto-prerenders sitemap.xml
+  // The sitemap module can serve sitemap.xml at runtime without prerendering it.
+  // Only wait for its prerender hook when the build will actually render it.
   const hasSitemapModule = hasNuxtModule('@nuxtjs/sitemap', nuxt)
 
-  let prerenderSitemap = hasSitemapModule || isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
+  let prerenderSitemap = isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
 
   if (resolveNitroPreset() === 'vercel-edge')
     prerenderSitemap = true

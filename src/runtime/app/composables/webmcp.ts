@@ -1,76 +1,165 @@
-import type { WebMcpRegisterOptions, WebMcpTool } from '../../webmcp'
-import { onScopeDispose } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter, ShallowRef } from 'vue'
+import type {
+  InferWebMcpInput,
+  WebMcpInputSchema,
+  WebMcpRegisterOptions,
+  WebMcpTool,
+  WebMcpToolRegistrationState,
+} from '../../webmcp'
+import {
+  computed,
+  getCurrentInstance,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  onScopeDispose,
+  ref,
+  shallowRef,
+  toValue,
+  watch,
+} from 'vue'
 import { checkToolBudget, getModelContext, registerTool } from '../../webmcp'
+import { getWebMcpDefaults } from '../webmcp-config'
+
+export interface UseWebMcpToolOptions extends WebMcpRegisterOptions {
+  /** Register only while this reactive value is true. */
+  enabled?: MaybeRefOrGetter<boolean>
+}
 
 export interface UseWebMcpToolReturn {
-  /** Whether the browser exposes `document.modelContext`. */
-  supported: boolean
-  /** Remove the tool from the page's model context. */
+  /** Whether the mounted client supports `document.modelContext`. */
+  supported: ComputedRef<boolean>
+  /** Registration lifecycle, including browser rejections. */
+  state: Readonly<ShallowRef<WebMcpToolRegistrationState>>
+  /** Remove the tool permanently for this composable instance. */
   unregister: () => void
 }
 
-/** Whether the current browser supports WebMCP. Always false during SSR. */
-export function isWebMcpSupported(): boolean {
-  return !!getModelContext()
+/**
+ * Hydration-safe WebMCP support. It stays false through SSR and the first client
+ * render, then updates after mount.
+ */
+export function useWebMcpSupported(): ComputedRef<boolean> {
+  const inComponent = !!getCurrentInstance()
+  const mounted = ref(!inComponent)
+  if (inComponent)
+    onMounted(() => mounted.value = true)
+  return computed(() => mounted.value && !!getModelContext())
 }
 
 /**
- * Register a WebMCP tool for the lifetime of the current effect scope, so
- * agents only see tools for the state the page is actually in.
- *
- * @example
- * ```ts
- * useWebMcpTool({
- *   name: 'filter_products',
- *   description: 'Filters the product list by price range.',
- *   inputSchema: {
- *     type: 'object',
- *     properties: { maxPrice: { type: 'number', description: 'Highest price to show.' } },
- *     required: ['maxPrice'],
- *   },
- *   annotations: { readOnlyHint: true },
- *   execute: ({ maxPrice }) => {
- *     filters.value.maxPrice = maxPrice
- *     return `Showing products under ${maxPrice}.`
- *   },
- * })
- * ```
+ * Register a WebMCP tool while its component is mounted, active and enabled.
  */
-export function useWebMcpTool<Input extends Record<string, any> = Record<string, any>>(
-  tool: WebMcpTool<Input>,
-  options: WebMcpRegisterOptions = {},
+export function useWebMcpTool<
+  const Schema extends WebMcpInputSchema,
+  Output,
+>(
+  tool: WebMcpTool<InferWebMcpInput<NoInfer<Schema>>, Output, Schema>,
+  options?: UseWebMcpToolOptions,
+): UseWebMcpToolReturn
+export function useWebMcpTool<
+  Input extends Record<string, unknown>,
+  Output,
+>(
+  tool: WebMcpTool<Input, Output>,
+  options?: UseWebMcpToolOptions,
+): UseWebMcpToolReturn
+export function useWebMcpTool(
+  tool: WebMcpTool<any, any>,
+  options: UseWebMcpToolOptions = {},
 ): UseWebMcpToolReturn {
-  const modelContext = getModelContext()
-  if (!modelContext)
-    return { supported: false, unregister: () => {} }
-  if (options.signal?.aborted)
-    return { supported: true, unregister: () => {} }
+  const inComponent = !!getCurrentInstance()
+  const state = shallowRef<WebMcpToolRegistrationState>({ _tag: 'Unsupported' })
+  const supported = computed(() => state.value._tag !== 'Unsupported')
+  const defaultExposedTo = getWebMcpDefaults().exposedTo
+  let mounted = !inComponent
+  let active = true
+  let permanentlyDisabled = options.signal?.aborted === true
+  let controller: AbortController | undefined
 
-  if (import.meta.dev) {
-    for (const warning of checkToolBudget(tool))
-      console.warn(`[nuxt-ai-ready] ${warning}`)
+  const stopRegistration = () => {
+    const current = controller
+    controller = undefined
+    current?.abort()
+    state.value = getModelContext() ? { _tag: 'Inactive' } : { _tag: 'Unsupported' }
   }
 
-  const controller = new AbortController()
-  const unregister = () => controller.abort()
+  const syncRegistration = () => {
+    if (!mounted)
+      return
 
-  if (options.signal) {
-    const callerSignal = options.signal
-    const abortFromCaller = () => controller.abort(callerSignal.reason)
-    const removeCallerListener = () => callerSignal.removeEventListener('abort', abortFromCaller)
+    const modelContext = getModelContext()
+    if (!modelContext) {
+      stopRegistration()
+      return
+    }
+    if (!active || permanentlyDisabled || !toValue(options.enabled ?? true)) {
+      stopRegistration()
+      return
+    }
+    if (controller)
+      return
+
+    if (import.meta.dev) {
+      for (const warning of checkToolBudget(tool))
+        console.warn(`[nuxt-ai-ready] ${warning}`)
+    }
+
+    const current = new AbortController()
+    controller = current
+    state.value = { _tag: 'Registering' }
+
+    const registerOptions: WebMcpRegisterOptions = { signal: current.signal }
+    const exposedTo = options.exposedTo ?? defaultExposedTo
+    if (exposedTo?.length)
+      registerOptions.exposedTo = exposedTo
+
+    void registerTool(modelContext, tool, registerOptions).then((result) => {
+      if (controller !== current || current.signal.aborted)
+        return
+      if (result._tag === 'Registered') {
+        state.value = result
+        return
+      }
+      controller = undefined
+      state.value = { _tag: 'Failed', error: result.error }
+    })
+  }
+
+  const unregister = () => {
+    permanentlyDisabled = true
+    stopRegistration()
+  }
+
+  const callerSignal = options.signal
+  const abortFromCaller = () => unregister()
+  if (callerSignal && !callerSignal.aborted)
     callerSignal.addEventListener('abort', abortFromCaller, { once: true })
-    controller.signal.addEventListener('abort', removeCallerListener, { once: true })
+
+  watch(() => toValue(options.enabled ?? true), syncRegistration)
+
+  if (inComponent) {
+    onMounted(() => {
+      mounted = true
+      syncRegistration()
+    })
+    onActivated(() => {
+      active = true
+      syncRegistration()
+    })
+    onDeactivated(() => {
+      active = false
+      stopRegistration()
+    })
+  }
+  else {
+    syncRegistration()
   }
 
-  // Only send exposedTo when it holds origins: WebIDL rejects a null or
-  // non-iterable value where it expects a sequence.
-  const registerOptions: WebMcpRegisterOptions = { signal: controller.signal }
-  if (options.exposedTo?.length)
-    registerOptions.exposedTo = options.exposedTo
+  onScopeDispose(() => {
+    callerSignal?.removeEventListener('abort', abortFromCaller)
+    stopRegistration()
+  }, true)
 
-  registerTool(modelContext, tool, registerOptions)
-
-  onScopeDispose(unregister, true)
-
-  return { supported: true, unregister }
+  return { supported, state, unregister }
 }
