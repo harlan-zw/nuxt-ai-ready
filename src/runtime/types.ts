@@ -103,8 +103,8 @@ export interface ModuleOptions {
      */
     searchLimit?: number
     /**
-     * Secure origins allowed to discover the built-in tools.
-     * Only list origins you trust — they gain read access to your page index.
+     * Trusted origins allowed to discover the built-in tools.
+     * Each listed origin gains read access to your page index.
      * @default undefined (same-origin only)
      */
     exposedTo?: string[]
