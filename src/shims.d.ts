@@ -48,10 +48,3 @@ declare module '#ai-ready-virtual/site-tools.mjs' {
   const config: ResolvedSiteToolsConfig
   export default config
 }
-
-declare module '#ai-ready-virtual/sitemap-sources.mjs' {
-  import type { SitemapSourceInput } from '@nuxtjs/sitemap'
-
-  const sources: SitemapSourceInput[]
-  export default sources
-}

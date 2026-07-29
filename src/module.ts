@@ -12,7 +12,6 @@ import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
-import { collectSitemapFallbackSources } from './runtime/sitemap-source-fallback'
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
@@ -361,15 +360,7 @@ export default defineNuxtModule<ModuleOptions>({
     })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
-    const sitemapConfig = nuxt.options.sitemap as {
-      zeroRuntime?: boolean
-      urls?: unknown
-      sources?: unknown
-    } | undefined
-    const sitemapFallback = collectSitemapFallbackSources(sitemapConfig)
-    for (const warning of sitemapFallback.warnings)
-      logger.warn(warning)
-    const sitemapFallbackSources = sitemapFallback.sources
+    const sitemapConfig = nuxt.options.sitemap as { zeroRuntime?: boolean } | undefined
     const sitemapRouteRule = nuxt.options.nitro?.routeRules?.['/sitemap.xml'] as { prerender?: boolean } | undefined
     const sitemapPrerendered = !!(
       sitemapConfig?.zeroRuntime
@@ -467,7 +458,6 @@ export default defineNuxtModule<ModuleOptions>({
 
       nitroConfig.virtual = nitroConfig.virtual || {}
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
-      nitroConfig.virtual['#ai-ready-virtual/sitemap-sources.mjs'] = `export default ${JSON.stringify(sitemapFallbackSources)}`
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
@@ -701,9 +691,6 @@ export async function lookupContentPage(event, path) {
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
       addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
     }
-
-    if (sitemapFallbackSources.length)
-      addServerPlugin(resolve('./runtime/server/plugins/sitemap-source-fallback'))
 
     // IndexNow endpoints (only if key is configured)
     if (indexNow) {
