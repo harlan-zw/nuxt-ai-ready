@@ -1,5 +1,5 @@
-import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
+import type { H3Event } from '#nuxtseo/h3'
 
 export interface ModuleOptions {
   /**

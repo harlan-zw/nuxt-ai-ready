@@ -1,9 +1,9 @@
 import type { SitemapUrlInput, SitemapXmlInput } from '@nuxtjs/sitemap/utils'
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { parseSitemapStream } from '@nuxtjs/sitemap/utils'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import { withLeadingSlash } from 'ufo'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { fetchPublicAsset, hasAssets } from './cloudflare'
 

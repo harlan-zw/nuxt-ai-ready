@@ -58,7 +58,8 @@
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
     "typecheck": "nuxt typecheck",
-    "test:attw": "attw --pack"
+    "test:attw": "attw --pack",
+    "test:nuxt5": "pnpm --dir test/fixtures/nuxt5 install --frozen-lockfile && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
     "@libsql/client": "^0.14.0",

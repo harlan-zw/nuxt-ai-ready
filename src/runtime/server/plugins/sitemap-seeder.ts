@@ -1,8 +1,10 @@
-import type { H3Event } from 'h3'
-import type { NitroApp } from 'nitropack/types'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
+import type { useNitroApp } from '#nuxtseo/nitro'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getPageLastmods, getSitemapLastCrawledAt, markSitemapCrawled, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
+
+type NitroApp = ReturnType<typeof useNitroApp>
 
 interface ResolvedSitemapUrl {
   loc: string

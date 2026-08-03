@@ -7,7 +7,7 @@ import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNux
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
-import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
+import { resolveNuxtContentVersion, setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
@@ -132,6 +132,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+    const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
 
     // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
@@ -235,7 +236,7 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     // Register type templates for Nitro hooks and virtual modules
-    registerTypeTemplates({ nuxt, config })
+    registerTypeTemplates({ nuxt, config, nitroCompatibility })
 
     // Build default llms.txt config with API endpoints
     const defaultLlmsTxtSections: LlmsTxtConfig['sections'] = []
@@ -357,7 +358,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
-      // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
+      // Enable async context to access the active request in nested functions (MCP handlers, etc.)
       // This enables access to H3Event and Cloudflare bindings from any async context
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true

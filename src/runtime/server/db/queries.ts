@@ -1,7 +1,7 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { RawExecutor } from './drizzle/raw'
-import { useEvent, useRuntimeConfig } from 'nitropack/runtime'
+import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleFromRoute } from '../utils/i18n'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
@@ -28,7 +28,7 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
   if (providedEvent)
     return providedEvent
   try {
-    return useEvent()
+    return useEvent() as H3Event
   }
   catch {
     return undefined

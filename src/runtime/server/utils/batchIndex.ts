@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { PageEntry } from '../db/queries'
 import { countPages, queryPages } from '../db/queries'
 import { logger } from '../logger'

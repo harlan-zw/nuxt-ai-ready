@@ -1,5 +1,7 @@
-import type { NitroApp } from 'nitropack/types'
+import type { useNitroApp } from '#nuxtseo/nitro'
 import { closeDrizzle } from '../db'
+
+type NitroApp = ReturnType<typeof useNitroApp>
 
 export default function dbLifecyclePlugin(nitroApp: NitroApp) {
   // Close request-scoped database connection

@@ -1,5 +1,7 @@
-import type { NitroApp } from 'nitropack/types'
+import type { useNitroApp } from '#nuxtseo/nitro'
 import { storePrerenderedHtml } from '../utils/prerender-html'
+
+type NitroApp = ReturnType<typeof useNitroApp>
 
 // Capture every page's rendered HTML during prerendering so the markdown
 // prerender middleware can reuse it instead of re-rendering the page.

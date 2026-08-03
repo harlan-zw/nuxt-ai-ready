@@ -1,6 +1,6 @@
 import type { PageEntry } from '../../db/queries'
-import { eventHandler, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { countPages, queryPages } from '../../db/queries'
 

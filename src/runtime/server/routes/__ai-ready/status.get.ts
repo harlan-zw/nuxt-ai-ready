@@ -1,6 +1,6 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
-import { eventHandler } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { countPages, countPagesNeedingIndexNowSync, countRecentlyIndexed, getCronLockStatus, getIndexNowBackoff, getIndexNowStats, getRecentCronRuns, getRecentlyIndexedPages, getSitemapStatus } from '../../db/queries'
 
 export default eventHandler(async (event) => {

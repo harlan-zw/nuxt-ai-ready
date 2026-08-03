@@ -1,13 +1,22 @@
 import type { Nuxt } from '@nuxt/schema'
+import type { NitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import type { ModuleOptions } from './runtime/types'
 import { addTemplate, addTypeTemplate } from '@nuxt/kit'
+import { renderNitroTypeAugmentations } from 'nuxtseo-shared/kit'
 
 interface TemplateContext {
   nuxt: Nuxt
   config: ModuleOptions
+  nitroCompatibility: NitroRuntimeCompatibility
 }
 
-export function registerTypeTemplates(_ctx: TemplateContext) {
+export function registerTypeTemplates(ctx: TemplateContext) {
+  const nitroTypes = renderNitroTypeAugmentations(ctx.nitroCompatibility, {
+    runtimeHooks: `'ai-ready:page:markdown': (context: MarkdownContext) => void | Promise<void>
+'ai-ready:mdreamConfig': (config: MdreamOptions) => void | Promise<void>
+'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>`,
+  })
+
   // Type augmentations for existing modules
   addTypeTemplate({
     filename: 'types/nuxt-ai-ready-augments.d.ts',
@@ -16,13 +25,7 @@ export function registerTypeTemplates(_ctx: TemplateContext) {
 import type { MarkdownContext, PageIndexedContext } from 'nuxt-ai-ready'
 import type { MdreamOptions } from 'mdream'
 
-declare module 'nitropack/types' {
-  interface NitroRuntimeHooks {
-    'ai-ready:page:markdown': (context: MarkdownContext) => void | Promise<void>
-    'ai-ready:mdreamConfig': (config: MdreamOptions) => void | Promise<void>
-    'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>
-  }
-}
+${nitroTypes}
 
 export {}
 `,
@@ -60,7 +63,7 @@ declare module '#ai-ready-virtual/logger.mjs' {
 }
 
 declare module '#ai-ready-virtual/db-provider.mjs' {
-  import type { H3Event } from 'h3'
+  import type { H3Event } from '#nuxtseo/h3'
   import type { DrizzleDatabase } from '#ai-ready/server/db/drizzle/client'
   export function createClient(event?: H3Event): Promise<DrizzleDatabase>
 }
@@ -70,7 +73,7 @@ declare module '#ai-ready-virtual/db-schema.mjs' {
 }
 
 declare module '#ai-ready-virtual/content-lookup.mjs' {
-  import type { H3Event } from 'h3'
+  import type { H3Event } from '#nuxtseo/h3'
   export function lookupContentPage(event: H3Event, path: string): Promise<{
     markdown: string
     title?: string

@@ -1,5 +1,5 @@
 import type { DumpRow } from '../../db/shared'
-import { createError, eventHandler } from 'h3'
+import { createError, eventHandler } from '#nuxtseo/h3'
 import { useRawDb } from '../../db'
 import { decompressFromBase64, importDbDump } from '../../db/shared'
 import { logger } from '../../logger'

@@ -1,7 +1,7 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { DumpRow } from '../db/shared'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import {
   countPages,
   getContentHashes,

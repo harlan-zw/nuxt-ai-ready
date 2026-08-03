@@ -27,7 +27,7 @@ declare module '#ai-ready-virtual/logger.mjs' {
 }
 
 declare module '#ai-ready-virtual/db-provider.mjs' {
-  import type { H3Event } from 'h3'
+  import type { H3Event } from '#nuxtseo/h3'
 
   interface DrizzleDatabase {
     dialect: 'sqlite' | 'postgres'

@@ -1,5 +1,5 @@
-import { eventHandler, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 /**
  * Key verification endpoint for IndexNow

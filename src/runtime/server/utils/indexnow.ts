@@ -1,5 +1,5 @@
-import type { H3Event } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import {
   deleteInfoValue,
   getInfoValue,

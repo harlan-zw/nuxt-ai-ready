@@ -1,13 +1,13 @@
 import type { ContentNegotiationResult } from '@mdream/js/negotiate'
-import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../module'
 import type { MarkdownContext } from '../types'
 import { negotiateContent } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
-import { getHeader, getHeaders } from 'h3'
 import { htmlToMarkdown } from 'mdream'
-import { useNitroApp } from 'nitropack/runtime'
+import { getHeader, getHeaders } from '#nuxtseo/h3'
+import { useNitroApp } from '#nuxtseo/nitro'
 
 export { toMarkdownPath } from '../markdown-path'
 

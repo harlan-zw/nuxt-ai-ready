@@ -1,6 +1,6 @@
 import type { PageEntry } from '../db/queries'
-import { createError, eventHandler, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { createError, eventHandler, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { useRawDb } from '../db'
 import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
 import { fetchPublicAsset, hasAssets } from '../utils/cloudflare'

@@ -1,6 +1,6 @@
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'

@@ -1,6 +1,7 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
-import { useEvent } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
 import { z } from 'zod'
+import { useEvent } from '#nuxtseo/nitro'
 import { searchPages } from '../../db/queries'
 
 const inputSchema = {
@@ -14,7 +15,7 @@ const tool: McpToolDefinition = {
   inputSchema,
   cache: '5m',
   async handler({ query, limit }) {
-    const event = useEvent()
+    const event = useEvent() as H3Event
     const results = await searchPages(event, query as string, { limit: limit as number })
     return { content: [{ type: 'text', text: JSON.stringify(results) }] }
   },
