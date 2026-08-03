@@ -20,6 +20,10 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
+  aiReady: {
+    webmcp: true,
+  },
+
   // MCP Toolkit config
   mcp: {
     enabled: true,

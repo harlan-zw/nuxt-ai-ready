@@ -7,7 +7,7 @@ import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
-import { parseSitemapXml } from '@nuxtjs/sitemap/utils'
+import { parseSitemap } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
@@ -410,11 +410,24 @@ async function crawlSitemapContent(
   sitemapContent: string,
 ): Promise<number> {
   logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
-  const result = await parseSitemapXml(sitemapContent).catch((e) => {
-    logger.debug(`Skipping sitemap: ${e.message}`)
-    return null
+  const urls: SitemapEntry[] = []
+  let parseError: string | undefined
+  await (async () => {
+    for await (const parsed of parseSitemap(sitemapContent)) {
+      if (parsed._tag === 'url')
+        urls.push(parsed.entry)
+      else if (parsed._tag === 'issue')
+        logger.debug(`Sitemap parse issue: ${parsed.issue.message}`)
+      else if (parsed._tag === 'end' && parsed.completeness._tag !== 'complete')
+        parseError = `Sitemap parse ${parsed.completeness._tag}: ${parsed.completeness.reason}`
+    }
+  })().catch((error) => {
+    parseError = error instanceof Error ? error.message : String(error)
   })
-  const urls = result?.urls || []
+  if (parseError) {
+    logger.debug(`Skipping sitemap: ${parseError}`)
+    return 0
+  }
   logger.debug(`Found ${urls.length} URLs in sitemap`)
   return crawlSitemapEntries(state, nuxt, nitro, urls)
 }
@@ -435,10 +448,11 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   const nuxt = useNuxt()
   const prerenderedRoutes = (nuxt.options.nitro.prerender?.routes || []) as string[]
 
-  // Check if @nuxtjs/sitemap module is installed - it auto-prerenders sitemap.xml
+  // The sitemap module can serve sitemap.xml at runtime without prerendering it.
+  // Only wait for its prerender hook when the build will actually render it.
   const hasSitemapModule = hasNuxtModule('@nuxtjs/sitemap', nuxt)
 
-  let prerenderSitemap = hasSitemapModule || isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
+  let prerenderSitemap = isNuxtGenerate() || includesSitemapRoot(sitemapName, prerenderedRoutes)
 
   if (resolveNitroPreset() === 'vercel-edge')
     prerenderSitemap = true

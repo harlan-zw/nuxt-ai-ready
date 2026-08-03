@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals"],
+    "noEmit": true
+  },
+  "include": [
+    "./**/*.test-d.ts",
+    "../../.nuxt/nuxt.d.ts",
+    "../../.nuxt/types/modules.d.ts"
+  ]
+}

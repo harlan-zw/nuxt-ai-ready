@@ -128,4 +128,16 @@ describe('fetchSitemapByRoute', () => {
     // fetched once for the index, skipped the self-referencing child
     expect((event.$fetch as any)).toHaveBeenCalledTimes(1)
   })
+
+  it('returns partial URLs with an error for an incomplete sitemap', async () => {
+    const incomplete = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/about</loc></url>`
+    const event = mockEvent({ '/sitemap.xml': incomplete })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(urls).toEqual([{ loc: 'https://example.com/about', lastmod: undefined }])
+    expect(error).toBe('Sitemap parse failed: malformed')
+  })
 })
