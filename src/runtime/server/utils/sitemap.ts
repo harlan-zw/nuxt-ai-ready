@@ -9,6 +9,7 @@ import type {
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { createSitemapReader } from 'sitemapd'
+import { parseSitemap } from 'sitemapd/parse'
 import { logger } from '../logger'
 import { getCfEnv, hasAssets } from './cloudflare'
 import { createUniversalContext } from './context'
@@ -96,6 +97,10 @@ type BoundedBodyResult
 type LocalFetchResult
   = | { _tag: 'ok', response: Response & { _data?: ReadableStream<Uint8Array> } }
     | { _tag: 'error', error: unknown, timedOut: boolean, cancelled: boolean }
+
+type RecoveredUrlset
+  = | { _tag: 'none' }
+    | { _tag: 'failed', entries: SitemapUrlRecord[], reason: string }
 
 function parseAbsoluteUrl(input: string, base?: string): ParsedUrl {
   try {
@@ -235,6 +240,7 @@ async function fetchLocalRoute(
 function createLocalSitemapLoader(
   event: H3Event | undefined,
   usePublicAsset: boolean,
+  loadedBodies: Map<string, Uint8Array>,
 ): SitemapDocumentLoader {
   return async (request): Promise<SitemapDocumentLoadResult> => {
     const parsed = parseAbsoluteUrl(request.url)
@@ -314,12 +320,35 @@ function createLocalSitemapLoader(
         bytesRead: read.result.bytesRead,
       }
     }
+    loadedBodies.set(request.url, read.result.body)
     return {
       _tag: 'body',
       url: request.url,
       body: read.result.body,
     }
   }
+}
+
+async function recoverFailedUrlset(body: Uint8Array): Promise<RecoveredUrlset> {
+  const entries: SitemapUrlRecord[] = []
+  let kind: 'urlset' | 'index' | undefined
+  let failureReason: string | undefined
+
+  for await (const event of parseSitemap(body, {
+    maxDecodedBytes: SITEMAP_READER_LIMITS.maxDecodedBytes,
+    maxEntries: SITEMAP_READER_LIMITS.maxEntries,
+  })) {
+    if (event._tag === 'document')
+      kind = event.kind
+    else if (event._tag === 'url')
+      entries.push(event.entry)
+    else if (event._tag === 'end' && event.completeness._tag === 'failed')
+      failureReason = event.completeness.reason
+  }
+
+  if (kind !== 'urlset' || !failureReason)
+    return { _tag: 'none' }
+  return { _tag: 'failed', entries, reason: failureReason }
 }
 
 function formatWalkFailure(failure: SitemapWalkFailure): string {
@@ -347,9 +376,10 @@ export async function fetchSitemapByRoute(
   if (rootUrl._tag === 'error')
     return { urls: [], error: `Invalid sitemap route: ${route}` }
 
+  const loadedBodies = new Map<string, Uint8Array>()
   const reader = createSitemapReader({
     limits: SITEMAP_READER_LIMITS,
-    loadDocument: createLocalSitemapLoader(event, usePublicAsset),
+    loadDocument: createLocalSitemapLoader(event, usePublicAsset, loadedBodies),
     authorizeTarget: (request) => {
       const target = parseAbsoluteUrl(request.url)
       if (target._tag === 'error')
@@ -365,11 +395,38 @@ export async function fetchSitemapByRoute(
   })
 
   const result = await reader.walk(rootUrl.value.toString(), SITEMAP_READER_LIMITS)
-  const urls = result.entries.map(normalizeUrl)
+  const entries = [...result.entries]
+  const parseFailures: string[] = []
+  for (const failure of result.failures) {
+    if (failure.result._tag !== 'failure' || failure.result.reason !== 'document')
+      continue
+    const body = loadedBodies.get(failure.result.url)
+    if (!body)
+      continue
+    const recovered = await recoverFailedUrlset(body)
+    if (recovered._tag === 'none')
+      continue
+    entries.push(...recovered.entries)
+    parseFailures.push(recovered.reason)
+  }
+
+  const seenUrls = new Set<string>()
+  const urls = entries
+    .filter((entry) => {
+      if (seenUrls.has(entry.loc))
+        return false
+      seenUrls.add(entry.loc)
+      return true
+    })
+    .slice(0, SITEMAP_READER_LIMITS.maxUrls)
+    .map(normalizeUrl)
   logger.debug(`[sitemap] Found ${urls.length} URLs from ${rootUrl.value.pathname}${rootUrl.value.search}`)
 
   if (result._tag === 'complete')
     return { urls }
+
+  if (result.failures.length === 1 && parseFailures.length === 1 && result.reasons.length === 1 && result.reasons[0] === 'read_failure')
+    return { urls, error: `Sitemap parse failed: ${parseFailures[0]}` }
 
   const failures = result.failures.map(formatWalkFailure)
   const details = failures.length > 0 ? `; ${failures.join('; ')}` : ''
