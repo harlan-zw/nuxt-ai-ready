@@ -16,6 +16,14 @@ export interface ModuleOptions {
   debug?: boolean
 
   /**
+   * Negotiate Markdown on HTML routes through Accept and User-Agent headers.
+   * Disable when a deployment cache cannot vary responses by request headers.
+   * Explicit .md routes remain available.
+   * @default Enabled unless an ISR route rule is configured
+   */
+  contentNegotiation?: boolean
+
+  /**
    * Options to pass to mdream htmlToMarkdown function
    */
   mdreamOptions?: MdreamOptions

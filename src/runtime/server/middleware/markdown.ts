@@ -14,9 +14,9 @@ import { buildLinkHeader } from '../utils/link-header'
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 type LinkUrlResolver = (path: string) => string
 
-// Always signal that response content varies by Accept so caches segment correctly
 function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
-  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
+  if (config.contentNegotiation)
+    setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
   // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
   setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl))
 }
@@ -75,7 +75,12 @@ export default defineEventHandler(async (event) => {
   if (getHeader(event, INTERNAL_HEADER))
     return
 
-  const renderInfo = getMarkdownRenderInfo(event)
+  const runtimeConfig = useRuntimeConfig(event)
+  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const renderInfo = getMarkdownRenderInfo(event, {
+    _tag: 'runtime',
+    contentNegotiation: config.contentNegotiation,
+  })
   if (!renderInfo)
     return
 
@@ -89,8 +94,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const { path, isExplicit, negotiation } = renderInfo
-  const runtimeConfig = useRuntimeConfig(event)
-  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const baseURL = runtimeConfig.app.baseURL
   const resolvePath = (path: string) => toDeployedRoute(path, baseURL)
   const resolveUrl = (path: string) => withSiteUrl(event, resolvePath(path))

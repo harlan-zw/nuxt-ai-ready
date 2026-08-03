@@ -13,6 +13,7 @@ import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
+import { resolveContentNegotiation } from './utils/content-negotiation'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -44,6 +45,7 @@ declare module '@nuxt/schema' {
 export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
+  contentNegotiation: boolean
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
@@ -136,6 +138,17 @@ export default defineNuxtModule<ModuleOptions>({
     }
     if (rawConfig.mdreamOptions?.preset) {
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
+    }
+
+    const contentNegotiation = resolveContentNegotiation({
+      configured: config.contentNegotiation,
+      routeRules: {
+        ...nuxt.options.routeRules,
+        ...nuxt.options.nitro.routeRules,
+      },
+    })
+    if (contentNegotiation._tag === 'disabled' && contentNegotiation.source === 'isr') {
+      logger.info(`Content negotiation disabled because ISR is configured for \`${contentNegotiation.route}\`. Set \`contentNegotiation: true\` to override.`)
     }
 
     const siteToolsResult = resolveSiteToolsConfig(config.tools)
@@ -607,6 +620,7 @@ export async function lookupContentPage(event, path) {
       version: version || '0.0.0',
       debug: config.debug || false,
       debugCron: config.debugCron || false,
+      contentNegotiation: contentNegotiation._tag === 'enabled',
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,
