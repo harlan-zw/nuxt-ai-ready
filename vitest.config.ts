@@ -34,6 +34,7 @@ export default defineConfig({
           name: 'e2e',
           include: ['./test/e2e/**/*.test.ts'],
           environment: 'node',
+          fileParallelism: false,
         },
       }),
       defineProject({

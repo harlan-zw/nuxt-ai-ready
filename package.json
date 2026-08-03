@@ -55,6 +55,7 @@
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",
     "test": "pnpm run prepare:fixtures && vitest",
+    "test:run": "pnpm run prepare:fixtures && vitest run && pnpm test:nuxt5",
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
     "typecheck": "nuxt typecheck",
