@@ -1,11 +1,17 @@
-import type { SitemapInput, SitemapUrlRecord } from '@nuxtjs/sitemap/utils'
 import type { H3Event } from 'h3'
+import type {
+  SitemapDocumentLoader,
+  SitemapDocumentLoadResult,
+  SitemapLoadRequest,
+  SitemapUrlRecord,
+  SitemapWalkFailure,
+} from 'sitemapd'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { parseSitemap } from '@nuxtjs/sitemap/utils'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { withLeadingSlash } from 'ufo'
+import { createSitemapReader } from 'sitemapd'
 import { logger } from '../logger'
-import { fetchPublicAsset, hasAssets } from './cloudflare'
+import { getCfEnv, hasAssets } from './cloudflare'
+import { createUniversalContext } from './context'
 
 export interface SitemapUrl {
   loc: string
@@ -17,7 +23,17 @@ export interface SitemapConfig {
   route: string
 }
 
-const FETCH_TIMEOUT = 15000 // 15s for sitemap
+const FETCH_TIMEOUT = 15_000
+const SITEMAP_FALLBACK_ORIGIN = 'http://localhost'
+const SITEMAP_READER_LIMITS = {
+  maxRedirects: 5,
+  maxDocuments: 100,
+  maxDepth: 3,
+  maxUrls: 50_000,
+  maxEntries: 50_000,
+  maxWireBytes: 50 * 1024 * 1024,
+  maxDecodedBytes: 50 * 1024 * 1024,
+} as const
 
 /**
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
@@ -69,122 +85,297 @@ function normalizeUrl(entry: SitemapUrlRecord): SitemapUrl {
   }
 }
 
-function isSitemapInput(value: unknown): value is SitemapInput {
-  return typeof value === 'string'
-    || value instanceof Uint8Array
-    || (typeof value === 'object' && value !== null && 'getReader' in value)
+type ParsedUrl
+  = | { _tag: 'ok', value: URL }
+    | { _tag: 'error', input: string }
+
+type BoundedBodyResult
+  = | { _tag: 'ok', body: Uint8Array }
+    | { _tag: 'limit', bytesRead: number }
+
+type LocalFetchResult
+  = | { _tag: 'ok', response: Response & { _data?: ReadableStream<Uint8Array> } }
+    | { _tag: 'error', error: unknown, timedOut: boolean, cancelled: boolean }
+
+function parseAbsoluteUrl(input: string, base?: string): ParsedUrl {
+  try {
+    return { _tag: 'ok', value: new URL(input, base) }
+  }
+  catch {
+    return { _tag: 'error', input }
+  }
+}
+
+function responseBody(
+  response: Response & { _data?: ReadableStream<Uint8Array> },
+): ReadableStream<Uint8Array> | null {
+  const data = response._data
+  if (data && typeof data.getReader === 'function')
+    return data
+  return response.body
+}
+
+async function cancelBody(
+  body: ReadableStream<Uint8Array> | null,
+  reason: string,
+): Promise<void> {
+  if (!body)
+    return
+  await body.cancel(reason).catch((error) => {
+    // Cleanup failure cannot change the established HTTP result.
+    logger.debug(`[sitemap] Failed to cancel response body: ${String(error)}`)
+  })
+}
+
+async function readBoundedBody(
+  body: ReadableStream<Uint8Array> | null,
+  maxWireBytes: number,
+): Promise<BoundedBodyResult> {
+  if (!body)
+    return { _tag: 'ok', body: new Uint8Array() }
+
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let bytesRead = 0
+  let reachedEnd = false
+  let exceeded = false
+
+  try {
+    while (!reachedEnd) {
+      const next = await reader.read()
+      reachedEnd = next.done
+      if (!next.value)
+        continue
+      bytesRead += next.value.byteLength
+      if (bytesRead > maxWireBytes) {
+        exceeded = true
+        break
+      }
+      chunks.push(next.value)
+    }
+  }
+  finally {
+    if (!reachedEnd) {
+      await reader.cancel('sitemap wire limit reached').catch((error) => {
+        // Cleanup failure cannot change the established wire-limit result.
+        logger.debug(`[sitemap] Failed to cancel bounded response body: ${String(error)}`)
+      })
+    }
+    reader.releaseLock()
+  }
+
+  if (exceeded)
+    return { _tag: 'limit', bytesRead }
+
+  const output = new Uint8Array(bytesRead)
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return { _tag: 'ok', body: output }
+}
+
+async function fetchLocalRoute(
+  event: H3Event | undefined,
+  route: string,
+  usePublicAsset: boolean,
+  request: SitemapLoadRequest,
+): Promise<LocalFetchResult> {
+  const controller = new AbortController()
+  let timedOut = false
+  const abortFromRequest = () => controller.abort(request.signal?.reason)
+  if (request.signal?.aborted)
+    abortFromRequest()
+  else
+    request.signal?.addEventListener('abort', abortFromRequest, { once: true })
+
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort(new DOMException('Sitemap fetch timed out', 'TimeoutError'))
+  }, FETCH_TIMEOUT)
+
+  const fetchPromise: Promise<Response & { _data?: ReadableStream<Uint8Array> }> = usePublicAsset
+    ? getCfEnv(event)!.ASSETS!.fetch(
+        new Request(new URL(route, 'https://assets.local'), {
+          redirect: 'manual',
+          signal: controller.signal,
+        }),
+      )
+    : event
+      ? event.fetch(route, {
+          redirect: 'manual',
+          signal: controller.signal,
+        })
+      : globalThis.$fetch.raw(route, {
+          responseType: 'stream',
+          redirect: 'manual',
+          retry: false,
+          ignoreResponseError: true,
+          signal: controller.signal,
+        })
+
+  return fetchPromise
+    .then((response): LocalFetchResult => ({
+      _tag: 'ok',
+      response,
+    }))
+    .catch((error): LocalFetchResult => ({
+      _tag: 'error',
+      error,
+      timedOut,
+      cancelled: Boolean(request.signal?.aborted),
+    }))
+    .finally(() => {
+      clearTimeout(timeout)
+      request.signal?.removeEventListener('abort', abortFromRequest)
+    })
+}
+
+function createLocalSitemapLoader(
+  event: H3Event | undefined,
+  usePublicAsset: boolean,
+): SitemapDocumentLoader {
+  return async (request): Promise<SitemapDocumentLoadResult> => {
+    const parsed = parseAbsoluteUrl(request.url)
+    if (parsed._tag === 'error') {
+      return {
+        _tag: 'load_error',
+        url: request.url,
+        code: 'network',
+        detail: `Invalid sitemap URL: ${request.url}`,
+      }
+    }
+
+    const route = `${parsed.value.pathname}${parsed.value.search}`
+    logger.debug(`[sitemap] Fetching ${route} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.fetch' : 'globalThis.$fetch'}`)
+    const fetched = await fetchLocalRoute(event, route, usePublicAsset, request)
+    if (fetched._tag === 'error') {
+      return {
+        _tag: 'load_error',
+        url: request.url,
+        code: fetched.timedOut ? 'timeout' : fetched.cancelled ? 'cancelled' : 'network',
+        detail: fetched.error instanceof Error ? fetched.error.message : String(fetched.error),
+      }
+    }
+
+    const { response } = fetched
+    const body = responseBody(response)
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      await cancelBody(body, 'redirect response handled by sitemap reader')
+      if (!location) {
+        return {
+          _tag: 'http_error',
+          url: request.url,
+          status: response.status,
+          statusText: 'Redirect response is missing Location',
+        }
+      }
+      return {
+        _tag: 'redirect',
+        url: request.url,
+        location,
+        status: response.status,
+      }
+    }
+    if (response.status === 404 || response.status === 410) {
+      await cancelBody(body, 'not found response body is unused')
+      return { _tag: 'not_found', url: request.url, status: response.status }
+    }
+    if (!response.ok) {
+      await cancelBody(body, 'error response body is unused')
+      return {
+        _tag: 'http_error',
+        url: request.url,
+        status: response.status,
+        statusText: response.statusText,
+      }
+    }
+
+    const maxWireBytes = request.maxWireBytes ?? SITEMAP_READER_LIMITS.maxWireBytes
+    const read = await readBoundedBody(body, maxWireBytes)
+      .then(result => ({ _tag: 'ok' as const, result }))
+      .catch(error => ({ _tag: 'error' as const, error }))
+    if (read._tag === 'error') {
+      return {
+        _tag: 'load_error',
+        url: request.url,
+        code: 'network',
+        detail: read.error instanceof Error ? read.error.message : String(read.error),
+      }
+    }
+    if (read.result._tag === 'limit') {
+      return {
+        _tag: 'load_error',
+        url: request.url,
+        code: 'wire_limit',
+        detail: `Sitemap response exceeds ${maxWireBytes} wire bytes`,
+        bytesRead: read.result.bytesRead,
+      }
+    }
+    return {
+      _tag: 'body',
+      url: request.url,
+      body: read.result.body,
+    }
+  }
+}
+
+function formatWalkFailure(failure: SitemapWalkFailure): string {
+  if (failure.result._tag === 'not_found')
+    return `${failure.url}: HTTP ${failure.result.status}`
+  return `${failure.url}: ${failure.result.reason}: ${failure.result.detail}`
 }
 
 /**
  * Fetch and parse a single sitemap by route
- * Supports both request context (event.$fetch) and cron context (ASSETS.fetch or globalThis.$fetch)
+ * Supports both request context (event.fetch) and cron context (ASSETS.fetch or globalThis.$fetch)
  */
 export async function fetchSitemapByRoute(
   event: H3Event | undefined,
   route: string,
-  depth = 0,
 ): Promise<{ urls: SitemapUrl[], error?: string }> {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  const fetchRoute = withLeadingSlash(route)
-
-  // Use ASSETS.fetch for prerendered sitemaps on Cloudflare (avoids self-fetch issues)
   const usePublicAsset = config.sitemapPrerendered && hasAssets(event)
-  logger.debug(`[sitemap] Fetching ${fetchRoute} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.$fetch' : 'globalThis.$fetch'}`)
+  const configuredSiteUrl = createUniversalContext(event).siteUrl ?? SITEMAP_FALLBACK_ORIGIN
+  const siteUrl = parseAbsoluteUrl(configuredSiteUrl)
+  if (siteUrl._tag === 'error')
+    return { urls: [], error: `Invalid site URL: ${configuredSiteUrl}` }
 
-  let sitemapInput: SitemapInput | null = null
+  const rootUrl = parseAbsoluteUrl(route, `${siteUrl.value.origin}/`)
+  if (rootUrl._tag === 'error')
+    return { urls: [], error: `Invalid sitemap route: ${route}` }
 
-  if (usePublicAsset) {
-    sitemapInput = await fetchPublicAsset<SitemapInput>(event, fetchRoute, { responseType: 'stream' })
-    if (!sitemapInput) {
-      logger.warn(`[sitemap] Not found in ASSETS: ${fetchRoute}`)
-      return { urls: [], error: 'Not found in ASSETS' }
-    }
-  }
-  else {
-    try {
-      // Use event.$fetch when available, fallback to globalThis.$fetch for cron
-      const $fetch = event?.$fetch ?? globalThis.$fetch
-      const res: unknown = await $fetch(fetchRoute, {
-        responseType: 'stream',
-        timeout: FETCH_TIMEOUT,
-      })
-      if (!res) {
-        logger.warn(`[sitemap] Empty response from ${fetchRoute}`)
-        return { urls: [], error: 'Empty response' }
+  const reader = createSitemapReader({
+    limits: SITEMAP_READER_LIMITS,
+    loadDocument: createLocalSitemapLoader(event, usePublicAsset),
+    authorizeTarget: (request) => {
+      const target = parseAbsoluteUrl(request.url)
+      if (target._tag === 'error')
+        return { _tag: 'deny', reason: `Invalid sitemap target: ${request.url}` }
+      if (target.value.origin !== siteUrl.value.origin) {
+        return {
+          _tag: 'deny',
+          reason: `Sitemap target origin ${target.value.origin} differs from ${siteUrl.value.origin}`,
+        }
       }
-      if (!isSitemapInput(res)) {
-        logger.warn(`[sitemap] Invalid response body from ${fetchRoute}`)
-        return { urls: [], error: 'Invalid response body' }
-      }
-      sitemapInput = res
-    }
-    catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      logger.warn(`[sitemap] Failed to fetch ${fetchRoute}: ${msg}`)
-      return { urls: [], error: msg }
-    }
-  }
+      return { _tag: 'allow' }
+    },
+  })
 
-  logger.debug(`[sitemap] Parsing sitemap XML stream`)
+  const result = await reader.walk(rootUrl.value.toString(), SITEMAP_READER_LIMITS)
+  const urls = result.entries.map(normalizeUrl)
+  logger.debug(`[sitemap] Found ${urls.length} URLs from ${rootUrl.value.pathname}${rootUrl.value.search}`)
 
-  const urls: SitemapUrl[] = []
-  const indexEntries: Array<{ loc: string }> = []
-  let kind: 'urlset' | 'index' | undefined
-  let parseError: string | undefined
-  try {
-    for await (const parsed of parseSitemap(sitemapInput)) {
-      if (parsed._tag === 'document')
-        kind = parsed.kind
-      else if (parsed._tag === 'url')
-        urls.push(normalizeUrl(parsed.entry))
-      else if (parsed._tag === 'sitemap')
-        indexEntries.push(parsed.entry)
-      else if (parsed._tag === 'issue')
-        logger.warn(`[sitemap] ${fetchRoute}: ${parsed.issue.message}`)
-      else if (parsed.completeness._tag !== 'complete')
-        parseError = `Sitemap parse ${parsed.completeness._tag}: ${parsed.completeness.reason}`
-    }
-  }
-  catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    logger.warn(`[sitemap] Failed to parse ${fetchRoute}: ${msg}`)
-    return { urls: [], error: msg }
-  }
+  if (result._tag === 'complete')
+    return { urls }
 
-  // Sitemap index (i18n / multi-sitemap sites): follow child sitemaps so
-  // llms.txt and runtime indexing receive page URLs rather than index entries.
-  if (kind === 'index') {
-    if (depth >= 3) {
-      logger.warn(`[sitemap] Sitemap index nesting too deep at ${fetchRoute}, stopping`)
-      return { urls: [] }
-    }
-    logger.debug(`[sitemap] ${fetchRoute} is a sitemap index with ${indexEntries.length} children`)
-    const allUrls: SitemapUrl[] = []
-    const childErrors: string[] = parseError ? [parseError] : []
-    for (const entry of indexEntries) {
-      const childRoute = entry.loc.startsWith('http') ? new URL(entry.loc).pathname : entry.loc
-      // Avoid re-fetching the index itself (self-referencing or normalised duplicate)
-      if (withLeadingSlash(childRoute) === fetchRoute)
-        continue
-      // Keep any URLs we did get, but record child failures so the caller does
-      // not treat a partial/empty crawl as a clean, complete one (which would
-      // let stale-route pruning act on incomplete evidence).
-      const { urls, error } = await fetchSitemapByRoute(event, childRoute, depth + 1)
-      allUrls.push(...urls)
-      if (error)
-        childErrors.push(`${withLeadingSlash(childRoute)}: ${error}`)
-    }
-    if (childErrors.length > 0) {
-      const msg = `${childErrors.length}/${indexEntries.length} child sitemaps failed (${childErrors.join('; ')})`
-      logger.warn(`[sitemap] Sitemap index ${fetchRoute}: ${msg}`)
-      return { urls: allUrls, error: msg }
-    }
-    return { urls: allUrls }
-  }
-
-  logger.debug(`[sitemap] Found ${urls.length} URLs in ${fetchRoute}`)
-
-  return parseError ? { urls, error: parseError } : { urls }
+  const failures = result.failures.map(formatWalkFailure)
+  const details = failures.length > 0 ? `; ${failures.join('; ')}` : ''
+  const error = `sitemap walk partial (${result.reasons.join(', ')}${details})`
+  logger.warn(`[sitemap] ${error}`)
+  return { urls, error }
 }
 
 /**

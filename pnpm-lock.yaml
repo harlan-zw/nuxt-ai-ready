@@ -60,6 +60,9 @@ catalogs:
     site-config-stack:
       specifier: ^4.1.2
       version: 4.1.2
+    sitemapd:
+      specifier: ^0.2.0
+      version: 0.2.0
     tinyglobby:
       specifier: ^0.2.17
       version: 0.2.17
@@ -205,6 +208,9 @@ importers:
       site-config-stack:
         specifier: 'catalog:'
         version: 4.1.2(vue@3.5.40(typescript@6.0.3))
+      sitemapd:
+        specifier: 'catalog:'
+        version: 0.2.0
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -11128,7 +11134,7 @@ snapshots:
     dependencies:
       '@vue/shared': 3.5.40
       defu: 6.1.7
-      nostics: 1.1.4
+      nostics: 1.2.0
       pathe: 2.0.3
       pkg-types: 2.3.1
       std-env: 4.2.0

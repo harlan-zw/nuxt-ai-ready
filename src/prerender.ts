@@ -7,8 +7,8 @@ import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
-import { parseSitemap } from '@nuxtjs/sitemap/utils'
 import { colorize } from 'consola/utils'
+import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
@@ -410,24 +410,13 @@ async function crawlSitemapContent(
   sitemapContent: string,
 ): Promise<number> {
   logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
-  const urls: SitemapEntry[] = []
-  let parseError: string | undefined
-  await (async () => {
-    for await (const parsed of parseSitemap(sitemapContent)) {
-      if (parsed._tag === 'url')
-        urls.push(parsed.entry)
-      else if (parsed._tag === 'issue')
-        logger.debug(`Sitemap parse issue: ${parsed.issue.message}`)
-      else if (parsed._tag === 'end' && parsed.completeness._tag !== 'complete')
-        parseError = `Sitemap parse ${parsed.completeness._tag}: ${parsed.completeness.reason}`
-    }
-  })().catch((error) => {
-    parseError = error instanceof Error ? error.message : String(error)
-  })
-  if (parseError) {
-    logger.debug(`Skipping sitemap: ${parseError}`)
+  const result = await collectSitemap(sitemapContent)
+  if (result._tag !== 'document' || result.document._tag !== 'urlset') {
+    const issues = result.issues.map(issue => issue.message).join('; ')
+    logger.debug(`Skipping sitemap: ${issues || 'document is not a URL set'}`)
     return 0
   }
+  const urls = result.document.entries
   logger.debug(`Found ${urls.length} URLs in sitemap`)
   return crawlSitemapEntries(state, nuxt, nitro, urls)
 }
