@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v1.5.8...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.8...main)
+
+### 🚀 Enhancements
+
+- Opt-in WebMCP support ([#57](https://github.com/harlan-zw/nuxt-ai-ready/pull/57))
+
+### 🩹 Fixes
+
+- Preserve Markdown structure in llms-full.txt ([#56](https://github.com/harlan-zw/nuxt-ai-ready/pull/56))
+- Resolve Markdown negotiation per request ([#61](https://github.com/harlan-zw/nuxt-ai-ready/pull/61))
+
+### 💅 Refactors
+
+- Adopt sitemapd reader ([#60](https://github.com/harlan-zw/nuxt-ai-ready/pull/60))
+
+### 🏡 Chore
+
+- Code cleanup sweep ([#54](https://github.com/harlan-zw/nuxt-ai-ready/pull/54))
+- Adopt nuxtseo-shared 5.3.4 APIs ([#55](https://github.com/harlan-zw/nuxt-ai-ready/pull/55))
+- Bump deps ([6ce583a](https://github.com/harlan-zw/nuxt-ai-ready/commit/6ce583a))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+- Daniel Christensen ([@BobTheShoplifter](https://github.com/BobTheShoplifter))
+- MicroHoffman ([@microHoffman](https://github.com/microHoffman))
+
 ## v1.5.7...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.7...main)

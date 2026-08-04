@@ -57,11 +57,11 @@ catalog:
   h3: ^1.15.11
   mdream: ^1.5.8
   nitropack: ^2.13.4
-  nuxtseo-layer-devtools: ^5.3.7
+  nuxtseo-layer-devtools: ^5.3.9
   nuxtseo-shared: ^5.3.9
   pathe: ^2.0.3
   pkg-types: ^2.3.1
-  site-config-stack: ^4.1.2
+  site-config-stack: ^4.1.4
   sitemapd: ^0.2.1
   tinyglobby: ^0.2.17
   ufo: ^1.6.4
