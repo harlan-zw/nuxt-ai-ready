@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 const cardRoute = '/docs/agent/mcp/server-card'
+const aiCatalogRoute = '/.well-known/ai-catalog.json'
 
 async function mcpRequest(method: string, params?: Record<string, unknown>) {
   const response = await fetch('/docs/agent/mcp', {
@@ -134,5 +135,39 @@ describe('late MCP Server Card dependency', async () => {
       }],
     })
     expect(homeResponse.headers.get('link')).toContain('rel="api-catalog"')
+  })
+
+  it('publishes origin-level AI Catalog discovery for the Server Card', async () => {
+    const response = await fetch(aiCatalogRoute, {
+      headers: { accept: 'application/ai-catalog+json' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('application/ai-catalog+json')
+    expect(response.headers.get('cache-control')).toBe('public, max-age=900')
+    await expect(response.json()).resolves.toEqual({
+      specVersion: '1.0',
+      entries: [{
+        identifier: 'urn:air:late-mcp.example.com:mcp:ai-ready',
+        type: 'application/mcp-server-card+json',
+        url: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
+      }],
+    })
+  })
+
+  it('supports AI Catalog HEAD and conditional requests', async () => {
+    const first = await fetch(aiCatalogRoute)
+    const etag = first.headers.get('etag')
+    expect(etag).toMatch(/^"[a-f0-9]{64}"$/)
+
+    const head = await fetch(aiCatalogRoute, { method: 'HEAD' })
+    expect(head.status).toBe(200)
+    expect(await head.text()).toBe('')
+
+    const conditional = await fetch(aiCatalogRoute, {
+      headers: { 'if-none-match': etag! },
+    })
+    expect(conditional.status).toBe(304)
+    expect(await conditional.text()).toBe('')
   })
 })

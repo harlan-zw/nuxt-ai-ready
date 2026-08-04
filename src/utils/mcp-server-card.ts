@@ -3,9 +3,10 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { resolvePackageJSON } from 'pkg-types'
+import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../runtime/server/utils/discovery-response'
 
 export const MCP_SERVER_CARD_SCHEMA = 'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json'
-export const MCP_SERVER_CARD_MEDIA_TYPE = 'application/mcp-server-card+json'
+export { MCP_SERVER_CARD_MEDIA_TYPE }
 
 // Keep the namespace stricter than `\w`; SEP-2127 allows `_` only after `/`.
 // eslint-disable-next-line regexp/prefer-w
@@ -281,11 +282,5 @@ export function createMcpServerCardEtag(card: McpServerCard): string {
 }
 
 export function matchesMcpServerCardEtag(requestHeader: string | undefined, etag: string): boolean {
-  if (!requestHeader)
-    return false
-
-  return requestHeader.split(',').some((candidate) => {
-    const normalized = candidate.trim().replace(/^W\//, '')
-    return normalized === '*' || normalized === etag
-  })
+  return matchesDiscoveryEtag(requestHeader, etag)
 }

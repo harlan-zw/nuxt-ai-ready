@@ -17,5 +17,6 @@ describe('disabled MCP Toolkit', async () => {
     expect((await fetch('/mcp')).status).toBe(404)
     expect((await fetch('/mcp/server-card')).status).toBe(404)
     expect((await fetch('/.well-known/api-catalog')).status).toBe(404)
+    expect((await fetch('/.well-known/ai-catalog.json')).status).toBe(404)
   })
 })

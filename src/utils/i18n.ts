@@ -1,27 +1,15 @@
 import type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
+import type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
 import { resolveI18nConfig as resolveSharedI18nConfig } from 'nuxtseo-shared/i18n'
 import { logger } from '../logger'
 
+export type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
 export type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
 
 /**
  * Runtime-safe i18n config: stripped of non-serializable LocaleObject extras.
  * Only carries what the runtime needs to resolve locale + alternates from a route.
  */
-export interface RuntimeI18nConfig {
-  defaultLocale: string
-  strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
-  locales: Array<{
-    code: string
-    /** BCP-47 language tag for hreflang (e.g. "fr-FR") */
-    hreflang: string
-    /** Display name (English-language) */
-    name?: string
-    /** Native display name (e.g. "Français") */
-    nativeName?: string
-  }>
-}
-
 const CJK_PREFIXES = ['zh', 'ja', 'ko']
 
 export function hasCjkLocale(i18n: RuntimeI18nConfig): boolean {

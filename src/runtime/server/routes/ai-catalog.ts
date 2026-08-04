@@ -1,16 +1,17 @@
+import type { AiCatalog } from '../utils/discovery-response'
 import { eventHandler, getHeader, setHeaders, setResponseStatus } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
-import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../utils/discovery-response'
+import { AI_CATALOG_MEDIA_TYPE, matchesDiscoveryEtag } from '../utils/discovery-response'
 
-interface McpServerCardRuntimeConfig {
-  card: Record<string, unknown>
+interface AiCatalogRuntimeConfig {
   cacheMaxAge: number
+  document: AiCatalog
   etag: string
 }
 
 export default eventHandler((event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as unknown as {
-    mcpServerCard: McpServerCardRuntimeConfig
+    aiCatalog: AiCatalogRuntimeConfig
   }
 
   setHeaders(event, {
@@ -18,15 +19,15 @@ export default eventHandler((event) => {
     'Access-Control-Allow-Methods': 'GET, HEAD',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Expose-Headers': 'ETag',
-    'Cache-Control': `public, max-age=${config.mcpServerCard.cacheMaxAge}`,
-    'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
-    'ETag': config.mcpServerCard.etag,
+    'Cache-Control': `public, max-age=${config.aiCatalog.cacheMaxAge}`,
+    'Content-Type': AI_CATALOG_MEDIA_TYPE,
+    'ETag': config.aiCatalog.etag,
   })
 
-  if (matchesDiscoveryEtag(getHeader(event, 'if-none-match'), config.mcpServerCard.etag)) {
+  if (matchesDiscoveryEtag(getHeader(event, 'if-none-match'), config.aiCatalog.etag)) {
     setResponseStatus(event, 304)
     return null
   }
 
-  return config.mcpServerCard.card
+  return config.aiCatalog.document
 })
