@@ -40,7 +40,7 @@ packages:
   - devtools
 overrides:
   h3: ^1.15.11
-  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@604
+  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@605
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
   vue: ^3.5.40
@@ -60,7 +60,7 @@ catalog:
   mdream: ^1.5.8
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.9
-  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@604
+  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@605
   pathe: ^2.0.3
   pkg-types: ^2.3.1
   site-config-stack: ^4.1.4
