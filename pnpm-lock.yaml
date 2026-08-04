@@ -78,6 +78,9 @@ catalogs:
     wrangler:
       specifier: ^4.118.0
       version: 4.118.0
+    yaml:
+      specifier: ^2.9.0
+      version: 2.9.0
     zod:
       specifier: ^4.4.3
       version: 4.4.3
@@ -217,6 +220,9 @@ importers:
       uncrypto:
         specifier: 'catalog:'
         version: 0.1.3
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
     devDependencies:
       '@antfu/eslint-config':
         specifier: catalog:dev-lint

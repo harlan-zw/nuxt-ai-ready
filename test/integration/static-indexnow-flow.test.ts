@@ -111,7 +111,7 @@ describe('static IndexNow flow (integration)', () => {
       }
 
       const content = await readFile(filePath).catch(() => {
-        // Missing fixture assets should produce the test server's 404 response.
+        // Missing fixture paths represent normal 404 responses in this test server.
         return null
       })
       if (content) {
@@ -192,7 +192,7 @@ export default defineNuxtConfig({
     // Check if dist was created
     const distDir = join(tempDir, '.output/public')
     const distExists = await readFile(join(distDir, 'index.html'), 'utf-8').catch(() => {
-      // The assertion below reports an absent generated index.
+      // The assertion below reports an absent generated file with build context.
       return null
     })
     console.log('Dist index.html exists:', !!distExists)

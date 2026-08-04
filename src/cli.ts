@@ -13,7 +13,7 @@ async function getSecret(cwd: string): Promise<string | null> {
     return null
   }
   return fsp.readFile(secretPath, 'utf-8').then(s => s.trim()).catch(() => {
-    // A missing or unreadable cache is reported as an absent secret by callers.
+    // requireSecret reports the missing or unreadable secret with recovery steps.
     return null
   })
 }

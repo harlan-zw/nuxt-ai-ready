@@ -29,7 +29,7 @@ async function ensureWritableDir(dir: string): Promise<NodeJS.ErrnoException | n
   // Best-effort cleanup; a failed probe-file removal does not change the fact
   // that the directory is writable, which is all this check establishes.
   await rm(probe, { force: true }).catch(() => {
-    // The probe already established writability; cleanup failure is harmless.
+    // Probe cleanup does not affect the established directory writability.
   })
   return null
 }

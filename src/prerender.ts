@@ -734,7 +734,7 @@ export function setupPrerenderHandler(
           headers: { 'x-nitro-prerender': '/sitemap.xml' },
           signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
         }).catch(() => {
-          // Sitemap generation is optional; prerendered route data remains usable.
+          // A missing sitemap leaves the explicit prerender route list as the source.
           return null
         }) as string | null
 

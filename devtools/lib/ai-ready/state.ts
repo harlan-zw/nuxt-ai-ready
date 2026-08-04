@@ -10,7 +10,7 @@ export async function refreshSources() {
   if (!appFetch.value || typeof appFetch.value !== 'function')
     return
   data.value = await appFetch.value('/__ai-ready__/debug.json', { responseType: 'json' }).catch(() => {
-    // The debug endpoint is optional until the host module finishes loading.
+    // The devtools host can disconnect while a refresh is in flight.
     return null
   })
   loading.value = false

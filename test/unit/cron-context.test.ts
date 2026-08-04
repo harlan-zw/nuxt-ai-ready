@@ -30,20 +30,20 @@ async function fetchPublicAsset<T = unknown>(
     const response = await cfEnv.ASSETS.fetch(
       new Request(`https://assets.local${path}`),
     ).catch(() => {
-      // An unavailable test asset is represented by a null result.
+      // A fixture asset miss falls through to the null result expected by callers.
       return null
     })
 
     if (response?.ok) {
       if (responseType === 'json') {
         return response.json().catch(() => {
-          // Invalid mock JSON is represented by a null result.
+          // Invalid fixture payloads are represented as unavailable assets.
           return null
         })
       }
       if (responseType === 'text') {
         return response.text().catch(() => {
-          // Invalid mock text is represented by a null result.
+          // Invalid fixture payloads are represented as unavailable assets.
           return null
         }) as T
       }
@@ -56,7 +56,7 @@ async function fetchPublicAsset<T = unknown>(
     baseURL: '/',
     responseType: responseType === 'arrayBuffer' ? 'arrayBuffer' : undefined,
   }).catch(() => {
-    // An unavailable fallback asset is represented by a null result.
+    // A fixture fetch miss is the expected unavailable asset result.
     return null
   }) as Promise<T | null>
 }

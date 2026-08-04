@@ -69,7 +69,7 @@ async function getSchemaVersion(db: DatabaseAdapter): Promise<string | null> {
     'SELECT version FROM _ai_ready_info WHERE id = ?',
     ['schema'],
   ).catch(() => {
-    // The metadata table may not exist before initial schema setup.
+    // The metadata table is absent before the first schema initialization.
     return null
   })
 
@@ -81,7 +81,7 @@ async function getStoredTokenizer(db: DatabaseAdapter): Promise<string | null> {
     'SELECT value FROM _ai_ready_info WHERE id = ?',
     ['fts_tokenizer'],
   ).catch(() => {
-    // The tokenizer metadata may not exist before initial schema setup.
+    // The metadata table is absent before the first schema initialization.
     return null
   })
 
@@ -320,10 +320,10 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
   catch (err) {
     // Best-effort teardown; original error is rethrown below regardless.
     await writer.abort(err).catch(() => {
-      // Preserve the original stream failure below.
+      // Preserve the original stream failure thrown below.
     })
     await reader.cancel().catch(() => {
-      // Preserve the original stream failure below.
+      // Preserve the original stream failure thrown below.
     })
     throw err
   }

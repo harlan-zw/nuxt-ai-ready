@@ -4,6 +4,103 @@ import type { SiteToolsConfig } from './site-tool-config'
 
 export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
 
+export interface ApiCatalogLinkTarget {
+  /** Target URI. Relative values resolve against the deployed site URL. */
+  href: string
+  /** Media type of the target resource. */
+  type?: string
+  /** Human-readable target label. */
+  title?: string
+  /** Language tag or tags for the target resource. */
+  hreflang?: string | string[]
+  /** Media query describing where the target applies. */
+  media?: string
+}
+
+export type ApiCatalogLinks = ApiCatalogLinkTarget | ApiCatalogLinkTarget[]
+
+export interface ApiCatalogEntry {
+  /** API endpoint or link context URI. */
+  anchor: string
+  /** API endpoints that belong to this catalog. */
+  item?: ApiCatalogLinks
+  /** Machine-readable API descriptions, such as OpenAPI documents. */
+  serviceDesc?: ApiCatalogLinks
+  /** Human-readable API documentation. */
+  serviceDoc?: ApiCatalogLinks
+  /** API metadata, such as policies or licensing information. */
+  serviceMeta?: ApiCatalogLinks
+  /** API status or health resources. */
+  status?: ApiCatalogLinks
+  /** Nested API catalogs. */
+  apiCatalog?: ApiCatalogLinks
+  /** Additional RFC 8288 link relations. */
+  relations?: Record<string, ApiCatalogLinks>
+}
+
+export interface ApiCatalogConfig {
+  /** Entries published in the RFC 9727 Linkset document. */
+  entries?: ApiCatalogEntry[]
+}
+
+export interface LocalAgentSkillConfig {
+  /** Read and embed a SKILL.md file during Nuxt setup. */
+  source: 'local'
+  /** Agent Skills identifier. */
+  name: string
+  /** Short activation guidance, up to 1024 characters. */
+  description: string
+  /** SKILL.md path, resolved relative to the Nuxt root directory. */
+  file: string
+}
+
+export interface ExternalAgentSkillConfig {
+  /** Advertise an artifact already hosted at a URL. */
+  source: 'external'
+  /** Agent Skills identifier. */
+  name: string
+  /** Artifact distribution type. */
+  type: 'skill-md' | 'archive'
+  /** Short activation guidance, up to 1024 characters. */
+  description: string
+  /** Absolute, path-absolute, or index-relative artifact URL. */
+  url: string
+  /** SHA-256 digest of the artifact's raw bytes. */
+  digest: `sha256:${string}`
+}
+
+export type AgentSkillConfig = LocalAgentSkillConfig | ExternalAgentSkillConfig
+
+export interface AgentSkillsConfig {
+  skills: AgentSkillConfig[]
+}
+
+export interface AgentSkillsIndexEntry {
+  name: string
+  type: 'skill-md' | 'archive'
+  description: string
+  url: string
+  digest: `sha256:${string}`
+}
+
+export interface AgentSkillsIndex {
+  $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
+  skills: AgentSkillsIndexEntry[]
+}
+
+export interface McpServerCardConfig {
+  /** Reverse-DNS server identifier, such as `com.example/docs-mcp`. */
+  name?: string
+  /** Human-readable server title. */
+  title?: string
+  /** Override the description derived from MCP Toolkit or site config. */
+  description?: string
+  /** Public HTTP(S) project or documentation URL. */
+  websiteUrl?: string
+  /** Discovery response cache lifetime in seconds. @default 3600 */
+  cacheMaxAge?: number
+}
+
 export interface ModuleOptions {
   /**
    * Enable/disable module
@@ -24,6 +121,14 @@ export interface ModuleOptions {
    * @default Automatic per route
    */
   contentNegotiation?: boolean
+
+  /**
+   * Publish an RFC 9727 API Catalog at `/.well-known/api-catalog`.
+   * Relative entry URLs resolve against the configured site URL and app base URL.
+   * Set to false to suppress both configured and automatically generated entries.
+   * @default undefined
+   */
+  apiCatalog?: false | ApiCatalogConfig
 
   /**
    * Options to pass to mdream htmlToMarkdown function
@@ -89,6 +194,13 @@ export interface ModuleOptions {
   }
 
   /**
+   * Publish MCP Server Card discovery metadata for the runtime MCP server.
+   * Enabled automatically when @nuxtjs/mcp-toolkit registers a runtime server.
+   * Set to false to disable.
+   */
+  mcpServerCard?: false | McpServerCardConfig
+
+  /**
    * Configure the built-in site tools once, then attach them to MCP, WebMCP,
    * or both through each tool's transport options.
    */
@@ -116,6 +228,13 @@ export interface ModuleOptions {
      */
     exposedTo?: string[]
   }
+
+  /**
+   * Publish an Agent Skills Discovery v0.2.0 index and optionally host local
+   * SKILL.md artifacts under `/.well-known/agent-skills/`.
+   * @default false
+   */
+  agentSkills?: false | AgentSkillsConfig
 
   /**
    * Cache duration for llms.txt in seconds (runtime generation)

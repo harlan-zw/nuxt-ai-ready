@@ -28,6 +28,9 @@ function extractHeadingsFromMarkdown(markdown: string): Array<Record<string, str
 }
 
 export default defineEventHandler(async (event) => {
+  if (event.path.startsWith('/.well-known/agent-skills/'))
+    return
+
   // Only run during prerender
   if (!import.meta.prerender) {
     return
@@ -46,8 +49,8 @@ export default defineEventHandler(async (event) => {
   // Prefer @nuxt/content source: skip HTML fetch + mdream when the route is
   // backed by a content collection. Body comes from the AST, so headings and
   // keywords come from the markdown itself rather than the rendered HTML.
-  const contentPage = await tryGetContentMarkdown(event, path).catch(() => {
-    // Missing content source is expected; HTML rendering remains available.
+  const contentPage = await tryGetContentMarkdown(event, path).catch((error) => {
+    logger.debug(`[markdown.prerender] Content lookup failed for ${path}`, error)
     return null
   })
   if (contentPage) {

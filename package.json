@@ -99,7 +99,8 @@
     "site-config-stack": "catalog:",
     "sitemapd": "catalog:",
     "ufo": "catalog:",
-    "uncrypto": "catalog:"
+    "uncrypto": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-lint",

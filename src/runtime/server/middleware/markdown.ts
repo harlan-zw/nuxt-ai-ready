@@ -88,6 +88,9 @@ function notFoundMarkdown(
 }
 
 export default defineEventHandler(async (event) => {
+  if (event.path.startsWith('/.well-known/agent-skills/'))
+    return
+
   // Skip internal requests to prevent infinite loop
   if (getHeader(event, INTERNAL_HEADER))
     return

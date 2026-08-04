@@ -74,7 +74,7 @@ async function handleStaticIndexNow(
   const prevMeta = await fetchFn(metaUrl)
     .then(r => r.ok ? r.json() as Promise<BuildMeta> : null)
     .catch(() => {
-      // An unreachable previous deployment is handled as a first deploy.
+      // An unreachable previous deployment is treated as the first deployment.
       return null
     })
 
