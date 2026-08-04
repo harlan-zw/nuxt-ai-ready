@@ -1,5 +1,6 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -13,6 +14,7 @@ import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
+import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -70,6 +72,7 @@ export interface ModulePublicRuntimeConfig {
     locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
   } | null
   ftsTokenizer?: string
+  apiCatalog?: ResolvedApiCatalogConfig
 }
 
 /** Runtime config exposed to the browser, only set when WebMCP is enabled. */
@@ -147,6 +150,21 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+
+    const siteConfig = useSiteConfig()
+    const apiCatalogResult = resolveApiCatalogConfig(config.apiCatalog, {
+      siteBaseURL: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
+      generatedEntries: [],
+    })
+    if (apiCatalogResult._tag === 'Invalid') {
+      throw new Error([
+        '[nuxt-ai-ready] Invalid API Catalog configuration:',
+        ...apiCatalogResult.errors.map(error => `- ${formatApiCatalogConfigError(error)}`),
+      ].join('\n'))
+    }
+    const apiCatalogConfig = apiCatalogResult._tag === 'Enabled'
+      ? apiCatalogResult.config
+      : undefined
 
     // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
@@ -355,6 +373,7 @@ export default defineNuxtModule<ModuleOptions>({
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           indexNow: !!indexNow,
+          apiCatalog: !!apiCatalogConfig,
           database: dbType,
         }
       }
@@ -638,6 +657,7 @@ export async function lookupContentPage(event, path) {
       sitemapPrerendered,
       i18n: i18nConfig,
       ftsTokenizer,
+      apiCatalog: apiCatalogConfig,
     } as any
 
     // Captures rendered HTML during prerendering so markdown.prerender can
@@ -667,6 +687,9 @@ export async function lookupContentPage(event, path) {
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+    if (apiCatalogConfig) {
+      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog') })
+    }
 
     if (webmcpConfig) {
       addImports(['useWebMcpSupported', 'useWebMcpTool'].map(name => ({
@@ -726,6 +749,25 @@ export async function lookupContentPage(event, path) {
     const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
     const isSPA = nuxt.options.ssr === false
 
+    if (apiCatalogConfig) {
+      const apiCatalogLink = `<${apiCatalogConfig.href}>; rel="api-catalog"`
+      extendRouteRules('/**', {
+        headers: { Link: apiCatalogLink },
+      })
+      extendRouteRules(API_CATALOG_PATH, {
+        headers: {
+          'Content-Type': apiCatalogConfig.mediaType,
+          'Link': apiCatalogLink,
+        },
+      })
+      if (isStatic || hasPrerenderedRoutes) {
+        nuxt.options.nitro.prerender ||= {}
+        nuxt.options.nitro.prerender.routes ||= []
+        if (!nuxt.options.nitro.prerender.routes.includes(API_CATALOG_PATH))
+          nuxt.options.nitro.prerender.routes.push(API_CATALOG_PATH)
+      }
+    }
+
     if (!nuxt.options.dev && !nuxt.options._prepare) {
       // Warn about unsupported/limited modes
       if (isSPA && !hasPrerenderedRoutes) {
@@ -738,7 +780,6 @@ export async function lookupContentPage(event, path) {
     }
 
     if (isStatic || hasPrerenderedRoutes) {
-      const siteConfig = useSiteConfig()
       setupPrerenderHandler(config, buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
@@ -796,4 +837,10 @@ export type {
   SiteToolsConfig,
   WebMcpSiteToolAttachmentOptions,
 } from './runtime/site-tool-config'
-export type { ModuleOptions } from './runtime/types'
+export type {
+  ApiCatalogConfig,
+  ApiCatalogEntry,
+  ApiCatalogLinks,
+  ApiCatalogLinkTarget,
+  ModuleOptions,
+} from './runtime/types'
