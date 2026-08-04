@@ -60,6 +60,9 @@ catalogs:
     site-config-stack:
       specifier: ^4.1.2
       version: 4.1.2
+    sitemapd:
+      specifier: ^0.1.0
+      version: 0.1.0
     tinyglobby:
       specifier: ^0.2.17
       version: 0.2.17
@@ -205,6 +208,9 @@ importers:
       site-config-stack:
         specifier: 'catalog:'
         version: 4.1.2(vue@3.5.40(typescript@6.0.3))
+      sitemapd:
+        specifier: 'catalog:'
+        version: 0.1.0
       ufo:
         specifier: 'catalog:'
         version: 1.6.4
@@ -8159,6 +8165,10 @@ packages:
     peerDependencies:
       vue: ^3.5.40
 
+  sitemapd@0.1.0:
+    resolution: {integrity: sha512-pEx0ec+XucvbN8aAUe8TW6iQ3NCDevPprjlWa1xVwXMXC2S1GZACVyp0xGKxZLVib4gHqUu1UE04HZOFz5t4IQ==}
+    engines: {node: '>=18.0.0'}
+
   sitemapd@0.2.0:
     resolution: {integrity: sha512-gpZhUzDIbMneHj8djlUVjQeevA50ZaHlHQKwl/k8lHBXGr8tqXasrOdi1uYVP6PWjnh5HEBZv1tgVavgbxilVg==}
     engines: {node: '>=18.0.0'}
@@ -11128,7 +11138,7 @@ snapshots:
     dependencies:
       '@vue/shared': 3.5.40
       defu: 6.1.7
-      nostics: 1.1.4
+      nostics: 1.2.0
       pathe: 2.0.3
       pkg-types: 2.3.1
       std-env: 4.2.0
@@ -18788,6 +18798,10 @@ snapshots:
     dependencies:
       ufo: 1.6.4
       vue: 3.5.40(typescript@6.0.3)
+
+  sitemapd@0.1.0:
+    dependencies:
+      fast-xml-parser: 5.10.1
 
   sitemapd@0.2.0:
     dependencies:

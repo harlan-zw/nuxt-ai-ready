@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v1.5.7...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.7...main)
+
+### 🚀 Enhancements
+
+- Link llms.txt pages to available Markdown ([#53](https://github.com/harlan-zw/nuxt-ai-ready/pull/53))
+
+### ❤️ Contributors
+
+- MicroHoffman ([@microHoffman](https://github.com/microHoffman))
+
+## v1.5.6...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.6...main)
+
+### 🔥 Performance
+
+- **sitemap:** Stream sitemap parsing ([#52](https://github.com/harlan-zw/nuxt-ai-ready/pull/52))
+
+### 🩹 Fixes
+
+- Align llms.txt output with proposal format ([#51](https://github.com/harlan-zw/nuxt-ai-ready/pull/51))
+
+### 🏡 Chore
+
+- Bump deps ([8c1da90](https://github.com/harlan-zw/nuxt-ai-ready/commit/8c1da90))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+- MicroHoffman ([@microHoffman](https://github.com/microHoffman))
+
 ## v1.5.5...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.5...main)

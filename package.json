@@ -95,6 +95,7 @@
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "site-config-stack": "catalog:",
+    "sitemapd": "catalog:",
     "ufo": "catalog:",
     "uncrypto": "catalog:"
   },

@@ -393,13 +393,18 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
 
+      // Keep the sitemap parser in the server bundle. Nitro can otherwise
+      // externalize it without copying the package into fixture/deploy output.
+      nitroConfig.externals = nitroConfig.externals || {}
+      nitroConfig.externals.inline = nitroConfig.externals.inline || []
+      nitroConfig.externals.inline.push('sitemapd')
+
       // mdream uses NAPI-RS native binaries on Node.js, WASM on edge runtimes.
       // For Node.js presets, externalize mdream so createRequire can find the native .node binary.
       // For edge presets (Cloudflare, Vercel Edge, Deno), export conditions auto-resolve to WASM.
       const preset = String(nitroConfig.preset || '')
       const isEdgePreset = ['cloudflare', 'vercel-edge', 'netlify-edge', 'deno'].some(p => preset.startsWith(p))
       if (!isEdgePreset) {
-        nitroConfig.externals = nitroConfig.externals || {}
         nitroConfig.externals.external = nitroConfig.externals.external || []
         ;(nitroConfig.externals.external as string[]).push('mdream')
       }
