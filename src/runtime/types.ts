@@ -43,6 +43,51 @@ export interface ApiCatalogConfig {
   entries?: ApiCatalogEntry[]
 }
 
+export interface LocalAgentSkillConfig {
+  /** Read and embed a SKILL.md file during Nuxt setup. */
+  source: 'local'
+  /** Agent Skills identifier. */
+  name: string
+  /** Short activation guidance, up to 1024 characters. */
+  description: string
+  /** SKILL.md path, resolved relative to the Nuxt root directory. */
+  file: string
+}
+
+export interface ExternalAgentSkillConfig {
+  /** Advertise an artifact already hosted at a URL. */
+  source: 'external'
+  /** Agent Skills identifier. */
+  name: string
+  /** Artifact distribution type. */
+  type: 'skill-md' | 'archive'
+  /** Short activation guidance, up to 1024 characters. */
+  description: string
+  /** Absolute, path-absolute, or index-relative artifact URL. */
+  url: string
+  /** SHA-256 digest of the artifact's raw bytes. */
+  digest: `sha256:${string}`
+}
+
+export type AgentSkillConfig = LocalAgentSkillConfig | ExternalAgentSkillConfig
+
+export interface AgentSkillsConfig {
+  skills: AgentSkillConfig[]
+}
+
+export interface AgentSkillsIndexEntry {
+  name: string
+  type: 'skill-md' | 'archive'
+  description: string
+  url: string
+  digest: `sha256:${string}`
+}
+
+export interface AgentSkillsIndex {
+  $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
+  skills: AgentSkillsIndexEntry[]
+}
+
 export interface ModuleOptions {
   /**
    * Enable/disable module
@@ -163,6 +208,13 @@ export interface ModuleOptions {
      */
     exposedTo?: string[]
   }
+
+  /**
+   * Publish an Agent Skills Discovery v0.2.0 index and optionally host local
+   * SKILL.md artifacts under `/.well-known/agent-skills/`.
+   * @default false
+   */
+  agentSkills?: false | AgentSkillsConfig
 
   /**
    * Cache duration for llms.txt in seconds (runtime generation)
