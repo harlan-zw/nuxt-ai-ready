@@ -48,3 +48,10 @@ declare module '#ai-ready-virtual/site-tools.mjs' {
   const config: ResolvedSiteToolsConfig
   export default config
 }
+
+declare module '#ai-ready-virtual/agent-skills.mjs' {
+  import type { AgentSkillsIndex } from './runtime/types'
+
+  export const agentSkillsIndex: AgentSkillsIndex | null
+  export const localAgentSkillArtifacts: Record<string, string>
+}

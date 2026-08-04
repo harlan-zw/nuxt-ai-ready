@@ -13,6 +13,7 @@ import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
+import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveAgentSkillsConfig } from './utils/agent-skills'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -127,6 +128,14 @@ export default defineNuxtModule<ModuleOptions>({
     if (config.enabled === false) {
       logger.debug('Module is disabled, skipping setup.')
       return
+    }
+
+    const agentSkillsResult = await resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir)
+    if (agentSkillsResult._tag === 'Invalid') {
+      const details = agentSkillsResult.issues
+        .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
+        .join('\n')
+      throw new Error(`[nuxt-ai-ready] Invalid Agent Skills configuration:\n${details}`)
     }
 
     // --- v0 → v1 deprecation handling ---
@@ -352,6 +361,7 @@ export default defineNuxtModule<ModuleOptions>({
         mod.features = {
           mcp: mcpAvailable,
           webmcp: !!webmcpConfig,
+          agentSkills: agentSkillsResult._tag === 'Enabled',
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           indexNow: !!indexNow,
@@ -464,6 +474,9 @@ export default defineNuxtModule<ModuleOptions>({
 
       nitroConfig.virtual = nitroConfig.virtual || {}
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
+      nitroConfig.virtual['#ai-ready-virtual/agent-skills.mjs'] = agentSkillsResult._tag === 'Enabled'
+        ? `export const agentSkillsIndex = ${JSON.stringify(agentSkillsResult.index)}\nexport const localAgentSkillArtifacts = ${JSON.stringify(agentSkillsResult.localArtifacts)}`
+        : 'export const agentSkillsIndex = null\nexport const localAgentSkillArtifacts = {}'
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
@@ -668,6 +681,42 @@ export async function lookupContentPage(event, path) {
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
 
+    if (agentSkillsResult._tag === 'Enabled') {
+      addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index') })
+      for (const route of Object.keys(agentSkillsResult.localArtifacts))
+        addServerHandler({ route, handler: resolve('./runtime/server/routes/agent-skills-artifact') })
+
+      extendRouteRules('/.well-known/agent-skills/**', {
+        headers: {
+          'Content-Type': 'text/markdown; charset=utf-8',
+          'Cache-Control': AGENT_SKILLS_CACHE_CONTROL,
+          'Access-Control-Allow-Origin': '*',
+        },
+      })
+      extendRouteRules(AGENT_SKILLS_INDEX_ROUTE, {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': AGENT_SKILLS_CACHE_CONTROL,
+          'Access-Control-Allow-Origin': '*',
+        },
+      })
+
+      const generating = nuxt.options.nitro.static === true
+        || (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true
+      if (generating) {
+        nuxt.options.nitro.prerender = nuxt.options.nitro.prerender || {}
+        nuxt.options.nitro.prerender.routes = nuxt.options.nitro.prerender.routes || []
+        const agentSkillRoutes = [
+          AGENT_SKILLS_INDEX_ROUTE,
+          ...Object.keys(agentSkillsResult.localArtifacts),
+        ]
+        for (const route of agentSkillRoutes) {
+          if (!nuxt.options.nitro.prerender.routes.includes(route))
+            nuxt.options.nitro.prerender.routes.push(route)
+        }
+      }
+    }
+
     if (webmcpConfig) {
       addImports(['useWebMcpSupported', 'useWebMcpTool'].map(name => ({
         name,
@@ -796,4 +845,12 @@ export type {
   SiteToolsConfig,
   WebMcpSiteToolAttachmentOptions,
 } from './runtime/site-tool-config'
-export type { ModuleOptions } from './runtime/types'
+export type {
+  AgentSkillConfig,
+  AgentSkillsConfig,
+  AgentSkillsIndex,
+  AgentSkillsIndexEntry,
+  ExternalAgentSkillConfig,
+  LocalAgentSkillConfig,
+  ModuleOptions,
+} from './runtime/types'

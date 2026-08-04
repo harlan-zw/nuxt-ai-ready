@@ -126,6 +126,12 @@ declare module '#ai-ready-virtual/content-lookup.mjs' {
     updatedAt?: string
   } | null>
 }
+
+declare module '#ai-ready-virtual/agent-skills.mjs' {
+  import type { AgentSkillsIndex } from 'nuxt-ai-ready'
+  export const agentSkillsIndex: AgentSkillsIndex | null
+  export const localAgentSkillArtifacts: Record<string, string>
+}
 `,
   })
 }
