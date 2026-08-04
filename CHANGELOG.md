@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v1.7.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.0...main)
+
+### 🩹 Fixes
+
+- Complete MCP discovery packaging ([#64](https://github.com/harlan-zw/nuxt-ai-ready/pull/64))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v1.6.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.6.0...main)
+
+### 🚀 Enhancements
+
+- Add agent discovery endpoints ([#63](https://github.com/harlan-zw/nuxt-ai-ready/pull/63))
+- Support Nitro 3 runtime compatibility ([#62](https://github.com/harlan-zw/nuxt-ai-ready/pull/62))
+
+### 🏡 Chore
+
+- Bump deps ([1fa3c12](https://github.com/harlan-zw/nuxt-ai-ready/commit/1fa3c12))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.5.8...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.5.8...main)
