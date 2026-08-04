@@ -9,11 +9,11 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import { createSitemapReader } from 'sitemapd'
 import { parseSitemap } from 'sitemapd/parse'
-import { fetchWithEvent as fetchRawWithEvent } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { getCfEnv, hasAssets } from './cloudflare'
 import { createUniversalContext } from './context'
+import { fetchRawWithEvent } from './fetch'
 
 export interface SitemapUrl {
   loc: string
