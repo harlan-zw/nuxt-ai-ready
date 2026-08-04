@@ -24,6 +24,11 @@ export default eventHandler((event) => {
     'ETag': config.aiCatalog.etag,
   })
 
+  if (event.method === 'OPTIONS') {
+    setResponseStatus(event, 204)
+    return null
+  }
+
   if (matchesDiscoveryEtag(getHeader(event, 'if-none-match'), config.aiCatalog.etag)) {
     setResponseStatus(event, 304)
     return null

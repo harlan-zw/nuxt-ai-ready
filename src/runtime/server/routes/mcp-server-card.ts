@@ -23,6 +23,11 @@ export default eventHandler((event) => {
     'ETag': config.mcpServerCard.etag,
   })
 
+  if (event.method === 'OPTIONS') {
+    setResponseStatus(event, 204)
+    return null
+  }
+
   if (matchesDiscoveryEtag(getHeader(event, 'if-none-match'), config.mcpServerCard.etag)) {
     setResponseStatus(event, 304)
     return null

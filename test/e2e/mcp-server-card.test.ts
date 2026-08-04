@@ -50,7 +50,13 @@ describe('late MCP Server Card dependency', async () => {
       remotes: [{
         type: 'streamable-http',
         url: 'https://late-mcp.example.com/docs/agent/mcp',
-        supportedProtocolVersions: ['2025-11-25'],
+        supportedProtocolVersions: [
+          '2025-11-25',
+          '2025-06-18',
+          '2025-03-26',
+          '2024-11-05',
+          '2024-10-07',
+        ],
       }],
     })
   })
@@ -169,5 +175,22 @@ describe('late MCP Server Card dependency', async () => {
     })
     expect(conditional.status).toBe(304)
     expect(await conditional.text()).toBe('')
+  })
+
+  it.each([cardRoute, aiCatalogRoute])('supports browser CORS preflights for %s', async (route) => {
+    const response = await fetch(route, {
+      method: 'OPTIONS',
+      headers: {
+        'access-control-request-headers': 'if-none-match',
+        'access-control-request-method': 'GET',
+        'origin': 'https://client.example.com',
+      },
+    })
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    expect(response.headers.get('access-control-allow-methods')).toBe('GET, HEAD')
+    expect(response.headers.get('access-control-allow-headers')).toContain('If-None-Match')
+    expect(await response.text()).toBe('')
   })
 })

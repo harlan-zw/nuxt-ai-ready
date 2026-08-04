@@ -1452,7 +1452,7 @@ packages:
     engines: {node: '>=18'}
 
   nuxt-ai-ready@file:module.tgz:
-    resolution: {integrity: sha512-27rkV4HhzJku9sGNAfuUMshagDe4dUlfw0TYHjRLf1LmnRovl5qXuvSa9spMsjBbVNtqCXqYvBEKd4XkbLwj4w==, tarball: file:module.tgz}
+    resolution: {integrity: sha512-WuHqX7/arGfJr34stwBfzDxzwFIZHOEdU2D3B9VeEA0j58Y1uDXeUrSofWurRb6WJAPb8DKHhxSRwqX0gQO3vw==, tarball: file:module.tgz}
     version: 1.7.0
     hasBin: true
     peerDependencies:

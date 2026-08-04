@@ -45,8 +45,8 @@ export type McpServerCardConfigResult
     | { _tag: 'Enabled', config: Required<Pick<McpServerCardConfig, 'cacheMaxAge'>> & Omit<McpServerCardConfig, 'cacheMaxAge'> }
     | { _tag: 'Invalid', message: string }
 
-export type McpProtocolVersionResult
-  = | { _tag: 'Resolved', protocolVersion: string }
+export type McpProtocolVersionsResult
+  = | { _tag: 'Resolved', protocolVersions: string[] }
     | { _tag: 'Invalid', message: string }
 
 export type McpServerCardNameResult
@@ -176,21 +176,40 @@ export function resolveMcpServerCardName(input: {
       }
 }
 
-export function parseLatestMcpProtocolVersion(source: string): McpProtocolVersionResult {
-  const match = source.match(/LATEST_PROTOCOL_VERSION\s*=\s*['"]([^'"]+)['"]/)
-  if (!match?.[1]) {
+export function parseSupportedMcpProtocolVersions(source: string): McpProtocolVersionsResult {
+  const latestMatch = source.match(/LATEST_PROTOCOL_VERSION\s*=\s*['"]([^'"]+)['"]/)
+  const supportedMatch = source.match(/SUPPORTED_PROTOCOL_VERSIONS\s*=\s*\[([\s\S]*?)\]/)
+  if (!latestMatch?.[1] || !supportedMatch?.[1]) {
     return {
       _tag: 'Invalid',
-      message: 'Could not read LATEST_PROTOCOL_VERSION from the installed MCP SDK.',
+      message: 'Could not read SUPPORTED_PROTOCOL_VERSIONS from the installed MCP SDK.',
     }
   }
-  return { _tag: 'Resolved', protocolVersion: match[1] }
+
+  const versionEntryPattern = /(?:exports\.)?LATEST_PROTOCOL_VERSION|(['"])([^'"]+)\1/g
+  const entriesSource = supportedMatch[1]
+  const protocolVersions = [...entriesSource.matchAll(versionEntryPattern)]
+    .map(match => match[2] || latestMatch[1])
+    .filter((version): version is string => isNonEmptyString(version))
+  const unsupportedSyntax = entriesSource
+    .replace(versionEntryPattern, '')
+    .replace(/[\s,]/g, '')
+  if (!protocolVersions.length || unsupportedSyntax) {
+    return {
+      _tag: 'Invalid',
+      message: unsupportedSyntax
+        ? 'The installed MCP SDK uses an unsupported protocol versions format.'
+        : 'The installed MCP SDK does not declare any supported protocol versions.',
+    }
+  }
+
+  return { _tag: 'Resolved', protocolVersions: [...new Set(protocolVersions)] }
 }
 
-export async function resolveInstalledMcpProtocolVersion(input: {
+export async function resolveInstalledMcpProtocolVersions(input: {
   rootDir: string
   modulesDir: string[]
-}): Promise<McpProtocolVersionResult> {
+}): Promise<McpProtocolVersionsResult> {
   const resolutionBases = [...new Set([...input.modulesDir, input.rootDir])]
   const sdkResolutionAttempts = resolutionBases.map(base =>
     resolvePackageJSON('@nuxtjs/mcp-toolkit', { from: base })
@@ -204,10 +223,10 @@ export async function resolveInstalledMcpProtocolVersion(input: {
       throw new AggregateError(results.map(result => result.status === 'rejected' ? result.reason : undefined), 'Could not resolve the MCP Toolkit SDK.')
     })
     .then(sdkTypesPath => readFile(sdkTypesPath, 'utf8'))
-    .then(parseLatestMcpProtocolVersion)
+    .then(parseSupportedMcpProtocolVersions)
     .catch((error: unknown) => ({
       _tag: 'Invalid',
-      message: `Could not resolve the MCP SDK protocol version: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Could not resolve the MCP SDK protocol versions: ${error instanceof Error ? error.message : String(error)}`,
     }))
 }
 
@@ -226,7 +245,7 @@ function resolveDescription(input: {
 }
 
 export function resolveMcpServerCard(input: {
-  protocolVersion: string
+  protocolVersions: string[]
   endpoint: string
   name: string
   toolkitTitle?: string
@@ -256,7 +275,7 @@ export function resolveMcpServerCard(input: {
     card.remotes = [{
       type: 'streamable-http',
       url: input.endpoint,
-      supportedProtocolVersions: [input.protocolVersion],
+      supportedProtocolVersions: input.protocolVersions,
     }]
   }
 

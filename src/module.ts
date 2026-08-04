@@ -25,7 +25,7 @@ import {
   createMcpServerCardEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
   parseMcpServerCardConfig,
-  resolveInstalledMcpProtocolVersion,
+  resolveInstalledMcpProtocolVersions,
   resolveMcpServerCard,
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
@@ -544,15 +544,15 @@ export default defineNuxtModule<ModuleOptions>({
       if (finalMcpServerCardNameResult._tag === 'Invalid')
         throw new Error(`[nuxt-ai-ready] ${finalMcpServerCardNameResult.message}`)
 
-      const protocolVersionResult = await resolveInstalledMcpProtocolVersion({
+      const protocolVersionsResult = await resolveInstalledMcpProtocolVersions({
         rootDir: nuxt.options.rootDir,
         modulesDir: nuxt.options.modulesDir,
       })
-      if (protocolVersionResult._tag === 'Invalid')
-        throw new Error(`[nuxt-ai-ready] ${protocolVersionResult.message}`)
+      if (protocolVersionsResult._tag === 'Invalid')
+        throw new Error(`[nuxt-ai-ready] ${protocolVersionsResult.message}`)
 
       const card = resolveMcpServerCard({
-        protocolVersion: protocolVersionResult.protocolVersion,
+        protocolVersions: protocolVersionsResult.protocolVersions,
         endpoint: siteConfig.url
           ? withSiteUrl(finalMcpToolkitState.route, { withBase: true })
           : finalMcpToolkitState.route,
@@ -584,6 +584,7 @@ export default defineNuxtModule<ModuleOptions>({
       const handler = resolve('./runtime/server/routes/mcp-server-card')
       addServerHandler({ route: mcpServerCardRoute, method: 'get', handler })
       addServerHandler({ route: mcpServerCardRoute, method: 'head', handler })
+      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler })
       extendRouteRules(mcpServerCardRoute, {
         sitemap: false,
         headers: {
@@ -614,6 +615,7 @@ export default defineNuxtModule<ModuleOptions>({
         const aiCatalogHandler = resolve('./runtime/server/routes/ai-catalog')
         addServerHandler({ route: AI_CATALOG_PATH, method: 'get', handler: aiCatalogHandler })
         addServerHandler({ route: AI_CATALOG_PATH, method: 'head', handler: aiCatalogHandler })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'options', handler: aiCatalogHandler })
         extendRouteRules(AI_CATALOG_PATH, {
           sitemap: false,
           headers: {
