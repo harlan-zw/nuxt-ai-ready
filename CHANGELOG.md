@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.7.1...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.1...main)
+
+### 🩹 Fixes
+
+- Route Nitro APIs through compatibility aliases ([#65](https://github.com/harlan-zw/nuxt-ai-ready/pull/65))
+
+### 🏡 Chore
+
+- Bump ([255dd0d](https://github.com/harlan-zw/nuxt-ai-ready/commit/255dd0d))
+
+### ❤️ Contributors
+
+- Harlan Wilton <harlan@harlanzw.com>
+
 ## v1.7.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.0...main)
