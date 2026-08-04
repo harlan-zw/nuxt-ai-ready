@@ -1,5 +1,6 @@
 linkWorkspacePackages: false
 preferWorkspacePackages: false
+blockExoticSubdeps: false
 
 minimumReleaseAgeExclude:
   - '@nuxt/kit-nightly@5.0.0-29762711.192612c7'
