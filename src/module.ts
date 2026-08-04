@@ -14,8 +14,8 @@ import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
-import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveAgentSkillsConfig } from './utils/agent-skills'
+import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -887,14 +887,14 @@ export type {
   WebMcpSiteToolAttachmentOptions,
 } from './runtime/site-tool-config'
 export type {
-  ApiCatalogConfig,
-  ApiCatalogEntry,
-  ApiCatalogLinks,
-  ApiCatalogLinkTarget,
   AgentSkillConfig,
   AgentSkillsConfig,
   AgentSkillsIndex,
   AgentSkillsIndexEntry,
+  ApiCatalogConfig,
+  ApiCatalogEntry,
+  ApiCatalogLinks,
+  ApiCatalogLinkTarget,
   ExternalAgentSkillConfig,
   LocalAgentSkillConfig,
   ModuleOptions,

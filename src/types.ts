@@ -1,13 +1,13 @@
 // Re-export public types from runtime
 export type {
-  ApiCatalogConfig,
-  ApiCatalogEntry,
-  ApiCatalogLinks,
-  ApiCatalogLinkTarget,
   AgentSkillConfig,
   AgentSkillsConfig,
   AgentSkillsIndex,
   AgentSkillsIndexEntry,
+  ApiCatalogConfig,
+  ApiCatalogEntry,
+  ApiCatalogLinks,
+  ApiCatalogLinkTarget,
   ExternalAgentSkillConfig,
   LlmsTxtConfig,
   LlmsTxtLink,
