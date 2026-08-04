@@ -12,7 +12,10 @@ async function getSecret(cwd: string): Promise<string | null> {
   if (!existsSync(secretPath)) {
     return null
   }
-  return fsp.readFile(secretPath, 'utf-8').then(s => s.trim()).catch(() => null)
+  return fsp.readFile(secretPath, 'utf-8').then(s => s.trim()).catch(() => {
+    // requireSecret reports the missing or unreadable secret with recovery steps.
+    return null
+  })
 }
 
 function authHeaders(secret: string): Record<string, string> {

@@ -1,5 +1,6 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -13,9 +14,20 @@ import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
+import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveAgentSkillsConfig } from './utils/agent-skills'
+import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
+import {
+  createMcpServerCardEtag,
+  MCP_SERVER_CARD_MEDIA_TYPE,
+  parseMcpServerCardConfig,
+  resolveInstalledMcpProtocolVersion,
+  resolveMcpServerCard,
+  resolveMcpServerCardName,
+  resolveMcpServerCardRoute,
+} from './utils/mcp-server-card'
 import { ensureStaticHeader } from './utils/static-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -70,6 +82,7 @@ export interface ModulePublicRuntimeConfig {
     locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
   } | null
   ftsTokenizer?: string
+  apiCatalog?: ResolvedApiCatalogConfig
 }
 
 /** Runtime config exposed to the browser, only set when WebMCP is enabled. */
@@ -99,7 +112,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=0.8.0',
     },
     '@nuxtjs/mcp-toolkit': {
-      version: '>=0.4.0',
+      version: '>=0.18.0',
       optional: true,
     },
   },
@@ -129,6 +142,18 @@ export default defineNuxtModule<ModuleOptions>({
       return
     }
 
+    const agentSkillsResult = await resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir)
+    if (agentSkillsResult._tag === 'Invalid') {
+      const details = agentSkillsResult.issues
+        .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
+        .join('\n')
+      throw new Error(`[nuxt-ai-ready] Invalid Agent Skills configuration:\n${details}`)
+    }
+
+    const mcpServerCardResult = parseMcpServerCardConfig(config.mcpServerCard)
+    if (mcpServerCardResult._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${mcpServerCardResult.message}`)
+
     // --- v0 → v1 deprecation handling ---
     const rawConfig = (nuxt.options as any).aiReady || {}
     if ('cacheMaxAgeSeconds' in rawConfig) {
@@ -147,6 +172,44 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+
+    const siteConfig = useSiteConfig()
+    const apiCatalogResult = resolveApiCatalogConfig(config.apiCatalog, {
+      siteBaseURL: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
+      generatedEntries: [],
+    })
+    const deferredGeneratedApiCatalog = apiCatalogResult._tag === 'Invalid'
+      && apiCatalogResult.errors.every(error => error._tag === 'MissingEntries')
+    if (apiCatalogResult._tag === 'Invalid' && !deferredGeneratedApiCatalog) {
+      throw new Error([
+        '[nuxt-ai-ready] Invalid API Catalog configuration:',
+        ...apiCatalogResult.errors.map(error => `- ${formatApiCatalogConfigError(error)}`),
+      ].join('\n'))
+    }
+    let apiCatalogConfig = apiCatalogResult._tag === 'Enabled'
+      ? apiCatalogResult.config
+      : undefined
+
+    const configuredMcpOptions = typeof nuxt.options.mcp === 'object' && nuxt.options.mcp !== null
+      ? nuxt.options.mcp
+      : {}
+    const configuredMcpTitle = configuredMcpOptions.name
+    const mcpServerCardNameResult = mcpServerCardResult._tag === 'Enabled'
+      ? resolveMcpServerCardName({
+          overrideName: mcpServerCardResult.config.name,
+          route: configuredMcpOptions.route || '/mcp',
+          siteUrl: siteConfig.url || undefined,
+        })
+      : undefined
+    if (mcpServerCardNameResult?._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${mcpServerCardNameResult.message}`)
+    const mcpServerCardName = mcpServerCardNameResult?._tag === 'Resolved'
+      ? mcpServerCardNameResult.name
+      : undefined
+    if (mcpServerCardName && nuxt.options.mcp !== false) {
+      nuxt.options.mcp = configuredMcpOptions
+      ;(nuxt.options.mcp as Record<string, unknown>).name = mcpServerCardName
+    }
 
     // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
@@ -221,13 +284,18 @@ export default defineNuxtModule<ModuleOptions>({
       static: nuxt.options.nitro.static === true,
       generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
     })
-    const mcpAvailable = mcpToolkitState._tag === 'Enabled'
+    let mcpAvailable = mcpToolkitState._tag === 'Enabled'
 
-    // Set the Toolkit name only when it will register a server.
-    if (mcpAvailable && nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
-      nuxt.options.mcp = nuxt.options.mcp || {} as Record<string, unknown>
-      ;(nuxt.options.mcp as Record<string, unknown>).name = useSiteConfig().name
-    }
+    // Register definition paths before later wrapper modules install Toolkit.
+    // Toolkit resolves this hook from its own modules:done handler.
+    nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
+      const mcpRuntimeDir = resolve('./runtime/server/mcp')
+      const mcpConfig = config.mcp || {}
+      if (mcpConfig.tools !== false && hasMcpSiteTools)
+        (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
+      if (mcpConfig.resources !== false)
+        (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
+    })
 
     // Add runtime server directories to Nitro scan
     nuxt.options.nitro.scanDirs = nuxt.options.nitro.scanDirs || []
@@ -275,39 +343,6 @@ export default defineNuxtModule<ModuleOptions>({
       ],
     })
 
-    if (mcpAvailable) {
-      // Hydrate the runtime database from build artifacts before Toolkit
-      // resolves definitions for its first request.
-      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
-
-      // Register MCP definitions from runtime directory
-      nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
-        const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
-        const mcpConfig = config.mcp || {}
-        if (mcpConfig.tools !== false && hasMcpSiteTools)
-          (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
-        if (mcpConfig.resources !== false)
-          (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
-      })
-
-      // Add MCP to the API endpoints section if bulk is enabled, or create new section
-      const mcpLink = {
-        title: 'MCP',
-        href: withSiteUrl(mcpToolkitState.route, { withBase: true }),
-        description: 'Model Context Protocol server endpoint for AI agent integration.',
-      }
-
-      if (defaultLlmsTxtSections[0]) {
-        defaultLlmsTxtSections[0].links!.push(mcpLink)
-      }
-      else {
-        defaultLlmsTxtSections.push({
-          title: 'LLM Tools',
-          links: [mcpLink],
-        })
-      }
-    }
-
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
@@ -346,18 +381,210 @@ export default defineNuxtModule<ModuleOptions>({
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
-    nuxt.hooks.hook('nuxt-seo-pro:modules' as any, (modules: any[]) => {
+    // @ts-expect-error untyped
+    const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
+    const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
+    const isSPA = nuxt.options.ssr === false
+
+    let apiCatalogRegistered = false
+    const registerApiCatalog = (catalog: ResolvedApiCatalogConfig) => {
+      if (apiCatalogRegistered)
+        return
+      apiCatalogRegistered = true
+
+      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog') })
+      const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
+      extendRouteRules('/**', {
+        headers: { Link: apiCatalogLink },
+      })
+      extendRouteRules(API_CATALOG_PATH, {
+        headers: {
+          'Content-Type': catalog.mediaType,
+          'Link': apiCatalogLink,
+        },
+      })
+      if (isStatic || hasPrerenderedRoutes) {
+        nuxt.options.nitro.prerender ||= {}
+        nuxt.options.nitro.prerender.routes ||= []
+        if (!nuxt.options.nitro.prerender.routes.includes(API_CATALOG_PATH))
+          nuxt.options.nitro.prerender.routes.push(API_CATALOG_PATH)
+      }
+    }
+
+    let seoProModules: any[] | undefined
+    const updateSeoProFeatures = (modules: any[]) => {
       const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
       if (mod) {
         mod.features = {
           mcp: mcpAvailable,
           webmcp: !!webmcpConfig,
+          agentSkills: agentSkillsResult._tag === 'Enabled',
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           indexNow: !!indexNow,
+          apiCatalog: !!apiCatalogConfig,
           database: dbType,
         }
       }
+    }
+    nuxt.hooks.hook('nuxt-seo-pro:modules' as any, (modules: any[]) => {
+      seoProModules = modules
+      updateSeoProFeatures(modules)
+    })
+
+    // Resolve Toolkit after every module dependency has installed. The
+    // mutable state feeds llms.txt, devtools, Nuxt SEO Pro, and Server Cards.
+    nuxt.hook('modules:done', async () => {
+      const finalMcpToolkitState = resolveMcpToolkitState({
+        installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
+          || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
+        options: nuxt.options.mcp,
+        static: nuxt.options.nitro.static === true,
+        generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
+      })
+      mcpAvailable = finalMcpToolkitState._tag === 'Enabled'
+      if (finalMcpToolkitState._tag !== 'Enabled') {
+        if (deferredGeneratedApiCatalog) {
+          throw new Error([
+            '[nuxt-ai-ready] Invalid API Catalog configuration:',
+            ...apiCatalogResult._tag === 'Invalid'
+              ? apiCatalogResult.errors.map(error => `- ${formatApiCatalogConfigError(error)}`)
+              : [],
+          ].join('\n'))
+        }
+        if (seoProModules)
+          updateSeoProFeatures(seoProModules)
+        return
+      }
+
+      // Hydrate the database before Toolkit resolves its first request.
+      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
+
+      const mcpLink = {
+        title: 'MCP',
+        href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
+        description: 'Model Context Protocol server endpoint for AI agent integration.',
+      }
+      const firstSection = mergedLlmsTxt.sections?.[0]
+      if (firstSection) {
+        firstSection.links ||= []
+        if (!firstSection.links.some(link => link.title === mcpLink.title))
+          firstSection.links.push(mcpLink)
+      }
+      else {
+        mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+      }
+
+      const mcpServerCardRoute = resolveMcpServerCardRoute(finalMcpToolkitState.route)
+
+      if (siteConfig.url && config.apiCatalog !== false) {
+        const generatedApiCatalog = resolveApiCatalogConfig(config.apiCatalog, {
+          siteBaseURL: withSiteUrl('/', { withBase: true }),
+          generatedEntries: [{
+            anchor: finalMcpToolkitState.route,
+            item: {
+              href: finalMcpToolkitState.route,
+              type: 'application/json',
+            },
+            ...(mcpServerCardResult._tag === 'Enabled' && {
+              serviceDesc: {
+                href: mcpServerCardRoute,
+                type: MCP_SERVER_CARD_MEDIA_TYPE,
+              },
+            }),
+          }],
+        })
+        if (generatedApiCatalog._tag === 'Invalid') {
+          throw new Error([
+            '[nuxt-ai-ready] Invalid generated API Catalog configuration:',
+            ...generatedApiCatalog.errors.map(error => `- ${formatApiCatalogConfigError(error)}`),
+          ].join('\n'))
+        }
+        if (generatedApiCatalog._tag === 'Enabled') {
+          apiCatalogConfig = generatedApiCatalog.config
+          const runtimeConfig = nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig
+          runtimeConfig.apiCatalog = apiCatalogConfig
+          registerApiCatalog(apiCatalogConfig)
+        }
+      }
+
+      if (deferredGeneratedApiCatalog && !apiCatalogConfig) {
+        throw new Error([
+          '[nuxt-ai-ready] Invalid API Catalog configuration:',
+          '- Configure a site URL for automatic MCP discovery, or provide at least one API Catalog entry.',
+        ].join('\n'))
+      }
+
+      if (seoProModules)
+        updateSeoProFeatures(seoProModules)
+
+      if (mcpServerCardResult._tag === 'Disabled')
+        return
+
+      const toolkitConfig = typeof nuxt.options.mcp === 'object' && nuxt.options.mcp !== null
+        ? nuxt.options.mcp
+        : {}
+      const finalMcpServerCardNameResult = mcpServerCardName
+        ? { _tag: 'Resolved' as const, name: mcpServerCardName }
+        : resolveMcpServerCardName({
+            overrideName: mcpServerCardResult.config.name,
+            route: finalMcpToolkitState.route,
+            siteUrl: siteConfig.url || undefined,
+          })
+      if (finalMcpServerCardNameResult._tag === 'Invalid')
+        throw new Error(`[nuxt-ai-ready] ${finalMcpServerCardNameResult.message}`)
+
+      const protocolVersionResult = await resolveInstalledMcpProtocolVersion({
+        rootDir: nuxt.options.rootDir,
+        modulesDir: nuxt.options.modulesDir,
+      })
+      if (protocolVersionResult._tag === 'Invalid')
+        throw new Error(`[nuxt-ai-ready] ${protocolVersionResult.message}`)
+
+      const card = resolveMcpServerCard({
+        protocolVersion: protocolVersionResult.protocolVersion,
+        endpoint: siteConfig.url
+          ? withSiteUrl(finalMcpToolkitState.route, { withBase: true })
+          : finalMcpToolkitState.route,
+        name: finalMcpServerCardNameResult.name,
+        toolkitTitle: configuredMcpTitle,
+        siteName: siteConfig.name || undefined,
+        siteDescription: siteConfig.description || undefined,
+        toolkit: {
+          ...toolkitConfig,
+        },
+        overrides: mcpServerCardResult.config,
+      })
+
+      const runtimeConfig = nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as {
+        mcpServerCard?: {
+          card: ReturnType<typeof resolveMcpServerCard>
+          cacheMaxAge: number
+          etag: string
+        }
+      }
+      const etag = createMcpServerCardEtag(card)
+      runtimeConfig.mcpServerCard = {
+        card,
+        cacheMaxAge: mcpServerCardResult.config.cacheMaxAge,
+        etag,
+      }
+
+      const handler = resolve('./runtime/server/routes/mcp-server-card')
+      addServerHandler({ route: mcpServerCardRoute, method: 'get', handler })
+      addServerHandler({ route: mcpServerCardRoute, method: 'head', handler })
+      extendRouteRules(mcpServerCardRoute, {
+        sitemap: false,
+        headers: {
+          'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+          'Access-Control-Allow-Methods': 'GET, HEAD',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Expose-Headers': 'ETag',
+          'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
+          'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
+          'ETag': etag,
+        },
+      })
     })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
@@ -464,6 +691,9 @@ export default defineNuxtModule<ModuleOptions>({
 
       nitroConfig.virtual = nitroConfig.virtual || {}
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
+      nitroConfig.virtual['#ai-ready-virtual/agent-skills.mjs'] = agentSkillsResult._tag === 'Enabled'
+        ? `export const agentSkillsIndex = ${JSON.stringify(agentSkillsResult.index)}\nexport const localAgentSkillArtifacts = ${JSON.stringify(agentSkillsResult.localArtifacts)}`
+        : 'export const agentSkillsIndex = null\nexport const localAgentSkillArtifacts = {}'
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
@@ -638,6 +868,7 @@ export async function lookupContentPage(event, path) {
       sitemapPrerendered,
       i18n: i18nConfig,
       ftsTokenizer,
+      apiCatalog: apiCatalogConfig,
     } as any
 
     // Captures rendered HTML during prerendering so markdown.prerender can
@@ -667,6 +898,41 @@ export async function lookupContentPage(event, path) {
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+    if (agentSkillsResult._tag === 'Enabled') {
+      addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index') })
+      for (const route of Object.keys(agentSkillsResult.localArtifacts)) {
+        addServerHandler({ route, handler: resolve('./runtime/server/routes/agent-skills-artifact') })
+        extendRouteRules(route, {
+          headers: {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Cache-Control': AGENT_SKILLS_CACHE_CONTROL,
+            'Access-Control-Allow-Origin': '*',
+          },
+        })
+      }
+      extendRouteRules(AGENT_SKILLS_INDEX_ROUTE, {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': AGENT_SKILLS_CACHE_CONTROL,
+          'Access-Control-Allow-Origin': '*',
+        },
+      })
+
+      const generating = nuxt.options.nitro.static === true
+        || (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true
+      if (generating) {
+        nuxt.options.nitro.prerender = nuxt.options.nitro.prerender || {}
+        nuxt.options.nitro.prerender.routes = nuxt.options.nitro.prerender.routes || []
+        const agentSkillRoutes = [
+          AGENT_SKILLS_INDEX_ROUTE,
+          ...Object.keys(agentSkillsResult.localArtifacts),
+        ]
+        for (const route of agentSkillRoutes) {
+          if (!nuxt.options.nitro.prerender.routes.includes(route))
+            nuxt.options.nitro.prerender.routes.push(route)
+        }
+      }
+    }
 
     if (webmcpConfig) {
       addImports(['useWebMcpSupported', 'useWebMcpTool'].map(name => ({
@@ -721,10 +987,8 @@ export async function lookupContentPage(event, path) {
     }
 
     // Setup prerendering hooks for static generation
-    // @ts-expect-error untyped
-    const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
-    const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
-    const isSPA = nuxt.options.ssr === false
+    if (apiCatalogConfig)
+      registerApiCatalog(apiCatalogConfig)
 
     if (!nuxt.options.dev && !nuxt.options._prepare) {
       // Warn about unsupported/limited modes
@@ -738,7 +1002,6 @@ export async function lookupContentPage(event, path) {
     }
 
     if (isStatic || hasPrerenderedRoutes) {
-      const siteConfig = useSiteConfig()
       setupPrerenderHandler(config, buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
@@ -796,4 +1059,17 @@ export type {
   SiteToolsConfig,
   WebMcpSiteToolAttachmentOptions,
 } from './runtime/site-tool-config'
-export type { ModuleOptions } from './runtime/types'
+export type {
+  AgentSkillConfig,
+  AgentSkillsConfig,
+  AgentSkillsIndex,
+  AgentSkillsIndexEntry,
+  ApiCatalogConfig,
+  ApiCatalogEntry,
+  ApiCatalogLinks,
+  ApiCatalogLinkTarget,
+  ExternalAgentSkillConfig,
+  LocalAgentSkillConfig,
+  McpServerCardConfig,
+  ModuleOptions,
+} from './runtime/types'

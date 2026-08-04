@@ -73,7 +73,10 @@ async function handleStaticIndexNow(
 
   const prevMeta = await fetchFn(metaUrl)
     .then(r => r.ok ? r.json() as Promise<BuildMeta> : null)
-    .catch(() => null)
+    .catch(() => {
+      // An unreachable previous deployment is treated as the first deployment.
+      return null
+    })
 
   if (!prevMeta?.pages) {
     return { skipped: 'first_deploy' }

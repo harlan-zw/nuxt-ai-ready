@@ -9,7 +9,10 @@ export const loading = ref(true)
 export async function refreshSources() {
   if (!appFetch.value || typeof appFetch.value !== 'function')
     return
-  data.value = await appFetch.value('/__ai-ready__/debug.json', { responseType: 'json' }).catch(() => null)
+  data.value = await appFetch.value('/__ai-ready__/debug.json', { responseType: 'json' }).catch(() => {
+    // The devtools host can disconnect while a refresh is in flight.
+    return null
+  })
   loading.value = false
   if (data.value?.siteConfigUrl)
     productionUrl.value = data.value.siteConfigUrl

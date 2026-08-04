@@ -52,5 +52,8 @@ export function buildLinkHeader(
       parts.push(`<${encodePathForHeader(resolveHeaderUrl(href, resolveUrl))}>; rel="alternate"; hreflang="${alt.hreflang}"`)
     }
   }
+  if (config.apiCatalog) {
+    parts.push(`<${encodePathForHeader(config.apiCatalog.href)}>; rel="api-catalog"`)
+  }
   return parts.join(', ')
 }

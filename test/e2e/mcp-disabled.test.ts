@@ -15,5 +15,7 @@ describe('disabled MCP Toolkit', async () => {
     const llmsTxt = await $fetch('/llms.txt') as string
     expect(llmsTxt).not.toContain('[MCP]')
     expect((await fetch('/mcp')).status).toBe(404)
+    expect((await fetch('/mcp/server-card')).status).toBe(404)
+    expect((await fetch('/.well-known/api-catalog')).status).toBe(404)
   })
 })
