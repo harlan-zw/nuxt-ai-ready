@@ -1,12 +1,14 @@
+import type { H3Event } from 'h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { createError, defineEventHandler, getHeader, sendRedirect, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { appendHeader, createError, defineEventHandler, getHeader, getResponseHeader, sendRedirect, setHeader } from 'h3'
+import { getRouteRules, useRuntimeConfig } from 'nitropack/runtime'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
 import { tryGetContentMarkdown } from '../utils/content'
+import { CONTENT_NEGOTIATION_VARY, resolveContentNegotiation } from '../utils/content-negotiation'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { buildLinkHeader } from '../utils/link-header'
@@ -14,16 +16,29 @@ import { buildLinkHeader } from '../utils/link-header'
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 type LinkUrlResolver = (path: string) => string
 
-function setNegotiationHeaders(event: any, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
-  if (config.contentNegotiation)
-    setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
+function setNegotiationHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
+  appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
   // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
   setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl))
 }
 
-function setMarkdownHeaders(event: any, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
+function setUncacheableHeaders(event: H3Event) {
+  setHeader(event, 'cache-control', 'private, no-store')
+  setHeader(event, 'cdn-cache-control', 'no-store')
+
+  for (const header of [
+    'cloudflare-cdn-cache-control',
+    'netlify-cdn-cache-control',
+    'vercel-cdn-cache-control',
+    'surrogate-control',
+  ] as const) {
+    if (getResponseHeader(event, header) !== undefined)
+      setHeader(event, header, 'no-store')
+  }
+}
+
+function setMarkdownHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
-  setHeader(event, 'vary', 'Accept, Sec-Fetch-Dest')
   setHeader(event, 'link', buildLinkHeader(path, 'markdown', config, resolveUrl))
   if (config.markdownCacheHeaders) {
     const { maxAge, swr } = config.markdownCacheHeaders
@@ -77,15 +92,21 @@ export default defineEventHandler(async (event) => {
 
   const runtimeConfig = useRuntimeConfig(event)
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
+  const contentNegotiation = resolveContentNegotiation({
+    policy: config.contentNegotiation,
+    routeRule: getRouteRules(event),
+  })
   const renderInfo = getMarkdownRenderInfo(event, {
     _tag: 'runtime',
-    contentNegotiation: config.contentNegotiation,
+    contentNegotiation: contentNegotiation._tag === 'enabled',
   })
   if (!renderInfo)
     return
 
   // Accept header sent but no supported representation matched → 406
   if ('notAcceptable' in renderInfo) {
+    appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
+    setUncacheableHeaders(event)
     throw createError({
       statusCode: 406,
       statusMessage: 'Not Acceptable',
@@ -101,7 +122,10 @@ export default defineEventHandler(async (event) => {
 
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
-    setNegotiationHeaders(event, path, config, resolveUrl)
+    if (contentNegotiation._tag === 'enabled')
+      setNegotiationHeaders(event, path, config, resolveUrl)
+    else
+      setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl))
     return
   }
 
@@ -112,6 +136,8 @@ export default defineEventHandler(async (event) => {
   // prerendered routes on Cloudflare Pages where HTML is served from edge cache
   // without honoring Vary: Accept.
   if (!isExplicit) {
+    setNegotiationHeaders(event, path, config, resolveUrl)
+    setUncacheableHeaders(event)
     return sendRedirect(event, resolvePath(toMarkdownPath(path)), 307)
   }
 

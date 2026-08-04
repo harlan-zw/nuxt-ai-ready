@@ -1,8 +1,24 @@
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
 
+  experimental: {
+    inlineRouteRules: true,
+  },
+
   routeRules: {
-    '/**': { isr: 3600 },
+    '/': {
+      headers: {
+        'cloudflare-cdn-cache-control': 'public, max-age=3600',
+        'vary': 'Accept-Encoding',
+      },
+    },
+    '/about': {
+      cache: {
+        maxAge: 3600,
+        varies: ['accept', 'sec-fetch-dest', 'user-agent'],
+      },
+    },
+    '/docs/**': { cache: { maxAge: 3600 } },
   },
 
   site: {
