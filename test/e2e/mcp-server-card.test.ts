@@ -112,4 +112,27 @@ describe('late MCP Server Card dependency', async () => {
     expect(response.headers.get('content-type')).toContain('application/json')
     expect(await response.text()).toBe('')
   })
+
+  it('advertises the late MCP server through the API catalog', async () => {
+    const [catalogResponse, homeResponse] = await Promise.all([
+      fetch('/.well-known/api-catalog'),
+      fetch('/'),
+    ])
+
+    expect(catalogResponse.status).toBe(200)
+    await expect(catalogResponse.json()).resolves.toEqual({
+      linkset: [{
+        'anchor': 'https://late-mcp.example.com/agent/mcp',
+        'item': [{
+          href: 'https://late-mcp.example.com/agent/mcp',
+          type: 'application/json',
+        }],
+        'service-desc': [{
+          href: 'https://late-mcp.example.com/.well-known/mcp/server-card.json',
+          type: 'application/json',
+        }],
+      }],
+    })
+    expect(homeResponse.headers.get('link')).toContain('rel="api-catalog"')
+  })
 })

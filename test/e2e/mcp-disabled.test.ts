@@ -16,5 +16,6 @@ describe('disabled MCP Toolkit', async () => {
     expect(llmsTxt).not.toContain('[MCP]')
     expect((await fetch('/mcp')).status).toBe(404)
     expect((await fetch('/.well-known/mcp/server-card.json')).status).toBe(404)
+    expect((await fetch('/.well-known/api-catalog')).status).toBe(404)
   })
 })

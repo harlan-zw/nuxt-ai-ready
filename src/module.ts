@@ -181,7 +181,7 @@ export default defineNuxtModule<ModuleOptions>({
         ...apiCatalogResult.errors.map(error => `- ${formatApiCatalogConfigError(error)}`),
       ].join('\n'))
     }
-    const apiCatalogConfig = apiCatalogResult._tag === 'Enabled'
+    let apiCatalogConfig = apiCatalogResult._tag === 'Enabled'
       ? apiCatalogResult.config
       : undefined
 
@@ -362,6 +362,36 @@ export default defineNuxtModule<ModuleOptions>({
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
+    // @ts-expect-error untyped
+    const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
+    const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
+    const isSPA = nuxt.options.ssr === false
+
+    let apiCatalogRegistered = false
+    const registerApiCatalog = (catalog: ResolvedApiCatalogConfig) => {
+      if (apiCatalogRegistered)
+        return
+      apiCatalogRegistered = true
+
+      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog') })
+      const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
+      extendRouteRules('/**', {
+        headers: { Link: apiCatalogLink },
+      })
+      extendRouteRules(API_CATALOG_PATH, {
+        headers: {
+          'Content-Type': catalog.mediaType,
+          'Link': apiCatalogLink,
+        },
+      })
+      if (isStatic || hasPrerenderedRoutes) {
+        nuxt.options.nitro.prerender ||= {}
+        nuxt.options.nitro.prerender.routes ||= []
+        if (!nuxt.options.nitro.prerender.routes.includes(API_CATALOG_PATH))
+          nuxt.options.nitro.prerender.routes.push(API_CATALOG_PATH)
+      }
+    }
+
     let seoProModules: any[] | undefined
     const updateSeoProFeatures = (modules: any[]) => {
       const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
@@ -394,10 +424,11 @@ export default defineNuxtModule<ModuleOptions>({
         generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
       })
       mcpAvailable = finalMcpToolkitState._tag === 'Enabled'
-      if (seoProModules)
-        updateSeoProFeatures(seoProModules)
-      if (finalMcpToolkitState._tag !== 'Enabled')
+      if (finalMcpToolkitState._tag !== 'Enabled') {
+        if (seoProModules)
+          updateSeoProFeatures(seoProModules)
         return
+      }
 
       // Hydrate the database before Toolkit resolves its first request.
       addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
@@ -417,6 +448,40 @@ export default defineNuxtModule<ModuleOptions>({
         mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
       }
 
+      if (siteConfig.url && config.apiCatalog !== false) {
+        const generatedApiCatalog = resolveApiCatalogConfig(config.apiCatalog, {
+          siteBaseURL: withSiteUrl('/', { withBase: true }),
+          generatedEntries: [{
+            anchor: finalMcpToolkitState.route,
+            item: {
+              href: finalMcpToolkitState.route,
+              type: 'application/json',
+            },
+            ...(mcpServerCardResult._tag === 'Enabled' && {
+              serviceDesc: {
+                href: MCP_SERVER_CARD_ROUTE,
+                type: 'application/json',
+              },
+            }),
+          }],
+        })
+        if (generatedApiCatalog._tag === 'Invalid') {
+          throw new Error([
+            '[nuxt-ai-ready] Invalid generated API Catalog configuration:',
+            ...generatedApiCatalog.errors.map(error => `- ${formatApiCatalogConfigError(error)}`),
+          ].join('\n'))
+        }
+        if (generatedApiCatalog._tag === 'Enabled') {
+          apiCatalogConfig = generatedApiCatalog.config
+          const runtimeConfig = nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig
+          runtimeConfig.apiCatalog = apiCatalogConfig
+          registerApiCatalog(apiCatalogConfig)
+        }
+      }
+
+      if (seoProModules)
+        updateSeoProFeatures(seoProModules)
+
       if (mcpServerCardResult._tag === 'Disabled')
         return
 
@@ -424,7 +489,6 @@ export default defineNuxtModule<ModuleOptions>({
       if (protocolVersionResult._tag === 'Invalid')
         throw new Error(`[nuxt-ai-ready] ${protocolVersionResult.message}`)
 
-      const siteConfig = useSiteConfig()
       const toolkitConfig = typeof nuxt.options.mcp === 'object' && nuxt.options.mcp !== null
         ? nuxt.options.mcp
         : {}
@@ -779,10 +843,6 @@ export async function lookupContentPage(event, path) {
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
-    if (apiCatalogConfig) {
-      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog') })
-    }
-
     if (agentSkillsResult._tag === 'Enabled') {
       addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index') })
       for (const route of Object.keys(agentSkillsResult.localArtifacts))
@@ -872,29 +932,8 @@ export async function lookupContentPage(event, path) {
     }
 
     // Setup prerendering hooks for static generation
-    // @ts-expect-error untyped
-    const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
-    const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
-    const isSPA = nuxt.options.ssr === false
-
-    if (apiCatalogConfig) {
-      const apiCatalogLink = `<${apiCatalogConfig.href}>; rel="api-catalog"`
-      extendRouteRules('/**', {
-        headers: { Link: apiCatalogLink },
-      })
-      extendRouteRules(API_CATALOG_PATH, {
-        headers: {
-          'Content-Type': apiCatalogConfig.mediaType,
-          'Link': apiCatalogLink,
-        },
-      })
-      if (isStatic || hasPrerenderedRoutes) {
-        nuxt.options.nitro.prerender ||= {}
-        nuxt.options.nitro.prerender.routes ||= []
-        if (!nuxt.options.nitro.prerender.routes.includes(API_CATALOG_PATH))
-          nuxt.options.nitro.prerender.routes.push(API_CATALOG_PATH)
-      }
-    }
+    if (apiCatalogConfig)
+      registerApiCatalog(apiCatalogConfig)
 
     if (!nuxt.options.dev && !nuxt.options._prepare) {
       // Warn about unsupported/limited modes
