@@ -5,8 +5,8 @@ import type {
   AgentSkillsIndexEntry,
 } from '../runtime/types'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { readFile, realpath } from 'node:fs/promises'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parseDocument } from 'yaml'
 
 export const AGENT_SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
@@ -36,8 +36,17 @@ function skillRoute(name: string) {
   return `/.well-known/agent-skills/${name}/SKILL.md`
 }
 
+function skillUrl(name: string) {
+  return `${name}/SKILL.md`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isWithinDirectory(directory: string, file: string): boolean {
+  const path = relative(directory, file)
+  return path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path)
 }
 
 function validateCommonFields(skill: Record<string, unknown>, index: number): AgentSkillsConfigIssue[] {
@@ -74,8 +83,13 @@ function validateSkill(skill: unknown, index: number): AgentSkillsConfigIssue[] 
   if (skill.source === 'external') {
     if (skill.type !== 'skill-md' && skill.type !== 'archive')
       issues.push({ index, field: 'type', message: 'must be "skill-md" or "archive"' })
-    if (typeof skill.url !== 'string' || !URL.canParse(skill.url, urlBase))
-      issues.push({ index, field: 'url', message: 'must be an absolute, path-absolute, or relative URL' })
+    if (typeof skill.url !== 'string'
+      || skill.url.trim().length === 0
+      || skill.url !== skill.url.trim()
+      || !URL.canParse(skill.url, urlBase)
+      || !['http:', 'https:'].includes(new URL(skill.url, urlBase).protocol)) {
+      issues.push({ index, field: 'url', message: 'must be an HTTP(S), path-absolute, or relative URL' })
+    }
     if (typeof skill.digest !== 'string' || !digestPattern.test(skill.digest))
       issues.push({ index, field: 'digest', message: 'must use the format sha256: followed by 64 lowercase hexadecimal characters' })
     return issues
@@ -128,6 +142,13 @@ function parseLocalSkillMetadata(
   }
 
   const issues: AgentSkillsConfigIssue[] = []
+  if (!content.slice(match[0].length).trim()) {
+    issues.push({
+      index,
+      field: 'file',
+      message: 'must contain Markdown instructions after its frontmatter',
+    })
+  }
   if (metadata.name !== skill.name) {
     issues.push({
       index,
@@ -154,30 +175,62 @@ async function resolveLocalEntry(
   | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }
 > {
   const file = resolve(rootDir, skill.file)
-  return readFile(file)
-    .then((content) => {
-      const text = content.toString('utf8')
-      const metadataIssues = parseLocalSkillMetadata(text, skill, index)
-      if (metadataIssues.length > 0) {
+  if (isAbsolute(skill.file) || !isWithinDirectory(rootDir, file)) {
+    return {
+      _tag: 'Invalid',
+      issues: [{
+        index,
+        field: 'file',
+        message: 'must resolve within the Nuxt root directory',
+      }],
+    }
+  }
+  return Promise.all([realpath(rootDir), realpath(file)])
+    .then(([realRootDir, realFile]) => {
+      if (!isWithinDirectory(realRootDir, realFile)) {
         return {
           _tag: 'Invalid' as const,
-          issues: metadataIssues,
+          issues: [{
+            index,
+            field: 'file' as const,
+            message: 'must resolve within the Nuxt root directory',
+          }],
         }
       }
-      const route = skillRoute(skill.name)
-      const digest = `sha256:${createHash('sha256').update(content).digest('hex')}` as const
-      return {
-        _tag: 'Resolved' as const,
-        entry: {
-          name: skill.name,
-          type: 'skill-md' as const,
-          description: skill.description,
-          url: route,
-          digest,
-        },
-        route,
-        content: text,
-      }
+      return readFile(realFile).then((content) => {
+        const text = content.toString('utf8')
+        if (!Buffer.from(text, 'utf8').equals(content)) {
+          return {
+            _tag: 'Invalid' as const,
+            issues: [{
+              index,
+              field: 'file' as const,
+              message: 'must contain valid UTF-8 text',
+            }],
+          }
+        }
+        const metadataIssues = parseLocalSkillMetadata(text, skill, index)
+        if (metadataIssues.length > 0) {
+          return {
+            _tag: 'Invalid' as const,
+            issues: metadataIssues,
+          }
+        }
+        const route = skillRoute(skill.name)
+        const digest = `sha256:${createHash('sha256').update(content).digest('hex')}` as const
+        return {
+          _tag: 'Resolved' as const,
+          entry: {
+            name: skill.name,
+            type: 'skill-md' as const,
+            description: skill.description,
+            url: skillUrl(skill.name),
+            digest,
+          },
+          route,
+          content: text,
+        }
+      })
     })
     .catch((error: unknown) => ({
       _tag: 'Invalid' as const,

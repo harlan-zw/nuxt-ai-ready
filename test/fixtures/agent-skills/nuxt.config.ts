@@ -2,6 +2,9 @@ import Module from '../../../src/module'
 
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
+  app: {
+    baseURL: '/docs/',
+  },
   modules: [Module, 'nuxt-site-config', '@nuxtjs/sitemap', '@nuxtjs/robots'],
   compatibilityDate: '2025-10-15',
   site: {
@@ -27,5 +30,8 @@ export default defineNuxtConfig({
         },
       ],
     },
+  },
+  robots: {
+    robotsTxt: false,
   },
 })

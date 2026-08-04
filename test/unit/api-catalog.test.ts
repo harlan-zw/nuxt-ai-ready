@@ -48,6 +48,27 @@ describe('resolveApiCatalogConfig', () => {
     })
   })
 
+  it('preserves RFC 3986 network-path references', () => {
+    const result = resolveApiCatalogConfig({
+      entries: [{
+        anchor: '//api.example.net/v1',
+        serviceDesc: { href: '//api.example.net/openapi.json' },
+      }],
+    }, { siteBaseURL: 'https://example.com/docs/' })
+
+    expect(result).toMatchObject({
+      _tag: 'Enabled',
+      config: {
+        document: {
+          linkset: [{
+            'anchor': 'https://api.example.net/v1',
+            'service-desc': [{ href: 'https://api.example.net/openapi.json' }],
+          }],
+        },
+      },
+    })
+  })
+
   it('preserves absolute URLs and optional target attributes', () => {
     const result = resolveApiCatalogConfig({
       entries: [{
@@ -131,6 +152,55 @@ describe('resolveApiCatalogConfig', () => {
         { _tag: 'InvalidAnchor', entryIndex: 0 },
         { _tag: 'InvalidLinkHref', entryIndex: 0, relation: 'serviceDesc', targetIndex: 0 },
       ],
+    })
+  })
+
+  it.each([
+    ['anchor', { anchor: { href: 'https://evil.example/' } }],
+    ['bad relation', { 'bad relation': { href: 'https://api.example.com/docs' } }],
+  ])('rejects the invalid custom relation %s', (relation, relations) => {
+    expect(resolveApiCatalogConfig({
+      entries: [{
+        anchor: 'https://api.example.com/',
+        serviceDesc: { href: 'https://api.example.com/openapi.json' },
+        relations,
+      }],
+    }, {})).toEqual({
+      _tag: 'Invalid',
+      errors: [{ _tag: 'InvalidRelation', entryIndex: 0, relation }],
+    })
+  })
+
+  it('accepts an absolute URI extension relation', () => {
+    expect(resolveApiCatalogConfig({
+      entries: [{
+        anchor: 'https://api.example.com/',
+        relations: {
+          'https://relations.example.com/policy': { href: 'https://api.example.com/policy' },
+        },
+      }],
+    }, {})).toMatchObject({
+      _tag: 'Enabled',
+      config: {
+        document: {
+          linkset: [{
+            'anchor': 'https://api.example.com/',
+            'https://relations.example.com/policy': [{ href: 'https://api.example.com/policy' }],
+          }],
+        },
+      },
+    })
+  })
+
+  it.each([
+    { anchor: 'https://api.example.com/' },
+    { anchor: 'https://api.example.com/', item: [] },
+  ])('rejects entries without links: %j', (entry) => {
+    expect(resolveApiCatalogConfig({ entries: [entry] }, {})).toMatchObject({
+      _tag: 'Invalid',
+      errors: expect.arrayContaining([
+        expect.objectContaining({ _tag: 'MissingLinks', entryIndex: 0 }),
+      ]),
     })
   })
 

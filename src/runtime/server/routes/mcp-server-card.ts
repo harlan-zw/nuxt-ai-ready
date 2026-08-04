@@ -1,10 +1,12 @@
 import type { McpServerCard } from '../../../utils/mcp-server-card'
-import { eventHandler, setHeaders } from 'h3'
+import { eventHandler, getHeader, setHeaders, setResponseStatus } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
+import { matchesMcpServerCardEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../../../utils/mcp-server-card'
 
 interface McpServerCardRuntimeConfig {
   card: McpServerCard
   cacheMaxAge: number
+  etag: string
 }
 
 export default eventHandler((event) => {
@@ -13,12 +15,19 @@ export default eventHandler((event) => {
   }
 
   setHeaders(event, {
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
     'Access-Control-Allow-Methods': 'GET, HEAD',
     'Access-Control-Allow-Origin': '*',
+    'Access-Control-Expose-Headers': 'ETag',
     'Cache-Control': `public, max-age=${config.mcpServerCard.cacheMaxAge}`,
-    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
+    'ETag': config.mcpServerCard.etag,
   })
 
-  return event.method === 'HEAD' ? null : config.mcpServerCard.card
+  if (matchesMcpServerCardEtag(getHeader(event, 'if-none-match'), config.mcpServerCard.etag)) {
+    setResponseStatus(event, 304)
+    return null
+  }
+
+  return config.mcpServerCard.card
 })

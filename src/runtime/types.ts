@@ -89,16 +89,14 @@ export interface AgentSkillsIndex {
 }
 
 export interface McpServerCardConfig {
-  /** Human-readable title included in serverInfo. */
+  /** Reverse-DNS server identifier, such as `com.example/docs-mcp`. */
+  name?: string
+  /** Human-readable server title. */
   title?: string
   /** Override the description derived from MCP Toolkit or site config. */
   description?: string
-  /** Override the instructions derived from MCP Toolkit. */
-  instructions?: string
-  /** Public HTTP(S) icon URL. Defaults to the first MCP Toolkit icon. */
-  iconUrl?: string
-  /** Public HTTP(S) documentation URL. */
-  documentationUrl?: string
+  /** Public HTTP(S) project or documentation URL. */
+  websiteUrl?: string
   /** Discovery response cache lifetime in seconds. @default 3600 */
   cacheMaxAge?: number
 }

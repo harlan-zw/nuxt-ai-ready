@@ -44,6 +44,7 @@ export type ApiCatalogConfigError
     | { _tag: 'InvalidEntry', entryIndex: number }
     | { _tag: 'InvalidAnchor', entryIndex: number }
     | { _tag: 'InvalidRelation', entryIndex: number, relation: string }
+    | { _tag: 'MissingLinks', entryIndex: number }
     | { _tag: 'InvalidLink', entryIndex: number, relation: string, targetIndex: number }
     | { _tag: 'InvalidLinkHref', entryIndex: number, relation: string, targetIndex: number }
     | { _tag: 'InvalidUrl', entryIndex: number, field: string, value: string }
@@ -87,6 +88,26 @@ function resolveUrl(
     }
   }
 
+  if (value.startsWith('//')) {
+    if (!baseURL) {
+      return {
+        _tag: 'Err',
+        error: { _tag: 'MissingSiteUrl', entryIndex: errorContext.entryIndex, field: errorContext.field },
+      }
+    }
+    return URL.canParse(value, baseURL)
+      ? { _tag: 'Ok', value: new URL(value, baseURL).href }
+      : {
+          _tag: 'Err',
+          error: {
+            _tag: 'InvalidUrl',
+            entryIndex: errorContext.entryIndex,
+            field: errorContext.field,
+            value,
+          },
+        }
+  }
+
   if (URL.canParse(value))
     return { _tag: 'Ok', value: new URL(value).href }
 
@@ -113,6 +134,13 @@ function resolveUrl(
 
 function normalizeLinks(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [value]
+}
+
+const registeredRelationPattern = /^[a-z][a-z0-9.-]*$/
+
+function isValidCustomRelation(relation: string): boolean {
+  return relation !== 'anchor'
+    && (registeredRelationPattern.test(relation) || URL.canParse(relation))
 }
 
 function parseLinks(
@@ -165,6 +193,7 @@ function parseEntry(
   baseURL: URL | undefined,
   errors: ApiCatalogConfigError[],
 ): ResolvedApiCatalogLinksetEntry | undefined {
+  const entryErrorStart = errors.length
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     errors.push({ _tag: 'InvalidEntry', entryIndex })
     return undefined
@@ -197,7 +226,7 @@ function parseEntry(
     }
     else {
       for (const [relation, links] of Object.entries(entry.relations)) {
-        if (!relation.trim()) {
+        if (!isValidCustomRelation(relation)) {
           errors.push({ _tag: 'InvalidRelation', entryIndex, relation })
           continue
         }
@@ -207,6 +236,12 @@ function parseEntry(
       }
     }
   }
+
+  const hasLinks = Object.entries(resolved).some(([relation, links]) => relation !== 'anchor'
+    && Array.isArray(links)
+    && links.length > 0)
+  if (!hasLinks && errors.length === entryErrorStart)
+    errors.push({ _tag: 'MissingLinks', entryIndex })
 
   return resolved
 }
@@ -270,6 +305,8 @@ export function formatApiCatalogConfigError(error: ApiCatalogConfigError): strin
       return `\`aiReady.apiCatalog.entries[${error.entryIndex}].anchor\` must be a non-empty URL.`
     case 'InvalidRelation':
       return `API catalog relation \`${error.relation}\` in entry ${error.entryIndex} is invalid.`
+    case 'MissingLinks':
+      return `API catalog entry ${error.entryIndex} must contain at least one link.`
     case 'InvalidLink':
       return `API catalog ${error.relation} target ${error.targetIndex} in entry ${error.entryIndex} must be an object.`
     case 'InvalidLinkHref':

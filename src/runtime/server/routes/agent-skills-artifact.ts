@@ -1,8 +1,11 @@
-import { createError, eventHandler, getRequestURL, setHeader } from 'h3'
+import { assertMethod, createError, eventHandler, getRequestURL, setHeader } from 'h3'
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
+import { toLogicalRoute } from '../../route-path'
 
 export default eventHandler((event) => {
-  const path = getRequestURL(event).pathname
+  assertMethod(event, ['GET', 'HEAD'])
+  const path = toLogicalRoute(getRequestURL(event).pathname, useRuntimeConfig(event).app.baseURL)
   const content = localAgentSkillArtifacts[path]
   if (content === undefined) {
     throw createError({

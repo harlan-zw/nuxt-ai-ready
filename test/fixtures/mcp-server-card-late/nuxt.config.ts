@@ -22,6 +22,9 @@ const SeoProObserver = defineNuxtModule({
 
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
+  app: {
+    baseURL: '/docs/',
+  },
   modules: [LateMcpHost, SeoProObserver],
   site: {
     url: 'https://late-mcp.example.com/',
@@ -41,10 +44,15 @@ export default defineNuxtConfig({
       routes: ['/', '/about'],
     },
   },
+  robots: {
+    robotsTxt: false,
+  },
   aiReady: {
+    apiCatalog: {},
     mcpServerCard: {
+      name: 'com.example.late-mcp/ai-ready',
       title: 'Late MCP discovery',
-      documentationUrl: 'https://late-mcp.example.com/mcp-docs',
+      websiteUrl: 'https://late-mcp.example.com/mcp-docs',
       cacheMaxAge: 900,
     },
   },
