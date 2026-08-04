@@ -4,6 +4,45 @@ import type { SiteToolsConfig } from './site-tool-config'
 
 export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
 
+export interface ApiCatalogLinkTarget {
+  /** Target URI. Relative values resolve against the deployed site URL. */
+  href: string
+  /** Media type of the target resource. */
+  type?: string
+  /** Human-readable target label. */
+  title?: string
+  /** Language tag or tags for the target resource. */
+  hreflang?: string | string[]
+  /** Media query describing where the target applies. */
+  media?: string
+}
+
+export type ApiCatalogLinks = ApiCatalogLinkTarget | ApiCatalogLinkTarget[]
+
+export interface ApiCatalogEntry {
+  /** API endpoint or link context URI. */
+  anchor: string
+  /** API endpoints that belong to this catalog. */
+  item?: ApiCatalogLinks
+  /** Machine-readable API descriptions, such as OpenAPI documents. */
+  serviceDesc?: ApiCatalogLinks
+  /** Human-readable API documentation. */
+  serviceDoc?: ApiCatalogLinks
+  /** API metadata, such as policies or licensing information. */
+  serviceMeta?: ApiCatalogLinks
+  /** API status or health resources. */
+  status?: ApiCatalogLinks
+  /** Nested API catalogs. */
+  apiCatalog?: ApiCatalogLinks
+  /** Additional RFC 8288 link relations. */
+  relations?: Record<string, ApiCatalogLinks>
+}
+
+export interface ApiCatalogConfig {
+  /** Entries published in the RFC 9727 Linkset document. */
+  entries?: ApiCatalogEntry[]
+}
+
 export interface ModuleOptions {
   /**
    * Enable/disable module
@@ -24,6 +63,14 @@ export interface ModuleOptions {
    * @default Automatic per route
    */
   contentNegotiation?: boolean
+
+  /**
+   * Publish an RFC 9727 API Catalog at `/.well-known/api-catalog`.
+   * Relative entry URLs resolve against the configured site URL and app base URL.
+   * Set to false to suppress both configured and automatically generated entries.
+   * @default undefined
+   */
+  apiCatalog?: false | ApiCatalogConfig
 
   /**
    * Options to pass to mdream htmlToMarkdown function

@@ -105,4 +105,17 @@ describe('buildLinkHeader', () => {
     expect(header).toContain('</about>; rel="alternate"; hreflang="en"')
     expect(header).toContain('</fr/about>; rel="alternate"; hreflang="fr"')
   })
+
+  it('advertises the API catalog only when enabled', () => {
+    const enabledConfig = {
+      apiCatalog: {
+        href: 'https://example.com/.well-known/api-catalog',
+      },
+    } as ModulePublicRuntimeConfig
+
+    expect(buildLinkHeader('/', 'html', enabledConfig)).toContain(
+      '<https://example.com/.well-known/api-catalog>; rel="api-catalog"',
+    )
+    expect(buildLinkHeader('/', 'html', baseConfig)).not.toContain('rel="api-catalog"')
+  })
 })

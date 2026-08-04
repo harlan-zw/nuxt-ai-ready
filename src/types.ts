@@ -1,5 +1,9 @@
 // Re-export public types from runtime
 export type {
+  ApiCatalogConfig,
+  ApiCatalogEntry,
+  ApiCatalogLinks,
+  ApiCatalogLinkTarget,
   LlmsTxtConfig,
   LlmsTxtLink,
   LlmsTxtSection,
