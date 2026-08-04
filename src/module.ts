@@ -1,5 +1,5 @@
 import type { ParsedMarkdownResult } from './prerender'
-import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -44,6 +44,7 @@ declare module '@nuxt/schema' {
 export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
+  contentNegotiation: ContentNegotiationPolicy
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
@@ -612,6 +613,11 @@ export async function lookupContentPage(event, path) {
       version: version || '0.0.0',
       debug: config.debug || false,
       debugCron: config.debugCron || false,
+      contentNegotiation: config.contentNegotiation === undefined
+        ? 'auto'
+        : config.contentNegotiation
+          ? 'enabled'
+          : 'disabled',
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,

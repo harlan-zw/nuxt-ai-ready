@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  const renderInfo = getMarkdownRenderInfo(event, true)
+  const renderInfo = getMarkdownRenderInfo(event, { _tag: 'prerender' })
   if (!renderInfo || 'notAcceptable' in renderInfo)
     return
 

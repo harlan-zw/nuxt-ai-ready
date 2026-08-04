@@ -2,6 +2,8 @@ import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
 import type { SiteToolsConfig } from './site-tool-config'
 
+export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
+
 export interface ModuleOptions {
   /**
    * Enable/disable module
@@ -14,6 +16,14 @@ export interface ModuleOptions {
    * @default false
    */
   debug?: boolean
+
+  /**
+   * Negotiate Markdown on HTML routes through Accept and User-Agent headers.
+   * Disable when a deployment cache cannot vary responses by request headers.
+   * Explicit .md routes remain available.
+   * @default Automatic per route
+   */
+  contentNegotiation?: boolean
 
   /**
    * Options to pass to mdream htmlToMarkdown function
