@@ -1,7 +1,7 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import type { PageEntry } from '../../db/queries'
-import { eventHandler, getQuery, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, getQuery, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { countPages, queryPages, searchPages } from '../../db/queries'
 
 const MAX_LIMIT = 50

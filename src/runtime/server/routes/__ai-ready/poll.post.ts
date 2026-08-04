@@ -1,4 +1,4 @@
-import { eventHandler, getQuery } from 'h3'
+import { eventHandler, getQuery } from '#nuxtseo/h3'
 import { batchIndexPages } from '../../utils/batchIndex'
 
 export default eventHandler(async (event) => {

@@ -1,7 +1,8 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
-import { useEvent } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
 import { z } from 'zod'
 import siteTools from '#ai-ready-virtual/site-tools.mjs'
+import { useEvent } from '#nuxtseo/nitro'
 import { SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { searchPages } from '../../db/queries'
 
@@ -21,7 +22,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   enabled: () => siteTools.searchPages.mcp.enabled,
   cache: '5m',
   async handler({ query, limit }) {
-    const event = useEvent()
+    const event = useEvent() as H3Event
     const results = await searchPages(event, query, { limit })
     return { content: [{ type: 'text', text: JSON.stringify(results) }] }
   },

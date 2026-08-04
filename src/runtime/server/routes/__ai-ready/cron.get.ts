@@ -1,4 +1,4 @@
-import { eventHandler } from 'h3'
+import { eventHandler } from '#nuxtseo/h3'
 import { runCron } from '../../utils/runCron'
 
 /**

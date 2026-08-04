@@ -1,7 +1,8 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { appendHeader, createError, defineEventHandler, getHeader, getResponseHeader, sendRedirect, setHeader } from 'h3'
-import { getRouteRules, useRuntimeConfig } from 'nitropack/runtime'
+import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
+import { appendHeader, createError, defineEventHandler, getHeader, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'
@@ -9,6 +10,7 @@ import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
 import { tryGetContentMarkdown } from '../utils/content'
 import { CONTENT_NEGOTIATION_VARY, resolveContentNegotiation } from '../utils/content-negotiation'
+import { fetchRawWithEvent } from '../utils/fetch'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { buildLinkHeader } from '../utils/link-header'
@@ -97,7 +99,7 @@ export default defineEventHandler(async (event) => {
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const contentNegotiation = resolveContentNegotiation({
     policy: config.contentNegotiation,
-    routeRule: getRouteRules(event),
+    routeRule: createNitroRouteRuleMatcher(runtimeConfig)(event.path),
   })
   const renderInfo = getMarkdownRenderInfo(event, {
     _tag: 'runtime',
@@ -168,7 +170,7 @@ export default defineEventHandler(async (event) => {
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
   // via mdream. Manual redirect so we can forward redirects with .md suffix.
   logger.debug(`[markdown] Fetching HTML for ${path}`)
-  const response = await event.fetch(resolvePath(path), {
+  const response = await fetchRawWithEvent(event, resolvePath(path), {
     headers: { [INTERNAL_HEADER]: '1' },
     redirect: 'manual',
   }).catch((e) => {

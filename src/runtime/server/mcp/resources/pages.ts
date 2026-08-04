@@ -1,6 +1,7 @@
 import type { McpResourceDefinition } from '@nuxtjs/mcp-toolkit'
+import type { H3Event } from '#nuxtseo/h3'
 import type { PageEntry } from '../../db/queries'
-import { useEvent } from 'nitropack/runtime'
+import { useEvent } from '#nuxtseo/nitro'
 import { countPages, queryPages } from '../../db/queries'
 
 export default ({
@@ -12,7 +13,7 @@ export default ({
   },
   cache: '1h',
   async handler(uri: URL) {
-    const event = useEvent()
+    const event = useEvent() as H3Event
     const limit = Math.min(Math.max(Number(uri.searchParams.get('limit')) || 100, 1), 500)
     const offset = Math.max(Number(uri.searchParams.get('offset')) || 0, 0)
     const pages = await queryPages(event, { limit, offset }) as PageEntry[]

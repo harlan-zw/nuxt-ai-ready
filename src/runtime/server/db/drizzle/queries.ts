@@ -1,9 +1,9 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { FtsTokenizer } from '../schema-sql'
 import type { DrizzleDatabase } from './client'
 import { and, count, desc, eq, gt, isNull, like, lt, or, sql } from 'drizzle-orm'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
 

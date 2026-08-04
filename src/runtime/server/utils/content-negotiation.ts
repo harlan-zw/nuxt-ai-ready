@@ -1,4 +1,3 @@
-import type { NitroRouteRules } from 'nitropack/types'
 import type { ContentNegotiationPolicy } from '../../types'
 
 export const CONTENT_NEGOTIATION_VARY = 'Accept, Sec-Fetch-Dest, User-Agent'
@@ -7,7 +6,13 @@ const NEGOTIATION_CACHE_HEADERS = CONTENT_NEGOTIATION_VARY
   .split(',')
   .map(header => header.trim().toLowerCase())
 
-type RouteRule = Pick<NitroRouteRules, 'cache' | 'isr'>
+interface RouteRule {
+  cache?: boolean | Record<string, unknown> & {
+    headersOnly?: boolean
+    varies?: string[]
+  }
+  isr?: boolean | number | { expiration: number }
+}
 
 export type ContentNegotiationResolution
   = | { _tag: 'enabled', source: 'default' | 'explicit' }

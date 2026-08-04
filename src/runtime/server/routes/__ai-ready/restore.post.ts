@@ -1,15 +1,15 @@
 import type { DumpRow } from '../../db/shared'
-import { createError, eventHandler } from 'h3'
+import { createError, eventHandler, getQuery } from '#nuxtseo/h3'
 import { useRawDb } from '../../db'
 import { decompressFromBase64, importDbDump } from '../../db/shared'
 import { logger } from '../../logger'
+import { requireAuth } from '../../utils/auth'
 import { fetchPublicAsset } from '../../utils/cloudflare'
 
 export default eventHandler(async (event) => {
-  const { requireAuth } = await import('../../utils/auth')
   requireAuth(event)
 
-  const query = (await import('h3')).getQuery(event)
+  const query = getQuery(event)
 
   // Fetch dump file
   logger.debug('[restore] Fetching dump...')

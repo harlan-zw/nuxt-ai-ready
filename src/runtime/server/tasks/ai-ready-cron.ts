@@ -1,4 +1,4 @@
-import { defineTask } from 'nitropack/runtime'
+import { defineTask } from '#nuxtseo/nitro'
 import { runCron } from '../utils/runCron'
 
 export default defineTask({

@@ -1,8 +1,8 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { createError, getHeader, getQuery } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import { logger } from '#ai-ready-virtual/logger.mjs'
+import { createError, getHeader, getQuery } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 /**
  * Verify the request has a valid Authorization: Bearer token.

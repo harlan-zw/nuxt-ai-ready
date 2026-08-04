@@ -5,10 +5,10 @@ cleanupUnusedCatalogs: true
 minimumReleaseAgeExclude:
   - nuxtseo-layer-devtools
   - nuxtseo-shared
-  - '@nuxtjs/sitemap@8.3.1'
-  - nuxt-site-config-kit@4.1.1
-  - nuxt-site-config@4.1.1
-  - site-config-stack@4.1.1
+  - '@nuxtjs/sitemap@8.3.2'
+  - nuxt-site-config-kit@4.1.1 || 4.1.4
+  - nuxt-site-config@4.1.1 || 4.1.4
+  - site-config-stack@4.1.1 || 4.1.4
   - '@vue/compiler-core@3.5.38'
   - '@vue/compiler-dom@3.5.38'
   - '@vue/compiler-sfc@3.5.38'
@@ -24,8 +24,7 @@ minimumReleaseAgeExclude:
   - '@nuxt/schema@4.5.0'
   - '@nuxt/vite-builder@4.5.0'
   - nuxt@4.5.0
-  - sitemapd@0.2.0
-  - sitemapd@0.1.0
+  - sitemapd@0.2.1
 shellEmulator: true
 
 trustPolicy: no-downgrade
@@ -55,14 +54,15 @@ catalog:
   drizzle-orm: ^0.45.2
   eslint-plugin-harlanzw: ^0.17.1
   execa: ^10.0.1
+  h3: ^1.15.11
   mdream: ^1.5.8
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.7
-  nuxtseo-shared: ^5.3.7
+  nuxtseo-shared: ^5.3.9
   pathe: ^2.0.3
   pkg-types: ^2.3.1
   site-config-stack: ^4.1.2
-  sitemapd: ^0.2.0
+  sitemapd: ^0.2.1
   tinyglobby: ^0.2.17
   ufo: ^1.6.4
   unbuild: ^3.6.1
@@ -98,7 +98,7 @@ catalogs:
     '@nuxtjs/sitemap': ^8.3.2
     '@vueuse/nuxt': ^14.4.0
     nuxt: ^4.5.1
-    nuxt-site-config: ^4.1.2
+    nuxt-site-config: ^4.1.4
   vue:
     vue-router: ^5.2.0
 onlyBuiltDependencies:

@@ -1,10 +1,11 @@
-import { createError, defineEventHandler } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { createError, defineEventHandler } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
 import { tryGetContentMarkdown } from '../utils/content'
+import { fetchRawWithEvent } from '../utils/fetch'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
 import { consumePrerenderedHtml } from '../utils/prerender-html'
@@ -86,7 +87,7 @@ export default defineEventHandler(async (event) => {
   }
   else {
     logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-    const response = await event.fetch(deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    const response = await fetchRawWithEvent(event, deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         throw createError({
           statusCode: 504,

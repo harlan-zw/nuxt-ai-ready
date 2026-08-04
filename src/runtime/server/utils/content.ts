@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import { lookupContentPage } from '#ai-ready-virtual/content-lookup.mjs'
 
 export interface ContentPageResult {

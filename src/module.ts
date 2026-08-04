@@ -9,7 +9,7 @@ import { addImports, addPlugin, addServerHandler, addServerPlugin, createResolve
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
-import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
+import { resolveNuxtContentVersion, setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
@@ -172,6 +172,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
+    const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
 
     const siteConfig = useSiteConfig()
     const apiCatalogResult = resolveApiCatalogConfig(config.apiCatalog, {
@@ -327,7 +328,7 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     // Register type templates for Nitro hooks and virtual modules
-    registerTypeTemplates({ nuxt, config })
+    registerTypeTemplates({ nuxt, config, nitroCompatibility })
 
     // Build default llms.txt config with API endpoints
     const defaultLlmsTxtSections: LlmsTxtConfig['sections'] = []
@@ -616,25 +617,51 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
-      // Enable async context to allow useEvent() in nested functions (MCP handlers, etc.)
+      // Enable async context to access the active request in nested functions (MCP handlers, etc.)
       // This enables access to H3Event and Cloudflare bindings from any async context
       nitroConfig.experimental = nitroConfig.experimental || {}
       nitroConfig.experimental.asyncContext = true
-
-      // Keep the sitemap parser in the server bundle. Nitro can otherwise
-      // externalize it without copying the package into fixture/deploy output.
-      nitroConfig.externals = nitroConfig.externals || {}
-      nitroConfig.externals.inline = nitroConfig.externals.inline || []
-      nitroConfig.externals.inline.push('sitemapd')
 
       // mdream uses NAPI-RS native binaries on Node.js, WASM on edge runtimes.
       // For Node.js presets, externalize mdream so createRequire can find the native .node binary.
       // For edge presets (Cloudflare, Vercel Edge, Deno), export conditions auto-resolve to WASM.
       const preset = String(nitroConfig.preset || '')
       const isEdgePreset = ['cloudflare', 'vercel-edge', 'netlify-edge', 'deno'].some(p => preset.startsWith(p))
-      if (!isEdgePreset) {
-        nitroConfig.externals.external = nitroConfig.externals.external || []
-        ;(nitroConfig.externals.external as string[]).push('mdream')
+      if (nitroCompatibility._tag === 'nitro-v3') {
+        const nitro3Config = nitroConfig as unknown as {
+          noExternals?: boolean | Array<string | RegExp>
+          rolldownConfig?: {
+            external?: unknown
+          }
+          traceDeps?: Array<string | RegExp>
+        }
+        const noExternals = Array.isArray(nitro3Config.noExternals) ? nitro3Config.noExternals : []
+        noExternals.push('sitemapd')
+        nitro3Config.noExternals = noExternals
+        if (!isEdgePreset) {
+          nitro3Config.traceDeps ||= []
+          nitro3Config.traceDeps.push('mdream*')
+          nitro3Config.rolldownConfig ||= {}
+          const external = nitro3Config.rolldownConfig.external
+          if (Array.isArray(external))
+            external.push('mdream')
+          else if (typeof external === 'string' || external instanceof RegExp)
+            nitro3Config.rolldownConfig.external = [external, 'mdream']
+          else if (!external)
+            nitro3Config.rolldownConfig.external = ['mdream']
+        }
+      }
+      else {
+        // Keep the sitemap parser in the server bundle. Nitro can otherwise
+        // externalize it without copying the package into fixture/deploy output.
+        const externals = nitroConfig.externals ||= {}
+        externals.inline ||= []
+        externals.inline.push('sitemapd')
+      }
+      if (!isEdgePreset && nitroCompatibility._tag === 'nitro-v2') {
+        const externals = nitroConfig.externals ||= {}
+        externals.external ||= []
+        ;(externals.external as string[]).push('mdream')
       }
 
       // Register scheduled task if cron is enabled (runs every 5 minutes)

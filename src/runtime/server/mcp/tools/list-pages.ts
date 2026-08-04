@@ -1,8 +1,9 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
+import type { H3Event } from '#nuxtseo/h3'
 import type { PageEntry } from '../../db/queries'
-import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
 import siteTools from '#ai-ready-virtual/site-tools.mjs'
+import { useEvent } from '#nuxtseo/nitro'
 import { SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { countPages, queryPages } from '../../db/queries'
 
@@ -22,7 +23,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   enabled: () => siteTools.listPages.mcp.enabled,
   cache: '1h',
   async handler({ limit, offset }) {
-    const event = useEvent()
+    const event = useEvent() as H3Event
     const pages = await queryPages(event, { limit, offset }) as PageEntry[]
     const total = await countPages(event)
 

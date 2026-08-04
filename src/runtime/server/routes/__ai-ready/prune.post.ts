@@ -1,6 +1,6 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
-import { eventHandler, getQuery } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, getQuery } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getStaleRoutes, pruneStaleRoutes } from '../../db/queries'
 
 export default eventHandler(async (event) => {

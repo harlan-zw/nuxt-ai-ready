@@ -1,6 +1,6 @@
-import type { H3Event } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
 import { createSiteConfigStack } from 'site-config-stack'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 export interface UniversalContext {
   /** Site URL from nuxt-site-config */

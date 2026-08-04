@@ -1,7 +1,7 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
-import { useNitroApp, useRuntimeConfig } from 'nitropack/runtime'
+import { fetchWithEvent, useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { getPageHash, isPageFresh, queryPages, upsertPage } from '../db/queries'
 import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
@@ -140,12 +140,16 @@ export async function indexPageByRoute(
   event: H3Event | undefined,
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
-  const $fetch = event?.$fetch ?? globalThis.$fetch
   logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
-  const html = await $fetch(route, {
-    headers: { [INDEXING_HEADER]: '1' },
-    timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
-  }).catch((err: Error) => {
+  const html = await (event
+    ? fetchWithEvent(event, route, {
+        headers: { [INDEXING_HEADER]: '1' },
+        timeout: 10000,
+      })
+    : globalThis.$fetch(route, {
+        headers: { [INDEXING_HEADER]: '1' },
+        timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
+      })).catch((err: Error) => {
     logger.warn(`[indexPageByRoute] Failed to fetch ${route}:`, err.message)
     return null
   }) as string | null

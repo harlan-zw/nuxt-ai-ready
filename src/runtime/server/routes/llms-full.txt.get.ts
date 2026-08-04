@@ -1,5 +1,5 @@
-import { eventHandler, sendIterable, setHeader, setResponseHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, sendIterable, setHeader, setResponseHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'

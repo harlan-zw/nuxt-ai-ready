@@ -1,7 +1,8 @@
 import type { McpToolDefinition } from '@nuxtjs/mcp-toolkit'
-import { useEvent } from 'nitropack/runtime'
+import type { H3Event } from '#nuxtseo/h3'
 import { z } from 'zod'
 import siteTools from '#ai-ready-virtual/site-tools.mjs'
+import { useEvent } from '#nuxtseo/nitro'
 import { normalizeSiteRoute, SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { queryPages } from '../../db/queries'
 
@@ -26,7 +27,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
       }
     }
 
-    const page = await queryPages(useEvent(), { route: path, includeMarkdown: true })
+    const page = await queryPages(useEvent() as H3Event, { route: path, includeMarkdown: true })
     if (!page) {
       return {
         content: [{ type: 'text', text: `No indexed page found at ${path}. Call search_pages or list_pages to find the correct route.` }],

@@ -1,4 +1,3 @@
-import type { H3Event } from 'h3'
 import type {
   SitemapDocumentLoader,
   SitemapDocumentLoadResult,
@@ -6,13 +5,15 @@ import type {
   SitemapUrlRecord,
   SitemapWalkFailure,
 } from 'sitemapd'
+import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import { createSitemapReader } from 'sitemapd'
 import { parseSitemap } from 'sitemapd/parse'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { getCfEnv, hasAssets } from './cloudflare'
 import { createUniversalContext } from './context'
+import { fetchRawWithEvent } from './fetch'
 
 export interface SitemapUrl {
   loc: string
@@ -208,7 +209,7 @@ async function fetchLocalRoute(
         }),
       )
     : event
-      ? event.fetch(route, {
+      ? fetchRawWithEvent(event, route, {
           redirect: 'manual',
           signal: controller.signal,
         })

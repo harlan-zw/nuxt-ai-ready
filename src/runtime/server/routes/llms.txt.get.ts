@@ -1,5 +1,5 @@
-import { eventHandler, setHeader } from 'h3'
-import { defineCachedFunction, useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, setHeader } from '#nuxtseo/h3'
+import { defineCachedFunction, useRuntimeConfig } from '#nuxtseo/nitro'
 import { buildLlmsTxt } from '../../llms-txt-utils'
 
 const buildLlmsTxtCached = defineCachedFunction(

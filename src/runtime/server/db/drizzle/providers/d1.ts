@@ -1,7 +1,7 @@
-import type { H3Event } from 'h3'
+import type { H3Event } from '#nuxtseo/h3'
 import { drizzle } from 'drizzle-orm/d1'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import * as schema from '#ai-ready-virtual/db-schema.mjs'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 

@@ -1,5 +1,4 @@
-import type { H3Event } from 'h3'
-import type { NitroApp } from 'nitropack/types'
+import type { H3Event } from '#nuxtseo/h3'
 import { checkAndHandleStale } from '../utils/checkStale'
 
 type EnsureResult
@@ -7,7 +6,13 @@ type EnsureResult
     | { _tag: 'Running', promise: Promise<void> }
     | { _tag: 'Ready' }
 
-export default function mcpDataPlugin(nitroApp: NitroApp): void {
+interface McpDataNitroApp {
+  hooks: {
+    hook: (name: 'mcp:config:resolved', handler: (payload: { event: H3Event }) => Promise<void>) => unknown
+  }
+}
+
+export default function mcpDataPlugin(nitroApp: McpDataNitroApp): void {
   let state: EnsureResult = { _tag: 'Idle' }
 
   const ensureData = (event: H3Event): Promise<void> => {
