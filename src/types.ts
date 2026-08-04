@@ -14,6 +14,7 @@ export type {
   LlmsTxtSection,
   LocalAgentSkillConfig,
   MarkdownContext,
+  McpServerCardConfig,
   ModuleOptions,
   PageDocument,
   PageIndexedContext,
