@@ -36,7 +36,7 @@ describe('static generation beneath an app base URL', async () => {
 
     const llmsFullTxt = await readFile(join(publicDir, 'llms-full.txt'), 'utf8')
     expect(llmsFullTxt).toContain('Canonical Origin: https://test.example.com/docs')
-    expect(llmsFullTxt).toContain('Source: https://test.example.com/docs/about')
+    expect(llmsFullTxt).toContain('- **Source:** https://test.example.com/docs/about')
 
     const pageData = JSON.parse(await readFile(join(publicDir, '__ai-ready/pages.json'), 'utf8')) as { pages: Array<{ route: string }> }
     expect(pageData.pages).toContainEqual(expect.objectContaining({ route: '/docs/api' }))

@@ -118,12 +118,19 @@ export function negotiateRepresentation(event: H3Event): ContentNegotiationResul
 // Check if request should be rendered as markdown
 // Returns normalized path, whether it's explicit (.md) or implicit (Accept header),
 // or 'not-acceptable' if the Accept header cannot be satisfied.
-// Use explicitOnly=true for prerender (only .md extension, no Accept header check).
-export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false):
+export type MarkdownRequestMode
+  = | { _tag: 'runtime', contentNegotiation: boolean }
+    | { _tag: 'prerender' }
+
+export function getMarkdownRenderInfo(
+  event: H3Event,
+  mode: MarkdownRequestMode = { _tag: 'runtime', contentNegotiation: true },
+):
   | { path: string, isExplicit: boolean, negotiation: ContentNegotiationResult }
   | { notAcceptable: true }
   | null {
   const originalPath = event.path
+  const isPrerender = mode._tag === 'prerender'
 
   // Never run on API routes or internal routes
   if (originalPath.startsWith('/api') || originalPath.startsWith('/_') || originalPath.startsWith('/@')) {
@@ -146,7 +153,7 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false):
   const isExplicit = originalPath.endsWith('.md')
 
   // For explicitOnly mode (prerender), only handle .md requests
-  if (explicitOnly && !isExplicit) {
+  if (isPrerender && !isExplicit) {
     return null
   }
 
@@ -160,7 +167,11 @@ export function getMarkdownRenderInfo(event: H3Event, explicitOnly = false):
     return null
   }
 
-  const negotiation: ContentNegotiationResult = explicitOnly ? 'markdown' : negotiateRepresentation(event)
+  const negotiation: ContentNegotiationResult = isPrerender
+    ? 'markdown'
+    : mode.contentNegotiation
+      ? negotiateRepresentation(event)
+      : 'html'
 
   // Explicit .md always serves markdown regardless of Accept
   if (isExplicit) {

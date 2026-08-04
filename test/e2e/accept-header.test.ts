@@ -144,13 +144,13 @@ describe('accept header content negotiation', async () => {
   })
 
   describe('vary and link headers', () => {
-    it('sets Vary: Accept on markdown response', async () => {
+    it('does not vary the explicit markdown response', async () => {
       const response = await fetch(url('/about'), {
         headers: { Accept: 'text/markdown' },
       })
 
-      const vary = response.headers.get('vary') || ''
-      expect(vary.toLowerCase()).toContain('accept')
+      expect(response.url).toContain('/about.md')
+      expect(response.headers.get('vary')).toBeNull()
     })
 
     it('sets Vary: Accept on HTML response for negotiable routes', async () => {
@@ -192,6 +192,8 @@ describe('accept header content negotiation', async () => {
       })
 
       expect(response.status).toBe(406)
+      expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Dest, User-Agent')
+      expect(response.headers.get('cache-control')).toContain('no-store')
     })
 
     it('returns 406 when all supported types have q=0', async () => {

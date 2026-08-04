@@ -1,4 +1,4 @@
-import { createError, defineEventHandler } from '#nuxtseo/h3'
+import { createError, defineEventHandler, fetchWithEvent as fetchRawWithEvent } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     return
   }
 
-  const renderInfo = getMarkdownRenderInfo(event, true)
+  const renderInfo = getMarkdownRenderInfo(event, { _tag: 'prerender' })
   if (!renderInfo || 'notAcceptable' in renderInfo)
     return
 
@@ -45,7 +45,10 @@ export default defineEventHandler(async (event) => {
   // Prefer @nuxt/content source: skip HTML fetch + mdream when the route is
   // backed by a content collection. Body comes from the AST, so headings and
   // keywords come from the markdown itself rather than the rendered HTML.
-  const contentPage = await tryGetContentMarkdown(event, path).catch(() => null)
+  const contentPage = await tryGetContentMarkdown(event, path).catch(() => {
+    // Missing content source is expected; HTML rendering remains available.
+    return null
+  })
   if (contentPage) {
     logger.debug(`[markdown.prerender] Using content source for ${path} (${contentPage.markdown.length} bytes)`)
     const lastUpdated = contentPage.updatedAt || new Date().toISOString()
@@ -80,7 +83,7 @@ export default defineEventHandler(async (event) => {
   }
   else {
     logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-    const response = await event.fetch(deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    const response = await fetchRawWithEvent(event, deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         throw createError({
           statusCode: 504,

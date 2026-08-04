@@ -1,7 +1,9 @@
-import NuxtAiReady from 'nuxt-ai-ready'
+import NuxtAiReady from 'nuxt-ai-ready-packed'
+import NuxtRobots from './modules/robots.ts'
+import NuxtSitemap from './modules/sitemap.ts'
 
 export default defineNuxtConfig({
-  modules: [NuxtAiReady],
+  modules: [NuxtRobots, NuxtSitemap, NuxtAiReady],
   mcp: false,
   aiReady: {
     database: {

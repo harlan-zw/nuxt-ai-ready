@@ -9,7 +9,7 @@ const fixtureRoot = resolve('../fixtures/basic')
 
 const RE_MD_H1 = /^# /
 const RE_MD_PAGES_HEADING = /## (Prerendered )?Pages/
-const RE_MD_SOURCE_URL = /Source: https?:\/\//
+const RE_MD_SOURCE_URL = /- \*\*Source:\*\* https?:\/\//
 const RE_MD_H1_M = /^# /m
 const RE_LLMS_LINK = /^- \[[^\]]+\]\([^)]+\)(?:: .*)?$/
 
@@ -114,11 +114,10 @@ describe('nuxt generate (static build)', async () => {
       // Header
       expect(llmsFullTxt).toMatch(RE_MD_H1)
 
-      // Pages section
-      expect(llmsFullTxt).toContain('## Pages')
-
-      // Individual page headings (h3)
-      expect(llmsFullTxt).toContain('### ')
+      // Independent page boundary and metadata
+      expect(llmsFullTxt).toContain('\n---\n\n- **Page:** ')
+      expect(llmsFullTxt).toContain('- **Source:** ')
+      expect(llmsFullTxt).not.toContain('## Pages')
     })
 
     it('includes page source URLs', async () => {
@@ -218,7 +217,7 @@ describe('nuxt generate (static build)', async () => {
       const llmsFullTxt = await $fetch('/llms-full.txt', { responseType: 'text' })
 
       // Error pages should not be in the full content
-      expect(llmsFullTxt).not.toContain('Source: https://example.com/missing')
+      expect(llmsFullTxt).not.toContain('- **Source:** https://example.com/missing')
     })
   })
 })

@@ -294,10 +294,10 @@ export async function getPageLastmods(
  * @param event - H3Event (optional, used for db context)
  * @param options - Query options
  */
-export async function queryPages(event?: H3Event, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
-export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
 export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string, includeMarkdown: true }): Promise<PageData | undefined>
+export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
 export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { includeMarkdown: true }): Promise<PageData[]>
+export async function queryPages(event?: H3Event, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
 export async function queryPages(
   event?: H3Event,
   options: QueryPagesOptions = {},

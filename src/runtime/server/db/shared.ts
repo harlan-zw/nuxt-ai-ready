@@ -68,7 +68,10 @@ async function getSchemaVersion(db: DatabaseAdapter): Promise<string | null> {
   const info = await db.first<{ version: string }>(
     'SELECT version FROM _ai_ready_info WHERE id = ?',
     ['schema'],
-  ).catch(() => null)
+  ).catch(() => {
+    // The metadata table may not exist before initial schema setup.
+    return null
+  })
 
   return info?.version || null
 }
@@ -77,7 +80,10 @@ async function getStoredTokenizer(db: DatabaseAdapter): Promise<string | null> {
   const info = await db.first<{ value: string }>(
     'SELECT value FROM _ai_ready_info WHERE id = ?',
     ['fts_tokenizer'],
-  ).catch(() => null)
+  ).catch(() => {
+    // The tokenizer metadata may not exist before initial schema setup.
+    return null
+  })
 
   return info?.value || null
 }
@@ -313,8 +319,12 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
   }
   catch (err) {
     // Best-effort teardown; original error is rethrown below regardless.
-    await writer.abort(err).catch(() => null)
-    await reader.cancel().catch(() => null)
+    await writer.abort(err).catch(() => {
+      // Preserve the original stream failure below.
+    })
+    await reader.cancel().catch(() => {
+      // Preserve the original stream failure below.
+    })
     throw err
   }
   await readPromise

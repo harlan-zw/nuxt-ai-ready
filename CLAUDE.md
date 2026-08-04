@@ -10,6 +10,7 @@ Key features:
 - **llms.txt generation**: Auto-generate `llms.txt` and `llms-full.txt` at build time
 - **On-demand markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`)
 - **MCP server**: `list_pages` and `search_pages` tools for AI agents
+- **WebMCP**: Browser-side tools for in-page AI agents via `document.modelContext`
 - **Content signals**: Configure AI training/search permissions via Nuxt Robots
 
 ## Development Commands
@@ -53,6 +54,7 @@ During prerender, the module:
   - `tools/list-pages.ts`: List all pages with metadata
   - `tools/search-pages.ts`: FTS5 full-text search
   - `resources/pages.ts`: Pages resource
+- **WebMCP** (`src/runtime/webmcp.ts`, `webmcp-site-tools.ts`): `document.modelContext` types plus the built-in `list_pages`, `search_pages` and `get_page_markdown` browser tools (opt-in via `webmcp`). Registered by `app/plugins/webmcp.client.ts`, backed by `GET /__ai-ready/pages`. `useWebMcpTool()` (`app/composables/webmcp.ts`) is always auto-imported.
 
 ### Database Layer (`src/runtime/server/db/`)
 
@@ -173,6 +175,7 @@ Config key: `aiReady` in nuxt.config.ts
   llmsTxt: { sections: [], notes: [] },
   contentSignal: { aiTrain: boolean, search: boolean, aiInput: boolean },
   mcp: { tools: true, resources: true },
+  webmcp: true, // browser tools via document.modelContext
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
   cron: true, // every minute, auto-enables runtimeSync
   indexNow: true, // derives key from site URL

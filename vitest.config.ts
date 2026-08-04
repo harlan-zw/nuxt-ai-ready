@@ -34,6 +34,8 @@ export default defineConfig({
           name: 'e2e',
           include: ['./test/e2e/**/*.test.ts'],
           environment: 'node',
+          // Several suites intentionally reuse fixture roots. Concurrent Nuxt
+          // builds race on build output and dev-server locks.
           fileParallelism: false,
         },
       }),

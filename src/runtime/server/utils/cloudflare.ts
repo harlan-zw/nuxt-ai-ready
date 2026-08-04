@@ -2,6 +2,12 @@ import type { H3Event } from '#nuxtseo/h3'
 
 const FETCH_TIMEOUT = 5000
 
+function unavailablePublicAsset(_error: unknown): null {
+  // Missing assets and self-fetch failures are expected here. Callers turn null
+  // into a domain-specific skip, warning, or retry.
+  return null
+}
+
 export interface CloudflareEnv {
   ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
 }
@@ -37,15 +43,15 @@ export async function fetchPublicAsset<T = unknown>(
   if (cfEnv?.ASSETS?.fetch) {
     const response = await cfEnv.ASSETS.fetch(
       new Request(`https://assets.local${path}`),
-    ).catch(() => null)
+    ).catch(unavailablePublicAsset)
 
     if (response?.ok) {
       if (responseType === 'json')
-        return response.json().catch(() => null)
+        return response.json().catch(unavailablePublicAsset)
       if (responseType === 'text')
-        return response.text().catch(() => null) as T
+        return response.text().catch(unavailablePublicAsset) as T
       if (responseType === 'arrayBuffer')
-        return response.arrayBuffer().catch(() => null) as T
+        return response.arrayBuffer().catch(unavailablePublicAsset) as T
       if (responseType === 'stream')
         return response.body as T | null
     }
@@ -60,8 +66,8 @@ export async function fetchPublicAsset<T = unknown>(
   return globalThis.$fetch(path, {
     baseURL: '/',
     signal: controller.signal,
-    responseType: responseType === 'arrayBuffer' || responseType === 'stream' ? responseType : undefined,
+    responseType,
   })
-    .catch(() => null)
+    .catch(unavailablePublicAsset)
     .finally(() => clearTimeout(timeout)) as Promise<T | null>
 }

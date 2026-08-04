@@ -193,7 +193,8 @@ Called via `nitro:init` hook when building static sites.
 
 Unlike llms.txt (generated at end), llms-full.txt is streamed during prerender:
 - Header written at crawler initialization
-- Each page appended as it's processed
+- Each page appended as an independent Markdown document with a thematic boundary and source metadata
+- Original page headings and fenced content preserved after generated frontmatter is removed
 - No memory accumulation of large content
 
 ### Sitemap Hook Detection
@@ -408,8 +409,7 @@ Uses mdream's declarative `extraction` option to capture:
 
 **`src/runtime/server/utils/llms-full.ts`** - llms-full.txt formatting:
 - `stripFrontmatter()`: Remove YAML frontmatter from markdown
-- `normalizeHeadings()`: Convert `#` headings to `h1.` style for LLM readability
-- `formatPageForLlmsFullTxt()`: Format single page entry
+- `formatPageForLlmsFullTxt()`: Add a page boundary and metadata without changing source heading levels
 - `buildLlmsFullTxtHeader()`: Generate file header with site info
 
 **`src/runtime/server/db/queries.ts`** - Unified query interface:

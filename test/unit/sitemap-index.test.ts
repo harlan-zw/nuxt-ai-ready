@@ -7,7 +7,10 @@ vi.mock('#ai-ready-virtual/logger.mjs', () => ({
 }))
 
 vi.mock('nitropack/runtime', () => ({
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': { sitemapPrerendered: false } }),
+  useRuntimeConfig: () => ({
+    'nuxt-ai-ready': { sitemapPrerendered: false },
+    'site': { url: 'https://example.com' },
+  }),
 }))
 
 // No Cloudflare ASSETS binding in this environment
@@ -49,15 +52,25 @@ function toChunkedStream(xml: string, chunkSize = 7): ReadableStream<Uint8Array>
   })
 }
 
-function mockEvent(routes: Record<string, string>): H3Event {
-  return {
-    $fetch: vi.fn(async (route: string, options?: { responseType?: string }) => {
-      const body = routes[route]
-      if (body == null)
-        throw new Error(`404 ${route}`)
-      return options?.responseType === 'stream' ? toChunkedStream(body) : body
-    }),
-  } as unknown as H3Event
+type MockRoute = string | { redirect: string }
+
+function mockEvent(routes: Record<string, MockRoute>): H3Event {
+  const localFetch = vi.fn(async (route: string) => {
+    const body = routes[route]
+    if (body == null)
+      return new Response(null, { status: 404, statusText: 'Not Found' })
+    if (typeof body !== 'string') {
+      return new Response(null, {
+        status: 302,
+        headers: { location: body.redirect },
+      })
+    }
+    return new Response(toChunkedStream(body), {
+      status: 200,
+      headers: { 'content-type': 'application/xml' },
+    })
+  })
+  return { fetch: localFetch } as unknown as H3Event
 }
 
 describe('fetchSitemapByRoute', () => {
@@ -73,8 +86,8 @@ describe('fetchSitemapByRoute', () => {
       'https://example.com/about',
       'https://example.com/contact',
     ])
-    expect(event.$fetch).toHaveBeenCalledWith('/sitemap.xml', expect.objectContaining({
-      responseType: 'stream',
+    expect(event.fetch).toHaveBeenCalledWith('/sitemap.xml', expect.objectContaining({
+      redirect: 'manual',
     }))
   })
 
@@ -126,6 +139,112 @@ describe('fetchSitemapByRoute', () => {
 
     expect(urls).toEqual([])
     // fetched once for the index, skipped the self-referencing child
-    expect((event.$fetch as any)).toHaveBeenCalledTimes(1)
+    expect(event.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops index fanout at the document budget and reports a partial result', async () => {
+    const childCount = 101
+    const children = Array.from(
+      { length: childCount },
+      (_, index) => `<sitemap><loc>https://example.com/children/${index}.xml</loc></sitemap>`,
+    ).join('')
+    const routes = Object.fromEntries([
+      ['/sitemap.xml', `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${children}</sitemapindex>`],
+      ...Array.from(
+        { length: childCount },
+        (_, index) => [`/children/${index}.xml`, URLSET] as const,
+      ),
+    ])
+    const event = mockEvent(routes)
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(urls.length).toBeGreaterThan(0)
+    expect(error).toContain('document_limit')
+    expect(event.fetch).toHaveBeenCalledTimes(100)
+  })
+
+  it('visits each document once across an A to B cycle', async () => {
+    const indexA = `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <sitemap><loc>https://example.com/b.xml</loc></sitemap>
+    </sitemapindex>`
+    const indexB = `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <sitemap><loc>https://example.com/a.xml</loc></sitemap>
+    </sitemapindex>`
+    const event = mockEvent({
+      '/a.xml': indexA,
+      '/b.xml': indexB,
+    })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/a.xml')
+
+    expect(urls).toEqual([])
+    expect(error).toBeUndefined()
+    expect(event.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('denies cross-origin index children', async () => {
+    const index = `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <sitemap><loc>https://foreign.example/child.xml</loc></sitemap>
+    </sitemapindex>`
+    const event = mockEvent({
+      '/sitemap.xml': index,
+      '/child.xml': URLSET,
+    })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(urls).toEqual([])
+    expect(error).toContain('unauthorized')
+    expect(event.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves child query strings when loading local routes', async () => {
+    const index = `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <sitemap><loc>https://example.com/child.xml?lang=en&amp;source=index</loc></sitemap>
+    </sitemapindex>`
+    const event = mockEvent({
+      '/sitemap.xml': index,
+      '/child.xml?lang=en&source=index': URLSET,
+    })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(error).toBeUndefined()
+    expect(urls).toHaveLength(2)
+    expect(event.fetch).toHaveBeenCalledWith(
+      '/child.xml?lang=en&source=index',
+      expect.objectContaining({ redirect: 'manual' }),
+    )
+  })
+
+  it('stops redirects at the redirect budget', async () => {
+    const event = mockEvent({
+      '/redirect-0.xml': { redirect: '/redirect-1.xml' },
+      '/redirect-1.xml': { redirect: '/redirect-2.xml' },
+      '/redirect-2.xml': { redirect: '/redirect-3.xml' },
+      '/redirect-3.xml': { redirect: '/redirect-4.xml' },
+      '/redirect-4.xml': { redirect: '/redirect-5.xml' },
+      '/redirect-5.xml': { redirect: '/redirect-6.xml' },
+      '/redirect-6.xml': URLSET,
+    })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/redirect-0.xml')
+
+    expect(urls).toEqual([])
+    expect(error).toContain('redirect_limit')
+    expect(event.fetch).toHaveBeenCalledTimes(6)
+  })
+
+  it('returns partial URLs with an error for an incomplete sitemap', async () => {
+    const incomplete = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.com/about</loc></url>`
+    const event = mockEvent({ '/sitemap.xml': incomplete })
+
+    const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
+
+    expect(urls).toEqual([{ loc: 'https://example.com/about', lastmod: undefined }])
+    expect(error).toBe('Sitemap parse failed: malformed')
   })
 })

@@ -110,7 +110,10 @@ describe('static IndexNow flow (integration)', () => {
         filePath = join(filePath, 'index.html')
       }
 
-      const content = await readFile(filePath).catch(() => null)
+      const content = await readFile(filePath).catch(() => {
+        // Missing fixture assets should produce the test server's 404 response.
+        return null
+      })
       if (content) {
         const ext = filePath.split('.').pop()
         const contentType = ext === 'json' ? 'application/json' : 'text/plain'
@@ -188,7 +191,10 @@ export default defineNuxtConfig({
 
     // Check if dist was created
     const distDir = join(tempDir, '.output/public')
-    const distExists = await readFile(join(distDir, 'index.html'), 'utf-8').catch(() => null)
+    const distExists = await readFile(join(distDir, 'index.html'), 'utf-8').catch(() => {
+      // The assertion below reports an absent generated index.
+      return null
+    })
     console.log('Dist index.html exists:', !!distExists)
 
     // Verify pages.meta.json was created

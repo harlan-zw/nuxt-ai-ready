@@ -37,6 +37,13 @@ try {
     throw new Error(`Unexpected compatibility marker: ${JSON.stringify(result)}`)
   if (result.requestContextMarker !== 'nuxt-5-context')
     throw new Error(`Unexpected request context marker: ${JSON.stringify(result)}`)
+
+  const markdownResponse = await fetch(`${origin}/index.md`)
+  if (!markdownResponse.ok)
+    throw new Error(`Markdown endpoint returned ${markdownResponse.status}`)
+  const markdown = await markdownResponse.text()
+  if (!markdown.includes('# Nuxt 5 compatibility'))
+    throw new Error(`Unexpected markdown response: ${markdown}`)
 }
 finally {
   server.kill('SIGTERM')

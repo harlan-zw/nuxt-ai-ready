@@ -1,5 +1,8 @@
 import type { MdreamOptions } from 'mdream'
 import type { H3Event } from '#nuxtseo/h3'
+import type { SiteToolsConfig } from './site-tool-config'
+
+export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
 
 export interface ModuleOptions {
   /**
@@ -13,6 +16,14 @@ export interface ModuleOptions {
    * @default false
    */
   debug?: boolean
+
+  /**
+   * Negotiate Markdown on HTML routes through Accept and User-Agent headers.
+   * Disable when a deployment cache cannot vary responses by request headers.
+   * Explicit .md routes remain available.
+   * @default Automatic per route
+   */
+  contentNegotiation?: boolean
 
   /**
    * Options to pass to mdream htmlToMarkdown function
@@ -71,10 +82,39 @@ export interface ModuleOptions {
    * @default All enabled when @nuxtjs/mcp-toolkit is installed
    */
   mcp?: {
-    /** Enable MCP tools (list-pages) @default true */
+    /** Attach enabled site tools to MCP Toolkit. @default true */
     tools?: boolean
     /** Enable MCP resources (pages) @default true */
     resources?: boolean
+  }
+
+  /**
+   * Configure the built-in site tools once, then attach them to MCP, WebMCP,
+   * or both through each tool's transport options.
+   */
+  tools?: SiteToolsConfig
+
+  /**
+   * WebMCP: register tools with in-browser AI agents via `document.modelContext`,
+   * so an agent on the page can search and read content without crawling it.
+   *
+   * Enabling this also auto-imports the `useWebMcpTool()` composable for your
+   * own tools. Set `tools: false` to register nothing but your own.
+   * @see https://developer.chrome.com/docs/ai/webmcp
+   * @default false
+   */
+  webmcp?: boolean | {
+    /**
+     * Attach enabled built-in tools to WebMCP.
+     * @default true
+     */
+    tools?: boolean
+    /**
+     * Default trusted origins for built-in and custom tools.
+     * Per-tool composable options take precedence.
+     * @default undefined (same-origin only)
+     */
+    exposedTo?: string[]
   }
 
   /**

@@ -29,13 +29,24 @@ async function fetchPublicAsset<T = unknown>(
   if (cfEnv?.ASSETS?.fetch) {
     const response = await cfEnv.ASSETS.fetch(
       new Request(`https://assets.local${path}`),
-    ).catch(() => null)
+    ).catch(() => {
+      // An unavailable test asset is represented by a null result.
+      return null
+    })
 
     if (response?.ok) {
-      if (responseType === 'json')
-        return response.json().catch(() => null)
-      if (responseType === 'text')
-        return response.text().catch(() => null) as T
+      if (responseType === 'json') {
+        return response.json().catch(() => {
+          // Invalid mock JSON is represented by a null result.
+          return null
+        })
+      }
+      if (responseType === 'text') {
+        return response.text().catch(() => {
+          // Invalid mock text is represented by a null result.
+          return null
+        }) as T
+      }
     }
     return null
   }
@@ -44,7 +55,10 @@ async function fetchPublicAsset<T = unknown>(
   return (globalThis as any).$fetch(path, {
     baseURL: '/',
     responseType: responseType === 'arrayBuffer' ? 'arrayBuffer' : undefined,
-  }).catch(() => null) as Promise<T | null>
+  }).catch(() => {
+    // An unavailable fallback asset is represented by a null result.
+    return null
+  }) as Promise<T | null>
 }
 
 describe('cron context utilities', () => {

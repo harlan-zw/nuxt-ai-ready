@@ -1,9 +1,10 @@
 import type { ParsedMarkdownResult } from './prerender'
-import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
+import { addImports, addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule, resolveModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
@@ -14,7 +15,9 @@ import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './preren
 import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import { ensureStaticHeader } from './utils/static-headers'
+import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
   /**
@@ -41,6 +44,7 @@ declare module '@nuxt/schema' {
 export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
+  contentNegotiation: ContentNegotiationPolicy
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
@@ -66,6 +70,11 @@ export interface ModulePublicRuntimeConfig {
     locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
   } | null
   ftsTokenizer?: string
+}
+
+/** Runtime config exposed to the browser, only set when WebMCP is enabled. */
+export interface ModuleAppRuntimeConfig {
+  webmcp: ResolvedWebMcpConfig
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -130,9 +139,16 @@ export default defineNuxtModule<ModuleOptions>({
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
 
+    const siteToolsResult = resolveSiteToolsConfig(config.tools)
+    for (const warning of siteToolsResult.warnings)
+      logger.warn(warning)
+    const siteToolsConfig = siteToolsResult.config
+    const hasMcpSiteTools = Object.values(siteToolsConfig).some(tool => tool.mcp.enabled)
+
     // Install site config for accessing site name and description
     await installNuxtSiteConfig()
     const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
+    nuxt.options.nitro.alias!.ofetch ||= resolveModule('ofetch', { url: new URL(import.meta.url) })
 
     // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
@@ -200,8 +216,17 @@ export default defineNuxtModule<ModuleOptions>({
       }
     }
 
-    // set default MCP name
-    if (nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
+    const mcpToolkitState = resolveMcpToolkitState({
+      installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
+        || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
+      options: nuxt.options.mcp,
+      static: nuxt.options.nitro.static === true,
+      generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
+    })
+    const mcpAvailable = mcpToolkitState._tag === 'Enabled'
+
+    // Set the Toolkit name only when it will register a server.
+    if (mcpAvailable && nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
       nuxt.options.mcp = nuxt.options.mcp || {} as Record<string, unknown>
       ;(nuxt.options.mcp as Record<string, unknown>).name = useSiteConfig().name
     }
@@ -252,13 +277,16 @@ export default defineNuxtModule<ModuleOptions>({
       ],
     })
 
-    const hasMCP = hasNuxtModule('@nuxtjs/mcp-toolkit')
-    if (hasMCP) {
+    if (mcpAvailable) {
+      // Hydrate the runtime database from build artifacts before Toolkit
+      // resolves definitions for its first request.
+      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
+
       // Register MCP definitions from runtime directory
       nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
         const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
         const mcpConfig = config.mcp || {}
-        if (mcpConfig.tools !== false)
+        if (mcpConfig.tools !== false && hasMcpSiteTools)
           (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
         if (mcpConfig.resources !== false)
           (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
@@ -267,7 +295,7 @@ export default defineNuxtModule<ModuleOptions>({
       // Add MCP to the API endpoints section if bulk is enabled, or create new section
       const mcpLink = {
         title: 'MCP',
-        href: withSiteUrl((nuxt.options.mcp !== false && nuxt.options.mcp?.route) || '/mcp', { withBase: true }),
+        href: withSiteUrl(mcpToolkitState.route, { withBase: true }),
         description: 'Model Context Protocol server endpoint for AI agent integration.',
       }
 
@@ -311,6 +339,10 @@ export default defineNuxtModule<ModuleOptions>({
     const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
+    // WebMCP exposes tools to in-browser agents via document.modelContext
+    const webmcpResult = resolveWebMcpConfig(config.webmcp, siteToolsConfig)
+    const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
+
     // IndexNow: auto-read key from env, derive from site URL if true
     const indexNow = config.indexNow === true
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
@@ -320,7 +352,8 @@ export default defineNuxtModule<ModuleOptions>({
       const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
       if (mod) {
         mod.features = {
-          mcp: hasMCP,
+          mcp: mcpAvailable,
+          webmcp: !!webmcpConfig,
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           indexNow: !!indexNow,
@@ -368,10 +401,41 @@ export default defineNuxtModule<ModuleOptions>({
       // For edge presets (Cloudflare, Vercel Edge, Deno), export conditions auto-resolve to WASM.
       const preset = String(nitroConfig.preset || '')
       const isEdgePreset = ['cloudflare', 'vercel-edge', 'netlify-edge', 'deno'].some(p => preset.startsWith(p))
-      if (!isEdgePreset) {
-        nitroConfig.externals = nitroConfig.externals || {}
-        nitroConfig.externals.external = nitroConfig.externals.external || []
-        ;(nitroConfig.externals.external as string[]).push('mdream')
+      if (nitroCompatibility._tag === 'nitro-v3') {
+        const nitro3Config = nitroConfig as unknown as {
+          noExternals?: boolean | Array<string | RegExp>
+          rolldownConfig?: {
+            external?: unknown
+          }
+          traceDeps?: Array<string | RegExp>
+        }
+        const noExternals = Array.isArray(nitro3Config.noExternals) ? nitro3Config.noExternals : []
+        noExternals.push('sitemapd')
+        nitro3Config.noExternals = noExternals
+        if (!isEdgePreset) {
+          nitro3Config.traceDeps ||= []
+          nitro3Config.traceDeps.push('mdream*')
+          nitro3Config.rolldownConfig ||= {}
+          const external = nitro3Config.rolldownConfig.external
+          if (Array.isArray(external))
+            external.push('mdream')
+          else if (typeof external === 'string' || external instanceof RegExp)
+            nitro3Config.rolldownConfig.external = [external, 'mdream']
+          else if (!external)
+            nitro3Config.rolldownConfig.external = ['mdream']
+        }
+      }
+      else {
+        // Keep the sitemap parser in the server bundle. Nitro can otherwise
+        // externalize it without copying the package into fixture/deploy output.
+        const externals = nitroConfig.externals ||= {}
+        externals.inline ||= []
+        externals.inline.push('sitemapd')
+      }
+      if (!isEdgePreset && nitroCompatibility._tag === 'nitro-v2') {
+        const externals = nitroConfig.externals ||= {}
+        externals.external ||= []
+        ;(externals.external as string[]).push('mdream')
       }
 
       // Register scheduled task if cron is enabled (runs every 5 minutes)
@@ -427,6 +491,7 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
+      nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
       // Helper to read from SQLite database during prerender
@@ -529,7 +594,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
         contentSignal: config.contentSignal || false,
-        mcp: { enabled: hasMCP, tools: hasMCP && (config.mcp?.tools !== false), resources: hasMCP && (config.mcp?.resources !== false) },
+        mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false) && hasMcpSiteTools, resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`
 
@@ -576,6 +641,11 @@ export async function lookupContentPage(event, path) {
       version: version || '0.0.0',
       debug: config.debug || false,
       debugCron: config.debugCron || false,
+      contentNegotiation: config.contentNegotiation === undefined
+        ? 'auto'
+        : config.contentNegotiation
+          ? 'enabled'
+          : 'disabled',
       mdreamOptions: config.mdreamOptions || {},
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,
@@ -625,6 +695,22 @@ export async function lookupContentPage(event, path) {
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+
+    if (webmcpConfig) {
+      addImports(['useWebMcpSupported', 'useWebMcpTool'].map(name => ({
+        name,
+        from: resolve('./runtime/app/composables/webmcp'),
+      })))
+
+      nuxt.options.runtimeConfig.public['nuxt-ai-ready'] = {
+        webmcp: webmcpConfig,
+      } satisfies ModuleAppRuntimeConfig as any
+
+      addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
+      if (Object.keys(webmcpConfig.tools).length) {
+        addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get') })
+      }
+    }
 
     // Devtools API endpoint
     addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
@@ -729,4 +815,13 @@ export async function lookupContentPage(event, path) {
   },
 })
 
+export type {
+  GetPageMarkdownToolOptions,
+  ListPagesToolOptions,
+  McpSiteToolAttachmentOptions,
+  SearchPagesToolOptions,
+  SiteToolOptions,
+  SiteToolsConfig,
+  WebMcpSiteToolAttachmentOptions,
+} from './runtime/site-tool-config'
 export type { ModuleOptions } from './runtime/types'

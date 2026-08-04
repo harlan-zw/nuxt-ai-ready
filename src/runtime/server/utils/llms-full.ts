@@ -6,8 +6,8 @@ import type { LlmsTxtConfig } from '../../types'
 import { joinURL } from 'ufo'
 import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
 
-const RE_FRONTMATTER = /^---\n[\s\S]*?\n---\n*/
-const RE_HEADING = /^(#{1,6}) ([^\n]+)$/gm
+const RE_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n*/
+const RE_INLINE_WHITESPACE = /\s+/g
 
 export function formatPageForLlmsFullTxt(
   route: string,
@@ -17,25 +17,18 @@ export function formatPageForLlmsFullTxt(
   siteUrl?: string,
 ): string {
   const canonicalUrl = siteUrl ? joinURL(siteUrl, route) : route
-  const heading = title && title !== route ? `### ${title}` : `### ${route}`
+  const pageTitle = (title && title !== route ? title : route).trim().replace(RE_INLINE_WHITESPACE, ' ')
+  const pageDescription = description.trim().replace(RE_INLINE_WHITESPACE, ' ')
+  const content = markdown.replace(RE_FRONTMATTER, '').trim()
 
-  // Strip frontmatter and normalize headings (h1 → h1., etc)
-
-  const content = markdown
-    .replace(RE_FRONTMATTER, '')
-    .replace(RE_HEADING, (_, hashes, text) => `h${(hashes as string).length}. ${text}`)
-
-  const parts = [heading, '']
-  parts.push(`Source: ${canonicalUrl}`)
-  if (description)
-    parts.push(`Description: ${description}`)
+  const parts = ['---', '', `- **Page:** ${pageTitle}`, `- **Source:** ${canonicalUrl}`]
+  if (pageDescription)
+    parts.push(`- **Description:** ${pageDescription}`)
   parts.push('')
-  if (content.trim()) {
-    parts.push(content.trim())
+  if (content) {
+    parts.push(content)
     parts.push('')
   }
-  parts.push('---')
-  parts.push('')
 
   return `${parts.join('\n')}\n`
 }
@@ -47,23 +40,17 @@ export interface SiteInfo {
 }
 
 export function buildLlmsFullTxtHeader(siteInfo?: SiteInfo, llmsTxtConfig?: LlmsTxtConfig): string {
-  const parts: string[] = []
-
-  parts.push(`# ${siteInfo?.name || siteInfo?.url || 'Site'}`)
+  const parts: string[] = [`# ${siteInfo?.name || siteInfo?.url || 'Site'}`]
   if (siteInfo?.description)
-    parts.push(`\n> ${siteInfo.description}`)
+    parts.push('', `> ${siteInfo.description}`)
   if (siteInfo?.url)
-    parts.push(`\nCanonical Origin: ${siteInfo.url}`)
-  parts.push('')
+    parts.push('', `Canonical Origin: ${siteInfo.url}`)
 
   if (llmsTxtConfig) {
     const normalizedContent = normalizeLlmsTxtConfig(llmsTxtConfig)
-    if (normalizedContent) {
-      parts.push(normalizedContent)
-      parts.push('')
-    }
+    if (normalizedContent)
+      parts.push('', normalizedContent)
   }
 
-  parts.push('## Pages\n\n')
-  return parts.join('\n')
+  return `${parts.join('\n')}\n\n`
 }
