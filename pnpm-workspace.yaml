@@ -58,8 +58,7 @@ catalog:
   mdream: ^1.5.8
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.7
-  nuxtseo-shared: ^5.3.8
-  ofetch: ^1.5.1
+  nuxtseo-shared: ^5.3.9
   pathe: ^2.0.3
   pkg-types: ^2.3.1
   site-config-stack: ^4.1.2

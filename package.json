@@ -65,7 +65,7 @@
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
     "typecheck": "nuxt typecheck && tsc -p test/types/tsconfig.json",
     "test:attw": "attw --pack",
-    "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm --dir test/fixtures/nuxt5 install --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
+    "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm install --dir test/fixtures/nuxt5 --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
     "@libsql/client": "^0.14.0",
@@ -94,7 +94,6 @@
     "mdream": "catalog:",
     "nuxt-site-config": "catalog:nuxt",
     "nuxtseo-shared": "catalog:",
-    "ofetch": "catalog:",
     "pathe": "catalog:",
     "pkg-types": "catalog:",
     "site-config-stack": "catalog:",
