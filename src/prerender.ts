@@ -733,7 +733,10 @@ export function setupPrerenderHandler(
         const sitemapContent = await globalThis.$fetch('/sitemap.xml', {
           headers: { 'x-nitro-prerender': '/sitemap.xml' },
           signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
-        }).catch(() => null) as string | null
+        }).catch(() => {
+          // A missing sitemap leaves the explicit prerender route list as the source.
+          return null
+        }) as string | null
 
         if (sitemapContent)
           await crawlSitemapContent(state, nuxt, nitro, sitemapContent)

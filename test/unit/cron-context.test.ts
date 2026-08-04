@@ -29,13 +29,24 @@ async function fetchPublicAsset<T = unknown>(
   if (cfEnv?.ASSETS?.fetch) {
     const response = await cfEnv.ASSETS.fetch(
       new Request(`https://assets.local${path}`),
-    ).catch(() => null)
+    ).catch(() => {
+      // A fixture asset miss falls through to the null result expected by callers.
+      return null
+    })
 
     if (response?.ok) {
-      if (responseType === 'json')
-        return response.json().catch(() => null)
-      if (responseType === 'text')
-        return response.text().catch(() => null) as T
+      if (responseType === 'json') {
+        return response.json().catch(() => {
+          // Invalid fixture payloads are represented as unavailable assets.
+          return null
+        })
+      }
+      if (responseType === 'text') {
+        return response.text().catch(() => {
+          // Invalid fixture payloads are represented as unavailable assets.
+          return null
+        }) as T
+      }
     }
     return null
   }
@@ -44,7 +55,10 @@ async function fetchPublicAsset<T = unknown>(
   return (globalThis as any).$fetch(path, {
     baseURL: '/',
     responseType: responseType === 'arrayBuffer' ? 'arrayBuffer' : undefined,
-  }).catch(() => null) as Promise<T | null>
+  }).catch(() => {
+    // A fixture fetch miss is the expected unavailable asset result.
+    return null
+  }) as Promise<T | null>
 }
 
 describe('cron context utilities', () => {
