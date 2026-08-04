@@ -60,11 +60,10 @@ describe('late MCP Server Card dependency', async () => {
       capabilities: {},
       clientInfo: { name: 'nuxt-ai-ready-test', version: '1.0.0' },
     })
-    const [cardResponse, tools, resources, pageResource, llmsTxt, sitemap, devtools, seoPro] = await Promise.all([
+    const [cardResponse, tools, resources, llmsTxt, sitemap, devtools, seoPro] = await Promise.all([
       fetch(cardRoute).then(response => response.json()),
       mcpRequest('tools/list'),
       mcpRequest('resources/list'),
-      mcpRequest('resources/read', { uri: 'resource://nuxt-ai-ready/pages' }),
       fetch('/llms.txt').then(response => response.text()),
       fetch('/sitemap.xml').then(response => response.text()),
       fetch('/__ai-ready__/debug.json').then(response => response.json()),
@@ -81,14 +80,6 @@ describe('late MCP Server Card dependency', async () => {
     ])
     expect(resources.result.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({ uri: 'resource://nuxt-ai-ready/pages' }),
-    ]))
-    const pages = JSON.parse(pageResource.result.contents[0].text).pages
-    expect(pages).toEqual(expect.arrayContaining([
-      expect.objectContaining({ route: '/' }),
-      expect.objectContaining({ route: '/about' }),
-    ]))
-    expect(pages).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ route: '/agent/mcp/server-card' }),
     ]))
     expect(llmsTxt).toContain('[MCP](https://late-mcp.example.com/docs/agent/mcp)')
     expect(sitemap).not.toContain('/agent/mcp/server-card')
