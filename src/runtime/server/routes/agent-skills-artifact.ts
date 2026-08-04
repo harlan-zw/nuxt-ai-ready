@@ -1,6 +1,6 @@
-import { assertMethod, createError, eventHandler, getRequestURL, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
+import { assertMethod, createError, eventHandler, getRequestURL, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { toLogicalRoute } from '../../route-path'
 
 export default eventHandler((event) => {
