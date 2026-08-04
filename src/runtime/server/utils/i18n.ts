@@ -1,6 +1,14 @@
-import type { RuntimeI18nConfig } from '../../../utils/i18n'
-
-export type { RuntimeI18nConfig } from '../../../utils/i18n'
+/** Runtime-safe subset used for route locale resolution. */
+export interface RuntimeI18nConfig {
+  defaultLocale: string
+  strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
+  locales: Array<{
+    code: string
+    hreflang: string
+    name?: string
+    nativeName?: string
+  }>
+}
 
 export interface LocaleAlternate {
   code: string

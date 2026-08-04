@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   createMcpServerCardEtag,
   matchesMcpServerCardEtag,
-  parseLatestMcpProtocolVersion,
   parseMcpServerCardConfig,
-  resolveInstalledMcpProtocolVersion,
+  parseSupportedMcpProtocolVersions,
+  resolveInstalledMcpProtocolVersions,
   resolveMcpServerCard,
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
@@ -67,16 +67,40 @@ describe('resolveMcpServerCardName', () => {
   })
 })
 
-describe('parseLatestMcpProtocolVersion', () => {
-  it('reads the exact MCP SDK protocol version', () => {
-    expect(parseLatestMcpProtocolVersion(`export const LATEST_PROTOCOL_VERSION = '2025-11-25';`)).toEqual({
+describe('parseSupportedMcpProtocolVersions', () => {
+  it('reads every protocol version negotiated by the MCP SDK', () => {
+    expect(parseSupportedMcpProtocolVersions(`
+      export const LATEST_PROTOCOL_VERSION = '2025-11-25';
+      export const SUPPORTED_PROTOCOL_VERSIONS = [
+        LATEST_PROTOCOL_VERSION,
+        '2025-06-18',
+        '2025-03-26',
+      ];
+    `)).toEqual({
       _tag: 'Resolved',
-      protocolVersion: '2025-11-25',
+      protocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'],
     })
   })
 
   it('returns an error value when the SDK format is unknown', () => {
-    expect(parseLatestMcpProtocolVersion('export const VERSION = 1')).toMatchObject({ _tag: 'Invalid' })
+    expect(parseSupportedMcpProtocolVersions('export const VERSION = 1')).toMatchObject({ _tag: 'Invalid' })
+  })
+
+  it('returns an error instead of silently omitting an unsupported SDK entry', () => {
+    expect(parseSupportedMcpProtocolVersions(`
+      export const LATEST_PROTOCOL_VERSION = '2025-11-25';
+      export const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, PREVIOUS_PROTOCOL_VERSION];
+    `)).toMatchObject({ _tag: 'Invalid' })
+  })
+
+  it('reads the CommonJS source selected by createRequire', () => {
+    expect(parseSupportedMcpProtocolVersions(`
+      exports.LATEST_PROTOCOL_VERSION = '2025-11-25';
+      exports.SUPPORTED_PROTOCOL_VERSIONS = [exports.LATEST_PROTOCOL_VERSION, '2025-06-18'];
+    `)).toEqual({
+      _tag: 'Resolved',
+      protocolVersions: ['2025-11-25', '2025-06-18'],
+    })
   })
 
   it('resolves the SDK installed beside a nested Toolkit package', async () => {
@@ -95,14 +119,17 @@ describe('parseLatestMcpProtocolVersion', () => {
       name: '@modelcontextprotocol/sdk',
       exports: { './types.js': './types.js' },
     }))
-    await writeFile(join(sdkDir, 'types.js'), `export const LATEST_PROTOCOL_VERSION = '2026-08-04';`)
+    await writeFile(join(sdkDir, 'types.js'), `
+      export const LATEST_PROTOCOL_VERSION = '2026-08-04';
+      export const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, '2025-11-25'];
+    `)
 
-    await expect(resolveInstalledMcpProtocolVersion({
+    await expect(resolveInstalledMcpProtocolVersions({
       rootDir: join(rootDir, 'consumer'),
       modulesDir: [wrapperModulesDir],
     })).resolves.toEqual({
       _tag: 'Resolved',
-      protocolVersion: '2026-08-04',
+      protocolVersions: ['2026-08-04', '2025-11-25'],
     })
   })
 })
@@ -110,7 +137,7 @@ describe('parseLatestMcpProtocolVersion', () => {
 describe('resolveMcpServerCard', () => {
   it('emits the current SEP-2127 Server Card shape', () => {
     expect(resolveMcpServerCard({
-      protocolVersion: '2025-11-25',
+      protocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'],
       endpoint: 'https://example.com/docs/agent/mcp',
       name: 'com.example/docs-mcp',
       siteName: 'Site fallback',
@@ -136,14 +163,14 @@ describe('resolveMcpServerCard', () => {
       remotes: [{
         type: 'streamable-http',
         url: 'https://example.com/docs/agent/mcp',
-        supportedProtocolVersions: ['2025-11-25'],
+        supportedProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'],
       }],
     })
   })
 
   it('omits unusable remote metadata without an absolute deployment URL', () => {
     expect(resolveMcpServerCard({
-      protocolVersion: '2025-11-25',
+      protocolVersions: ['2025-11-25'],
       endpoint: '/mcp',
       name: 'com.example/mcp',
       siteName: 'Fallback site',
@@ -155,7 +182,7 @@ describe('resolveMcpServerCard', () => {
       description: 'MCP server for Fallback site.',
     })
     expect(resolveMcpServerCard({
-      protocolVersion: '2025-11-25',
+      protocolVersions: ['2025-11-25'],
       endpoint: '/mcp',
       name: 'com.example/mcp',
       toolkit: {},
@@ -165,7 +192,7 @@ describe('resolveMcpServerCard', () => {
 
   it('builds a stable strong ETag from the serialized card', () => {
     const card = resolveMcpServerCard({
-      protocolVersion: '2025-11-25',
+      protocolVersions: ['2025-11-25'],
       endpoint: '/mcp',
       name: 'com.example/mcp',
       toolkit: {},

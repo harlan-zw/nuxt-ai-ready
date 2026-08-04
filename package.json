@@ -48,7 +48,7 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && pnpm run build:devtools",
+    "build": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && pnpm run build:devtools && pnpm run test:dist",
     "build:devtools": "node -e \"require('fs').cpSync('devtools','dist/devtools',{recursive:true})\"",
     "dev": "nuxt dev playground",
     "dev:minimal": "nuxt dev playground",
@@ -63,6 +63,7 @@
     "test:run": "pnpm run prepare:fixtures && vitest run && pnpm test:nuxt5",
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
+    "test:dist": "node scripts/check-dist-imports.mjs",
     "typecheck": "nuxt typecheck && tsc -p test/types/tsconfig.json",
     "test:attw": "attw --pack",
     "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm install --dir test/fixtures/nuxt5 --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
@@ -71,7 +72,7 @@
     "@libsql/client": "^0.14.0",
     "@neondatabase/serverless": "^1.0.0",
     "@nuxtjs/sitemap": ">=8.3.1",
-    "better-sqlite3": "^11.0.0 || ^12.0.0"
+    "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0"
   },
   "peerDependenciesMeta": {
     "@libsql/client": {

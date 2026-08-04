@@ -4,6 +4,7 @@ import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { addImports, addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
@@ -15,6 +16,7 @@ import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveAgentSkillsConfig } from './utils/agent-skills'
+import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
@@ -23,7 +25,7 @@ import {
   createMcpServerCardEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
   parseMcpServerCardConfig,
-  resolveInstalledMcpProtocolVersion,
+  resolveInstalledMcpProtocolVersions,
   resolveMcpServerCard,
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
@@ -82,6 +84,11 @@ export interface ModulePublicRuntimeConfig {
     locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
   } | null
   ftsTokenizer?: string
+  aiCatalog?: {
+    cacheMaxAge: number
+    document: ReturnType<typeof resolveAiCatalog>
+    etag: string
+  }
   apiCatalog?: ResolvedApiCatalogConfig
 }
 
@@ -132,6 +139,8 @@ export default defineNuxtModule<ModuleOptions>({
     }
   },
   async setup(config, nuxt) {
+    const resolveFromModule = createRequire(import.meta.url)
+    const nuxtSeoSharedUtilsPath = resolveFromModule.resolve('nuxtseo-shared/utils')
     const { resolve } = createResolver(import.meta.url)
     const { version } = await readPackageJSON(resolve('../package.json'))
 
@@ -535,15 +544,15 @@ export default defineNuxtModule<ModuleOptions>({
       if (finalMcpServerCardNameResult._tag === 'Invalid')
         throw new Error(`[nuxt-ai-ready] ${finalMcpServerCardNameResult.message}`)
 
-      const protocolVersionResult = await resolveInstalledMcpProtocolVersion({
+      const protocolVersionsResult = await resolveInstalledMcpProtocolVersions({
         rootDir: nuxt.options.rootDir,
         modulesDir: nuxt.options.modulesDir,
       })
-      if (protocolVersionResult._tag === 'Invalid')
-        throw new Error(`[nuxt-ai-ready] ${protocolVersionResult.message}`)
+      if (protocolVersionsResult._tag === 'Invalid')
+        throw new Error(`[nuxt-ai-ready] ${protocolVersionsResult.message}`)
 
       const card = resolveMcpServerCard({
-        protocolVersion: protocolVersionResult.protocolVersion,
+        protocolVersions: protocolVersionsResult.protocolVersions,
         endpoint: siteConfig.url
           ? withSiteUrl(finalMcpToolkitState.route, { withBase: true })
           : finalMcpToolkitState.route,
@@ -558,6 +567,7 @@ export default defineNuxtModule<ModuleOptions>({
       })
 
       const runtimeConfig = nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as {
+        aiCatalog?: NonNullable<ModulePublicRuntimeConfig['aiCatalog']>
         mcpServerCard?: {
           card: ReturnType<typeof resolveMcpServerCard>
           cacheMaxAge: number
@@ -574,6 +584,7 @@ export default defineNuxtModule<ModuleOptions>({
       const handler = resolve('./runtime/server/routes/mcp-server-card')
       addServerHandler({ route: mcpServerCardRoute, method: 'get', handler })
       addServerHandler({ route: mcpServerCardRoute, method: 'head', handler })
+      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler })
       extendRouteRules(mcpServerCardRoute, {
         sitemap: false,
         headers: {
@@ -586,6 +597,38 @@ export default defineNuxtModule<ModuleOptions>({
           'ETag': etag,
         },
       })
+
+      if (siteConfig.url) {
+        const document = resolveAiCatalog({
+          siteUrl: siteConfig.url,
+          serverCardName: card.name,
+          serverCardUrl: withSiteUrl(mcpServerCardRoute, { withBase: true }),
+        })
+        const aiCatalogEtag = createAiCatalogEtag(document)
+        const aiCatalogCacheMaxAge = mcpServerCardResult.config.cacheMaxAge
+        runtimeConfig.aiCatalog = {
+          cacheMaxAge: aiCatalogCacheMaxAge,
+          document,
+          etag: aiCatalogEtag,
+        }
+
+        const aiCatalogHandler = resolve('./runtime/server/routes/ai-catalog')
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'get', handler: aiCatalogHandler })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'head', handler: aiCatalogHandler })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'options', handler: aiCatalogHandler })
+        extendRouteRules(AI_CATALOG_PATH, {
+          sitemap: false,
+          headers: {
+            'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+            'Access-Control-Allow-Methods': 'GET, HEAD',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'ETag',
+            'Cache-Control': `public, max-age=${aiCatalogCacheMaxAge}`,
+            'Content-Type': AI_CATALOG_MEDIA_TYPE,
+            'ETag': aiCatalogEtag,
+          },
+        })
+      }
     })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
@@ -799,7 +842,7 @@ export async function readPageDataFromFilesystem() {
 
       // Logger with debug level configured from module options
       nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
-import { createModuleLogger } from 'nuxtseo-shared/utils'
+import { createModuleLogger } from ${JSON.stringify(nuxtSeoSharedUtilsPath)}
 export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
 `
 

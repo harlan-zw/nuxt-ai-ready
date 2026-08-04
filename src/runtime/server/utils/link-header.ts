@@ -1,4 +1,4 @@
-import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { RuntimeI18nConfig } from './i18n'
 import { toMarkdownPath } from '../../markdown-path'
 import { computeLocaleAlternates } from './i18n'
 
@@ -14,6 +14,11 @@ export function encodePathForHeader(path: string): string {
 }
 
 type LinkUrlResolver = (path: string) => string
+
+interface LinkHeaderConfig {
+  apiCatalog?: { href: string }
+  i18n?: RuntimeI18nConfig | null
+}
 
 function resolveHeaderUrl(path: string, resolveUrl?: LinkUrlResolver): string {
   if (!resolveUrl)
@@ -32,7 +37,7 @@ function resolveHeaderUrl(path: string, resolveUrl?: LinkUrlResolver): string {
 export function buildLinkHeader(
   path: string,
   variant: 'html' | 'markdown',
-  config: ModulePublicRuntimeConfig,
+  config: LinkHeaderConfig,
   resolveUrl?: LinkUrlResolver,
 ): string {
   const parts: string[] = []

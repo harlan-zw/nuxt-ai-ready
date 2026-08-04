@@ -1,8 +1,7 @@
 import type { ContentNegotiationResult } from '@mdream/js/negotiate'
 import type { MdreamOptions } from 'mdream'
 import type { H3Event } from '#nuxtseo/h3'
-import type { ModulePublicRuntimeConfig } from '../../module'
-import type { MarkdownContext } from '../types'
+import type { MarkdownContext, ModuleOptions } from '../types'
 import { negotiateContent } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { htmlToMarkdown } from 'mdream'
@@ -30,7 +29,7 @@ interface ExtractedMeta {
 // Build mdream options with extraction plugin
 function buildMdreamOptions(
   url: string,
-  mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions'],
+  mdreamOptions: ModuleOptions['mdreamOptions'],
   meta: ExtractedMeta,
   extractUpdatedAt: boolean,
   additionalFields: Record<string, string>,
@@ -238,7 +237,7 @@ interface ConvertHtmlOptions {
 export async function convertHtmlToMarkdown(
   html: string,
   url: string,
-  mdreamOptions: ModulePublicRuntimeConfig['mdreamOptions'],
+  mdreamOptions: ModuleOptions['mdreamOptions'],
   opts: ConvertHtmlOptions = {},
 ) {
   const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [] }

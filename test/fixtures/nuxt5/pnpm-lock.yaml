@@ -1452,14 +1452,14 @@ packages:
     engines: {node: '>=18'}
 
   nuxt-ai-ready@file:module.tgz:
-    resolution: {integrity: sha512-1ShoL44cV2LIs5yHxPJENrgIZXzcfhhYslLtb+JNFW7sTU1QVB/CcEW5A5ZIFbytqpEgRPQtIFrslD5GfZ9KfQ==, tarball: file:module.tgz}
-    version: 1.6.0
+    resolution: {integrity: sha512-WuHqX7/arGfJr34stwBfzDxzwFIZHOEdU2D3B9VeEA0j58Y1uDXeUrSofWurRb6WJAPb8DKHhxSRwqX0gQO3vw==, tarball: file:module.tgz}
+    version: 1.7.0
     hasBin: true
     peerDependencies:
       '@libsql/client': ^0.14.0
       '@neondatabase/serverless': ^1.0.0
       '@nuxtjs/sitemap': '>=8.3.1'
-      better-sqlite3: ^11.0.0 || ^12.0.0
+      better-sqlite3: ^11.0.0 || ^12.0.0 || ^13.0.0
     peerDependenciesMeta:
       '@libsql/client':
         optional: true

@@ -28,7 +28,7 @@ function extractHeadingsFromMarkdown(markdown: string): Array<Record<string, str
 }
 
 export default defineEventHandler(async (event) => {
-  if (event.path.startsWith('/.well-known/agent-skills/'))
+  if (event.path.startsWith('/.well-known/'))
     return
 
   // Only run during prerender
