@@ -1,6 +1,16 @@
 export interface McpToolkitOptions {
   enabled?: boolean
   route?: string
+  name?: string
+  version?: string
+  description?: string
+  instructions?: string
+  icons?: Array<{
+    src: string
+    mimeType?: string
+    sizes?: string[]
+    theme?: 'light' | 'dark'
+  }>
 }
 
 export type McpToolkitState

@@ -4,6 +4,7 @@ export type {
   LlmsTxtLink,
   LlmsTxtSection,
   MarkdownContext,
+  McpServerCardConfig,
   ModuleOptions,
   PageDocument,
   PageIndexedContext,

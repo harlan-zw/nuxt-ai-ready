@@ -4,6 +4,21 @@ import type { SiteToolsConfig } from './site-tool-config'
 
 export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
 
+export interface McpServerCardConfig {
+  /** Human-readable title included in serverInfo. */
+  title?: string
+  /** Override the description derived from MCP Toolkit or site config. */
+  description?: string
+  /** Override the instructions derived from MCP Toolkit. */
+  instructions?: string
+  /** Public HTTP(S) icon URL. Defaults to the first MCP Toolkit icon. */
+  iconUrl?: string
+  /** Public HTTP(S) documentation URL. */
+  documentationUrl?: string
+  /** Discovery response cache lifetime in seconds. @default 3600 */
+  cacheMaxAge?: number
+}
+
 export interface ModuleOptions {
   /**
    * Enable/disable module
@@ -87,6 +102,13 @@ export interface ModuleOptions {
     /** Enable MCP resources (pages) @default true */
     resources?: boolean
   }
+
+  /**
+   * Publish MCP Server Card discovery metadata for the runtime MCP server.
+   * Enabled automatically when @nuxtjs/mcp-toolkit registers a runtime server.
+   * Set to false to disable.
+   */
+  mcpServerCard?: false | McpServerCardConfig
 
   /**
    * Configure the built-in site tools once, then attach them to MCP, WebMCP,

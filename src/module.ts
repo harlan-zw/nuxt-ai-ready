@@ -16,6 +16,12 @@ import { registerTypeTemplates } from './templates'
 import { refineDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
+import {
+  MCP_SERVER_CARD_ROUTE,
+  parseMcpServerCardConfig,
+  resolveInstalledMcpProtocolVersion,
+  resolveMcpServerCard,
+} from './utils/mcp-server-card'
 import { ensureStaticHeader } from './utils/static-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -99,7 +105,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=0.8.0',
     },
     '@nuxtjs/mcp-toolkit': {
-      version: '>=0.4.0',
+      version: '>=0.18.0',
       optional: true,
     },
   },
@@ -128,6 +134,10 @@ export default defineNuxtModule<ModuleOptions>({
       logger.debug('Module is disabled, skipping setup.')
       return
     }
+
+    const mcpServerCardResult = parseMcpServerCardConfig(config.mcpServerCard)
+    if (mcpServerCardResult._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${mcpServerCardResult.message}`)
 
     // --- v0 → v1 deprecation handling ---
     const rawConfig = (nuxt.options as any).aiReady || {}
@@ -221,10 +231,22 @@ export default defineNuxtModule<ModuleOptions>({
       static: nuxt.options.nitro.static === true,
       generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
     })
-    const mcpAvailable = mcpToolkitState._tag === 'Enabled'
+    let mcpAvailable = mcpToolkitState._tag === 'Enabled'
 
-    // Set the Toolkit name only when it will register a server.
-    if (mcpAvailable && nuxt.options.mcp !== false && !nuxt.options.mcp?.name) {
+    // Register definition paths before later wrapper modules install Toolkit.
+    // Toolkit resolves this hook from its own modules:done handler.
+    nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
+      const mcpRuntimeDir = resolve('./runtime/server/mcp')
+      const mcpConfig = config.mcp || {}
+      if (mcpConfig.tools !== false && hasMcpSiteTools)
+        (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
+      if (mcpConfig.resources !== false)
+        (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
+    })
+
+    // Set the Toolkit name before later wrapper modules can install it through
+    // moduleDependencies. Its server template snapshots this during setup.
+    if (nuxt.options.mcp !== false && !nuxt.options.mcp?.name && useSiteConfig().name) {
       nuxt.options.mcp = nuxt.options.mcp || {} as Record<string, unknown>
       ;(nuxt.options.mcp as Record<string, unknown>).name = useSiteConfig().name
     }
@@ -275,39 +297,6 @@ export default defineNuxtModule<ModuleOptions>({
       ],
     })
 
-    if (mcpAvailable) {
-      // Hydrate the runtime database from build artifacts before Toolkit
-      // resolves definitions for its first request.
-      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
-
-      // Register MCP definitions from runtime directory
-      nuxt.hook('mcp:definitions:paths' as any, (paths: Record<string, string[]>) => {
-        const mcpRuntimeDir = resolve(`./runtime/server/mcp`)
-        const mcpConfig = config.mcp || {}
-        if (mcpConfig.tools !== false && hasMcpSiteTools)
-          (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
-        if (mcpConfig.resources !== false)
-          (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
-      })
-
-      // Add MCP to the API endpoints section if bulk is enabled, or create new section
-      const mcpLink = {
-        title: 'MCP',
-        href: withSiteUrl(mcpToolkitState.route, { withBase: true }),
-        description: 'Model Context Protocol server endpoint for AI agent integration.',
-      }
-
-      if (defaultLlmsTxtSections[0]) {
-        defaultLlmsTxtSections[0].links!.push(mcpLink)
-      }
-      else {
-        defaultLlmsTxtSections.push({
-          title: 'LLM Tools',
-          links: [mcpLink],
-        })
-      }
-    }
-
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
@@ -346,7 +335,8 @@ export default defineNuxtModule<ModuleOptions>({
       ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
       : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
 
-    nuxt.hooks.hook('nuxt-seo-pro:modules' as any, (modules: any[]) => {
+    let seoProModules: any[] | undefined
+    const updateSeoProFeatures = (modules: any[]) => {
       const mod = modules.find((m: any) => m.name === 'nuxt-ai-ready')
       if (mod) {
         mod.features = {
@@ -358,6 +348,95 @@ export default defineNuxtModule<ModuleOptions>({
           database: dbType,
         }
       }
+    }
+    nuxt.hooks.hook('nuxt-seo-pro:modules' as any, (modules: any[]) => {
+      seoProModules = modules
+      updateSeoProFeatures(modules)
+    })
+
+    // Resolve Toolkit after every module dependency has installed. The
+    // mutable state feeds llms.txt, devtools, Nuxt SEO Pro, and Server Cards.
+    nuxt.hook('modules:done', async () => {
+      const finalMcpToolkitState = resolveMcpToolkitState({
+        installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
+          || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
+        options: nuxt.options.mcp,
+        static: nuxt.options.nitro.static === true,
+        generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
+      })
+      mcpAvailable = finalMcpToolkitState._tag === 'Enabled'
+      if (seoProModules)
+        updateSeoProFeatures(seoProModules)
+      if (finalMcpToolkitState._tag !== 'Enabled')
+        return
+
+      // Hydrate the database before Toolkit resolves its first request.
+      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
+
+      const mcpLink = {
+        title: 'MCP',
+        href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
+        description: 'Model Context Protocol server endpoint for AI agent integration.',
+      }
+      const firstSection = mergedLlmsTxt.sections?.[0]
+      if (firstSection) {
+        firstSection.links ||= []
+        if (!firstSection.links.some(link => link.title === mcpLink.title))
+          firstSection.links.push(mcpLink)
+      }
+      else {
+        mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+      }
+
+      if (mcpServerCardResult._tag === 'Disabled')
+        return
+
+      const protocolVersionResult = await resolveInstalledMcpProtocolVersion(nuxt.options.rootDir)
+      if (protocolVersionResult._tag === 'Invalid')
+        throw new Error(`[nuxt-ai-ready] ${protocolVersionResult.message}`)
+
+      const siteConfig = useSiteConfig()
+      const toolkitConfig = typeof nuxt.options.mcp === 'object' && nuxt.options.mcp !== null
+        ? nuxt.options.mcp
+        : {}
+      const card = resolveMcpServerCard({
+        protocolVersion: protocolVersionResult.protocolVersion,
+        siteUrl: siteConfig.url || undefined,
+        siteName: siteConfig.name || undefined,
+        siteDescription: siteConfig.description || undefined,
+        toolkit: {
+          ...toolkitConfig,
+          route: finalMcpToolkitState.route,
+        },
+        overrides: mcpServerCardResult.config,
+      })
+
+      const runtimeConfig = nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as {
+        mcpServerCard?: {
+          card: ReturnType<typeof resolveMcpServerCard>
+          cacheMaxAge: number
+        }
+      }
+      runtimeConfig.mcpServerCard = {
+        card,
+        cacheMaxAge: mcpServerCardResult.config.cacheMaxAge,
+      }
+
+      const handler = resolve('./runtime/server/routes/mcp-server-card')
+      addServerHandler({ route: MCP_SERVER_CARD_ROUTE, method: 'get', handler })
+      addServerHandler({ route: MCP_SERVER_CARD_ROUTE, method: 'head', handler })
+      extendRouteRules(MCP_SERVER_CARD_ROUTE, {
+        // Static output cannot run MCP Toolkit, so finalMcpToolkitState above
+        // excludes it. A card is safe to prerender only for runtime deployments.
+        prerender: true,
+        headers: {
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'GET, HEAD',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      })
     })
 
     // Detect if sitemap is prerendered (zeroRuntime mode, route rules, or nuxi generate)
