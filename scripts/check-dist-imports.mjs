@@ -2,13 +2,15 @@ import { readdir, readFile, stat } from 'node:fs/promises'
 import { dirname, extname, relative, resolve, sep } from 'node:path'
 
 const importPatterns = [
-  /\bfrom\s*['"](\.[^'"]+)['"]/g,
-  /\bimport\s*['"](\.[^'"]+)['"]/g,
-  /\bimport\s*\(\s*['"](\.[^'"]+)['"]/g,
-  /\brequire\s*\(\s*['"](\.[^'"]+)['"]/g,
+  /\bfrom\s*['"]([^'"]+)['"]/g,
+  /\bimport\s*['"]([^'"]+)['"]/g,
+  /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
+  /\brequire\s*\(\s*['"]([^'"]+)['"]/g,
 ]
 const declarationSourcePattern = /\.d\.[cm]?ts$/
 const publishedSourcePattern = /(?:\.d\.[cm]?ts|\.[cm]?js)$/
+const publishedServerRuntimePattern = /^dist\/runtime\/server\/.*\.[cm]?js$/
+const incompatibleRuntimeImports = new Set(['h3', 'nitropack/runtime'])
 
 function parsePublishedPaths(packageJson) {
   if (!packageJson || typeof packageJson !== 'object' || !Array.isArray(packageJson.files))
@@ -62,6 +64,10 @@ function importCandidates(importer, specifier) {
 }
 
 function extractRelativeImports(source) {
+  return extractImports(source).filter(specifier => specifier.startsWith('.'))
+}
+
+function extractImports(source) {
   return [...new Set(importPatterns.flatMap(pattern => [...source.matchAll(pattern)].map(match => match[1])))]
 }
 
@@ -81,11 +87,31 @@ async function findMissingRelativeImports(packageRoot) {
   }))).flat()
 }
 
-const packageRoot = resolve(process.argv[2] || import.meta.dirname, process.argv[2] ? '.' : '..')
-const missing = await findMissingRelativeImports(packageRoot)
+async function findIncompatibleRuntimeImports(packageRoot) {
+  const packageJson = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'))
+  const publishedPaths = parsePublishedPaths(packageJson)
+  const publishedFiles = (await Promise.all(publishedPaths.map(path => listFiles(resolve(packageRoot, path))))).flat()
+  const runtimeFiles = publishedFiles.filter(path => publishedServerRuntimePattern.test(toPackagePath(packageRoot, path)))
 
-if (missing.length) {
-  throw new Error(`Published package has unresolved relative imports:\n${missing.map(item => `- ${item}`).join('\n')}`)
+  return (await Promise.all(runtimeFiles.map(async (file) => {
+    const source = await readFile(file, 'utf8')
+    return extractImports(source)
+      .filter(specifier => incompatibleRuntimeImports.has(specifier))
+      .map(specifier => `${toPackagePath(packageRoot, file)} -> ${specifier}`)
+  }))).flat()
 }
+
+const packageRoot = resolve(process.argv[2] || import.meta.dirname, process.argv[2] ? '.' : '..')
+const [missing, incompatible] = await Promise.all([
+  findMissingRelativeImports(packageRoot),
+  findIncompatibleRuntimeImports(packageRoot),
+])
+
+const failures = [
+  ...(missing.length ? [`Published package has unresolved relative imports:\n${missing.map(item => `- ${item}`).join('\n')}`] : []),
+  ...(incompatible.length ? [`Published server runtime bypasses Nitro compatibility aliases:\n${incompatible.map(item => `- ${item}`).join('\n')}`] : []),
+]
+if (failures.length)
+  throw new Error(failures.join('\n'))
 
 console.log(`Checked published import closure for ${packageRoot}.`)

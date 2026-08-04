@@ -1,5 +1,5 @@
-import { assertMethod, defineEventHandler, setHeader } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { assertMethod, defineEventHandler, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 interface ApiCatalogRuntimeConfig {
   href: string

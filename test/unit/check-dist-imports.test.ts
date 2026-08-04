@@ -42,4 +42,23 @@ describe('published import closure', () => {
     expect(result.stderr).toContain('dist/index.mjs -> ./missing-require.cjs')
     expect(result.stderr).toContain('dist/types.d.mts -> ./missing-types.mjs')
   })
+
+  it('rejects runtime imports that bypass Nitro compatibility aliases', async () => {
+    const packageRoot = await mkdtemp(resolve(tmpdir(), 'nuxt-ai-ready-dist-check-'))
+    temporaryDirectories.push(packageRoot)
+    await mkdir(resolve(packageRoot, 'dist/runtime/server'), { recursive: true })
+    await Promise.all([
+      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({ files: ['dist'] })),
+      writeFile(resolve(packageRoot, 'dist/runtime/server/index.mjs'), [
+        `import { eventHandler } from 'h3'`,
+        `import { useRuntimeConfig } from 'nitropack/runtime'`,
+      ].join('\n')),
+    ])
+
+    const result = await execa(process.execPath, [scriptPath, packageRoot], { reject: false })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('dist/runtime/server/index.mjs -> h3')
+    expect(result.stderr).toContain('dist/runtime/server/index.mjs -> nitropack/runtime')
+  })
 })

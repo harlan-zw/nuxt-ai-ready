@@ -1,5 +1,5 @@
-import { assertMethod, eventHandler, setHeader } from 'h3'
 import { agentSkillsIndex } from '#ai-ready-virtual/agent-skills.mjs'
+import { assertMethod, eventHandler, setHeader } from '#nuxtseo/h3'
 
 export default eventHandler((event) => {
   assertMethod(event, ['GET', 'HEAD'])

@@ -1,5 +1,5 @@
-import { eventHandler, getHeader, setHeaders, setResponseStatus } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, getHeader, setHeaders, setResponseStatus } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../utils/discovery-response'
 
 interface McpServerCardRuntimeConfig {

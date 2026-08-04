@@ -1,6 +1,6 @@
 import type { AiCatalog } from '../utils/discovery-response'
-import { eventHandler, getHeader, setHeaders, setResponseStatus } from 'h3'
-import { useRuntimeConfig } from 'nitropack/runtime'
+import { eventHandler, getHeader, setHeaders, setResponseStatus } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { AI_CATALOG_MEDIA_TYPE, matchesDiscoveryEtag } from '../utils/discovery-response'
 
 interface AiCatalogRuntimeConfig {
