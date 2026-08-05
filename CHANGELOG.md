@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.7.2...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.2...main)
+
+### 🩹 Fixes
+
+- Route raw fetches through shared Nitro bridge ([#66](https://github.com/harlan-zw/nuxt-ai-ready/pull/66))
+
+### 🏡 Chore
+
+- Bump ([beb656b](https://github.com/harlan-zw/nuxt-ai-ready/commit/beb656b))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.7.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.1...main)
