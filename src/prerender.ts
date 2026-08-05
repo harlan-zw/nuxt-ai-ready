@@ -559,6 +559,7 @@ export function setupPrerenderHandler(
       // The prerender middleware already wrote frontmatter via mdream's
       // additionalFields, so write the markdown straight to disk.
       route.contents = parsed.markdown
+      route.contentType = 'text/markdown; charset=utf-8'
       state.totalProcessingTime += Date.now() - pageStartTime
     })
 

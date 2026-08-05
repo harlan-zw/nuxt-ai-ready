@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
-import { $fetch, setup, useTestContext } from '@nuxt/test-utils'
+import { $fetch, fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -49,6 +49,9 @@ describe('nuxt generate (static build)', async () => {
     build: true,
     server: true,
     nuxtConfig: {
+      aiReady: {
+        contentNegotiation: false,
+      },
       sitemap: {
         // Reproduces sitemap sites that emit canonical trailing slashes. The
         // prerender route itself is stored without one.
@@ -163,6 +166,16 @@ describe('nuxt generate (static build)', async () => {
   })
 
   describe('static .md files', () => {
+    it('serves prerendered Markdown with its correct content type', async () => {
+      const [markdownResponse, htmlResponse] = await Promise.all([
+        fetch(url('/about.md')),
+        fetch(url('/about')),
+      ])
+
+      expect(markdownResponse.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
+      expect(htmlResponse.headers.get('content-type')).toContain('text/html')
+    })
+
     it('generates .md files for prerendered pages', async () => {
       const aboutMd = await $fetch('/about.md', { responseType: 'text' })
 
