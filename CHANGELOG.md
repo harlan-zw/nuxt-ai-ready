@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.7.3...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.3...main)
+
+### 🩹 Fixes
+
+- Set prerendered markdown content type ([#69](https://github.com/harlan-zw/nuxt-ai-ready/pull/69))
+
+### 🏡 Chore
+
+- Bump ([c465e86](https://github.com/harlan-zw/nuxt-ai-ready/commit/c465e86))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.7.2...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.2...main)
