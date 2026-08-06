@@ -5,6 +5,7 @@ import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import type * as schema from '#ai-ready-virtual/db-schema.mjs'
 import type { H3Event } from '#nuxtseo/h3'
+import { DB_CONTEXT_KEY } from '../context'
 import { closeDriver } from './raw'
 
 export type DatabaseDialect = 'sqlite' | 'postgres'
@@ -17,7 +18,6 @@ export interface DrizzleDatabase {
   db: SQLiteDB | PostgresDB
 }
 
-const DB_CONTEXT_KEY = '_aiReadyDrizzle'
 let fallbackClient: DrizzleDatabase | undefined
 
 /**

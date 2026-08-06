@@ -11,7 +11,7 @@ vi.mock('h3', () => ({
 vi.mock('mdream', () => ({ htmlToMarkdown: () => '' }))
 vi.mock('nitropack/runtime', () => ({ useNitroApp: () => ({ hooks: { callHook: () => {} } }) }))
 
-const { negotiateRepresentation } = await import('../../src/runtime/server/utils')
+const { negotiateRepresentation } = await import('../../src/runtime/server/utils/markdown-request')
 
 // Build a minimal H3 event; the stubbed getHeader/getHeaders read node.req.headers
 function mockEvent(headers: Record<string, string>): H3Event {

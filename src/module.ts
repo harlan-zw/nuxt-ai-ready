@@ -1,21 +1,22 @@
 import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { addImports, addPlugin, addServerHandler, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
+import { addImports, addPlugin, addServerHandler, addServerImports, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
-import { setupDevToolsUI } from 'nuxtseo-shared/devtools'
 import { resolveNuxtContentVersion, setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { logger } from './logger'
-import { MARKDOWN_LINK_AVAILABILITY_FILE, setupPrerenderHandler } from './prerender'
+import { resolveModuleEntryUrl } from './module-resolver'
+import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { registerTypeTemplates } from './templates'
-import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveAgentSkillsConfig } from './utils/agent-skills'
+import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
@@ -139,9 +140,10 @@ export default defineNuxtModule<ModuleOptions>({
     }
   },
   async setup(config, nuxt) {
-    const resolveFromModule = createRequire(import.meta.url)
+    const moduleEntryUrl = resolveModuleEntryUrl(import.meta.url)
+    const resolveFromModule = createRequire(moduleEntryUrl)
     const nuxtSeoSharedUtilsPath = resolveFromModule.resolve('nuxtseo-shared/utils')
-    const { resolve } = createResolver(import.meta.url)
+    const { resolve } = createResolver(moduleEntryUrl)
     const { version } = await readPackageJSON(resolve('../package.json'))
 
     logger.level = (config.debug || nuxt.options.debug) ? 4 : 3
@@ -151,7 +153,10 @@ export default defineNuxtModule<ModuleOptions>({
       return
     }
 
-    const agentSkillsResult = await resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir)
+    const agentSkillsResult: ResolvedAgentSkillsConfig = config.agentSkills === false || config.agentSkills === undefined
+      ? { _tag: 'Disabled' }
+      : await import('./utils/agent-skills')
+          .then(({ resolveAgentSkillsConfig }) => resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir))
     if (agentSkillsResult._tag === 'Invalid') {
       const details = agentSkillsResult.issues
         .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
@@ -232,6 +237,17 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Set up alias
     nuxt.options.alias['#ai-ready'] = resolve('./runtime')
+    addServerImports([
+      'countPages',
+      'indexPage',
+      'indexPageByRoute',
+      'queryPages',
+      'searchPages',
+      'streamPages',
+    ].map(name => ({
+      name,
+      from: resolve('./runtime'),
+    })))
 
     // Auto-detect database type based on deployment preset
     const preset = String(nuxt.options.nitro.preset || '')
@@ -306,12 +322,6 @@ export default defineNuxtModule<ModuleOptions>({
       if (mcpConfig.resources !== false)
         (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
     })
-
-    // Add runtime server directories to Nitro scan
-    nuxt.options.nitro.scanDirs = nuxt.options.nitro.scanDirs || []
-    nuxt.options.nitro.scanDirs.push(
-      resolve('./runtime/server/utils'),
-    )
 
     // Detect @nuxt/content v3 — if present, the markdown middleware will
     // prefer raw markdown source from content collections over HTML→mdream
@@ -393,7 +403,8 @@ export default defineNuxtModule<ModuleOptions>({
 
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
-    const hasPrerenderedRoutes = nuxt.options.nitro.prerender?.routes?.length
+    const hasPrerenderedRoutes = !!nuxt.options.nitro.prerender?.routes?.length
+    const prerenderEnabled = !!(isStatic || hasPrerenderedRoutes)
     const isSPA = nuxt.options.ssr === false
 
     let apiCatalogRegistered = false
@@ -402,7 +413,7 @@ export default defineNuxtModule<ModuleOptions>({
         return
       apiCatalogRegistered = true
 
-      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog') })
+      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog'), lazy: true })
       const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
       extendRouteRules('/**', {
         headers: { Link: apiCatalogLink },
@@ -413,7 +424,7 @@ export default defineNuxtModule<ModuleOptions>({
           'Link': apiCatalogLink,
         },
       })
-      if (isStatic || hasPrerenderedRoutes) {
+      if (prerenderEnabled) {
         nuxt.options.nitro.prerender ||= {}
         nuxt.options.nitro.prerender.routes ||= []
         if (!nuxt.options.nitro.prerender.routes.includes(API_CATALOG_PATH))
@@ -582,9 +593,9 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       const handler = resolve('./runtime/server/routes/mcp-server-card')
-      addServerHandler({ route: mcpServerCardRoute, method: 'get', handler })
-      addServerHandler({ route: mcpServerCardRoute, method: 'head', handler })
-      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler })
+      addServerHandler({ route: mcpServerCardRoute, method: 'get', handler, lazy: true })
+      addServerHandler({ route: mcpServerCardRoute, method: 'head', handler, lazy: true })
+      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler, lazy: true })
       extendRouteRules(mcpServerCardRoute, {
         sitemap: false,
         headers: {
@@ -613,9 +624,9 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         const aiCatalogHandler = resolve('./runtime/server/routes/ai-catalog')
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'get', handler: aiCatalogHandler })
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'head', handler: aiCatalogHandler })
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'options', handler: aiCatalogHandler })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'get', handler: aiCatalogHandler, lazy: true })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'head', handler: aiCatalogHandler, lazy: true })
+        addServerHandler({ route: AI_CATALOG_PATH, method: 'options', handler: aiCatalogHandler, lazy: true })
         extendRouteRules(AI_CATALOG_PATH, {
           sitemap: false,
           headers: {
@@ -941,24 +952,23 @@ export async function lookupContentPage(event, path) {
       apiCatalog: apiCatalogConfig,
     } as any
 
-    // Captures rendered HTML during prerendering so markdown.prerender can
-    // reuse it instead of re-rendering each page
-    addServerPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
-    addServerHandler({
-      middleware: true,
-      handler: resolve('./runtime/server/middleware/markdown.prerender'),
-    })
-    addServerHandler({
-      middleware: true,
-      handler: resolve('./runtime/server/middleware/markdown'),
-    })
-
-    if (nuxt.options.build) {
+    if (prerenderEnabled) {
+      // Captures rendered HTML so markdown.prerender can avoid a second SSR render.
+      addServerPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
+      addServerHandler({
+        middleware: true,
+        handler: resolve('./runtime/server/middleware/markdown.prerender'),
+      })
       addPlugin({
         mode: 'server',
         src: resolve('./runtime/app/plugins/md-hints.prerender'),
       })
     }
+
+    addServerHandler({
+      middleware: true,
+      handler: resolve('./runtime/server/middleware/markdown'),
+    })
 
     // Inject <link rel="alternate" type="text/markdown"> into HTML pages
     addPlugin({
@@ -966,12 +976,12 @@ export async function lookupContentPage(event, path) {
       src: resolve('./runtime/app/plugins/md-alternate.server'),
     })
     // gets replaced with a static file
-    addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get') })
-    addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get') })
+    addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
+    addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
     if (agentSkillsResult._tag === 'Enabled') {
-      addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index') })
+      addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index'), lazy: true })
       for (const route of Object.keys(agentSkillsResult.localArtifacts)) {
-        addServerHandler({ route, handler: resolve('./runtime/server/routes/agent-skills-artifact') })
+        addServerHandler({ route, handler: resolve('./runtime/server/routes/agent-skills-artifact'), lazy: true })
         extendRouteRules(route, {
           headers: {
             'Content-Type': 'text/markdown; charset=utf-8',
@@ -1016,24 +1026,24 @@ export async function lookupContentPage(event, path) {
 
       addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
       if (Object.keys(webmcpConfig.tools).length) {
-        addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get') })
+        addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get'), lazy: true })
       }
     }
 
     // Devtools API endpoint
-    addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get') })
+    addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get'), lazy: true })
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {
-      addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get') })
+      addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get'), lazy: true })
     }
 
     // Indexing control endpoints (only if runtimeSync enabled)
     if (runtimeSyncEnabled) {
-      addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
-      addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post') })
-      addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post') })
-      addServerHandler({ route: '/__ai-ready/restore', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/restore.post') })
+      addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get'), lazy: true })
+      addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post'), lazy: true })
+      addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post'), lazy: true })
+      addServerHandler({ route: '/__ai-ready/restore', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/restore.post'), lazy: true })
 
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
       addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
@@ -1042,18 +1052,18 @@ export async function lookupContentPage(event, path) {
     // IndexNow endpoints (only if key is configured)
     if (indexNow) {
       // Key verification route: /{key}.txt
-      addServerHandler({ route: `/${indexNow}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get') })
+      addServerHandler({ route: `/${indexNow}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get'), lazy: true })
       // Sync endpoint
-      addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post') })
+      addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post'), lazy: true })
       // Status endpoint needed for IndexNow stats (may not have runtimeSync)
       if (!runtimeSyncEnabled) {
-        addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get') })
+        addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get'), lazy: true })
       }
     }
 
     // Cron endpoint (for Vercel and other HTTP-based cron systems)
     if (config.cron && !nuxt.options.dev) {
-      addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get') })
+      addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get'), lazy: true })
     }
 
     // Setup prerendering hooks for static generation
@@ -1071,7 +1081,8 @@ export async function lookupContentPage(event, path) {
       }
     }
 
-    if (isStatic || hasPrerenderedRoutes) {
+    if (prerenderEnabled) {
+      const { setupPrerenderHandler } = await import('./prerender')
       setupPrerenderHandler(config, buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
@@ -1082,13 +1093,15 @@ export async function lookupContentPage(event, path) {
     // Add lifecycle plugin to handle database connection cleanup
     addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
 
-    // DevTools integration
-    setupDevToolsUI({
-      route: '/__nuxt-ai-ready',
-      name: 'nuxt-ai-ready',
-      title: 'AI Ready',
-      icon: 'carbon:ai-label',
-    }, resolve, nuxt)
+    if (nuxt.options.dev) {
+      const { setupDevToolsUI } = await import('nuxtseo-shared/devtools')
+      setupDevToolsUI({
+        route: '/__nuxt-ai-ready',
+        name: 'nuxt-ai-ready',
+        title: 'AI Ready',
+        icon: 'carbon:ai-label',
+      }, resolve, nuxt)
+    }
 
     // Add route rules for static files with proper charset
     for (const route of ['/llms.txt', '/llms-full.txt']) {

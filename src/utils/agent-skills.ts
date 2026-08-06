@@ -1,32 +1,20 @@
 import type {
   AgentSkillConfig,
   AgentSkillsConfig,
-  AgentSkillsIndex,
   AgentSkillsIndexEntry,
 } from '../runtime/types'
+import type {
+  AgentSkillsConfigIssue,
+  ResolvedAgentSkillsConfig,
+} from './agent-skills-config'
 import { createHash } from 'node:crypto'
 import { readFile, realpath } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parseDocument } from 'yaml'
+import { AGENT_SKILLS_SCHEMA } from './agent-skills-config'
 
-export const AGENT_SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
-export const AGENT_SKILLS_INDEX_ROUTE = '/.well-known/agent-skills/index.json'
-export const AGENT_SKILLS_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400'
-
-export interface AgentSkillsConfigIssue {
-  index?: number
-  field: 'agentSkills' | 'source' | 'name' | 'type' | 'description' | 'file' | 'url' | 'digest'
-  message: string
-}
-
-export type ResolvedAgentSkillsConfig
-  = | { _tag: 'Disabled' }
-    | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }
-    | {
-      _tag: 'Enabled'
-      index: AgentSkillsIndex
-      localArtifacts: Record<string, string>
-    }
+export { AGENT_SKILLS_SCHEMA } from './agent-skills-config'
+export type { AgentSkillsConfigIssue, ResolvedAgentSkillsConfig } from './agent-skills-config'
 
 const namePattern = /^(?!.*--)[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 const digestPattern = /^sha256:[a-f0-9]{64}$/
