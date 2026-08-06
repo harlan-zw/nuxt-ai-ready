@@ -1,19 +1,17 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { buildFrontmatter } from '../utils/frontmatter'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { appendHeader, createError, defineEventHandler, getHeader, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
-import { queryPages } from '../db/queries'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo, toMarkdownPath } from '../utils'
-import { tryGetContentMarkdown } from '../utils/content'
 import { CONTENT_NEGOTIATION_VARY, resolveContentNegotiation } from '../utils/content-negotiation'
-import { fetchRawWithEvent } from '../utils/fetch'
-import { buildFrontmatter } from '../utils/frontmatter'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { buildLinkHeader } from '../utils/link-header'
+import { getMarkdownRenderInfo } from '../utils/markdown-request'
 
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 type LinkUrlResolver = (path: string) => string
@@ -56,6 +54,7 @@ function notFoundMarkdown(
   path: string,
   config: ModulePublicRuntimeConfig,
   resolveUrl: LinkUrlResolver,
+  build: typeof buildFrontmatter,
 ): string {
   const body = [
     `# Page not found`,
@@ -76,7 +75,7 @@ function notFoundMarkdown(
     ? computeLocaleAlternates(path, i18n).map(a => ({ hreflang: a.hreflang, href: resolveUrl(a.path) }))
     : undefined
 
-  const frontmatter = buildFrontmatter({
+  const frontmatter = build({
     title: 'Page not found',
     description: `No content is available at ${path}.`,
     canonical_url: canonicalUrl,
@@ -146,6 +145,16 @@ export default defineEventHandler(async (event) => {
     return sendRedirect(event, resolvePath(toMarkdownPath(path)), 307)
   }
 
+  const [
+    { tryGetContentMarkdown },
+    { fetchRawWithEvent },
+    { buildFrontmatter },
+  ] = await Promise.all([
+    import('../utils/content'),
+    import('../utils/fetch'),
+    import('../utils/frontmatter'),
+  ])
+
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
   // pages as a structural AST (minimark) that round-trips to markdown without
   // the lossiness of HTML parsing. Frontmatter is layered: our canonical_url +
@@ -180,7 +189,7 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, buildFrontmatter)
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -199,17 +208,25 @@ export default defineEventHandler(async (event) => {
   // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, buildFrontmatter)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     setMarkdownHeaders(event, path, config, resolveUrl)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl)
+    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, buildFrontmatter)
   }
 
   const html = await response.text()
   logger.debug(`[markdown] Fetched HTML for ${path} (${html.length} bytes)`)
+
+  const [
+    { queryPages },
+    { convertHtmlToMarkdown, extractLastUpdated },
+  ] = await Promise.all([
+    import('../db/queries'),
+    import('../utils'),
+  ])
 
   // Resolve last_updated: DB (authoritative, set at index time) → page meta tags
   // → request time. The DB lookup keeps the timestamp stable across requests.

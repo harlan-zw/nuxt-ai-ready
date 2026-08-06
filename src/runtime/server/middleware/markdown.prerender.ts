@@ -3,11 +3,12 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toDeployedRoute } from '../../route-path'
 import { logger } from '../logger'
-import { convertHtmlToMarkdown, extractLastUpdated, getMarkdownRenderInfo } from '../utils'
+import { convertHtmlToMarkdown, extractLastUpdated } from '../utils'
 import { tryGetContentMarkdown } from '../utils/content'
 import { fetchRawWithEvent } from '../utils/fetch'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
+import { getMarkdownRenderInfo } from '../utils/markdown-request'
 import { consumePrerenderedHtml } from '../utils/prerender-html'
 
 // Pull headings out of source markdown for the page-data record. mdream

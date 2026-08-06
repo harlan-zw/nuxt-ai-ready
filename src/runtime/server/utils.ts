@@ -1,14 +1,8 @@
-import type { ContentNegotiationResult } from '@mdream/js/negotiate'
 import type { MdreamOptions } from 'mdream'
 import type { H3Event } from '#nuxtseo/h3'
 import type { MarkdownContext, ModuleOptions } from '../types'
-import { negotiateContent } from '@mdream/js/negotiate'
-import { getBotInfo } from '@nuxtjs/robots/util'
 import { htmlToMarkdown } from 'mdream'
-import { getHeader, getHeaders } from '#nuxtseo/h3'
 import { useNitroApp } from '#nuxtseo/nitro'
-
-export { toMarkdownPath } from '../markdown-path'
 
 const RE_NBSP = /\u00A0/g
 
@@ -79,120 +73,6 @@ function buildMdreamOptions(
     frontmatter,
     extraction: { ...extraction, ...mdreamOptions?.extraction },
   }
-}
-
-// H3 wrapper over @mdream/js/negotiate that layers AI bot detection (via
-// @nuxtjs/robots) on top of RFC 7231 Accept header negotiation. AI bots get
-// markdown regardless of what their Accept header says.
-export function negotiateRepresentation(event: H3Event): ContentNegotiationResult {
-  // Nitro prerender requests must always resolve to HTML. Negotiating them to
-  // markdown makes the middleware 307 redirect the route to its `.md` twin, and
-  // Nitro bakes that redirect's meta-refresh stub into the canonical
-  // `index.html`, destroying the prerendered page (issue #36). `import.meta.prerender`
-  // covers the whole prerender bundle; the `x-nitro-prerender` header is the
-  // per-request signal carried even when the constant isn't inlined.
-  if (import.meta.prerender || getHeader(event, 'x-nitro-prerender'))
-    return 'html'
-
-  const accept = getHeader(event, 'accept')
-  const secFetchDest = getHeader(event, 'sec-fetch-dest')
-
-  // Honor a direct markdown preference
-  if (negotiateContent(accept) === 'markdown')
-    return 'markdown'
-
-  // Browser navigation always gets HTML (short-circuit before bot check so
-  // AI-categorized browsers don't get markdown pushed at them mid-navigation)
-  if (secFetchDest === 'document')
-    return 'html'
-
-  // AI bots always get markdown regardless of Accept
-  const botInfo = getBotInfo(getHeaders(event))
-  if (botInfo?.category === 'ai')
-    return 'markdown'
-
-  return negotiateContent(accept, secFetchDest)
-}
-
-// Check if request should be rendered as markdown
-// Returns normalized path, whether it's explicit (.md) or implicit (Accept header),
-// or 'not-acceptable' if the Accept header cannot be satisfied.
-export type MarkdownRequestMode
-  = | { _tag: 'runtime', contentNegotiation: boolean }
-    | { _tag: 'prerender' }
-
-export function getMarkdownRenderInfo(
-  event: H3Event,
-  mode: MarkdownRequestMode = { _tag: 'runtime', contentNegotiation: true },
-):
-  | { path: string, isExplicit: boolean, negotiation: ContentNegotiationResult }
-  | { notAcceptable: true }
-  | null {
-  const originalPath = event.path
-  const isPrerender = mode._tag === 'prerender'
-
-  // Never run on API routes or internal routes
-  if (originalPath.startsWith('/api') || originalPath.startsWith('/_') || originalPath.startsWith('/@')) {
-    return null
-  }
-
-  // Step aside for unambiguous non-document Accept headers (MCP/SSE/JSON RPCs).
-  // If the client asks for application/json or text/event-stream and never
-  // text/html|markdown|plain, this middleware has nothing to offer; the
-  // underlying handler should respond instead of being hijacked with a 406.
-  // Synthetic probes / unknown media types still 406 below to preserve the
-  // RFC 7231 contract for content negotiation against document URLs.
-  const accept = getHeader(event, 'accept') || ''
-  if (!originalPath.endsWith('.md') && accept
-    && /\b(?:application\/json|text\/event-stream)\b/i.test(accept)
-    && !/text\/(?:html|markdown|plain)\b|\*\/\*/i.test(accept)) {
-    return null
-  }
-
-  const isExplicit = originalPath.endsWith('.md')
-
-  // For explicitOnly mode (prerender), only handle .md requests
-  if (isPrerender && !isExplicit) {
-    return null
-  }
-
-  // Extract file extension
-  const lastSegment = originalPath.split('/').pop() || ''
-  const hasExtension = lastSegment.includes('.')
-  const extension = hasExtension ? lastSegment.substring(lastSegment.lastIndexOf('.')) : ''
-
-  // Skip non-.md extensions
-  if (hasExtension && extension !== '.md') {
-    return null
-  }
-
-  const negotiation: ContentNegotiationResult = isPrerender
-    ? 'markdown'
-    : mode.contentNegotiation
-      ? negotiateRepresentation(event)
-      : 'html'
-
-  // Explicit .md always serves markdown regardless of Accept
-  if (isExplicit) {
-    const path = normalizePath(originalPath.slice(0, -3))
-    return { path, isExplicit: true, negotiation: 'markdown' }
-  }
-
-  if (negotiation === 'not-acceptable')
-    return { notAcceptable: true }
-
-  return { path: normalizePath(originalPath), isExplicit: false, negotiation }
-}
-
-function normalizePath(path: string): string {
-  if (path.endsWith('/index'))
-    return path.slice(0, -5) || '/'
-  return path
-}
-
-// Back-compat: detect if client prefers markdown
-export function clientPrefersMarkdown(event: H3Event): boolean {
-  return negotiateRepresentation(event) === 'markdown'
 }
 
 // Pull the most recent `last_updated` candidate from the HTML head. Used to

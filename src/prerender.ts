@@ -11,6 +11,7 @@ import { colorize } from 'consola/utils'
 import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
+import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
@@ -25,8 +26,6 @@ const RE_INDEX_SUFFIX = /\/index$/
 const RE_MD_EXT = /\.md$/
 const RE_NEGATED_GLOB = /^(!?)(.*)$/
 const RE_PARENT_DIR_GLOB = /!?\.\.\//
-
-export const MARKDOWN_LINK_AVAILABILITY_FILE = 'markdown-link-availability.json'
 
 export interface ParsedMarkdownResult {
   markdown: string
