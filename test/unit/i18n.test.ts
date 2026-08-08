@@ -86,6 +86,86 @@ describe('computeLocaleAlternates', () => {
   })
 })
 
+describe('computeLocaleAlternates with translated routes', () => {
+  const translated: RuntimeI18nConfig = {
+    ...prefixExceptDefault,
+    pages: {
+      'about': { en: '/about', fr: '/a-propos' },
+      'blog': { en: '/blog', fr: '/journal' },
+      'blog-slug': { en: '/blog/[slug]', fr: '/journal/[slug]' },
+      'docs-path': { en: '/docs/[...path]', fr: '/documentation/[...path]' },
+      'legal': { en: '/legal', fr: false },
+    },
+  }
+
+  it('uses the translated slug instead of prefixing the default one', () => {
+    expect(computeLocaleAlternates('/about', translated)).toEqual([
+      { code: 'en', hreflang: 'en', path: '/about' },
+      { code: 'fr', hreflang: 'fr-FR', path: '/fr/a-propos' },
+    ])
+  })
+
+  it('resolves back from a translated route to the default one', () => {
+    expect(computeLocaleAlternates('/fr/a-propos', translated).map(a => a.path))
+      .toEqual(['/about', '/fr/a-propos'])
+  })
+
+  it('carries dynamic params across locales', () => {
+    expect(computeLocaleAlternates('/blog/hello-world', translated).map(a => a.path))
+      .toEqual(['/blog/hello-world', '/fr/journal/hello-world'])
+    expect(computeLocaleAlternates('/fr/journal/hello-world', translated).map(a => a.path))
+      .toEqual(['/blog/hello-world', '/fr/journal/hello-world'])
+  })
+
+  it('carries catch-all params across locales', () => {
+    expect(computeLocaleAlternates('/docs/guide/getting-started', translated).map(a => a.path))
+      .toEqual(['/docs/guide/getting-started', '/fr/documentation/guide/getting-started'])
+  })
+
+  it('omits locales the page is disabled for', () => {
+    expect(computeLocaleAlternates('/legal', translated)).toEqual([
+      { code: 'en', hreflang: 'en', path: '/legal' },
+    ])
+  })
+
+  it('does not confuse a listing route with its detail route', () => {
+    expect(computeLocaleAlternates('/blog', translated).map(a => a.path))
+      .toEqual(['/blog', '/fr/journal'])
+  })
+
+  it('falls back to prefixing for routes absent from the table', () => {
+    expect(computeLocaleAlternates('/contact', translated).map(a => a.path))
+      .toEqual(['/contact', '/fr/contact'])
+  })
+
+  it('falls back to prefixing when an entry omits a locale', () => {
+    const partial: RuntimeI18nConfig = {
+      ...prefixExceptDefault,
+      pages: { about: { fr: '/a-propos' } },
+    }
+    expect(computeLocaleAlternates('/fr/a-propos', partial).map(a => a.path))
+      .toEqual(['/a-propos', '/fr/a-propos'])
+  })
+
+  it('prefixes every locale under the prefix strategy', () => {
+    const prefixed: RuntimeI18nConfig = {
+      ...prefixAll,
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    }
+    expect(computeLocaleAlternates('/en/about', prefixed).map(a => a.path))
+      .toEqual(['/en/about', '/fr/a-propos'])
+  })
+
+  it('ignores the table under no_prefix, where each page has one URL', () => {
+    const single: RuntimeI18nConfig = {
+      ...noPrefix,
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    }
+    expect(computeLocaleAlternates('/about', single).map(a => a.path))
+      .toEqual(['/about', '/about'])
+  })
+})
+
 describe('hasCjkLocale', () => {
   it('detects CJK locales by code prefix', () => {
     expect(hasCjkLocale({ ...prefixExceptDefault, locales: [en, ja] })).toBe(true)

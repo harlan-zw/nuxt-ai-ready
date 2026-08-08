@@ -1,3 +1,14 @@
+/**
+ * Custom route paths keyed by route name, then locale code — i18n's `pages`
+ * option (`globalLocaleRoutes` for nuxt-i18n-micro). `false` means the page is
+ * disabled for that locale.
+ *
+ * ```
+ * { about: { en: '/about', fr: '/a-propos' } }
+ * ```
+ */
+export type LocalePages = Record<string, Record<string, string | false> | undefined>
+
 /** Runtime-safe subset used for route locale resolution. */
 export interface RuntimeI18nConfig {
   defaultLocale: string
@@ -8,6 +19,8 @@ export interface RuntimeI18nConfig {
     name?: string
     nativeName?: string
   }>
+  /** Translated route paths, when i18n is configured with custom routes. */
+  pages?: LocalePages
 }
 
 export interface LocaleAlternate {
@@ -59,12 +72,129 @@ export function localePath(basePath: string, locale: string, i18n: RuntimeI18nCo
   return `/${locale}${basePath}`
 }
 
+function toSegments(path: string): string[] {
+  return path.split('/').filter(Boolean)
+}
+
+/** `[slug]` / `:slug` (one segment) and `[...slug]` / `:slug(.*)` (the rest). */
+function readParam(segment: string): { name: string, catchAll: boolean } | null {
+  const bracket = /^\[(\.{3})?([^\]]+)\]$/.exec(segment)
+  if (bracket)
+    return { name: bracket[2]!, catchAll: !!bracket[1] }
+  const colon = /^:([^(]+)(\(\.\*\))?$/.exec(segment)
+  if (colon)
+    return { name: colon[1]!.replace(/[?*+]$/, ''), catchAll: !!colon[2] }
+  return null
+}
+
+/**
+ * Match a route pattern from the pages map against a concrete path, capturing
+ * dynamic segments. Returns null when the path belongs to a different route.
+ */
+function matchPagePattern(pattern: string, path: string): Record<string, string> | null {
+  const patternSegments = toSegments(pattern)
+  const pathSegments = toSegments(path)
+  const params: Record<string, string> = {}
+
+  for (let i = 0; i < patternSegments.length; i++) {
+    const param = readParam(patternSegments[i]!)
+    if (param?.catchAll) {
+      const rest = pathSegments.slice(i)
+      if (!rest.length)
+        return null
+      params[param.name] = rest.join('/')
+      return params
+    }
+    const segment = pathSegments[i]
+    if (segment === undefined)
+      return null
+    if (param)
+      params[param.name] = segment
+    else if (patternSegments[i] !== segment)
+      return null
+  }
+
+  return pathSegments.length === patternSegments.length ? params : null
+}
+
+/** Render a pattern with captured params. Null when a param has no value. */
+function fillPagePattern(pattern: string, params: Record<string, string>): string | null {
+  const filled: string[] = []
+  for (const segment of toSegments(pattern)) {
+    const param = readParam(segment)
+    if (!param) {
+      filled.push(segment)
+      continue
+    }
+    const value = params[param.name]
+    if (value === undefined)
+      return null
+    filled.push(value)
+  }
+  return filled.length ? `/${filled.join('/')}` : '/'
+}
+
+/**
+ * Resolve alternates from the translated route table.
+ *
+ * Returns null when the pages map can't answer for this route — it isn't
+ * listed, or an entry doesn't spell out every locale (i18n then leaves those
+ * locales on the untranslated file path, which the map doesn't record). The
+ * caller falls back to locale-prefix arithmetic in that case.
+ */
+function alternatesFromPages(basePath: string, locale: string, i18n: RuntimeI18nConfig): LocaleAlternate[] | null {
+  // no_prefix gives every locale the same single URL, so there is nothing to
+  // translate between.
+  const pages = i18n.pages
+  if (!pages || i18n.strategy === 'no_prefix')
+    return null
+
+  for (const localePaths of Object.values(pages)) {
+    const pattern = localePaths?.[locale]
+    if (!pattern)
+      continue
+
+    const params = matchPagePattern(pattern, basePath)
+    if (!params)
+      continue
+
+    const alternates: LocaleAlternate[] = []
+    for (const l of i18n.locales) {
+      const localePattern = localePaths[l.code]
+      // Disabled for this locale: no page, so no alternate.
+      if (localePattern === false)
+        continue
+      if (localePattern === undefined)
+        return null
+      const path = fillPagePattern(localePattern, params)
+      if (path === null)
+        return null
+      alternates.push({
+        code: l.code,
+        hreflang: l.hreflang || l.code,
+        path: localePath(path, l.code, i18n),
+      })
+    }
+    return alternates
+  }
+
+  return null
+}
+
 /**
  * Compute hreflang alternates for a given route.
  * Returns the route itself plus all sibling locale variants.
  */
 export function computeLocaleAlternates(route: string, i18n: RuntimeI18nConfig): LocaleAlternate[] {
-  const { basePath } = resolveLocaleFromRoute(route, i18n)
+  const { locale, basePath } = resolveLocaleFromRoute(route, i18n)
+
+  // Translated slugs (i18n `pages`) can't be derived by adding or removing a
+  // locale prefix — /about and /fr/a-propos are the same page. Consult the
+  // route table first so we don't advertise URLs that 404.
+  const translated = alternatesFromPages(basePath, locale, i18n)
+  if (translated)
+    return translated
+
   return i18n.locales.map(l => ({
     code: l.code,
     hreflang: l.hreflang || l.code,

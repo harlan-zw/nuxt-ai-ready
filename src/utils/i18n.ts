@@ -20,6 +20,10 @@ export function toRuntimeI18nConfig(auto: AutoI18nConfig): RuntimeI18nConfig {
   return {
     defaultLocale: auto.defaultLocale,
     strategy: auto.strategy,
+    // Translated route paths. Without these the runtime can only guess
+    // alternates by adding/removing a locale prefix, which is wrong for every
+    // page whose slug differs per locale.
+    ...(auto.pages && Object.keys(auto.pages).length ? { pages: auto.pages } : {}),
     locales: auto.locales.map((l) => {
       const raw = l as typeof l & { name?: string, nativeName?: string, language?: string }
       return {

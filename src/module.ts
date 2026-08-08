@@ -2,6 +2,7 @@ import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import type { ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
+import type { RuntimeI18nConfig } from './utils/i18n'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -79,11 +80,7 @@ export interface ModulePublicRuntimeConfig {
   runtimeSyncSecret?: string
   indexNow?: string
   sitemapPrerendered: boolean
-  i18n?: {
-    defaultLocale: string
-    strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
-    locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
-  } | null
+  i18n?: RuntimeI18nConfig | null
   ftsTokenizer?: string
   aiCatalog?: {
     cacheMaxAge: number

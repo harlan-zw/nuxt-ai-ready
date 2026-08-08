@@ -106,6 +106,24 @@ describe('buildLinkHeader', () => {
     expect(header).toContain('</fr/about>; rel="alternate"; hreflang="fr"')
   })
 
+  it('advertises translated slugs rather than prefixed default ones', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    }
+    const config = { i18n } as ModulePublicRuntimeConfig
+    const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl)
+
+    expect(header).toContain('<https://example.com/about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://example.com/fr/a-propos>; rel="alternate"; hreflang="fr"')
+    expect(header).not.toContain('/fr/about')
+  })
+
   it('advertises the API catalog only when enabled', () => {
     const enabledConfig = {
       apiCatalog: {
