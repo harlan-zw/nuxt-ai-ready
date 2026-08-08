@@ -76,15 +76,63 @@ function toSegments(path: string): string[] {
   return path.split('/').filter(Boolean)
 }
 
-/** `[slug]` / `:slug` (one segment) and `[...slug]` / `:slug(.*)` (the rest). */
-function readParam(segment: string): { name: string, catchAll: boolean } | null {
-  const bracket = /^\[(\.{3})?([^\]]+)\]$/.exec(segment)
-  if (bracket)
-    return { name: bracket[2]!, catchAll: !!bracket[1] }
-  const colon = /^:([^(]+)(\(\.\*\))?$/.exec(segment)
+interface PageParam {
+  name: string
+  catchAll: boolean
+  optional: boolean
+}
+
+/**
+ * Read a dynamic segment: `[slug]`, `[[slug]]`, `[...slug]`, `[[...slug]]` and
+ * the router equivalents `:slug`, `:slug?`, `:slug(.*)`.
+ */
+function readParam(segment: string): PageParam | null {
+  if (segment.startsWith('[') && segment.endsWith(']')) {
+    let name = segment.slice(1, -1)
+    let optional = false
+    if (name.startsWith('[') && name.endsWith(']')) {
+      name = name.slice(1, -1)
+      optional = true
+    }
+    const catchAll = name.startsWith('...')
+    if (catchAll)
+      name = name.slice(3)
+    // Anything still carrying a bracket isn't a segment we understand.
+    if (!name || name.includes('[') || name.includes(']'))
+      return null
+    return { name, catchAll, optional }
+  }
+  const colon = /^:([^(?*+]+)([?*+])?(\(\.\*\))?$/.exec(segment)
   if (colon)
-    return { name: colon[1]!.replace(/[?*+]$/, ''), catchAll: !!colon[2] }
+    return { name: colon[1]!, catchAll: !!colon[3] || colon[2] === '*', optional: colon[2] === '?' || colon[2] === '*' }
   return null
+}
+
+/**
+ * Specificity of each segment, most specific first: static beats a param, a
+ * param beats a catch-all. Mirrors how the router itself ranks routes, so the
+ * order entries happen to be declared in doesn't decide which page a path
+ * belongs to.
+ */
+function segmentRanks(pattern: string): number[] {
+  return toSegments(pattern).map((segment) => {
+    const param = readParam(segment)
+    if (!param)
+      return 2
+    return param.catchAll ? 0 : 1
+  })
+}
+
+/** Negative when `a` is more specific than `b`, for use as a sort comparator. */
+function compareSpecificity(a: number[], b: number[]): number {
+  const length = Math.max(a.length, b.length)
+  for (let i = 0; i < length; i++) {
+    // A pattern that ran out of segments is the less specific of the two.
+    const diff = (b[i] ?? -1) - (a[i] ?? -1)
+    if (diff !== 0)
+      return diff
+  }
+  return 0
 }
 
 /**
@@ -101,13 +149,15 @@ function matchPagePattern(pattern: string, path: string): Record<string, string>
     if (param?.catchAll) {
       const rest = pathSegments.slice(i)
       if (!rest.length)
-        return null
+        return param.optional ? params : null
       params[param.name] = rest.join('/')
       return params
     }
     const segment = pathSegments[i]
-    if (segment === undefined)
-      return null
+    if (segment === undefined) {
+      // The path stopped early: fine only if every segment left is optional.
+      return patternSegments.slice(i).every(s => readParam(s)?.optional) ? params : null
+    }
     if (param)
       params[param.name] = segment
     else if (patternSegments[i] !== segment)
@@ -127,20 +177,55 @@ function fillPagePattern(pattern: string, params: Record<string, string>): strin
       continue
     }
     const value = params[param.name]
-    if (value === undefined)
+    if (value === undefined) {
+      if (param.optional)
+        continue
       return null
+    }
     filled.push(value)
   }
   return filled.length ? `/${filled.join('/')}` : '/'
 }
 
 /**
+ * Build the alternates for one matched entry, or null when a locale the entry
+ * does name can't be rendered from the captured params.
+ */
+function alternatesForEntry(
+  localePaths: Record<string, string | false>,
+  params: Record<string, string>,
+  basePath: string,
+  i18n: RuntimeI18nConfig,
+): LocaleAlternate[] | null {
+  // Locales the entry doesn't name keep the untranslated route path, which the
+  // table doesn't record. The default locale's pattern is the closest thing to
+  // it we have; without one, fall back to the path that was requested.
+  const untranslated = localePaths[i18n.defaultLocale]
+  const alternates: LocaleAlternate[] = []
+
+  for (const l of i18n.locales) {
+    const pattern = localePaths[l.code] ?? untranslated
+    // Disabled for this locale: no page, so no alternate.
+    if (localePaths[l.code] === false)
+      continue
+    const path = typeof pattern === 'string' ? fillPagePattern(pattern, params) : basePath
+    if (path === null)
+      return null
+    alternates.push({
+      code: l.code,
+      hreflang: l.hreflang || l.code,
+      path: localePath(path, l.code, i18n),
+    })
+  }
+
+  return alternates
+}
+
+/**
  * Resolve alternates from the translated route table.
  *
- * Returns null when the pages map can't answer for this route — it isn't
- * listed, or an entry doesn't spell out every locale (i18n then leaves those
- * locales on the untranslated file path, which the map doesn't record). The
- * caller falls back to locale-prefix arithmetic in that case.
+ * Returns null when the pages map can't answer for this route, in which case
+ * the caller falls back to locale-prefix arithmetic.
  */
 function alternatesFromPages(basePath: string, locale: string, i18n: RuntimeI18nConfig): LocaleAlternate[] | null {
   // no_prefix gives every locale the same single URL, so there is nothing to
@@ -149,33 +234,22 @@ function alternatesFromPages(basePath: string, locale: string, i18n: RuntimeI18n
   if (!pages || i18n.strategy === 'no_prefix')
     return null
 
+  const matches: Array<{ ranks: number[], localePaths: Record<string, string | false>, params: Record<string, string> }> = []
   for (const localePaths of Object.values(pages)) {
     const pattern = localePaths?.[locale]
     if (!pattern)
       continue
-
     const params = matchPagePattern(pattern, basePath)
-    if (!params)
-      continue
+    if (params)
+      matches.push({ ranks: segmentRanks(pattern), localePaths, params })
+  }
 
-    const alternates: LocaleAlternate[] = []
-    for (const l of i18n.locales) {
-      const localePattern = localePaths[l.code]
-      // Disabled for this locale: no page, so no alternate.
-      if (localePattern === false)
-        continue
-      if (localePattern === undefined)
-        return null
-      const path = fillPagePattern(localePattern, params)
-      if (path === null)
-        return null
-      alternates.push({
-        code: l.code,
-        hreflang: l.hreflang || l.code,
-        path: localePath(path, l.code, i18n),
-      })
-    }
-    return alternates
+  matches.sort((a, b) => compareSpecificity(a.ranks, b.ranks))
+
+  for (const match of matches) {
+    const alternates = alternatesForEntry(match.localePaths, match.params, basePath, i18n)
+    if (alternates)
+      return alternates
   }
 
   return null
