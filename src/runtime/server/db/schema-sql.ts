@@ -118,7 +118,14 @@ export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
       INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
     END`,
-    `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages BEGIN
+    `CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages
+      WHEN old.route IS NOT new.route
+        OR old.title IS NOT new.title
+        OR old.description IS NOT new.description
+        OR old.markdown IS NOT new.markdown
+        OR old.headings IS NOT new.headings
+        OR old.keywords IS NOT new.keywords
+      BEGIN
       INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)

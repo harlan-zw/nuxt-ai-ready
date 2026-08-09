@@ -104,6 +104,19 @@ async function markIndexNowSynced(db: TestDatabaseAdapter, routes: string[]): Pr
   }
 }
 
+async function markRoutesPending(db: TestDatabaseAdapter, routes: string[]): Promise<void> {
+  if (routes.length === 0)
+    return
+  for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
+    const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
+    const placeholders = batch.map(() => '?').join(',')
+    await db.exec(
+      `UPDATE ai_ready_pages SET indexed = 0 WHERE route IN (${placeholders})`,
+      batch,
+    )
+  }
+}
+
 describe('db-queries: stale route functions', () => {
   let sqliteDb: Database.Database
   let db: TestDatabaseAdapter
@@ -502,6 +515,61 @@ describe('db-queries: stale route functions', () => {
 
       const pages = await getPagesNeedingIndexNowSync(db, 5)
       expect(pages).toHaveLength(5)
+    })
+  })
+
+  describe('markRoutesPending', () => {
+    it('marks single route as pending', async () => {
+      const now = Date.now()
+      await db.exec(`
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+        VALUES ('/page1', 'page1', 'Page 1', '', '# Content', '[]', '[]', ?, ?, 0, 1, 0)
+      `, [new Date().toISOString(), now])
+
+      await markRoutesPending(db, ['/page1'])
+
+      const row = await db.first<{ indexed: number }>('SELECT indexed FROM ai_ready_pages WHERE route = ?', ['/page1'])
+      expect(row?.indexed).toBe(0)
+    })
+
+    it('handles empty array', async () => {
+      await markRoutesPending(db, [])
+    })
+
+    it('chunks IN clause to respect D1 100-param cap', async () => {
+      // D1 (and SQLite) error out at >100 bound params per statement. Use a
+      // mock adapter that asserts the cap, plus a real DB to confirm correctness.
+      const now = Date.now()
+      const routeCount = 250
+      const routes: string[] = []
+      for (let i = 1; i <= routeCount; i++) {
+        const route = `/r${i}`
+        routes.push(route)
+        await db.exec(`
+          INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, last_seen_at)
+          VALUES (?, ?, '', '', '', '[]', '[]', ?, ?, 0, 1, 0)
+        `, [route, `r${i}`, new Date().toISOString(), now])
+      }
+
+      const calls: number[] = []
+      const wrapped: TestDatabaseAdapter = {
+        ...db,
+        async exec(sql, params) {
+          calls.push((params || []).length)
+          expect((params || []).length).toBeLessThanOrEqual(100)
+          await db.exec(sql, params)
+        },
+      }
+
+      await markRoutesPending(wrapped, routes)
+
+      // 250 routes -> ceil(250/99) = 3 batches
+      expect(calls).toHaveLength(3)
+
+      const pending = await db.first<{ count: number }>(
+        'SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 0',
+      )
+      expect(pending?.count).toBe(routeCount)
     })
   })
 })
