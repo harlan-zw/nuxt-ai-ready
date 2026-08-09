@@ -26,6 +26,15 @@ export function registerDriver(
 const RE_PARAM_PLACEHOLDER = /\?/g
 
 /**
+ * Remote drivers (D1, libsql, neon) pay a network round-trip per statement.
+ * Drivers expose a batched API (D1 `batch`, libsql `batch`, neon `transaction`)
+ * that runs many statements in a single request. Local drivers wrap in a
+ * transaction for a similar speedup. All drivers cap a batch's statement count;
+ * chunk conservatively so callers never need to think about limits.
+ */
+const MAX_BATCH_STATEMENTS = 100
+
+/**
  * Get raw SQL executor for a Drizzle client
  */
 export function getRawExecutor(client: DrizzleDatabase) {
@@ -93,6 +102,65 @@ export function getRawExecutor(client: DrizzleDatabase) {
           let idx = 0
           const pgQuery = query.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
           await sqlFn.query(pgQuery, params)
+          break
+        }
+      }
+    },
+
+    /**
+     * Execute many statements in as few round-trips as the driver allows.
+     * Statements run in order; on a remote driver each chunk is one request.
+     */
+    async batch(queries: { sql: string, params?: unknown[] }[]): Promise<void> {
+      if (queries.length === 0)
+        return
+
+      switch (type) {
+        case 'better-sqlite3': {
+          const sqlite = driver as {
+            prepare: (sql: string) => { run: (...p: unknown[]) => void }
+            transaction: (fn: () => void) => () => void
+          }
+          const tx = sqlite.transaction(() => {
+            for (const q of queries)
+              sqlite.prepare(q.sql).run(...(q.params || []))
+          })
+          tx()
+          break
+        }
+        case 'libsql': {
+          const client = driver as { batch: (stmts: { sql: string, args?: unknown[] }[]) => Promise<unknown> }
+          for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
+            const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
+            await client.batch(chunk.map(q => ({ sql: q.sql, args: q.params || [] })))
+          }
+          break
+        }
+        case 'd1': {
+          const db = driver as {
+            prepare: (sql: string) => { bind: (...p: unknown[]) => { run: () => Promise<unknown> } }
+            batch: (stmts: unknown[]) => Promise<unknown>
+          }
+          for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
+            const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
+            await db.batch(chunk.map(q => db.prepare(q.sql).bind(...(q.params || []))))
+          }
+          break
+        }
+        case 'neon': {
+          const sqlFn = driver as {
+            query: (sql: string, params: unknown[]) => Promise<unknown>
+            transaction: (queries: unknown[]) => Promise<unknown>
+          }
+          for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
+            const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
+            const pgQueries = chunk.map((q) => {
+              let idx = 0
+              const pgQuery = q.sql.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
+              return sqlFn.query(pgQuery, q.params || [])
+            })
+            await sqlFn.transaction(pgQueries)
+          }
           break
         }
       }

@@ -6,6 +6,7 @@ import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
+import { useRawDb } from './raw'
 
 function resolveFtsTokenizer(event?: H3Event): FtsTokenizer {
   const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
@@ -148,14 +149,32 @@ export async function getAllPages(
 ): Promise<PageOutput[] | PageMetaOutput[]> {
   const client = await useDrizzle(event)
 
-  let query = (client.db as any).select().from(pages)
+  // When markdown is excluded, project only the meta columns instead of
+  // selecting `*` and discarding markdown after transfer (markdown is by far
+  // the largest column).
+  const cols = options?.excludeMarkdown
+    ? {
+        route: pages.route,
+        title: pages.title,
+        description: pages.description,
+        headings: pages.headings,
+        keywords: pages.keywords,
+        contentHash: pages.contentHash,
+        updatedAt: pages.updatedAt,
+        isError: pages.isError,
+      }
+    : undefined
+
+  let query = cols
+    ? (client.db as any).select(cols).from(pages)
+    : (client.db as any).select().from(pages)
 
   if (!options?.includeErrors) {
     query = query.where(eq(pages.isError, 0))
   }
 
   const rows = await query
-  return rows.map((row: any) => options?.excludeMarkdown ? rowToMeta(row) : rowToPage(row))
+  return rows.map((row: any) => cols ? rowToMeta(row) : rowToPage(row))
 }
 
 /**
@@ -338,12 +357,20 @@ export async function markRoutesPending(event: H3Event | undefined, routes: stri
   if (routes.length === 0)
     return
 
-  const client = await useDrizzle(event)
-
-  await (client.db as any)
-    .update(pages)
-    .set({ indexed: 0 })
-    .where(sql`${pages.route} IN (${sql.join(routes.map(r => sql`${r}`), sql`, `)})`)
+  // D1/SQLite caps prepared-statement params at 100; chunk the IN clause to
+  // 99 routes per statement, then run all chunks in one driver-level batch.
+  const db = await useRawDb(event)
+  const stmts: { sql: string, params: unknown[] }[] = []
+  const D1_MAX_IN_ROUTES = 99
+  for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
+    const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
+    const placeholders = batch.map(() => '?').join(',')
+    stmts.push({
+      sql: `UPDATE ai_ready_pages SET indexed = 0 WHERE route IN (${placeholders})`,
+      params: batch,
+    })
+  }
+  await db.batch(stmts)
 }
 
 /**
@@ -408,7 +435,7 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // Schema Management
 // ============================================================================
 
-const SCHEMA_VERSION = 'v2.1.0-drizzle'
+const SCHEMA_VERSION = 'v2.1.1-drizzle'
 
 /**
  * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
@@ -584,7 +611,9 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       route, title, description, markdown, headings, keywords,
       content=ai_ready_pages, content_rowid=id, tokenize='${ftsTokenizer}'
     )`),
-    // FTS triggers
+    // FTS triggers. The UPDATE trigger only fires when a searchable column
+    // actually changed; updates to bookkeeping columns (indexed, indexed_at,
+    // indexnow_synced_at, last_seen_at…) skip the delete+reinsert FTS churn.
     sql`CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
       VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
@@ -593,7 +622,14 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
     END`,
-    sql`CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages BEGIN
+    sql`CREATE TRIGGER IF NOT EXISTS ai_ready_pages_au AFTER UPDATE ON ai_ready_pages
+      WHEN old.route IS NOT new.route
+        OR old.title IS NOT new.title
+        OR old.description IS NOT new.description
+        OR old.markdown IS NOT new.markdown
+        OR old.headings IS NOT new.headings
+        OR old.keywords IS NOT new.keywords
+      BEGIN
       INSERT INTO ai_ready_pages_fts(ai_ready_pages_fts, rowid, route, title, description, markdown, headings, keywords)
       VALUES('delete', old.id, old.route, old.title, old.description, old.markdown, old.headings, old.keywords);
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
@@ -739,19 +775,22 @@ export async function markIndexNowSynced(
   if (routes.length === 0)
     return
 
-  const client = await useDrizzle(event)
   const now = Date.now()
 
-  // D1/SQLite caps prepared-statement params at 100; chunk to 99 routes + ts.
+  // D1/SQLite caps prepared-statement params at 100; chunk to 99 routes + ts,
+  // then run all chunks in one driver-level batch.
+  const db = await useRawDb(event)
+  const stmts: { sql: string, params: unknown[] }[] = []
   const D1_MAX_IN_ROUTES = 99
   for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
     const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
     const placeholders = batch.map(() => '?').join(',')
-    await (client.db as any).run(
-      sql.raw(`UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`),
-      [now, ...batch],
-    )
+    stmts.push({
+      sql: `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+      params: [now, ...batch],
+    })
   }
+  await db.batch(stmts)
 }
 
 // ============================================================================
@@ -1076,35 +1115,36 @@ export async function seedRoutes(
   if (routes.length === 0)
     return 0
 
-  const client = await useDrizzle(event)
+  // Dedupe by route to avoid SQLite's "ON CONFLICT cannot affect row a second
+  // time" error when a multi-row INSERT contains the same route twice.
+  const byRoute = new Map<string, string>()
+  for (const route of routes)
+    byRoute.set(route, normalizeRouteKey(route))
+
+  // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
+  // call on D1), so one INSERT per route times out large sitemaps. 4 bind
+  // params per row keeps each statement within D1's 100-parameter cap. All
+  // statements then go through `db.batch` so round-trips collapse into one.
+  const ROWS_PER_INSERT = 20
+  const db = await useRawDb(event)
   const now = new Date().toISOString()
   const nowMs = Date.now()
-
-  for (const route of routes) {
-    const values = {
-      route,
-      routeKey: normalizeRouteKey(route),
-      title: '',
-      description: '',
-      markdown: '',
-      headings: '[]',
-      keywords: '[]',
-      updatedAt: now,
-      indexedAt: 0,
-      isError: 0,
-      indexed: 0,
-      source: 'runtime',
-      lastSeenAt: nowMs,
-    }
-
-    await (client.db as any)
-      .insert(pages)
-      .values(values)
-      .onConflictDoUpdate({
-        target: pages.route,
-        set: { lastSeenAt: nowMs },
-      })
+  const entries = [...byRoute.entries()]
+  const stmts: { sql: string, params: unknown[] }[] = []
+  for (let i = 0; i < entries.length; i += ROWS_PER_INSERT) {
+    const batch = entries.slice(i, i + ROWS_PER_INSERT)
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?)`).join(', ')
+    const params = batch.flatMap(([route, routeKey]) => [route, routeKey, now, nowMs])
+    stmts.push({
+      sql: `
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
+        VALUES ${valuesSql}
+        ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at
+      `,
+      params,
+    })
   }
+  await db.batch(stmts)
 
-  return routes.length
+  return byRoute.size
 }
