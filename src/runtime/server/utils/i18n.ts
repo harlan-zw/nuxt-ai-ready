@@ -22,13 +22,15 @@ export function resolveLocaleAlternateUrl(
   alternate: Pick<LocaleAlternate, 'domain' | 'path'>,
   resolveUrl: (path: string) => string,
 ): string {
+  const resolved = resolveUrl(alternate.path)
   if (!alternate.domain)
-    return resolveUrl(alternate.path)
+    return resolved
 
   const origin = /^[a-z][a-z\d+.-]*:\/\//i.test(alternate.domain)
     ? alternate.domain
     : `https://${alternate.domain}`
-  return new URL(alternate.path, origin).href
+  const deployed = new URL(resolved, 'http://nuxtseo.local')
+  return new URL(`${deployed.pathname}${deployed.search}${deployed.hash}`, origin).href
 }
 
 /** Get the runtime i18n config from runtimeConfig, or null when disabled. */

@@ -1,6 +1,6 @@
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
 import { describe, expect, it } from 'vitest'
-import { computeLocaleAlternates, localePath, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
+import { computeLocaleAlternates, localePath, resolveLocaleAlternateUrl, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
 import { hasCjkLocale, toRuntimeI18nConfig } from '../../src/utils/i18n'
 
 const en = { code: 'en', hreflang: 'en' }
@@ -83,6 +83,15 @@ describe('computeLocaleAlternates', () => {
   it('produces alternates for default-locale routes', () => {
     const alts = computeLocaleAlternates('/about', prefixExceptDefault)
     expect(alts.map(a => a.path)).toEqual(['/about', '/fr/about'])
+  })
+})
+
+describe('resolveLocaleAlternateUrl', () => {
+  it('keeps the deployed base path when switching locale domains', () => {
+    expect(resolveLocaleAlternateUrl(
+      { domain: 'fr.example.com', path: '/fr/about?view=full' },
+      path => new URL(`/docs${path}`, 'https://en.example.com').href,
+    )).toBe('https://fr.example.com/docs/fr/about?view=full')
   })
 })
 
