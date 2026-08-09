@@ -2,12 +2,20 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
+import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapCrawlPartial, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, seedRoutes, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
 import { syncToIndexNow } from './indexnow'
-import { fetchSitemapByRoute, getSitemapsFromConfig } from './sitemap'
+import { crawlSitemapByRoute, getSitemapsFromConfig, mapSitemapRoutes } from './sitemap'
+
+interface SitemapPingResult {
+  name?: string
+  pinged: boolean
+  continuing?: boolean
+  error?: string
+  pruned: number
+}
 
 export interface CronResult {
   runId?: number | null
@@ -15,6 +23,7 @@ export interface CronResult {
   sitemap?: {
     name?: string
     pinged: boolean
+    continuing?: boolean
     error?: string
     pruned: number
   }
@@ -105,7 +114,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
     // Ping next sitemap to trigger seeding via sitemap:resolved hook
     // The sitemap-seeder plugin handles actual route insertion
     if (config.runtimeSync.enabled) {
-      const sitemapResult = await pingSitemap(event, config, debug).catch((err): { name?: string, pinged: boolean, pruned: number, error?: string } => {
+      const sitemapResult = await pingSitemap(event, config, debug).catch((err): SitemapPingResult => {
         const msg = err instanceof Error ? err.message : String(err)
         logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
         allErrors.push(`sitemap: ${msg}`)
@@ -114,7 +123,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
       results.sitemap = sitemapResult
       if (debug) {
         if (sitemapResult.name) {
-          logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.error ? ` (error: ${sitemapResult.error})` : ''}`)
+          logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.continuing ? ' (continuing)' : sitemapResult.error ? ` (error: ${sitemapResult.error})` : ''}`)
         }
         if (sitemapResult.pruned > 0) {
           logger.info(`[cron] Sitemap: pruned ${sitemapResult.pruned} stale routes`)
@@ -219,7 +228,7 @@ async function pingSitemap(
   event: H3Event | undefined,
   config: ModulePublicRuntimeConfig,
   debug?: boolean,
-): Promise<{ name?: string, pinged: boolean, pruned: number, error?: string }> {
+): Promise<SitemapPingResult> {
   const { pruneTtl } = config.runtimeSync
 
   // Sync sitemap list from runtime config to DB
@@ -247,38 +256,59 @@ async function pingSitemap(
   if (debug)
     logger.info(`[cron] Pinging sitemap: ${nextSitemap.name} (${nextSitemap.route})`)
 
-  // Fetch sitemap using fetchSitemapByRoute which handles ASSETS.fetch on Cloudflare
-  // This avoids self-fetch hangs in cron context
+  // Fetch one bounded round. ASSETS.fetch avoids self-fetch hangs on Cloudflare.
   if (debug)
     logger.info(`[cron] Starting sitemap fetch: ${nextSitemap.route}`)
 
-  const { urls, error } = await fetchSitemapByRoute(event, nextSitemap.route)
+  const result = await crawlSitemapByRoute(event, {
+    route: nextSitemap.route,
+    state: nextSitemap.crawlState,
+  })
+  const routes = [...mapSitemapRoutes(result.urls).keys()]
+  if (routes.length > 0)
+    await seedRoutes(event, routes)
 
-  if (error) {
-    await markSitemapError(event, nextSitemap.name, error)
+  if (result._tag === 'failed') {
+    await markSitemapError(event, nextSitemap.name, result.error)
+    return {
+      name: nextSitemap.name,
+      pinged: false,
+      pruned: 0,
+      error: result.error,
+    }
   }
-  else {
+
+  if (result._tag === 'partial') {
+    await markSitemapCrawlPartial(event, nextSitemap.name, result.state)
     if (debug)
-      logger.info(`[cron] Sitemap fetch complete (${urls.length} URLs)`)
-    // Success - mark as crawled with URL count
-    // Note: sitemap-seeder plugin may also call this via hook, but we call
-    // again in case the hook didn't fire (e.g., ASSETS.fetch bypasses hooks)
-    await markSitemapCrawled(event, nextSitemap.name, urls.length)
+      logger.info(`[cron] Sitemap round complete (${result.urls.length} URLs, ${result.state.frontier.length} frontier entries)`)
+    return {
+      name: nextSitemap.name,
+      pinged: true,
+      continuing: true,
+      pruned: 0,
+    }
   }
+
+  if (debug)
+    logger.info(`[cron] Sitemap fetch complete (${result.urls.length} URLs)`)
+  // Success: mark as crawled with the total count across continuation rounds.
+  // Note: sitemap-seeder plugin may also call this via hook, but we call
+  // again in case the hook didn't fire (e.g., ASSETS.fetch bypasses hooks)
+  await markSitemapCrawled(event, nextSitemap.name, result.urlsObserved)
 
   // Prune stale routes if configured, but only after a clean crawl. A failed or
   // partial crawl (e.g. a child sitemap 404'd) means some routes' last_seen_at
   // wasn't refreshed; pruning on that incomplete evidence could delete live
   // routes whose sitemap simply failed to load this run.
   let pruned = 0
-  if (pruneTtl > 0 && !error) {
-    pruned = await pruneStaleRoutes(event, pruneTtl)
+  if (pruneTtl > 0) {
+    pruned = await pruneStaleRoutes(event, pruneTtl, result.startedAt)
   }
 
   return {
     name: nextSitemap.name,
-    pinged: !error,
+    pinged: true,
     pruned,
-    error,
   }
 }

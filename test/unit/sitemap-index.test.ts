@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchSitemapByRoute } from '../../src/runtime/server/utils/sitemap'
+import { crawlSitemapByRoute, fetchSitemapByRoute } from '../../src/runtime/server/utils/sitemap'
 
 vi.mock('#ai-ready-virtual/logger.mjs', () => ({
   logger: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
@@ -162,6 +162,74 @@ describe('fetchSitemapByRoute', () => {
     expect(urls.length).toBeGreaterThan(0)
     expect(error).toContain('document_limit')
     expect(event.fetch).toHaveBeenCalledTimes(100)
+  })
+
+  it('resumes document-limited fanout without refetching committed documents', async () => {
+    const childCount = 101
+    const children = Array.from(
+      { length: childCount },
+      (_, index) => `<sitemap><loc>https://example.com/children/${index}.xml</loc></sitemap>`,
+    ).join('')
+    const routes = Object.fromEntries([
+      ['/sitemap.xml', `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${children}</sitemapindex>`],
+      ...Array.from(
+        { length: childCount },
+        (_, index) => [`/children/${index}.xml`, URLSET] as const,
+      ),
+    ])
+    const event = mockEvent(routes)
+
+    const first = await crawlSitemapByRoute(event, { route: '/sitemap.xml' })
+
+    expect(first._tag).toBe('partial')
+    if (first._tag !== 'partial')
+      return
+    expect(first.state.frontier.length).toBeGreaterThan(0)
+    expect(first.state.seenDocuments).toContain('https://example.com/sitemap.xml')
+    expect(first.state.startedAt).toEqual(expect.any(Number))
+
+    const second = await crawlSitemapByRoute(event, {
+      route: '/sitemap.xml',
+      state: first.state,
+    })
+
+    expect(second._tag).toBe('complete')
+    expect(second.startedAt).toBe(first.state.startedAt)
+    expect(event.fetch).toHaveBeenCalledTimes(childCount + 1)
+    expect(event.fetch).toHaveBeenCalledWith('/sitemap.xml', expect.anything())
+    expect((event.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([route]) => route === '/sitemap.xml')).toHaveLength(1)
+  })
+
+  it('retries failed frontier entries without refetching successful documents', async () => {
+    const routes: Record<string, MockRoute> = {
+      '/sitemap.xml': INDEX,
+      '/__sitemap__/en.xml': URLSET,
+    }
+    const event = mockEvent(routes)
+
+    const first = await crawlSitemapByRoute(event, { route: '/sitemap.xml' })
+
+    expect(first._tag).toBe('partial')
+    if (first._tag !== 'partial')
+      return
+    expect(first.state.frontier.map(entry => entry.url)).toEqual([
+      'https://example.com/__sitemap__/fr.xml',
+    ])
+
+    routes['/__sitemap__/fr.xml'] = URLSET_FR
+    const second = await crawlSitemapByRoute(event, {
+      route: '/sitemap.xml',
+      state: first.state,
+    })
+
+    expect(second._tag).toBe('complete')
+    expect(second.urls.map(url => url.loc)).toEqual(['https://example.com/fr/about'])
+    expect((event.fetch as ReturnType<typeof vi.fn>).mock.calls.map(([route]) => route)).toEqual([
+      '/sitemap.xml',
+      '/__sitemap__/en.xml',
+      '/__sitemap__/fr.xml',
+      '/__sitemap__/fr.xml',
+    ])
   })
 
   it('visits each document once across an A to B cycle', async () => {

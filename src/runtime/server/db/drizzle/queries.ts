@@ -1,9 +1,11 @@
 import type { H3Event } from '#nuxtseo/h3'
+import type { SitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import type { FtsTokenizer } from '../schema-sql'
 import type { DrizzleDatabase } from './client'
-import { and, count, desc, eq, gt, isNull, like, lt, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, isNotNull, isNull, like, lt, or, sql } from 'drizzle-orm'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
 import { useRawDb } from './raw'
@@ -435,7 +437,7 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // Schema Management
 // ============================================================================
 
-const SCHEMA_VERSION = 'v2.1.1-drizzle'
+const SCHEMA_VERSION = 'v2.2.0-drizzle'
 
 /**
  * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
@@ -597,7 +599,8 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       last_crawled_at INTEGER,
       url_count INTEGER DEFAULT 0,
       error_count INTEGER DEFAULT 0,
-      last_error TEXT
+      last_error TEXT,
+      crawl_state TEXT
     )`,
     // Indexes
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)`,
@@ -695,7 +698,8 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       last_crawled_at INTEGER,
       url_count INTEGER DEFAULT 0,
       error_count INTEGER DEFAULT 0,
-      last_error TEXT
+      last_error TEXT,
+      crawl_state TEXT
     )`,
     // Indexes
     sql`CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)`,
@@ -913,9 +917,18 @@ export interface SitemapOutput {
   urlCount: number
   errorCount: number
   lastError: string | null
+  continuing: boolean
 }
 
-function rowToSitemap(row: any): SitemapOutput {
+interface SitemapEntry extends Omit<SitemapOutput, 'continuing'> {
+  crawlState: SitemapCrawlState | null
+}
+
+function rowToSitemap(row: any): SitemapEntry {
+  const parsedState = parseSitemapCrawlState(row.crawlState ?? null)
+  if (parsedState._tag === 'error')
+    throw new Error(`Invalid crawl state for sitemap ${row.name}: ${parsedState.error}`)
+
   return {
     name: row.name,
     route: row.route,
@@ -923,6 +936,7 @@ function rowToSitemap(row: any): SitemapOutput {
     urlCount: row.urlCount || 0,
     errorCount: row.errorCount || 0,
     lastError: row.lastError,
+    crawlState: parsedState.state,
   }
 }
 
@@ -936,10 +950,11 @@ export async function syncSitemaps(
   const client = await useDrizzle(event)
 
   const existing = await (client.db as any)
-    .select({ name: sitemaps.name })
+    .select({ name: sitemaps.name, route: sitemaps.route })
     .from(sitemaps)
 
   const existingNames = new Set(existing.map((r: any) => r.name))
+  const existingRoutes = new Map(existing.map((row: any) => [row.name, row.route]))
   const configNames = new Set(sitemapList.map(s => s.name))
 
   let added = 0
@@ -952,6 +967,19 @@ export async function syncSitemaps(
         .insert(sitemaps)
         .values({ name: sitemap.name, route: sitemap.route })
       added++
+    }
+    else if (existingRoutes.get(sitemap.name) !== sitemap.route) {
+      await (client.db as any)
+        .update(sitemaps)
+        .set({
+          route: sitemap.route,
+          lastCrawledAt: null,
+          urlCount: 0,
+          errorCount: 0,
+          lastError: null,
+          crawlState: null,
+        })
+        .where(eq(sitemaps.name, sitemap.name))
     }
   }
 
@@ -974,9 +1002,23 @@ export async function syncSitemaps(
 export async function getNextSitemapToCrawl(
   event: H3Event | undefined,
   minIntervalMinutes = 5,
-): Promise<SitemapOutput | null> {
+): Promise<SitemapEntry | null> {
   const client = await useDrizzle(event)
   const threshold = Date.now() - minIntervalMinutes * 60 * 1000
+
+  // Continue bounded work before considering normal recrawl throttling.
+  const continuationRow = await (client.db as any)
+    .select()
+    .from(sitemaps)
+    .where(and(
+      isNotNull(sitemaps.crawlState),
+      eq(sitemaps.errorCount, 0),
+    ))
+    .orderBy(sitemaps.lastCrawledAt)
+    .limit(1)
+
+  if (continuationRow.length)
+    return rowToSitemap(continuationRow[0])
 
   // First try error sitemaps
   const errorRow = await (client.db as any)
@@ -1034,6 +1076,54 @@ export async function markSitemapCrawled(
       urlCount,
       errorCount: 0,
       lastError: null,
+      crawlState: null,
+    })
+    .where(eq(sitemaps.name, name))
+}
+
+/** Record a deferred sitemap hook seed only when no crawl is in progress. */
+export async function markSitemapSeeded(
+  event: H3Event | undefined,
+  name: string,
+  urlCount: number,
+  expectedLastCrawledAt: number | null,
+): Promise<void> {
+  const client = await useDrizzle(event)
+
+  await (client.db as any)
+    .update(sitemaps)
+    .set({
+      lastCrawledAt: Date.now(),
+      urlCount,
+      errorCount: 0,
+      lastError: null,
+    })
+    .where(and(
+      eq(sitemaps.name, name),
+      isNull(sitemaps.crawlState),
+      eq(sitemaps.errorCount, 0),
+      expectedLastCrawledAt === null
+        ? isNull(sitemaps.lastCrawledAt)
+        : eq(sitemaps.lastCrawledAt, expectedLastCrawledAt),
+    ))
+}
+
+/** Persist a resumable sitemap crawl without incrementing its error budget. */
+export async function markSitemapCrawlPartial(
+  event: H3Event | undefined,
+  name: string,
+  state: SitemapCrawlState,
+): Promise<void> {
+  const client = await useDrizzle(event)
+
+  await (client.db as any)
+    .update(sitemaps)
+    .set({
+      lastCrawledAt: Date.now(),
+      urlCount: state.urlsObserved,
+      errorCount: 0,
+      lastError: null,
+      crawlState: serializeSitemapCrawlState(state),
     })
     .where(eq(sitemaps.name, name))
 }
@@ -1054,6 +1144,7 @@ export async function markSitemapError(
       lastCrawledAt: Date.now(),
       errorCount: sql`${sitemaps.errorCount} + 1`,
       lastError: error,
+      crawlState: null,
     })
     .where(eq(sitemaps.name, name))
 }
@@ -1071,7 +1162,10 @@ export async function getSitemapStatus(
     .from(sitemaps)
     .orderBy(sitemaps.name)
 
-  return rows.map(rowToSitemap)
+  return rows.map((row: any) => {
+    const { crawlState, ...entry } = rowToSitemap(row)
+    return { ...entry, continuing: crawlState !== null }
+  })
 }
 
 /**
@@ -1080,11 +1174,14 @@ export async function getSitemapStatus(
 export async function resetSitemapErrors(event: H3Event | undefined): Promise<number> {
   const client = await useDrizzle(event)
 
-  // Count sitemaps with errors
+  // Count sitemaps with errors or abandoned continuation state.
   const countResult = await (client.db as any)
     .select({ count: count() })
     .from(sitemaps)
-    .where(gt(sitemaps.errorCount, 0))
+    .where(or(
+      gt(sitemaps.errorCount, 0),
+      sql`${sitemaps.crawlState} IS NOT NULL`,
+    ))
 
   const errorCount = countResult[0]?.count || 0
 
@@ -1095,6 +1192,7 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
         errorCount: 0,
         lastError: null,
         lastCrawledAt: null,
+        crawlState: null,
       })
   }
 

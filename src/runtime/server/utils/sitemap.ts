@@ -3,10 +3,13 @@ import type {
   SitemapDocumentLoadResult,
   SitemapLoadRequest,
   SitemapUrlRecord,
+  SitemapWalkEntry,
   SitemapWalkFailure,
+  SitemapWalkPartialReason,
 } from 'sitemapd'
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { SitemapCrawlState } from './sitemap-crawl-state'
 import { createSitemapReader } from 'sitemapd'
 import { parseSitemap } from 'sitemapd/parse'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
@@ -25,6 +28,11 @@ export interface SitemapConfig {
   route: string
 }
 
+export interface SitemapRouteSource {
+  loc: string
+  _path?: { pathname: string } | null
+}
+
 const FETCH_TIMEOUT = 15_000
 const SITEMAP_FALLBACK_ORIGIN = 'http://localhost'
 const SITEMAP_READER_LIMITS = {
@@ -36,6 +44,19 @@ const SITEMAP_READER_LIMITS = {
   maxWireBytes: 50 * 1024 * 1024,
   maxDecodedBytes: 50 * 1024 * 1024,
 } as const
+const MAX_SITEMAP_CRAWL_ROUNDS = 10
+
+interface SitemapCrawlResultBase {
+  urls: SitemapUrl[]
+  documentsAttempted: number
+  urlsObserved: number
+  startedAt: number
+}
+
+export type SitemapCrawlResult
+  = | SitemapCrawlResultBase & { _tag: 'complete' }
+    | SitemapCrawlResultBase & { _tag: 'partial', state: SitemapCrawlState, error: string }
+    | SitemapCrawlResultBase & { _tag: 'failed', error: string }
 
 /**
  * Get list of sitemaps from @nuxtjs/sitemap runtime config
@@ -75,6 +96,18 @@ export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
 export function hasMultipleSitemaps(event: H3Event): boolean {
   const sitemaps = getSitemapsFromConfig(event)
   return sitemaps.length > 1
+}
+
+/** Normalize sitemap URL records into the route map used by the page store. */
+export function mapSitemapRoutes<T extends SitemapRouteSource>(urls: readonly T[]): Map<string, T> {
+  const routeToUrl = new Map<string, T>()
+  for (const url of urls) {
+    const route = url._path?.pathname
+      ?? (url.loc.startsWith('/') ? (url.loc.split('?')[0] ?? url.loc) : new URL(url.loc).pathname)
+    if (!route.includes('.'))
+      routeToUrl.set(route, url)
+  }
+  return routeToUrl
 }
 
 /**
@@ -358,26 +391,119 @@ function formatWalkFailure(failure: SitemapWalkFailure): string {
   return `${failure.url}: ${failure.result.reason}: ${failure.result.detail}`
 }
 
+function toWalkEntry(failure: SitemapWalkFailure): SitemapWalkEntry {
+  if (failure.source === 'root') {
+    return {
+      url: failure.url,
+      depth: 0,
+      source: 'root',
+    }
+  }
+  return {
+    url: failure.url,
+    depth: failure.depth,
+    source: 'index_child',
+    parentUrl: failure.parentUrl,
+  }
+}
+
+function isRetryableWalkFailure(failure: SitemapWalkFailure): boolean {
+  if (failure.result._tag === 'not_found')
+    return true
+  if (failure.result.reason === 'http')
+    return true
+  return failure.result.reason === 'load'
+    && (failure.result.code === 'network' || failure.result.code === 'timeout' || failure.result.code === 'cancelled')
+}
+
+function createNextFrontier(
+  failures: SitemapWalkFailure[],
+  frontier: SitemapWalkEntry[],
+  seenDocuments: Set<string>,
+): SitemapWalkEntry[] {
+  const seenEntries = new Set<string>()
+  const entries = [
+    ...failures.filter(isRetryableWalkFailure).map(toWalkEntry),
+    ...frontier,
+  ]
+  return entries.filter((entry) => {
+    if (seenDocuments.has(entry.url) || seenEntries.has(entry.url))
+      return false
+    seenEntries.add(entry.url)
+    return true
+  })
+}
+
+function isTerminalPartialReason(reason: SitemapWalkPartialReason): boolean {
+  return reason === 'depth_limit' || reason === 'url_limit' || reason === 'document_partial'
+}
+
+function formatWalkError(result: {
+  reasons: SitemapWalkPartialReason[]
+  failures: SitemapWalkFailure[]
+}, parseFailures: string[]): string {
+  if (result.failures.length === 1 && parseFailures.length === 1 && result.reasons.length === 1 && result.reasons[0] === 'read_failure')
+    return `Sitemap parse failed: ${parseFailures[0]}`
+
+  const failures = result.failures.map(formatWalkFailure)
+  const details = failures.length > 0 ? `; ${failures.join('; ')}` : ''
+  return `sitemap walk partial (${result.reasons.join(', ')}${details})`
+}
+
 /**
- * Fetch and parse a single sitemap by route
- * Supports both request context (event.fetch) and cron context (ASSETS.fetch or globalThis.$fetch)
+ * Execute one bounded sitemap traversal round. Partial results include the
+ * exact pending frontier and committed document set needed by the next round.
  */
-export async function fetchSitemapByRoute(
+export async function crawlSitemapByRoute(
   event: H3Event | undefined,
-  route: string,
-): Promise<{ urls: SitemapUrl[], error?: string }> {
+  input: { route: string, state?: SitemapCrawlState | null },
+): Promise<SitemapCrawlResult> {
+  const { route, state = null } = input
+  const previousDocumentsAttempted = state?.documentsAttempted ?? 0
+  const previousUrlsObserved = state?.urlsObserved ?? 0
+  const previousRounds = state?.rounds ?? 0
+  const startedAt = state?.startedAt ?? Date.now()
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const usePublicAsset = config.sitemapPrerendered && hasAssets(event)
   const configuredSiteUrl = createUniversalContext(event).siteUrl ?? SITEMAP_FALLBACK_ORIGIN
   const siteUrl = parseAbsoluteUrl(configuredSiteUrl)
-  if (siteUrl._tag === 'error')
-    return { urls: [], error: `Invalid site URL: ${configuredSiteUrl}` }
+  if (siteUrl._tag === 'error') {
+    return {
+      _tag: 'failed',
+      urls: [],
+      documentsAttempted: previousDocumentsAttempted,
+      urlsObserved: previousUrlsObserved,
+      startedAt,
+      error: `Invalid site URL: ${configuredSiteUrl}`,
+    }
+  }
 
   const rootUrl = parseAbsoluteUrl(route, `${siteUrl.value.origin}/`)
-  if (rootUrl._tag === 'error')
-    return { urls: [], error: `Invalid sitemap route: ${route}` }
+  if (rootUrl._tag === 'error') {
+    return {
+      _tag: 'failed',
+      urls: [],
+      documentsAttempted: previousDocumentsAttempted,
+      urlsObserved: previousUrlsObserved,
+      startedAt,
+      error: `Invalid sitemap route: ${route}`,
+    }
+  }
+
+  const remainingUrls = SITEMAP_READER_LIMITS.maxUrls - previousUrlsObserved
+  if (remainingUrls <= 0) {
+    return {
+      _tag: 'failed',
+      urls: [],
+      documentsAttempted: previousDocumentsAttempted,
+      urlsObserved: previousUrlsObserved,
+      startedAt,
+      error: `sitemap walk partial (url_limit)`,
+    }
+  }
 
   const loadedBodies = new Map<string, Uint8Array>()
+  const seenDocuments = new Set(state?.seenDocuments ?? [])
   const reader = createSitemapReader({
     limits: SITEMAP_READER_LIMITS,
     loadDocument: createLocalSitemapLoader(event, usePublicAsset, loadedBodies),
@@ -395,7 +521,16 @@ export async function fetchSitemapByRoute(
     },
   })
 
-  const result = await reader.walk(rootUrl.value.toString(), SITEMAP_READER_LIMITS)
+  const result = await reader.walk(state?.frontier ?? rootUrl.value.toString(), {
+    ...SITEMAP_READER_LIMITS,
+    maxUrls: remainingUrls,
+    seenDocuments: state?.seenDocuments,
+    onDocument: (document) => {
+      seenDocuments.add(document.requestedUrl)
+    },
+  })
+  const documentsAttempted = previousDocumentsAttempted + result.documentsAttempted
+  const urlsObserved = previousUrlsObserved + result.urlsObserved
   const entries = [...result.entries]
   const parseFailures: string[] = []
   for (const failure of result.failures) {
@@ -419,21 +554,70 @@ export async function fetchSitemapByRoute(
       seenUrls.add(entry.loc)
       return true
     })
-    .slice(0, SITEMAP_READER_LIMITS.maxUrls)
+    .slice(0, remainingUrls)
     .map(normalizeUrl)
   logger.debug(`[sitemap] Found ${urls.length} URLs from ${rootUrl.value.pathname}${rootUrl.value.search}`)
 
-  if (result._tag === 'complete')
-    return { urls }
+  if (result._tag === 'complete') {
+    return {
+      _tag: 'complete',
+      urls,
+      documentsAttempted,
+      urlsObserved,
+      startedAt,
+    }
+  }
 
-  if (result.failures.length === 1 && parseFailures.length === 1 && result.reasons.length === 1 && result.reasons[0] === 'read_failure')
-    return { urls, error: `Sitemap parse failed: ${parseFailures[0]}` }
+  const error = formatWalkError(result, parseFailures)
+  const frontier = createNextFrontier(result.failures, result.frontier, seenDocuments)
+  const rounds = previousRounds + 1
+  const canContinue = frontier.length > 0
+    && rounds < MAX_SITEMAP_CRAWL_ROUNDS
+    && !result.reasons.some(isTerminalPartialReason)
 
-  const failures = result.failures.map(formatWalkFailure)
-  const details = failures.length > 0 ? `; ${failures.join('; ')}` : ''
-  const error = `sitemap walk partial (${result.reasons.join(', ')}${details})`
   logger.warn(`[sitemap] ${error}`)
-  return { urls, error }
+  if (!canContinue) {
+    return {
+      _tag: 'failed',
+      urls,
+      documentsAttempted,
+      urlsObserved,
+      startedAt,
+      error,
+    }
+  }
+
+  return {
+    _tag: 'partial',
+    urls,
+    documentsAttempted,
+    urlsObserved,
+    startedAt,
+    error,
+    state: {
+      _tag: 'continuation',
+      frontier,
+      seenDocuments: [...seenDocuments],
+      documentsAttempted,
+      urlsObserved,
+      rounds,
+      startedAt,
+    },
+  }
+}
+
+/**
+ * Fetch and parse a single sitemap by route
+ * Supports both request context (event.fetch) and cron context (ASSETS.fetch or globalThis.$fetch)
+ */
+export async function fetchSitemapByRoute(
+  event: H3Event | undefined,
+  route: string,
+): Promise<{ urls: SitemapUrl[], error?: string }> {
+  const result = await crawlSitemapByRoute(event, { route })
+  return result._tag === 'complete'
+    ? { urls: result.urls }
+    : { urls: result.urls, error: result.error }
 }
 
 /**

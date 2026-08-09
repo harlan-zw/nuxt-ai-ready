@@ -1,15 +1,15 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { useNitroApp } from '#nuxtseo/nitro'
+import type { SitemapRouteSource } from '../utils/sitemap'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { getPageLastmods, getSitemapLastCrawledAt, markSitemapCrawled, seedRoutes } from '../db/queries'
+import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
+import { mapSitemapRoutes } from '../utils/sitemap'
 
 type NitroApp = ReturnType<typeof useNitroApp>
 
-interface ResolvedSitemapUrl {
-  loc: string
+interface ResolvedSitemapUrl extends SitemapRouteSource {
   lastmod?: string | Date
-  _path?: { pathname: string } | null
 }
 
 interface SitemapResolvedCtx {
@@ -115,16 +115,7 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     if (urls.length === 0)
       return
 
-    // Extract + dedupe routes from URLs
-    const routeToUrl = new Map<string, ResolvedSitemapUrl>()
-    for (const u of urls) {
-      // Prefer pre-parsed path if available, else parse from loc
-      const route = u._path?.pathname
-        ?? (u.loc.startsWith('/') ? (u.loc.split('?')[0] ?? u.loc) : new URL(u.loc).pathname)
-      // Skip file extensions
-      if (!route.includes('.'))
-        routeToUrl.set(route, u)
-    }
+    const routeToUrl = mapSitemapRoutes(urls)
     if (routeToUrl.size === 0)
       return
 
@@ -180,7 +171,7 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
         logger.warn(`[sitemap-seeder] Failed to seed routes: ${e.message}`)
         return 0
       })
-      await markSitemapCrawled(event, sitemapName, urlCount).catch((e) => {
+      await markSitemapSeeded(event, sitemapName, urlCount, lastCrawled).catch((e) => {
         logger.warn(`[sitemap-seeder] Failed to mark sitemap: ${e.message}`)
       })
       const seedMs = Date.now() - seedStart
