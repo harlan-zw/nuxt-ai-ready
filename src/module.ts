@@ -114,7 +114,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=3.2',
     },
     'nuxtseo-shared': {
-      version: '>=0.8.0',
+      version: '>=5.3.11',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.18.0',

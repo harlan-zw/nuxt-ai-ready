@@ -1,5 +1,6 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
+import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
 import type { BuildMeta, BuildMetaChanges } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
@@ -8,6 +9,7 @@ import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
 import { colorize } from 'consola/utils'
+import { resolveLocaleFromRoute } from 'nuxtseo-shared/i18n-runtime'
 import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
@@ -166,11 +168,7 @@ async function submitIndexNow(
   }
 }
 
-export interface PrerenderI18nConfig {
-  defaultLocale: string
-  strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
-  locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
-}
+export type PrerenderI18nConfig = RuntimeI18nConfig
 
 export interface CrawlerState {
   prerenderedRoutes: Set<string>
@@ -254,20 +252,8 @@ function flattenHeadings(headings: Array<Record<string, string>> | undefined): s
     .join('|')
 }
 
-/**
- * Resolve locale for a route given the i18n config.
- * Mirrors the runtime helper in server/utils/i18n.ts but kept inline to avoid
- * pulling runtime imports into the build entrypoint.
- */
 function resolveRouteLocale(route: string, i18n: PrerenderI18nConfig | null | undefined): string {
-  if (!i18n)
-    return ''
-  if (i18n.strategy === 'no_prefix')
-    return i18n.defaultLocale
-  const segments = route.split('/').filter(Boolean)
-  const first = segments[0]
-  const matched = first ? i18n.locales.find(l => l.code === first) : undefined
-  return matched ? matched.code : i18n.defaultLocale
+  return i18n ? resolveLocaleFromRoute(route, i18n).locale : ''
 }
 
 async function processMarkdownRoute(

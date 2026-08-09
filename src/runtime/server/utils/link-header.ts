@@ -1,6 +1,6 @@
-import type { RuntimeI18nConfig } from './i18n'
+import type { RuntimeI18nConfig, RuntimeRouteContext } from './i18n'
 import { toMarkdownPath } from '../../markdown-path'
-import { computeLocaleAlternates } from './i18n'
+import { computeLocaleAlternates, resolveLocaleAlternateUrl } from './i18n'
 
 /**
  * Encode a URL path for safe inclusion in an HTTP header value.
@@ -39,6 +39,7 @@ export function buildLinkHeader(
   variant: 'html' | 'markdown',
   config: LinkHeaderConfig,
   resolveUrl?: LinkUrlResolver,
+  routeContext: RuntimeRouteContext = {},
 ): string {
   const parts: string[] = []
   if (variant === 'html') {
@@ -51,10 +52,14 @@ export function buildLinkHeader(
   }
 
   if (config.i18n) {
-    const alternates = computeLocaleAlternates(path, config.i18n)
+    const alternates = computeLocaleAlternates(path, config.i18n, routeContext)
     for (const alt of alternates) {
-      const href = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
-      parts.push(`<${encodePathForHeader(resolveHeaderUrl(href, resolveUrl))}>; rel="alternate"; hreflang="${alt.hreflang}"`)
+      const alternatePath = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
+      const href = resolveLocaleAlternateUrl(
+        { ...alt, path: alternatePath },
+        candidate => resolveHeaderUrl(candidate, resolveUrl),
+      )
+      parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; hreflang="${alt.hreflang}"`)
     }
   }
   if (config.apiCatalog) {

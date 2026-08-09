@@ -1,15 +1,11 @@
 import type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
-import type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
-import { resolveI18nConfig as resolveSharedI18nConfig } from 'nuxtseo-shared/i18n'
+import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
+import { resolveI18nConfig as resolveSharedI18nConfig, toRuntimeI18nConfig as toSharedRuntimeI18nConfig } from 'nuxtseo-shared/i18n'
 import { logger } from '../logger'
 
-export type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
 export type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
+export type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
 
-/**
- * Runtime-safe i18n config: stripped of non-serializable LocaleObject extras.
- * Only carries what the runtime needs to resolve locale + alternates from a route.
- */
 const CJK_PREFIXES = ['zh', 'ja', 'ko']
 
 export function hasCjkLocale(i18n: RuntimeI18nConfig): boolean {
@@ -17,23 +13,7 @@ export function hasCjkLocale(i18n: RuntimeI18nConfig): boolean {
 }
 
 export function toRuntimeI18nConfig(auto: AutoI18nConfig): RuntimeI18nConfig {
-  return {
-    defaultLocale: auto.defaultLocale,
-    strategy: auto.strategy,
-    // Translated route paths. Without these the runtime can only guess
-    // alternates by adding/removing a locale prefix, which is wrong for every
-    // page whose slug differs per locale.
-    ...(auto.pages && Object.keys(auto.pages).length ? { pages: auto.pages } : {}),
-    locales: auto.locales.map((l) => {
-      const raw = l as typeof l & { name?: string, nativeName?: string, language?: string }
-      return {
-        code: l.code,
-        hreflang: l._hreflang || raw.language || l.code,
-        name: raw.name,
-        nativeName: raw.nativeName ?? raw.name,
-      }
-    }),
-  }
+  return toSharedRuntimeI18nConfig(auto)
 }
 
 /**

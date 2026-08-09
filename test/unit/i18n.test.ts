@@ -1,7 +1,7 @@
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
 import { describe, expect, it } from 'vitest'
 import { computeLocaleAlternates, localePath, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
-import { hasCjkLocale } from '../../src/utils/i18n'
+import { hasCjkLocale, toRuntimeI18nConfig } from '../../src/utils/i18n'
 
 const en = { code: 'en', hreflang: 'en' }
 const fr = { code: 'fr', hreflang: 'fr-FR' }
@@ -138,13 +138,13 @@ describe('computeLocaleAlternates with translated routes', () => {
       .toEqual(['/contact', '/fr/contact'])
   })
 
-  it('falls back to prefixing when an entry names no default locale', () => {
+  it('does not fabricate alternates for locales omitted from a translated entry', () => {
     const partial: RuntimeI18nConfig = {
       ...prefixExceptDefault,
       pages: { about: { fr: '/a-propos' } },
     }
     expect(computeLocaleAlternates('/fr/a-propos', partial).map(a => a.path))
-      .toEqual(['/a-propos', '/fr/a-propos'])
+      .toEqual(['/fr/a-propos'])
   })
 
   it('keeps translations for the locales an entry does name', () => {
@@ -208,6 +208,15 @@ describe('computeLocaleAlternates with translated routes', () => {
       .toEqual(['/blog', '/fr/journal'])
   })
 
+  it('carries params embedded in static segments across locales', () => {
+    const mixed: RuntimeI18nConfig = {
+      ...prefixExceptDefault,
+      pages: { product: { en: '/products/product-[id]', fr: '/produits/produit-[id]' } },
+    }
+    expect(computeLocaleAlternates('/products/product-42', mixed).map(a => a.path))
+      .toEqual(['/products/product-42', '/fr/produits/produit-42'])
+  })
+
   it('prefixes every locale under the prefix strategy', () => {
     const prefixed: RuntimeI18nConfig = {
       ...prefixAll,
@@ -236,5 +245,27 @@ describe('hasCjkLocale', () => {
 
   it('returns false when no CJK locales present', () => {
     expect(hasCjkLocale(prefixExceptDefault)).toBe(false)
+  })
+})
+
+describe('toRuntimeI18nConfig', () => {
+  it('keeps the domain metadata needed by runtime locale resolution', () => {
+    const config = toRuntimeI18nConfig({
+      defaultLocale: 'en',
+      strategy: 'prefix_and_default',
+      differentDomains: true,
+      locales: [
+        { code: 'en', _hreflang: 'en', _sitemap: 'en', domain: 'en.example.com' },
+        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr', domain: 'fr.example.com' },
+      ],
+    })
+
+    expect(config).toMatchObject({
+      differentDomains: true,
+      locales: [
+        { code: 'en', domain: 'en.example.com' },
+        { code: 'fr', domain: 'fr.example.com' },
+      ],
+    })
   })
 })

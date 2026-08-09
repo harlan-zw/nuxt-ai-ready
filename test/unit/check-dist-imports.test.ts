@@ -52,6 +52,7 @@ describe('published import closure', () => {
       writeFile(resolve(packageRoot, 'dist/runtime/server/index.mjs'), [
         `import { eventHandler } from 'h3'`,
         `import { useRuntimeConfig } from 'nitropack/runtime'`,
+        `import { resolveI18nConfig } from 'nuxtseo-shared/i18n'`,
       ].join('\n')),
     ])
 
@@ -60,5 +61,6 @@ describe('published import closure', () => {
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain('dist/runtime/server/index.mjs -> h3')
     expect(result.stderr).toContain('dist/runtime/server/index.mjs -> nitropack/runtime')
+    expect(result.stderr).toContain('dist/runtime/server/index.mjs -> nuxtseo-shared/i18n')
   })
 })

@@ -10,7 +10,7 @@ const importPatterns = [
 const declarationSourcePattern = /\.d\.[cm]?ts$/
 const publishedSourcePattern = /(?:\.d\.[cm]?ts|\.[cm]?js)$/
 const publishedServerRuntimePattern = /^dist\/runtime\/server\/.*\.[cm]?js$/
-const incompatibleRuntimeImports = new Set(['h3', 'nitropack/runtime'])
+const incompatibleRuntimeImports = new Set(['h3', 'nitropack/runtime', 'nuxtseo-shared/i18n'])
 
 function parsePublishedPaths(packageJson) {
   if (!packageJson || typeof packageJson !== 'object' || !Array.isArray(packageJson.files))

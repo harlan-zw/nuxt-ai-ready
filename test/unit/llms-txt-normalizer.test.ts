@@ -238,6 +238,30 @@ describe('llms.txt generated file-list entries', () => {
     ])
   })
 
+  it('formats locale roots on their configured domains', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_and_default',
+      differentDomains: true,
+      locales: [
+        { code: 'en', hreflang: 'en', domain: 'en.example.com' },
+        { code: 'fr', hreflang: 'fr-FR', domain: 'fr.example.com' },
+      ],
+    }
+
+    expect(formatAvailableLanguagesSection(
+      i18n,
+      new Map([['en', 2], ['fr', 3]]),
+      pathname => pathname,
+      { host: 'en.example.com' },
+    )).toEqual([
+      '## Available Languages on Website',
+      '',
+      '- [en](https://en.example.com/): 2 pages; content included below.',
+      '- [fr](https://fr.example.com/): 3 pages; visit this language for content.',
+    ])
+  })
+
   it('normalizes multiline page descriptions onto one file-list line', () => {
     expect(formatLlmsTxtPageLink({
       pathname: '/guide/',
