@@ -530,6 +530,11 @@ export interface PageIndexState {
   contentHash: string | null
 }
 
+interface PageIndexStateRow {
+  indexed_at: number
+  content_hash: string | null
+}
+
 /**
  * Fetch a page's index bookkeeping in one lightweight query.
  * Combines the freshness, existence, and prior-hash lookups that the indexing
@@ -544,10 +549,13 @@ export async function getPageIndexState(
   if (!db)
     return undefined
 
-  return db.first<PageIndexState>(
-    'SELECT indexed_at as indexedAt, content_hash as contentHash FROM ai_ready_pages WHERE route = ?',
+  const row = await db.first<PageIndexStateRow>(
+    'SELECT indexed_at, content_hash FROM ai_ready_pages WHERE route = ?',
     [route],
   )
+  return row
+    ? { indexedAt: row.indexed_at, contentHash: row.content_hash }
+    : undefined
 }
 
 /**

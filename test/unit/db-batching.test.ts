@@ -204,6 +204,39 @@ describe('db: importDbDump batching (shared.ts)', () => {
     expect(db.prepare('SELECT COUNT(*) as count FROM ai_ready_pages').get()).toEqual({ count: 2 })
   })
 
+  it('uses portable upsert SQL for PostgreSQL drivers', async () => {
+    db = schemaDb()
+    const seen: string[] = []
+    const adapter: DatabaseAdapter = {
+      exec: async () => {},
+      all: async () => [],
+      first: async () => undefined,
+      batch: async (queries) => {
+        seen.push(...queries.map(query => query.sql))
+      },
+    }
+
+    await importDbDump(adapter, [dumpRow(1)])
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).not.toContain('INSERT OR REPLACE')
+    expect(seen[0]).toContain('ON CONFLICT(route) DO UPDATE SET')
+  })
+
+  it('updates existing rows without replacing their primary keys', async () => {
+    db = schemaDb()
+    const adapter = makeAdapter(db)
+    const original = dumpRow(1)
+    await importDbDump(adapter, [original])
+    const before = db.prepare('SELECT id FROM ai_ready_pages WHERE route = ?').get(original.route) as { id: number }
+
+    await importDbDump(adapter, [{ ...original, title: 'Updated title', markdown: '# Updated' }])
+
+    const after = db.prepare('SELECT id, title, markdown FROM ai_ready_pages WHERE route = ?').get(original.route)
+    expect(after).toEqual({ id: before.id, title: 'Updated title', markdown: '# Updated' })
+    expect(db.prepare('SELECT COUNT(*) as count FROM ai_ready_pages').get()).toEqual({ count: 1 })
+  })
+
   it('is a no-op for an empty row list', async () => {
     db = schemaDb()
     await importDbDump(makeAdapter(db), [])

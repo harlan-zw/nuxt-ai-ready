@@ -390,8 +390,24 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
     })
     stmts.push({
       sql: `
-        INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
         VALUES ${valuesSql}
+        ON CONFLICT(route) DO UPDATE SET
+          route_key = excluded.route_key,
+          title = excluded.title,
+          description = excluded.description,
+          markdown = excluded.markdown,
+          headings = excluded.headings,
+          keywords = excluded.keywords,
+          content_hash = excluded.content_hash,
+          updated_at = excluded.updated_at,
+          indexed_at = excluded.indexed_at,
+          is_error = excluded.is_error,
+          indexed = excluded.indexed,
+          source = excluded.source,
+          last_seen_at = excluded.last_seen_at,
+          indexnow_synced_at = excluded.indexnow_synced_at,
+          locale = excluded.locale
       `,
       params,
     })
