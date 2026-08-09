@@ -2,7 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
 import { fetchWithEvent, useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
-import { getPageHash, isPageFresh, queryPages, upsertPage } from '../db/queries'
+import { getPageIndexState, upsertPage } from '../db/queries'
 import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown } from '../utils'
@@ -59,14 +59,17 @@ export async function indexPage(
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const ttl = options.ttl ?? config.runtimeSync.ttl
 
+  // Single lightweight row read covers freshness, existence, and prior hash
+  // (previously three queries per page, one of which was a full `SELECT *`).
+  const state = await getPageIndexState(event, route)
+
   // Check if already indexed and fresh (unless force)
-  if (!options.force && await isPageFresh(event, route, ttl)) {
+  if (!options.force && ttl > 0 && state && (Date.now() - state.indexedAt) / 1000 < ttl) {
     logger.debug(`[indexPage] Skipping ${route} - still fresh`)
     return { success: true, skipped: true, isUpdate: true }
   }
 
-  const existing = await queryPages(event, { route })
-  const isUpdate = !!existing
+  const isUpdate = !!state
 
   // Check for error pages
   const isError = html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')
@@ -80,8 +83,7 @@ export async function indexPage(
 
   // Compute content hash and check for changes
   const contentHash = await computeContentHash(result.markdown)
-  const existingHash = await getPageHash(event, route)
-  const contentChanged = existingHash !== contentHash
+  const contentChanged = state?.contentHash !== contentHash
 
   await upsertPage(event, {
     route,
