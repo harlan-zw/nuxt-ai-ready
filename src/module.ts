@@ -21,7 +21,7 @@ import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/ag
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
-import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
   createMcpServerCardEtag,
@@ -227,6 +227,30 @@ export default defineNuxtModule<ModuleOptions>({
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
     if (i18nConfig) {
       logger.info(`i18n detected: ${i18nConfig.locales.length} locales (default: ${i18nConfig.defaultLocale}, strategy: ${i18nConfig.strategy})`)
+    }
+    const configuredI18nPages = i18nConfig?.pages
+    if (i18nConfig && configuredI18nPages) {
+      const syncI18nConfig = (target: unknown) => {
+        if (target && typeof target === 'object')
+          Object.assign(target, { i18n: i18nConfig })
+      }
+      let syncNitroI18nConfig: (() => void) | undefined
+      nuxt.hook('nitro:init', (nitro) => {
+        syncNitroI18nConfig = () => syncI18nConfig(nitro.options.runtimeConfig['nuxt-ai-ready'])
+        syncNitroI18nConfig()
+      })
+      const removePageCapture = nuxt.hooks.beforeEach((event) => {
+        if (event.name !== 'pages:extend')
+          return
+        const pages = event.args[event.args.length - 1]
+        if (!Array.isArray(pages))
+          return
+        i18nConfig.pages = materializeI18nPages({ ...i18nConfig, pages: configuredI18nPages }, pages)
+        syncI18nConfig(nuxt.options.runtimeConfig['nuxt-ai-ready'])
+        syncI18nConfig(nuxt.options.nitro.runtimeConfig?.['nuxt-ai-ready'])
+        syncNitroI18nConfig?.()
+        removePageCapture()
+      })
     }
     const ftsTokenizer = i18nConfig && hasCjkLocale(i18nConfig)
       ? 'trigram'

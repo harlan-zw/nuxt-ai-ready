@@ -279,6 +279,9 @@ describe('toRuntimeI18nConfig', () => {
   })
 
   it('materializes omitted locale paths before runtime resolution', () => {
+    const routes = [
+      { name: 'about', path: '/about' },
+    ]
     const config = toRuntimeI18nConfig({
       defaultLocale: 'en',
       strategy: 'prefix_except_default',
@@ -289,12 +292,58 @@ describe('toRuntimeI18nConfig', () => {
       pages: {
         about: { fr: '/a-propos' },
       },
-    })
+    }, routes)
 
     expect(config.pages).toEqual({
       about: { en: '/about', fr: '/a-propos' },
     })
     expect(computeLocaleAlternates('/about', config).map(alternate => alternate.path))
       .toEqual(['/about', '/fr/a-propos'])
+  })
+
+  it('uses Nuxt route paths and default-locale custom path fallbacks', () => {
+    const routes = [
+      { name: 'services-development', path: '/services/development' },
+      { name: 'blog-slug', path: '/blog/:slug()' },
+      { name: 'contact', path: '/contact' },
+    ]
+    const config = toRuntimeI18nConfig({
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', _hreflang: 'en', _sitemap: 'en' },
+        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr' },
+        { code: 'de', _hreflang: 'de-DE', _sitemap: 'de' },
+      ],
+      pages: {
+        'services-development': { fr: '/offres/developpement' },
+        'blog-slug': { fr: '/journal/[slug]' },
+        'contact': { en: '/contact-us', fr: '/contactez-nous' },
+      },
+    }, routes)
+
+    expect(config.pages).toEqual({
+      'services-development': {
+        en: '/services/development',
+        fr: '/offres/developpement',
+        de: '/services/development',
+      },
+      'blog-slug': {
+        en: '/blog/[slug]',
+        fr: '/journal/[slug]',
+        de: '/blog/[slug]',
+      },
+      'contact': {
+        en: '/contact-us',
+        fr: '/contactez-nous',
+        de: '/contact-us',
+      },
+    })
+    expect(computeLocaleAlternates('/services/development', config).map(alternate => alternate.path))
+      .toEqual(['/services/development', '/fr/offres/developpement', '/de/services/development'])
+    expect(computeLocaleAlternates('/blog/hello', config).map(alternate => alternate.path))
+      .toEqual(['/blog/hello', '/fr/journal/hello', '/de/blog/hello'])
+    expect(computeLocaleAlternates('/contact-us', config).map(alternate => alternate.path))
+      .toEqual(['/contact-us', '/fr/contactez-nous', '/de/contact-us'])
   })
 })
