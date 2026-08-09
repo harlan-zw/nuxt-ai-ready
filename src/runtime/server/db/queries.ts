@@ -145,6 +145,9 @@ async function getPrerenderDb(): Promise<RawExecutor> {
     exec: async (_query: string, _params: unknown[] = []): Promise<void> => {
       // No-op for prerender (read-only)
     },
+    batch: async (_queries: { sql: string, params?: unknown[] }[]): Promise<void> => {
+      // No-op for prerender (read-only)
+    },
   }
 }
 
@@ -308,9 +311,15 @@ export async function queryPages(
   if (!db)
     return route ? undefined : []
 
+  // Project only the columns actually needed. markdown is by far the largest
+  // column, so meta-only consumers shouldn't pay to transfer it across the wire.
+  const cols = includeMarkdown
+    ? '*'
+    : 'route, title, description, headings, keywords, updated_at, is_error, locale'
+
   // Single page lookup
   if (route) {
-    const row = await db.first<PageRow>('SELECT * FROM ai_ready_pages WHERE route = ?', [route])
+    const row = await db.first<PageRow>(`SELECT ${cols} FROM ai_ready_pages WHERE route = ?`, [route])
     if (!row)
       return undefined
     return includeMarkdown ? rowToData(row) : rowToEntry(row)
@@ -318,7 +327,7 @@ export async function queryPages(
 
   // Build query
   const { sql: whereClause, params } = buildWhereClause(where)
-  let sql = `SELECT * FROM ai_ready_pages ${whereClause}`
+  let sql = `SELECT ${cols} FROM ai_ready_pages ${whereClause}`
 
   if (limit) {
     sql += ` LIMIT ?`
@@ -350,12 +359,15 @@ export async function* streamPages(
     return
 
   const batchSize = options.batchSize || 50
-  let offset = 0
+  let lastRoute: string | undefined
 
+  // Keyset (cursor) pagination on the route index. `OFFSET` re-scans from the
+  // start on every page, so it degrades to O(N) across a large table.
   while (true) {
+    const where = `WHERE is_error = 0${lastRoute ? ' AND route > ?' : ''}`
     const rows = await db.all<PageRow>(
-      `SELECT * FROM ai_ready_pages WHERE is_error = 0 ORDER BY route LIMIT ? OFFSET ?`,
-      [batchSize, offset],
+      `SELECT * FROM ai_ready_pages ${where} ORDER BY route LIMIT ?`,
+      lastRoute ? [lastRoute, batchSize] : [batchSize],
     )
 
     if (rows.length === 0)
@@ -368,7 +380,7 @@ export async function* streamPages(
     if (rows.length < batchSize)
       break
 
-    offset += batchSize
+    lastRoute = rows[rows.length - 1]!.route
   }
 }
 
@@ -513,6 +525,31 @@ export async function isPageFresh(event: H3Event | undefined, route: string, ttl
   return age < ttlSeconds
 }
 
+export interface PageIndexState {
+  indexedAt: number
+  contentHash: string | null
+}
+
+/**
+ * Fetch a page's index bookkeeping in one lightweight query.
+ * Combines the freshness, existence, and prior-hash lookups that the indexing
+ * hot path needs into a single indexed row read (avoids `SELECT *` and two
+ * extra round-trips per page).
+ */
+export async function getPageIndexState(
+  event: H3Event | undefined,
+  route: string,
+): Promise<PageIndexState | undefined> {
+  const db = await getDb(event)
+  if (!db)
+    return undefined
+
+  return db.first<PageIndexState>(
+    'SELECT indexed_at as indexedAt, content_hash as contentHash FROM ai_ready_pages WHERE route = ?',
+    [route],
+  )
+}
+
 /**
  * Get existing content hash for a page (for change detection)
  * @internal
@@ -557,17 +594,24 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. 5 bind
-  // params per row keeps each statement within D1's 100-parameter cap.
+  // params per row keeps each statement within D1's 100-parameter cap. The
+  // statements then go through `db.batch` so all round-trips collapse into one
+  // driver-level batch request.
   const ROWS_PER_INSERT = 20
+  const stmts: { sql: string, params: unknown[] }[] = []
   for (const batch of chunk([...byRoute.values()], ROWS_PER_INSERT)) {
     const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
     const params = batch.flatMap(r => [r.route, r.routeKey, now, nowMs, r.locale])
-    await db.exec(`
-      INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
-      VALUES ${valuesSql}
-      ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
-    `, params)
+    stmts.push({
+      sql: `
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+        VALUES ${valuesSql}
+        ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
+      `,
+      params,
+    })
   }
+  await db.batch(stmts)
   return byRoute.size
 }
 
@@ -690,17 +734,19 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 async function markRoutesSyncedChunked(
-  db: { exec: (sql: string, params: unknown[]) => Promise<unknown> },
+  db: RawExecutor,
   routes: string[],
   now: number,
 ): Promise<void> {
+  const stmts: { sql: string, params: unknown[] }[] = []
   for (const batch of chunk(routes, D1_MAX_IN_ROUTES)) {
     const placeholders = batch.map(() => '?').join(',')
-    await db.exec(
-      `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-      [now, ...batch],
-    )
+    stmts.push({
+      sql: `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
+      params: [now, ...batch],
+    })
   }
+  await db.batch(stmts)
 }
 
 /**
@@ -1293,13 +1339,15 @@ export async function syncSitemaps(
   let added = 0
   let removed = 0
 
+  const stmts: { sql: string, params: unknown[] }[] = []
+
   // Insert new sitemaps
   for (const sitemap of sitemaps) {
     if (!existingNames.has(sitemap.name)) {
-      await db.exec(
-        'INSERT INTO ai_ready_sitemaps (name, route) VALUES (?, ?)',
-        [sitemap.name, sitemap.route],
-      )
+      stmts.push({
+        sql: 'INSERT INTO ai_ready_sitemaps (name, route) VALUES (?, ?)',
+        params: [sitemap.name, sitemap.route],
+      })
       added++
     }
   }
@@ -1307,10 +1355,15 @@ export async function syncSitemaps(
   // Remove sitemaps no longer in config
   for (const name of existingNames) {
     if (!configNames.has(name)) {
-      await db.exec('DELETE FROM ai_ready_sitemaps WHERE name = ?', [name])
+      stmts.push({
+        sql: 'DELETE FROM ai_ready_sitemaps WHERE name = ?',
+        params: [name],
+      })
       removed++
     }
   }
+
+  await db.batch(stmts)
 
   return { added, removed }
 }

@@ -17,6 +17,11 @@ export interface DatabaseAdapter {
   all: <T>(sql: string, params?: unknown[]) => Promise<T[]>
   first: <T>(sql: string, params?: unknown[]) => Promise<T | undefined>
   exec: (sql: string, params?: unknown[]) => Promise<void>
+  /**
+   * Execute many statements in as few round-trips as the driver allows.
+   * Optional; callers fall back to sequential `exec` when absent.
+   */
+  batch?: (queries: { sql: string, params?: unknown[] }[]) => Promise<void>
   close?: () => Promise<void>
 }
 
@@ -289,16 +294,19 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
   // aborted so the reader loop exits; otherwise `await readPromise` hangs forever.
   try {
     await writer.write(encoder.encode('['))
-    let offset = 0
+    let lastRoute: string | undefined
     let first = true
 
+    // Keyset (cursor) pagination on the route index; `OFFSET` would re-scan
+    // from the start on every page, degrading to O(N) on large tables.
     while (true) {
       const rows = await db.all<DumpRow>(`
         SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale
         FROM ai_ready_pages
+        ${lastRoute ? 'WHERE route > ?' : ''}
         ORDER BY route
-        LIMIT ${DUMP_BATCH_SIZE} OFFSET ${offset}
-      `)
+        LIMIT ${DUMP_BATCH_SIZE}
+      `, lastRoute ? [lastRoute] : [])
 
       if (rows.length === 0)
         break
@@ -311,7 +319,7 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
 
       if (rows.length < DUMP_BATCH_SIZE)
         break
-      offset += DUMP_BATCH_SIZE
+      lastRoute = rows[rows.length - 1]!.route
     }
 
     await writer.write(encoder.encode(']'))
@@ -344,13 +352,56 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
  * Import dump into database
  * Sets indexed=1, last_seen_at=indexed_at, indexnow_synced_at=indexed_at
  * (pages from dump were already indexed and synced during build, no need to re-notify)
+ *
+ * Rows are packed into multi-row INSERTs (15 bind params per row, 5 rows per
+ * statement stays under D1's 100-param cap) and fired through `db.batch` so a
+ * cold-start restore of thousands of pages is a handful of round-trips, not one
+ * per page.
  */
+const IMPORT_ROWS_PER_STATEMENT = 5
+
 export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promise<void> {
-  for (const row of rows) {
-    const source = row.source || 'prerender'
-    await db.exec(`
-      INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-    `, [row.route, row.route_key, row.title, row.description, row.markdown, row.headings, row.keywords, row.content_hash || null, row.updated_at, row.indexed_at, row.is_error, source, row.indexed_at, row.indexed_at, row.locale || ''])
+  if (rows.length === 0)
+    return
+
+  const stmts: { sql: string, params: unknown[] }[] = []
+  for (let i = 0; i < rows.length; i += IMPORT_ROWS_PER_STATEMENT) {
+    const batch = rows.slice(i, i + IMPORT_ROWS_PER_STATEMENT)
+    const valuesSql = batch.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).join(', ')
+    const params = batch.flatMap((row) => {
+      const source = row.source || 'prerender'
+      return [
+        row.route,
+        row.route_key,
+        row.title,
+        row.description,
+        row.markdown,
+        row.headings,
+        row.keywords,
+        row.content_hash || null,
+        row.updated_at,
+        row.indexed_at,
+        row.is_error,
+        source,
+        row.indexed_at,
+        row.indexed_at,
+        row.locale || '',
+      ]
+    })
+    stmts.push({
+      sql: `
+        INSERT OR REPLACE INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
+        VALUES ${valuesSql}
+      `,
+      params,
+    })
+  }
+
+  if (db.batch) {
+    await db.batch(stmts)
+  }
+  else {
+    for (const stmt of stmts)
+      await db.exec(stmt.sql, stmt.params)
   }
 }
