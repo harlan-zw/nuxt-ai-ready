@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v1.7.4...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.4...main)
+
+### 🔥 Performance
+
+- Lazy-load optional module features ([#70](https://github.com/harlan-zw/nuxt-ai-ready/pull/70))
+
+### 🏡 Chore
+
+- Bump ([d99d408](https://github.com/harlan-zw/nuxt-ai-ready/commit/d99d408))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.7.3...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.3...main)
