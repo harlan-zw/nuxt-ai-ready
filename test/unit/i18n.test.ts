@@ -277,4 +277,24 @@ describe('toRuntimeI18nConfig', () => {
       ],
     })
   })
+
+  it('materializes omitted locale paths before runtime resolution', () => {
+    const config = toRuntimeI18nConfig({
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', _hreflang: 'en', _sitemap: 'en' },
+        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr' },
+      ],
+      pages: {
+        about: { fr: '/a-propos' },
+      },
+    })
+
+    expect(config.pages).toEqual({
+      about: { en: '/about', fr: '/a-propos' },
+    })
+    expect(computeLocaleAlternates('/about', config).map(alternate => alternate.path))
+      .toEqual(['/about', '/fr/a-propos'])
+  })
 })

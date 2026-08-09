@@ -13,7 +13,17 @@ export function hasCjkLocale(i18n: RuntimeI18nConfig): boolean {
 }
 
 export function toRuntimeI18nConfig(auto: AutoI18nConfig): RuntimeI18nConfig {
-  return toSharedRuntimeI18nConfig(auto)
+  const pages = auto.pages
+    ? Object.fromEntries(Object.entries(auto.pages).map(([pageName, pageLocales]) => [
+        pageName,
+        Object.fromEntries(auto.locales.map((locale) => {
+          const configuredPath = pageLocales[locale.code]
+          return [locale.code, configuredPath === undefined ? `/${pageName}` : configuredPath]
+        })),
+      ]))
+    : undefined
+
+  return toSharedRuntimeI18nConfig({ ...auto, pages })
 }
 
 /**
