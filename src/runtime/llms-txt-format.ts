@@ -2,9 +2,9 @@
  * Pure formatting functions for llms.txt - no runtime dependencies
  */
 
-import type { RuntimeI18nConfig } from './server/utils/i18n'
+import type { RuntimeI18nConfig, RuntimeRouteContext } from './server/utils/i18n'
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './types'
-import { localePath } from './server/utils/i18n'
+import { computeLocaleAlternates, localePath, resolveLocaleAlternateUrl } from './server/utils/i18n'
 
 const RE_INLINE_WHITESPACE = /\s+/g
 const RE_LINK_TITLE_BRACKET = /[[\]]/g
@@ -95,11 +95,18 @@ export function formatAvailableLanguagesSection(
   i18n: RuntimeI18nConfig,
   pageCounts: Map<string, number>,
   resolveHref: (pathname: string) => string = pathname => pathname,
+  routeContext: RuntimeRouteContext = {},
 ): string[] {
   const lines: string[] = ['## Available Languages on Website', '']
+  const rootAlternates = new Map(computeLocaleAlternates('/', i18n, routeContext).map(alternate => [alternate.code, alternate]))
   for (const locale of i18n.locales) {
     const isDefault = locale.code === i18n.defaultLocale
-    const prefix = localePath('/', locale.code, i18n)
+    const alternate = rootAlternates.get(locale.code)
+    const prefix = alternate?.path ?? localePath('/', locale.code, i18n, routeContext)
+    const resolvedPath = resolveHref(prefix)
+    const href = alternate
+      ? resolveLocaleAlternateUrl({ ...alternate, path: resolvedPath }, candidate => candidate)
+      : resolvedPath
     const count = pageCounts.get(locale.code) ?? 0
     const display = locale.nativeName
       ? `${locale.nativeName} (${locale.code})`
@@ -109,7 +116,7 @@ export function formatAvailableLanguagesSection(
     const suffix = isDefault ? 'content included below' : 'visit this language for content'
     lines.push(normalizeLink({
       title: display,
-      href: resolveHref(prefix),
+      href,
       description: `${count} pages; ${suffix}.`,
     }))
   }

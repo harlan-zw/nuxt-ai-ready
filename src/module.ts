@@ -2,6 +2,7 @@ import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import type { ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
+import type { RuntimeI18nConfig } from './utils/i18n'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -20,7 +21,7 @@ import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/ag
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { refineDatabaseConfig } from './utils/database'
-import { detectI18n, hasCjkLocale } from './utils/i18n'
+import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
   createMcpServerCardEtag,
@@ -79,11 +80,7 @@ export interface ModulePublicRuntimeConfig {
   runtimeSyncSecret?: string
   indexNow?: string
   sitemapPrerendered: boolean
-  i18n?: {
-    defaultLocale: string
-    strategy: 'no_prefix' | 'prefix_except_default' | 'prefix' | 'prefix_and_default'
-    locales: Array<{ code: string, hreflang: string, name?: string, nativeName?: string }>
-  } | null
+  i18n?: RuntimeI18nConfig | null
   ftsTokenizer?: string
   aiCatalog?: {
     cacheMaxAge: number
@@ -117,7 +114,7 @@ export default defineNuxtModule<ModuleOptions>({
       version: '>=3.2',
     },
     'nuxtseo-shared': {
-      version: '>=0.8.0',
+      version: '>=5.3.11',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.18.0',
@@ -230,6 +227,30 @@ export default defineNuxtModule<ModuleOptions>({
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
     if (i18nConfig) {
       logger.info(`i18n detected: ${i18nConfig.locales.length} locales (default: ${i18nConfig.defaultLocale}, strategy: ${i18nConfig.strategy})`)
+    }
+    const configuredI18nPages = i18nConfig?.pages
+    if (i18nConfig && configuredI18nPages) {
+      const syncI18nConfig = (target: unknown) => {
+        if (target && typeof target === 'object')
+          Object.assign(target, { i18n: i18nConfig })
+      }
+      let syncNitroI18nConfig: (() => void) | undefined
+      nuxt.hook('nitro:init', (nitro) => {
+        syncNitroI18nConfig = () => syncI18nConfig(nitro.options.runtimeConfig['nuxt-ai-ready'])
+        syncNitroI18nConfig()
+      })
+      const removePageCapture = nuxt.hooks.beforeEach((event) => {
+        if (event.name !== 'pages:extend')
+          return
+        const pages = event.args[event.args.length - 1]
+        if (!Array.isArray(pages))
+          return
+        i18nConfig.pages = materializeI18nPages({ ...i18nConfig, pages: configuredI18nPages }, pages)
+        syncI18nConfig(nuxt.options.runtimeConfig['nuxt-ai-ready'])
+        syncI18nConfig(nuxt.options.nitro.runtimeConfig?.['nuxt-ai-ready'])
+        syncNitroI18nConfig?.()
+        removePageCapture()
+      })
     }
     const ftsTokenizer = i18nConfig && hasCjkLocale(i18nConfig)
       ? 'trigram'

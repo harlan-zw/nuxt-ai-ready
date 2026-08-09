@@ -2,6 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
+import { getRequestURL } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
@@ -22,7 +23,7 @@ function deriveLocale(event: H3Event | undefined, route: string, explicit?: stri
   const i18n = cfg['nuxt-ai-ready']?.i18n
   if (!i18n)
     return ''
-  return resolveLocaleFromRoute(route, i18n).locale
+  return resolveLocaleFromRoute(route, i18n, event ? { host: getRequestURL(event).host } : undefined).locale
 }
 
 /** Try to get the current H3Event from context or use provided event */

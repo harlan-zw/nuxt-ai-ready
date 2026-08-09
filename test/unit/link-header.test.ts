@@ -44,7 +44,7 @@ describe('buildLinkHeader', () => {
         { code: 'ja', hreflang: 'ja-JP' },
       ],
     }
-    const config = { i18n } as ModulePublicRuntimeConfig
+    const config = { ...baseConfig, i18n }
     const header = buildLinkHeader('/page:日本.md', 'html', config)
     expect(isAscii(header)).toBe(true)
   })
@@ -104,6 +104,42 @@ describe('buildLinkHeader', () => {
 
     expect(header).toContain('</about>; rel="alternate"; hreflang="en"')
     expect(header).toContain('</fr/about>; rel="alternate"; hreflang="fr"')
+  })
+
+  it('advertises translated slugs rather than prefixed default ones', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    }
+    const config = { i18n } as ModulePublicRuntimeConfig
+    const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl)
+
+    expect(header).toContain('<https://example.com/about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://example.com/fr/a-propos>; rel="alternate"; hreflang="fr"')
+    expect(header).not.toContain('/fr/about')
+  })
+
+  it('uses locale domains for hreflang alternates', () => {
+    const i18n = {
+      defaultLocale: 'en',
+      strategy: 'prefix_and_default',
+      differentDomains: true,
+      locales: [
+        { code: 'en', hreflang: 'en', domain: 'en.example.com' },
+        { code: 'fr', hreflang: 'fr', domain: 'fr.example.com' },
+      ],
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    } satisfies RuntimeI18nConfig
+    const config = { ...baseConfig, i18n }
+    const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl, { host: 'en.example.com' })
+
+    expect(header).toContain('<https://en.example.com/about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://fr.example.com/a-propos>; rel="alternate"; hreflang="fr"')
   })
 
   it('advertises the API catalog only when enabled', () => {

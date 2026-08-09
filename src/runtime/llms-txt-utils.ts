@@ -3,6 +3,7 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { decodePath } from 'ufo'
+import { getRequestURL } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
@@ -198,6 +199,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const siteConfig = getSiteConfig(event)
   const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
+  const i18nContext = { host: getRequestURL(event).host }
   const baseURL = runtimeConfig.app.baseURL
   const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
   const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL))
@@ -291,7 +293,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const other: PageItem[] = []
   for (const pathname of sitemapPaths) {
     if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
-      const locale = i18n ? resolveLocaleFromRoute(pathname, i18n).locale : undefined
+      const locale = i18n ? resolveLocaleFromRoute(pathname, i18n, i18nContext).locale : undefined
       other.push({ pathname, locale })
       seenPaths.add(pathname)
     }
@@ -319,10 +321,10 @@ export async function buildLlmsTxt(event: H3Event) {
     const pageCounts = new Map<string, number>()
     for (const locale of i18n.locales) pageCounts.set(locale.code, 0)
     for (const p of [...prerendered, ...other]) {
-      const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n).locale
+      const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n, i18nContext).locale
       pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
     }
-    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePageHref))
+    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePageHref, i18nContext))
     parts.push('')
   }
 
@@ -331,7 +333,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const isDefaultLocale = (item: PageItem): boolean => {
     if (!i18n)
       return true
-    const code = item.locale || resolveLocaleFromRoute(item.pathname, i18n).locale
+    const code = item.locale || resolveLocaleFromRoute(item.pathname, i18n, i18nContext).locale
     return code === i18n.defaultLocale
   }
 

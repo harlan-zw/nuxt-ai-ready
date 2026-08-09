@@ -1,35 +1,72 @@
 import type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
-import type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
-import { resolveI18nConfig as resolveSharedI18nConfig } from 'nuxtseo-shared/i18n'
+import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
+import { resolveI18nConfig as resolveSharedI18nConfig, toRuntimeI18nConfig as toSharedRuntimeI18nConfig } from 'nuxtseo-shared/i18n'
 import { logger } from '../logger'
 
-export type { RuntimeI18nConfig } from '../runtime/server/utils/i18n'
 export type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
+export type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
 
-/**
- * Runtime-safe i18n config: stripped of non-serializable LocaleObject extras.
- * Only carries what the runtime needs to resolve locale + alternates from a route.
- */
 const CJK_PREFIXES = ['zh', 'ja', 'ko']
+
+export interface I18nPageRoute {
+  name?: string
+  path: string
+  children?: I18nPageRoute[]
+}
 
 export function hasCjkLocale(i18n: RuntimeI18nConfig): boolean {
   return i18n.locales.some(l => CJK_PREFIXES.some(p => l.code.startsWith(p) || l.hreflang.startsWith(p)))
 }
 
-export function toRuntimeI18nConfig(auto: AutoI18nConfig): RuntimeI18nConfig {
-  return {
-    defaultLocale: auto.defaultLocale,
-    strategy: auto.strategy,
-    locales: auto.locales.map((l) => {
-      const raw = l as typeof l & { name?: string, nativeName?: string, language?: string }
-      return {
-        code: l.code,
-        hreflang: l._hreflang || raw.language || l.code,
-        name: raw.name,
-        nativeName: raw.nativeName ?? raw.name,
-      }
-    }),
-  }
+function resolvePagePath(parentPath: string, routePath: string): string {
+  const normalizedRoutePath = routePath.replace(/:(\w+)\(\)/g, '[$1]')
+  if (normalizedRoutePath.startsWith('/'))
+    return normalizedRoutePath
+  if (!normalizedRoutePath)
+    return parentPath || '/'
+  return `${parentPath === '/' ? '' : parentPath.replace(/\/$/, '')}/${normalizedRoutePath}`
+}
+
+function collectPagePaths(routes: readonly I18nPageRoute[], parentPath = ''): Map<string, string> {
+  return routes.reduce((paths, route) => {
+    const path = resolvePagePath(parentPath, route.path)
+    if (route.name)
+      paths.set(route.name, path)
+    if (route.children?.length) {
+      for (const [name, childPath] of collectPagePaths(route.children, path))
+        paths.set(name, childPath)
+    }
+    return paths
+  }, new Map<string, string>())
+}
+
+export function materializeI18nPages(
+  i18n: Pick<RuntimeI18nConfig, 'defaultLocale' | 'locales' | 'pages'>,
+  routes: readonly I18nPageRoute[],
+): RuntimeI18nConfig['pages'] {
+  if (!i18n.pages)
+    return undefined
+
+  const pagePaths = collectPagePaths(routes)
+  return Object.fromEntries(Object.entries(i18n.pages).map(([pageName, pageLocales]) => {
+    const defaultPath = pageLocales?.[i18n.defaultLocale]
+    const fallbackPath = typeof defaultPath === 'string' ? defaultPath : pagePaths.get(pageName)
+    const locales = Object.fromEntries(i18n.locales.flatMap((locale) => {
+      const configuredPath = pageLocales?.[locale.code]
+      if (configuredPath !== undefined)
+        return [[locale.code, configuredPath]]
+      return fallbackPath === undefined ? [] : [[locale.code, fallbackPath]]
+    }))
+    return [pageName, locales]
+  }))
+}
+
+export function toRuntimeI18nConfig(auto: AutoI18nConfig, routes: readonly I18nPageRoute[] = []): RuntimeI18nConfig {
+  const runtime = toSharedRuntimeI18nConfig(auto)
+  if (!runtime.pages || !routes.length)
+    return runtime
+
+  return { ...runtime, pages: materializeI18nPages(runtime, routes) }
 }
 
 /**
