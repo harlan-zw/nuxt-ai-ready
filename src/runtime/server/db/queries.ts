@@ -1,8 +1,10 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { RuntimeI18nConfig } from '../utils/i18n'
+import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleFromRoute } from '../utils/i18n'
+import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
 import { normalizeRouteKey } from './shared'
@@ -598,12 +600,19 @@ export async function setSitemapSeededAt(event: H3Event | undefined, timestamp: 
  * Prune routes not seen in sitemap for longer than threshold
  * Only prunes routes with source='runtime' (never prerendered pages)
  */
-export async function pruneStaleRoutes(event: H3Event | undefined, staleThresholdSeconds: number): Promise<number> {
+export async function pruneStaleRoutes(
+  event: H3Event | undefined,
+  staleThresholdSeconds: number,
+  protectedSince?: number,
+): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
 
-  const threshold = Date.now() - (staleThresholdSeconds * 1000)
+  const staleThreshold = Date.now() - (staleThresholdSeconds * 1000)
+  const threshold = protectedSince === undefined
+    ? staleThreshold
+    : Math.min(staleThreshold, protectedSince)
 
   const countRow = await db.first<{ count: number }>(
     'SELECT COUNT(*) as count FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
@@ -1147,7 +1156,7 @@ export async function getCronFastPathStatus(
       (SELECT value FROM _ai_ready_info WHERE id = 'last_stale_check') as last_stale_check,
       (SELECT value FROM _ai_ready_info WHERE id = 'build_id') as build_id,
       (SELECT value FROM _ai_ready_info WHERE id = 'indexnow_backoff') as indexnow_backoff,
-      (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 10) as sitemaps_need_crawl
+      (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (crawl_state IS NOT NULL OR last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 10) as sitemaps_need_crawl
   `, [sitemapThreshold])
 
   if (!row)
@@ -1252,6 +1261,11 @@ export interface SitemapEntry {
   urlCount: number
   errorCount: number
   lastError: string | null
+  crawlState: SitemapCrawlState | null
+}
+
+export interface SitemapStatusEntry extends Omit<SitemapEntry, 'crawlState'> {
+  continuing: boolean
 }
 
 interface SitemapRow {
@@ -1261,16 +1275,22 @@ interface SitemapRow {
   url_count: number
   error_count: number
   last_error: string | null
+  crawl_state: string | null
 }
 
 function rowToSitemapEntry(row: SitemapRow): SitemapEntry {
+  const parsedState = parseSitemapCrawlState(row.crawl_state)
+  if (parsedState._tag === 'error')
+    throw new Error(`Invalid crawl state for sitemap ${row.name}: ${parsedState.error}`)
+
   return {
     name: row.name,
     route: row.route,
     lastCrawledAt: row.last_crawled_at,
-    urlCount: row.url_count,
-    errorCount: row.error_count,
+    urlCount: row.url_count || 0,
+    errorCount: row.error_count || 0,
     lastError: row.last_error,
+    crawlState: parsedState.state,
   }
 }
 
@@ -1286,8 +1306,9 @@ export async function syncSitemaps(
   if (!db)
     return { added: 0, removed: 0 }
 
-  const existingRows = await db.all<{ name: string }>('SELECT name FROM ai_ready_sitemaps')
+  const existingRows = await db.all<{ name: string, route: string }>('SELECT name, route FROM ai_ready_sitemaps')
   const existingNames = new Set(existingRows.map(r => r.name))
+  const existingRoutes = new Map(existingRows.map(row => [row.name, row.route]))
   const configNames = new Set(sitemaps.map(s => s.name))
 
   let added = 0
@@ -1301,6 +1322,18 @@ export async function syncSitemaps(
         [sitemap.name, sitemap.route],
       )
       added++
+    }
+    else if (existingRoutes.get(sitemap.name) !== sitemap.route) {
+      await db.exec(`
+        UPDATE ai_ready_sitemaps SET
+          route = ?,
+          last_crawled_at = NULL,
+          url_count = 0,
+          error_count = 0,
+          last_error = NULL,
+          crawl_state = NULL
+        WHERE name = ?
+      `, [sitemap.route, sitemap.name])
     }
   }
 
@@ -1317,7 +1350,7 @@ export async function syncSitemaps(
 
 /**
  * Get next sitemap to crawl
- * Prioritizes: sitemaps with errors (for retry), then oldest crawled
+ * Prioritizes: in-progress continuations, errors, then oldest crawled
  * Skips sitemaps crawled within minIntervalMinutes (default 5 min)
  */
 export async function getNextSitemapToCrawl(
@@ -1330,6 +1363,18 @@ export async function getNextSitemapToCrawl(
 
   // Calculate threshold as milliseconds timestamp (matching how we store last_crawled_at)
   const threshold = Date.now() - minIntervalMinutes * 60 * 1000
+
+  // Continuations bypass the normal recrawl interval. They are already bounded
+  // to one round per cron run, and delaying them could allow pruning against an
+  // incomplete traversal.
+  const continuationRow = await db.first<SitemapRow>(`
+    SELECT * FROM ai_ready_sitemaps
+    WHERE crawl_state IS NOT NULL AND error_count = 0
+    ORDER BY last_crawled_at ASC NULLS FIRST
+    LIMIT 1
+  `)
+  if (continuationRow)
+    return rowToSitemapEntry(continuationRow)
 
   // First try sitemaps with errors (retry after interval)
   // Only retry if error_count < 10 to avoid infinite retries
@@ -1391,9 +1436,58 @@ export async function markSitemapCrawled(
       last_crawled_at = ?,
       url_count = ?,
       error_count = 0,
-      last_error = NULL
+      last_error = NULL,
+      crawl_state = NULL
     WHERE name = ?
   `, [Date.now(), urlCount, name])
+}
+
+/**
+ * Record a sitemap:resolved hook seed only while no durable crawl is active.
+ * The hook may finish in waitUntil after cron has persisted a continuation.
+ */
+export async function markSitemapSeeded(
+  event: H3Event | undefined,
+  name: string,
+  urlCount: number,
+  expectedLastCrawledAt: number | null,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec(`
+    UPDATE ai_ready_sitemaps SET
+      last_crawled_at = ?,
+      url_count = ?,
+      error_count = 0,
+      last_error = NULL
+    WHERE name = ?
+      AND crawl_state IS NULL
+      AND error_count = 0
+      AND ((? IS NULL AND last_crawled_at IS NULL) OR last_crawled_at = ?)
+  `, [Date.now(), urlCount, name, expectedLastCrawledAt, expectedLastCrawledAt])
+}
+
+/** Persist a resumable sitemap crawl without incrementing its error budget. */
+export async function markSitemapCrawlPartial(
+  event: H3Event | undefined,
+  name: string,
+  state: SitemapCrawlState,
+): Promise<void> {
+  const db = await getDb(event)
+  if (!db)
+    return
+
+  await db.exec(`
+    UPDATE ai_ready_sitemaps SET
+      last_crawled_at = ?,
+      url_count = ?,
+      error_count = 0,
+      last_error = NULL,
+      crawl_state = ?
+    WHERE name = ?
+  `, [Date.now(), state.urlsObserved, serializeSitemapCrawlState(state), name])
 }
 
 /**
@@ -1412,7 +1506,8 @@ export async function markSitemapError(
     UPDATE ai_ready_sitemaps SET
       last_crawled_at = ?,
       error_count = error_count + 1,
-      last_error = ?
+      last_error = ?,
+      crawl_state = NULL
     WHERE name = ?
   `, [Date.now(), error, name])
 }
@@ -1426,12 +1521,12 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
     return 0
 
   const countRow = await db.first<{ count: number }>(
-    'SELECT COUNT(*) as count FROM ai_ready_sitemaps WHERE error_count > 0',
+    'SELECT COUNT(*) as count FROM ai_ready_sitemaps WHERE error_count > 0 OR crawl_state IS NOT NULL',
   )
   const count = countRow?.count || 0
 
   if (count > 0) {
-    await db.exec('UPDATE ai_ready_sitemaps SET error_count = 0, last_error = NULL, last_crawled_at = NULL')
+    await db.exec('UPDATE ai_ready_sitemaps SET error_count = 0, last_error = NULL, last_crawled_at = NULL, crawl_state = NULL')
   }
 
   return count
@@ -1442,13 +1537,16 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
  */
 export async function getSitemapStatus(
   event: H3Event | undefined,
-): Promise<SitemapEntry[]> {
+): Promise<SitemapStatusEntry[]> {
   const db = await getDb(event)
   if (!db)
     return []
 
   const rows = await db.all<SitemapRow>('SELECT * FROM ai_ready_sitemaps ORDER BY name')
-  return rows.map(rowToSitemapEntry)
+  return rows.map((row) => {
+    const { crawlState, ...entry } = rowToSitemapEntry(row)
+    return { ...entry, continuing: crawlState !== null }
+  })
 }
 
 // ============================================================================

@@ -79,6 +79,7 @@ export default eventHandler(async (event) => {
         urlCount: s.urlCount,
         lastCrawledAt: s.lastCrawledAt,
         errorCount: s.errorCount,
+        continuing: s.continuing,
       }))
     }
   }

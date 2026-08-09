@@ -3,7 +3,7 @@
  * Used by shared.ts during nuxi generate/build
  */
 
-export const SCHEMA_VERSION = 'v2.1.0'
+export const SCHEMA_VERSION = 'v2.2.0'
 
 /**
  * Allowed FTS5 tokenizer values. The configured value gets interpolated into the
@@ -94,7 +94,8 @@ export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
       last_crawled_at INTEGER,
       url_count INTEGER DEFAULT 0,
       error_count INTEGER DEFAULT 0,
-      last_error TEXT
+      last_error TEXT,
+      crawl_state TEXT
     )`,
     // Indexes
     `CREATE INDEX IF NOT EXISTS idx_ai_ready_pages_route ON ai_ready_pages(route)`,

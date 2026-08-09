@@ -72,6 +72,7 @@ export const sitemaps = pgTable('ai_ready_sitemaps', {
   urlCount: integer('url_count').default(0),
   errorCount: integer('error_count').default(0),
   lastError: text('last_error'),
+  crawlState: text('crawl_state'),
 }, table => [
   index('idx_ai_ready_sitemaps_crawled').on(table.lastCrawledAt),
 ])
