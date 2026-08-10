@@ -37,7 +37,8 @@ export function getMarkdownRenderInfo(
   | { path: string, isExplicit: boolean, negotiation: ContentNegotiationResult }
   | { notAcceptable: true }
   | null {
-  const originalPath = event.path
+  const queryIndex = event.path.indexOf('?')
+  const originalPath = queryIndex === -1 ? event.path : event.path.slice(0, queryIndex)
   const isPrerender = mode._tag === 'prerender'
 
   if (originalPath.startsWith('/api') || originalPath.startsWith('/_') || originalPath.startsWith('/@'))
