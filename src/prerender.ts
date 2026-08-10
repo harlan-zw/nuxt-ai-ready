@@ -220,14 +220,7 @@ async function initCrawler(state: CrawlerState): Promise<void> {
   if (state.dbPath) {
     logger.debug(`Creating directory for SQLite: ${dirname(state.dbPath)}`)
     await mkdir(dirname(state.dbPath), { recursive: true })
-    const { default: Database } = await import('better-sqlite3')
-    const sqlite = new Database(state.dbPath)
-    const db: DatabaseAdapter = {
-      all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params) as T[],
-      first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params) as T | undefined,
-      exec: async (sql: string, params: unknown[] = []) => { sqlite.prepare(sql).run(...params) },
-      close: async () => { sqlite.close() },
-    }
+    const db = await createPrerenderDatabase(state.dbPath)
     state.db = db
     await initSchema(db, { ftsTokenizer: state.ftsTokenizer })
     logger.debug(`Crawler initialized with SQLite at ${state.dbPath} (tokenizer: ${state.ftsTokenizer || 'default'})`)
@@ -244,6 +237,35 @@ async function initCrawler(state: CrawlerState): Promise<void> {
   }
 
   state.initialized = true
+}
+
+export async function createPrerenderDatabase(dbPath: string): Promise<DatabaseAdapter> {
+  const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
+
+  if (nodeVersion >= 22) {
+    const { DatabaseSync } = await import('node:sqlite')
+    const sqlite = new DatabaseSync(dbPath)
+    return {
+      all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params as never[]) as T[],
+      first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params as never[]) as T | undefined,
+      exec: async (sql: string, params: unknown[] = []) => {
+        if (params.length)
+          sqlite.prepare(sql).run(...params as never[])
+        else
+          sqlite.exec(sql)
+      },
+      close: async () => { sqlite.close() },
+    }
+  }
+
+  const { default: Database } = await import('better-sqlite3')
+  const sqlite = new Database(dbPath)
+  return {
+    all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params) as T[],
+    first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params) as T | undefined,
+    exec: async (sql: string, params: unknown[] = []) => { sqlite.prepare(sql).run(...params) },
+    close: async () => { sqlite.close() },
+  }
 }
 
 function flattenHeadings(headings: Array<Record<string, string>> | undefined): string {
