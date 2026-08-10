@@ -2,7 +2,7 @@ import type { ContentNegotiationResult } from '@mdream/js/negotiate'
 import type { H3Event } from '#nuxtseo/h3'
 import { negotiateContent } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
-import { getHeader, getHeaders, getRequestURL } from '#nuxtseo/h3'
+import { getHeader, getHeaders } from '#nuxtseo/h3'
 
 // H3 wrapper over @mdream/js/negotiate that layers AI bot detection on top of
 // Accept header negotiation. AI bots get markdown unless navigating a browser.
@@ -37,7 +37,8 @@ export function getMarkdownRenderInfo(
   | { path: string, isExplicit: boolean, negotiation: ContentNegotiationResult }
   | { notAcceptable: true }
   | null {
-  const originalPath = getRequestURL(event).pathname
+  const queryIndex = event.path.indexOf('?')
+  const originalPath = queryIndex === -1 ? event.path : event.path.slice(0, queryIndex)
   const isPrerender = mode._tag === 'prerender'
 
   if (originalPath.startsWith('/api') || originalPath.startsWith('/_') || originalPath.startsWith('/@'))

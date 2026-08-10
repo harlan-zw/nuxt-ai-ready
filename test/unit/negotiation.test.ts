@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('h3', () => ({
   getHeader: (event: any, name: string) => event.node.req.headers[name.toLowerCase()],
   getHeaders: (event: any) => event.node.req.headers,
-  getRequestURL: (event: any) => new URL(event.path, 'https://example.com'),
+  getRequestURL: (event: any) => new URL(event.node.req.url, 'https://example.com'),
 }))
 vi.mock('mdream', () => ({ htmlToMarkdown: () => '' }))
 vi.mock('nitropack/runtime', () => ({ useNitroApp: () => ({ hooks: { callHook: () => {} } }) }))
@@ -14,11 +14,11 @@ vi.mock('nitropack/runtime', () => ({ useNitroApp: () => ({ hooks: { callHook: (
 const { getMarkdownRenderInfo, negotiateRepresentation } = await import('../../src/runtime/server/utils/markdown-request')
 
 // Build a minimal H3 event for the stubbed request helpers.
-function mockEvent(headers: Record<string, string>, path = '/'): H3Event {
+function mockEvent(headers: Record<string, string>, path = '/', requestUrl = path): H3Event {
   const lower: Record<string, string> = {}
   for (const k in headers)
     lower[k.toLowerCase()] = headers[k]!
-  return { node: { req: { headers: lower } }, path } as unknown as H3Event
+  return { node: { req: { headers: lower, url: requestUrl } }, path } as unknown as H3Event
 }
 
 describe('getMarkdownRenderInfo', () => {
@@ -27,6 +27,16 @@ describe('getMarkdownRenderInfo', () => {
 
     expect(getMarkdownRenderInfo(event, { _tag: 'runtime', contentNegotiation: false })).toEqual({
       path: '/meta/charset',
+      isExplicit: true,
+      negotiation: 'markdown',
+    })
+  })
+
+  it('preserves the base-relative event path', () => {
+    const event = mockEvent({}, '/about.md?probe=1', '/docs/about.md?probe=1')
+
+    expect(getMarkdownRenderInfo(event, { _tag: 'runtime', contentNegotiation: false })).toEqual({
+      path: '/about',
       isExplicit: true,
       negotiation: 'markdown',
     })
