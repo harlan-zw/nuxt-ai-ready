@@ -13,6 +13,7 @@ import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { resolveNuxtContentVersion, setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
+import { createBuildPageDataVirtual } from './build-page-data-virtual'
 import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
@@ -798,77 +799,12 @@ export default defineNuxtModule<ModuleOptions>({
         : 'export const agentSkillsIndex = null\nexport const localAgentSkillArtifacts = {}'
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
-      // Helper to read from SQLite database during prerender
-      // Uses node:sqlite or better-sqlite3 directly since we're in Node.js context
-      // In dev mode, provide a stub to avoid rollup warnings about node:sqlite
-      nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = nuxt.options.dev
-        ? `
-export async function readPageDataFromFilesystem() { return { pages: [], errorRoutes: [] } }
-export async function readMarkdownLinkAvailabilityFromFilesystem() { return { runtimeMarkdownAvailable: false, paths: [] } }
-`
-        : `
-export async function readMarkdownLinkAvailabilityFromFilesystem() {
-  if (!import.meta.prerender) {
-    return { runtimeMarkdownAvailable: false, paths: [] }
-  }
-
-  const { readFile } = await import('node:fs/promises')
-  try {
-    const availability = JSON.parse(await readFile(${JSON.stringify(markdownLinkAvailabilityPath)}, 'utf8'))
-    return {
-      runtimeMarkdownAvailable: availability?.runtimeMarkdownAvailable === true,
-      paths: Array.isArray(availability?.paths) ? availability.paths.filter(path => typeof path === 'string') : [],
-    }
-  }
-  catch (error) {
-    console.warn('[nuxt-ai-ready] Failed to read Markdown link availability; keeping canonical links.', error)
-    return { runtimeMarkdownAvailable: false, paths: [] }
-  }
-}
-
-export async function readPageDataFromFilesystem() {
-  if (!import.meta.prerender) {
-    return { pages: [], errorRoutes: [] }
-  }
-
-  const dbPath = ${JSON.stringify(buildDbPath)}
-
-  // Check if database file exists
-  const { existsSync } = await import('node:fs')
-  if (!existsSync(dbPath)) {
-    return { pages: [], errorRoutes: [] }
-  }
-
-  let rows = []
-  const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
-  if (nodeVersion >= 22) {
-    const { DatabaseSync } = await import('node' + ':sqlite')
-    const db = new DatabaseSync(dbPath, { open: true })
-    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error, locale FROM ai_ready_pages').all()
-    db.close()
-  }
-  else {
-    const Database = (await import('better-sqlite3')).default
-    const db = new Database(dbPath, { readonly: true })
-    rows = db.prepare('SELECT route, title, description, markdown, headings, keywords, updated_at, is_error, locale FROM ai_ready_pages').all()
-    db.close()
-  }
-
-  const pages = rows.filter(r => !r.is_error).map(r => ({
-    route: r.route,
-    title: r.title,
-    description: r.description,
-    markdown: r.markdown,
-    headings: r.headings,
-    keywords: JSON.parse(r.keywords || '[]'),
-    updatedAt: r.updated_at,
-    locale: r.locale || '',
-  }))
-  const errorRoutes = rows.filter(r => r.is_error).map(r => r.route)
-
-  return { pages, errorRoutes }
-}
-`
+      nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = createBuildPageDataVirtual({
+        buildDbPath,
+        markdownLinkAvailabilityPath,
+        nodeMajor: Number.parseInt(process.versions.node?.split('.')[0] || '0'),
+        dev: nuxt.options.dev,
+      })
       // Runtime module exports empty arrays (pages read from database at runtime)
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
 
