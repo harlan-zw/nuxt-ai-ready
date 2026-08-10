@@ -6,6 +6,7 @@ import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSite
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
+import { resolveCronPlan, resolveSitemapIntervalMinutes } from './cron-plan'
 import { syncToIndexNow } from './indexnow'
 import { crawlSitemapByRoute, getSitemapsFromConfig, mapSitemapRoutes } from './sitemap'
 
@@ -53,6 +54,8 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   const startTime = Date.now()
   const results: CronResult = {}
   const allErrors: string[] = []
+  const sitemapIntervalMinutes = resolveSitemapIntervalMinutes(config.runtimeSync.ttl)
+  let runIndexNow = !!config.indexNow
 
   // Prevent overlapping cron runs
   const acquired = await tryAcquireCronLock(event)
@@ -70,17 +73,20 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   try {
   // Fast path: single query to check if any work is needed
     if (config.runtimeSync.enabled) {
-      const status = await getCronFastPathStatus(event)
+      const status = await getCronFastPathStatus(event, sitemapIntervalMinutes)
       if (status) {
         const now = Date.now()
         const staleCheckNeeded = !status.lastStaleCheck || (now - status.lastStaleCheck) >= STALE_CHECK_INTERVAL_MS
-        const inBackoff = status.indexNowBackoff && now < status.indexNowBackoff.until
-        const hasWork = staleCheckNeeded
-          || status.pendingPages > 0
-          || status.sitemapsNeedCrawl > 0
-          || (config.indexNow && status.indexNowPending > 0 && !inBackoff)
+        const plan = resolveCronPlan({
+          status,
+          runtimeSyncTtlSeconds: config.runtimeSync.ttl,
+          indexNowEnabled: !!config.indexNow,
+          staleCheckNeeded,
+          now,
+        })
+        runIndexNow = plan.runIndexNow
 
-        if (!hasWork) {
+        if (!plan.hasWork) {
           if (debug) {
             const duration = Date.now() - startTime
             logger.info(`[cron] Fast path: no work needed (${duration}ms)`)
@@ -114,7 +120,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
     // Ping next sitemap to trigger seeding via sitemap:resolved hook
     // The sitemap-seeder plugin handles actual route insertion
     if (config.runtimeSync.enabled) {
-      const sitemapResult = await pingSitemap(event, config, debug).catch((err): SitemapPingResult => {
+      const sitemapResult = await pingSitemap(event, config, sitemapIntervalMinutes, debug).catch((err): SitemapPingResult => {
         const msg = err instanceof Error ? err.message : String(err)
         logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
         allErrors.push(`sitemap: ${msg}`)
@@ -157,7 +163,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
     }
 
     // Run IndexNow sync if key is configured
-    if (config.indexNow) {
+    if (runIndexNow) {
       const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
         logger.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
         return { success: false, submitted: 0, remaining: 0, error: err.message }
@@ -227,6 +233,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
 async function pingSitemap(
   event: H3Event | undefined,
   config: ModulePublicRuntimeConfig,
+  sitemapIntervalMinutes: number,
   debug?: boolean,
 ): Promise<SitemapPingResult> {
   const { pruneTtl } = config.runtimeSync
@@ -241,7 +248,7 @@ async function pingSitemap(
   await syncSitemaps(event, sitemaps)
 
   // Get next sitemap to ping (round-robin, prioritizes errors for retry)
-  const nextSitemap = await getNextSitemapToCrawl(event)
+  const nextSitemap = await getNextSitemapToCrawl(event, sitemapIntervalMinutes)
   if (!nextSitemap) {
     if (debug)
       logger.info('[cron] No sitemaps to ping')
