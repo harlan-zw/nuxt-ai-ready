@@ -425,7 +425,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
-    const hasPrerenderedRoutes = !!nuxt.options.nitro.prerender?.routes?.length
+    const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
     const prerenderEnabled = !!(isStatic || hasPrerenderedRoutes)
     const isSPA = nuxt.options.ssr === false
 

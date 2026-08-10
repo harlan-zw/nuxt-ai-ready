@@ -82,6 +82,25 @@ describe('server handler registration', () => {
     }
   })
 
+  it('treats link crawling as prerendering', () => {
+    const filename = resolve(import.meta.dirname, '../../src/module.ts')
+    const source = readFileSync(filename, 'utf8')
+    const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    let initializer: ts.Expression | undefined
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node)
+        && ts.isIdentifier(node.name)
+        && node.name.text === 'hasPrerenderedRoutes') {
+        initializer = node.initializer
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+
+    expect(initializer?.getText(sourceFile)).toContain('nuxt.options.nitro.prerender?.crawlLinks')
+  })
+
   it('auto-imports public server composables without a global Nitro scan directory', () => {
     const filename = resolve(import.meta.dirname, '../../src/module.ts')
     const source = readFileSync(filename, 'utf8')
