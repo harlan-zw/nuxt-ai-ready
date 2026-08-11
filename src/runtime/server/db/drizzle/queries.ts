@@ -61,8 +61,15 @@ export interface PageMetaOutput {
 const RE_LEADING_SLASH = /^\//
 const RE_SLASH = /\//g
 
+/** See `normalizeRoute` in `../shared`: one page must resolve to one `route`. */
+function normalizeRoute(route: string): string {
+  if (!route || route === '/')
+    return '/'
+  return route.startsWith('/') ? route : `/${route}`
+}
+
 function normalizeRouteKey(route: string): string {
-  return route.replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
+  return normalizeRoute(route).replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
 }
 
 function rowToPage(row: any): PageOutput {
@@ -103,7 +110,7 @@ export async function upsertPage(event: H3Event | undefined, page: PageInput): P
   const now = Date.now()
 
   const values = {
-    route: page.route,
+    route: normalizeRoute(page.route),
     routeKey: normalizeRouteKey(page.route),
     title: page.title,
     description: page.description,
@@ -1216,8 +1223,12 @@ export async function seedRoutes(
   // Dedupe by route to avoid SQLite's "ON CONFLICT cannot affect row a second
   // time" error when a multi-row INSERT contains the same route twice.
   const byRoute = new Map<string, string>()
-  for (const route of routes)
+  for (const raw of routes) {
+    // Canonicalise before keying: '' and '/' are one page, so leaving them
+    // distinct defeats the dedupe and collides on route_key instead.
+    const route = normalizeRoute(raw)
     byRoute.set(route, normalizeRouteKey(route))
+  }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. 4 bind
