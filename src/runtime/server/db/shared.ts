@@ -97,11 +97,36 @@ const RE_LEADING_SLASH = /^\//
 const RE_SLASH = /\//g
 
 /**
+ * Canonical storage form of a route.
+ *
+ * `ai_ready_pages` puts a UNIQUE index on `route` and another on `route_key`,
+ * while every upsert targets `ON CONFLICT(route)`. Two spellings of one page
+ * therefore have to agree on `route`, or the conflict target misses, the insert
+ * reaches the `route_key` index instead, and the whole statement fails with
+ * `UNIQUE constraint failed: ai_ready_pages.route_key`.
+ *
+ * `''` and `'/'` are the pair that occurs in practice, since both key to
+ * `index`: one spelling takes the row, the other retries and fails on every
+ * subsequent write. A bare `'about'` against `'/about'` is the same defect.
+ *
+ * Normalising here rather than widening the conflict target keeps one page to
+ * one row. Widening it would let both spellings persist and race for the key.
+ */
+export function normalizeRoute(route: string): string {
+  if (!route || route === '/')
+    return '/'
+  return route.startsWith('/') ? route : `/${route}`
+}
+
+/**
  * Normalize route to storage key format
  * e.g., '/about/team' -> 'about:team', '/' -> 'index'
+ *
+ * Derived from the canonical route so the two can never disagree: equal keys
+ * imply equal routes, which is what the pair of unique indexes requires.
  */
 export function normalizeRouteKey(route: string): string {
-  return route.replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
+  return normalizeRoute(route).replace(RE_LEADING_SLASH, '').replace(RE_SLASH, ':') || 'index'
 }
 
 /**
@@ -364,9 +389,20 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
   if (rows.length === 0)
     return
 
+  // A dump written before routes were canonicalised can hold both '' and '/',
+  // which key alike and would fail the route_key index on import. Canonicalise
+  // and dedupe first so a stale dump cannot reintroduce the collision. Last row
+  // wins, matching the upsert semantics of the statement below.
+  const byRoute = new Map<string, DumpRow>()
+  for (const row of rows) {
+    const route = normalizeRoute(row.route)
+    byRoute.set(route, { ...row, route, route_key: normalizeRouteKey(route) })
+  }
+  const canonical = [...byRoute.values()]
+
   const stmts: { sql: string, params: unknown[] }[] = []
-  for (let i = 0; i < rows.length; i += IMPORT_ROWS_PER_STATEMENT) {
-    const batch = rows.slice(i, i + IMPORT_ROWS_PER_STATEMENT)
+  for (let i = 0; i < canonical.length; i += IMPORT_ROWS_PER_STATEMENT) {
+    const batch = canonical.slice(i, i + IMPORT_ROWS_PER_STATEMENT)
     const valuesSql = batch.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).join(', ')
     const params = batch.flatMap((row) => {
       const source = row.source || 'prerender'

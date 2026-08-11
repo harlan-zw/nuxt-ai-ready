@@ -8,7 +8,7 @@ import { resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
-import { normalizeRouteKey } from './shared'
+import { normalizeRoute, normalizeRouteKey } from './shared'
 
 /**
  * Resolve a route's locale, deferring to the explicit value when supplied.
@@ -483,12 +483,13 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
   if (!db)
     return
 
-  const routeKey = normalizeRouteKey(page.route)
+  const route = normalizeRoute(page.route)
+  const routeKey = normalizeRouteKey(route)
   const keywordsJson = JSON.stringify(page.keywords)
   const indexedAt = Date.now()
   const source = page.source || 'runtime'
   const lastSeenAt = source === 'runtime' ? indexedAt : null
-  const locale = deriveLocale(event, page.route, page.locale)
+  const locale = deriveLocale(event, route, page.locale)
 
   await db.exec(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
@@ -507,7 +508,7 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
       source = excluded.source,
       last_seen_at = excluded.last_seen_at,
       locale = excluded.locale
-  `, [page.route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt, locale])
+  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt, locale])
 }
 
 /**
@@ -594,7 +595,9 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
   // multi-row INSERT contains the same route twice.
   const byRoute = new Map<string, { route: string, routeKey: string, locale: string }>()
   for (const entry of routes) {
-    const route = typeof entry === 'string' ? entry : entry.route
+    // Canonicalise before keying the map: '' and '/' are one page, so leaving
+    // them distinct here defeats the dedupe and collides on route_key instead.
+    const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
     const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
     byRoute.set(route, {
       route,
