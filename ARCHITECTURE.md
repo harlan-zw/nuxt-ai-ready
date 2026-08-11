@@ -87,8 +87,7 @@ src/
         │       ├── status.get.ts      # GET indexing status
         │       ├── poll.post.ts       # POST bulk indexing trigger
         │       ├── prune.post.ts      # POST prune stale routes
-        │       ├── cron.get.ts        # GET cron trigger (Vercel, external)
-        │       └── indexnow.post.ts   # POST IndexNow sync trigger
+        │       └── cron.get.ts        # GET cron trigger (Vercel, external)
         │
         ├── db/
         │   ├── index.ts       # useDatabase() singleton
@@ -267,11 +266,7 @@ POST /__ai-ready/prune  # requires Authorization: Bearer <token>
 
 # Cron trigger (Vercel, external cron)
 GET /__ai-ready/cron
-# Returns: { index: { indexed, remaining, complete }, indexNow?: { submitted, remaining } }
-
-# IndexNow manual sync
-POST /__ai-ready/indexnow  # requires Authorization: Bearer <token>
-# Returns: { success, submitted, remaining, error? }
+# Returns: { index: { indexed, remaining, complete } }
 ```
 
 ### Scheduled Task
@@ -281,8 +276,7 @@ The cron task runs every minute when `cron: true` is set. It auto-enables `runti
 ```ts
 // nuxt.config.ts
 aiReady: {
-  cron: true,          // every minute, auto-enables runtimeSync
-  indexNow: 'key',  // optional IndexNow sync
+  cron: true, // every minute, auto-enables runtimeSync
 }
 ```
 
@@ -291,9 +285,7 @@ aiReady: {
 - **Vercel**: Auto-configures `vercel.json` crons to call `GET /__ai-ready/cron`
 - **Other platforms**: Use external cron service to call `GET /__ai-ready/cron`
 
-The task runs `runCron()` utility which:
-1. Batch indexes pending pages (if runtimeSync enabled)
-2. Submits changed URLs to IndexNow (if indexNow configured)
+The task runs `runCron()` to batch index pending pages when runtime sync is enabled.
 
 ### Database Schema (v1.5.0)
 
@@ -342,7 +334,6 @@ const contentChanged = existingHash !== newHash
 ```
 
 This enables:
-- **IndexNow integration**: Only notify search engines when content actually changes
 - **Skip unchanged pages**: Avoid unnecessary processing during re-indexing
 - **TTL revalidation**: Re-fetch page, compare hash, skip upsert if unchanged
 
@@ -568,7 +559,6 @@ interface ModuleOptions {
     authToken?: string
   }
   cron?: boolean // Every minute, auto-enables runtimeSync
-  indexNow?: string // IndexNow API key
   runtimeSyncSecret?: string // Auth for endpoints
   runtimeSync?: boolean | { // true or config object
     ttl?: number

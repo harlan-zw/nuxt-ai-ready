@@ -62,7 +62,6 @@ function dumpRow(i: number): DumpRow {
     indexed: 1,
     source: 'prerender',
     last_seen_at: i,
-    indexnow_synced_at: i,
     locale: '',
   }
 }
@@ -99,7 +98,6 @@ describe('db: FTS trigger WHEN guard (schema v2.1.1)', () => {
     // Updates that touch only bookkeeping columns must NOT lose FTS entries.
     db.prepare(`UPDATE ai_ready_pages SET indexed = 0 WHERE route = '/a'`).run()
     db.prepare(`UPDATE ai_ready_pages SET indexed_at = 12345 WHERE route = '/a'`).run()
-    db.prepare(`UPDATE ai_ready_pages SET indexnow_synced_at = 67890 WHERE route = '/a'`).run()
     db.prepare(`UPDATE ai_ready_pages SET last_seen_at = 1, locale = 'en' WHERE route = '/a'`).run()
 
     expect(db.prepare(FTS_MATCH_COUNT).get('zebra')).toEqual({ count: 1 })
@@ -161,17 +159,15 @@ describe('db: importDbDump batching (shared.ts)', () => {
       source: string
       indexed_at: number
       last_seen_at: number
-      indexnow_synced_at: number
       locale: string
     }
     expect(page.indexed).toBe(1)
     expect(page.source).toBe('prerender')
     expect(page.last_seen_at).toBe(page.indexed_at)
-    expect(page.indexnow_synced_at).toBe(page.indexed_at)
     expect(page.locale).toBe('')
   })
 
-  it('chunks into statements of 5 rows (≤ 100 params) and uses db.batch', async () => {
+  it('chunks into statements of 7 rows (≤ 100 params) and uses db.batch', async () => {
     db = schemaDb()
     let batchCalls = 0
     const seen: { sql: string, params?: unknown[] }[] = []
@@ -190,8 +186,8 @@ describe('db: importDbDump batching (shared.ts)', () => {
     await importDbDump(adapter, Array.from({ length: 12 }, (_, i) => dumpRow(i + 1)))
 
     expect(batchCalls).toBe(1)
-    // 12 rows / 5 per statement = 3 statements (5 + 5 + 2).
-    expect(seen).toHaveLength(3)
+    // 12 rows / 7 per statement = 2 statements (7 + 5).
+    expect(seen).toHaveLength(2)
     for (const stmt of seen)
       expect(stmt.params!.length).toBeLessThanOrEqual(100)
     expect(db.prepare('SELECT COUNT(*) as count FROM ai_ready_pages').get()).toEqual({ count: 12 })

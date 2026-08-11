@@ -4,7 +4,7 @@ import { runCron } from '../utils/runCron'
 export default defineTask({
   meta: {
     name: 'ai-ready:cron',
-    description: 'Scheduled task for AI Ready - runs indexing and IndexNow sync',
+    description: 'Scheduled task for AI Ready indexing',
   },
   async run({ payload }) {
     // Skip in dev - context not fully available

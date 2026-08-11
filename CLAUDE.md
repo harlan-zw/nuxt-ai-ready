@@ -83,7 +83,7 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 
 ### Indexing Control Endpoints (when `runtimeSync: true`)
 
-- `GET /__ai-ready/status` - Returns `{ total, indexed, pending, indexNow? }`
+- `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
 - `POST /__ai-ready/restore` - Force restore from prerendered dump:
   - `?clear=false` - Don't clear existing pages first (default: true)
   - Requires `Authorization: Bearer <token>` header if `runtimeSyncSecret` configured
@@ -99,22 +99,13 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
   - `?ttl=N` - Override pruneTtl config
   - Requires `Authorization: Bearer <token>` header unless dry run
 
-### IndexNow Endpoints (when `indexNow` configured)
-
-- `GET /{key}.txt` - Key verification endpoint
-- `POST /__ai-ready/indexnow` - Manual sync trigger:
-  - `?limit=N` - Max URLs to submit (default: 100)
-  - Requires `Authorization: Bearer <token>` header if `runtimeSyncSecret` configured
-  - Returns: `{ success, submitted, remaining, error? }`
-
 ### Scheduled Task (`src/runtime/server/tasks/ai-ready-cron.ts`)
 
 Cron task runs every minute when enabled. `cron: true` auto-enables `runtimeSync`.
 
 ```ts
 aiReady: {
-  cron: true,          // every minute, auto-enables runtimeSync
-  indexNow: true,   // optional IndexNow sync
+  cron: true, // every minute, auto-enables runtimeSync
 }
 ```
 
@@ -128,7 +119,6 @@ aiReady: {
 - **utils/batchIndex.ts**: Shared batch indexing logic for poll endpoint and scheduled task
 - **utils/pageData.ts**: Unified read from database
 - **utils/sitemap.ts**: Fetch and parse sitemap URLs
-- **utils/indexnow.ts**: IndexNow submission utilities (`submitToIndexNow`, `syncToIndexNow`)
 
 ### Key Dependencies
 
@@ -178,8 +168,7 @@ Config key: `aiReady` in nuxt.config.ts
   webmcp: true, // browser tools via document.modelContext
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
   cron: true, // every minute, auto-enables runtimeSync
-  indexNow: true, // derives key from site URL
-  runtimeSyncSecret: 'token', // auth for poll/prune/indexnow endpoints
+  runtimeSyncSecret: 'token', // auth for runtime sync endpoints
   runtimeSync: { ttl: 3600, batchSize: 20, pruneTtl: 0 }, // optional overrides
 }
 ```

@@ -1,7 +1,7 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import { eventHandler } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { countPages, countPagesNeedingIndexNowSync, countRecentlyIndexed, getCronLockStatus, getIndexNowBackoff, getIndexNowStats, getRecentCronRuns, getRecentlyIndexedPages, getSitemapStatus } from '../../db/queries'
+import { countPages, countRecentlyIndexed, getCronLockStatus, getRecentCronRuns, getRecentlyIndexedPages, getSitemapStatus } from '../../db/queries'
 
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
@@ -26,28 +26,6 @@ export default eventHandler(async (event) => {
       last24h: recentlyIndexed24h,
       recentPages,
     },
-  }
-
-  // Include IndexNow stats if key is configured
-  if (config.indexNow) {
-    const [indexNowPending, indexNowStats, backoff] = await Promise.all([
-      countPagesNeedingIndexNowSync(event),
-      getIndexNowStats(event),
-      getIndexNowBackoff(event),
-    ])
-
-    result.indexNow = {
-      pending: indexNowPending,
-      totalSubmitted: indexNowStats.totalSubmitted,
-      lastSubmittedAt: indexNowStats.lastSubmittedAt,
-      lastError: indexNowStats.lastError,
-      backoff: {
-        active: backoff.active,
-        until: backoff.until,
-        remainingMs: backoff.remainingMs,
-        attempt: backoff.attempt,
-      },
-    }
   }
 
   // Include cron and sitemap info if runtime sync is enabled

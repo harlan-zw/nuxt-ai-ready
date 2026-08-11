@@ -15,8 +15,6 @@ export {
   completeCronRun,
   // Page queries
   countPages,
-  // IndexNow queries
-  countPagesNeedingIndexNowSync,
   // Info table queries
   deleteInfoValue,
   deletePage,
@@ -27,12 +25,10 @@ export {
   getNextSitemapToCrawl,
   getPageByRoute,
   getPageLastmods,
-  getPagesNeedingIndexNowSync,
   getPendingPages,
   getRecentCronRuns,
   getSitemapStatus,
   initSchema,
-  markIndexNowSynced,
   markPageIndexed,
   markRoutesPending,
   markSitemapCrawled,

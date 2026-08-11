@@ -17,7 +17,6 @@ export const pages = pgTable('ai_ready_pages', {
   indexed: integer('indexed').notNull().default(0),
   source: text('source').notNull().default('prerender'),
   lastSeenAt: integer('last_seen_at'),
-  indexnowSyncedAt: integer('indexnow_synced_at'),
   locale: text('locale').notNull().default(''),
 }, table => [
   index('idx_ai_ready_pages_route').on(table.route),
@@ -45,23 +44,10 @@ export const cronRuns = pgTable('ai_ready_cron_runs', {
   durationMs: integer('duration_ms'),
   pagesIndexed: integer('pages_indexed').default(0),
   pagesRemaining: integer('pages_remaining').default(0),
-  indexnowSubmitted: integer('indexnow_submitted').default(0),
-  indexnowRemaining: integer('indexnow_remaining').default(0),
   errors: text('errors').default('[]'),
   status: text('status').default('running'),
 }, table => [
   index('idx_ai_ready_cron_runs_started').on(table.startedAt),
-])
-
-// IndexNow submission log
-export const indexnowLog = pgTable('ai_ready_indexnow_log', {
-  id: serial('id').primaryKey(),
-  submittedAt: integer('submitted_at').notNull(),
-  urlCount: integer('url_count').notNull(),
-  success: integer('success').notNull().default(0),
-  error: text('error'),
-}, table => [
-  index('idx_ai_ready_indexnow_log_submitted').on(table.submittedAt),
 ])
 
 // Sitemap tracking
@@ -78,4 +64,4 @@ export const sitemaps = pgTable('ai_ready_sitemaps', {
 ])
 
 // Export schema for migrations
-export const schema = { pages, info, cronRuns, indexnowLog, sitemaps }
+export const schema = { pages, info, cronRuns, sitemaps }

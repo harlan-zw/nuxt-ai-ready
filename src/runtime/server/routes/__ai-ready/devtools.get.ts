@@ -28,7 +28,6 @@ export default eventHandler(async (event) => {
     config: {
       database: { type: runtimeConfig.database?.type || 'sqlite' },
       runtimeSync: runtimeConfig.runtimeSync,
-      indexNow: !!runtimeConfig.indexNow,
       sitemapPrerendered: runtimeConfig.sitemapPrerendered,
       markdownCacheHeaders: runtimeConfig.markdownCacheHeaders,
       llmsTxtCacheSeconds: runtimeConfig.llmsTxtCacheSeconds,

@@ -444,7 +444,7 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // Schema Management
 // ============================================================================
 
-const SCHEMA_VERSION = 'v2.2.0-drizzle'
+const SCHEMA_VERSION = 'v2.3.0-drizzle'
 
 /**
  * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
@@ -571,7 +571,6 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
       last_seen_at INTEGER,
-      indexnow_synced_at INTEGER,
       locale TEXT NOT NULL DEFAULT ''
     )`,
     sql`CREATE TABLE IF NOT EXISTS _ai_ready_info (
@@ -588,17 +587,8 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       duration_ms INTEGER,
       pages_indexed INTEGER DEFAULT 0,
       pages_remaining INTEGER DEFAULT 0,
-      indexnow_submitted INTEGER DEFAULT 0,
-      indexnow_remaining INTEGER DEFAULT 0,
       errors TEXT DEFAULT '[]',
       status TEXT DEFAULT 'running'
-    )`,
-    sql`CREATE TABLE IF NOT EXISTS ai_ready_indexnow_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      submitted_at INTEGER NOT NULL,
-      url_count INTEGER NOT NULL,
-      success INTEGER NOT NULL DEFAULT 0,
-      error TEXT
     )`,
     sql`CREATE TABLE IF NOT EXISTS ai_ready_sitemaps (
       name TEXT PRIMARY KEY,
@@ -622,8 +612,7 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       content=ai_ready_pages, content_rowid=id, tokenize='${ftsTokenizer}'
     )`),
     // FTS triggers. The UPDATE trigger only fires when a searchable column
-    // actually changed; updates to bookkeeping columns (indexed, indexed_at,
-    // indexnow_synced_at, last_seen_at…) skip the delete+reinsert FTS churn.
+    // actually changed; updates to bookkeeping columns skip FTS churn.
     sql`CREATE TRIGGER IF NOT EXISTS ai_ready_pages_ai AFTER INSERT ON ai_ready_pages BEGIN
       INSERT INTO ai_ready_pages_fts(rowid, route, title, description, markdown, headings, keywords)
       VALUES (new.id, new.route, new.title, new.description, new.markdown, new.headings, new.keywords);
@@ -670,7 +659,6 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
       last_seen_at INTEGER,
-      indexnow_synced_at INTEGER,
       locale TEXT NOT NULL DEFAULT ''
     )`,
     sql`CREATE TABLE IF NOT EXISTS _ai_ready_info (
@@ -687,17 +675,8 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       duration_ms INTEGER,
       pages_indexed INTEGER DEFAULT 0,
       pages_remaining INTEGER DEFAULT 0,
-      indexnow_submitted INTEGER DEFAULT 0,
-      indexnow_remaining INTEGER DEFAULT 0,
       errors TEXT DEFAULT '[]',
       status TEXT DEFAULT 'running'
-    )`,
-    sql`CREATE TABLE IF NOT EXISTS ai_ready_indexnow_log (
-      id SERIAL PRIMARY KEY,
-      submitted_at INTEGER NOT NULL,
-      url_count INTEGER NOT NULL,
-      success INTEGER NOT NULL DEFAULT 0,
-      error TEXT
     )`,
     sql`CREATE TABLE IF NOT EXISTS ai_ready_sitemaps (
       name TEXT PRIMARY KEY,
@@ -723,88 +702,6 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
 }
 
 // ============================================================================
-// IndexNow Queries
-// ============================================================================
-
-/**
- * Get pages needing IndexNow sync
- */
-export async function getPagesNeedingIndexNowSync(
-  event: H3Event | undefined,
-  limit = 100,
-): Promise<{ route: string }[]> {
-  const client = await useDrizzle(event)
-
-  return (client.db as any)
-    .select({ route: pages.route })
-    .from(pages)
-    .where(
-      and(
-        eq(pages.indexed, 1),
-        eq(pages.isError, 0),
-        or(
-          isNull(pages.indexnowSyncedAt),
-          lt(pages.indexnowSyncedAt, pages.indexedAt),
-        ),
-      ),
-    )
-    .limit(limit)
-}
-
-/**
- * Count pages needing IndexNow sync
- */
-export async function countPagesNeedingIndexNowSync(
-  event: H3Event | undefined,
-): Promise<number> {
-  const client = await useDrizzle(event)
-
-  const result = await (client.db as any)
-    .select({ count: count() })
-    .from(pages)
-    .where(
-      and(
-        eq(pages.indexed, 1),
-        eq(pages.isError, 0),
-        or(
-          isNull(pages.indexnowSyncedAt),
-          lt(pages.indexnowSyncedAt, pages.indexedAt),
-        ),
-      ),
-    )
-
-  return Number(result[0]?.count || 0)
-}
-
-/**
- * Mark pages as synced to IndexNow
- */
-export async function markIndexNowSynced(
-  event: H3Event | undefined,
-  routes: string[],
-): Promise<void> {
-  if (routes.length === 0)
-    return
-
-  const now = Date.now()
-
-  // D1/SQLite caps prepared-statement params at 100; chunk to 99 routes + ts,
-  // then run all chunks in one driver-level batch.
-  const db = await useRawDb(event)
-  const stmts: { sql: string, params: unknown[] }[] = []
-  const D1_MAX_IN_ROUTES = 99
-  for (let i = 0; i < routes.length; i += D1_MAX_IN_ROUTES) {
-    const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
-    const placeholders = batch.map(() => '?').join(',')
-    stmts.push({
-      sql: `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-      params: [now, ...batch],
-    })
-  }
-  await db.batch(stmts)
-}
-
-// ============================================================================
 // Cron Run Queries
 // ============================================================================
 
@@ -815,8 +712,6 @@ export interface CronRunOutput {
   durationMs: number | null
   pagesIndexed: number
   pagesRemaining: number
-  indexNowSubmitted: number
-  indexNowRemaining: number
   errors: string[]
   status: 'running' | 'success' | 'partial' | 'error'
 }
@@ -829,8 +724,6 @@ function rowToCronRun(row: any): CronRunOutput {
     durationMs: row.durationMs,
     pagesIndexed: row.pagesIndexed || 0,
     pagesRemaining: row.pagesRemaining || 0,
-    indexNowSubmitted: row.indexnowSubmitted || 0,
-    indexNowRemaining: row.indexnowRemaining || 0,
     errors: JSON.parse(row.errors || '[]'),
     status: row.status,
   }
@@ -860,8 +753,6 @@ export async function completeCronRun(
   result: {
     pagesIndexed: number
     pagesRemaining: number
-    indexNowSubmitted: number
-    indexNowRemaining: number
     errors: string[]
   },
 ): Promise<void> {
@@ -887,8 +778,6 @@ export async function completeCronRun(
       durationMs,
       pagesIndexed: result.pagesIndexed,
       pagesRemaining: result.pagesRemaining,
-      indexnowSubmitted: result.indexNowSubmitted,
-      indexnowRemaining: result.indexNowRemaining,
       errors: JSON.stringify(result.errors),
       status,
     })

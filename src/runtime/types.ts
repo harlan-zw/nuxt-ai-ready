@@ -282,20 +282,12 @@ export interface ModuleOptions {
   /**
    * Enable scheduled cron task (runs every minute)
    * When true, automatically enables runtimeSync for background indexing
-   * Also runs IndexNow sync if indexNow is enabled
    */
   cron?: boolean
 
   /**
-   * Enable IndexNow for instant search engine notifications
-   * Submits to Bing, Yandex, Naver, Seznam when content changes
-   * Set to `true` to derive key from site URL, or provide your own string
-   */
-  indexNow?: boolean | string
-
-  /**
    * Secret token for authenticating runtime sync endpoints
-   * When set, requires `Authorization: Bearer <token>` header for poll/prune/indexnow endpoints
+   * When set, requires `Authorization: Bearer <token>` header for runtime sync endpoints
    */
   runtimeSyncSecret?: string
 
@@ -487,6 +479,6 @@ export interface PageIndexedContext {
   updatedAt: string
   /** Whether this is a new page or an update */
   isUpdate: boolean
-  /** Whether the content hash changed (triggers IndexNow sync) */
+  /** Whether the content hash changed */
   contentChanged: boolean
 }
