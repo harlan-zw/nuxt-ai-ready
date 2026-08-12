@@ -9,6 +9,7 @@ import { withSiteUrl } from '#site-config/server/composables/utils'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { logger } from '../logger'
+import { setStatusAwareLinkHeader } from '../plugins/link-header'
 import { CONTENT_NEGOTIATION_VARY, resolveContentNegotiation } from '../utils/content-negotiation'
 import { computeLocaleAlternates, resolveLocaleAlternateUrl, resolveLocaleFromRoute } from '../utils/i18n'
 import { buildLinkHeader } from '../utils/link-header'
@@ -17,10 +18,21 @@ import { getMarkdownRenderInfo } from '../utils/markdown-request'
 const INTERNAL_HEADER = 'x-ai-ready-internal'
 type LinkUrlResolver = (path: string) => string
 
+function setLinkHeader(event: H3Event, path: string, variant: 'html' | 'markdown', config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
+  const successHeader = buildLinkHeader(path, variant, config, resolveUrl, routeContext)
+  if (!config.i18n) {
+    setStatusAwareLinkHeader(event, successHeader)
+    return
+  }
+
+  const safeHeader = buildLinkHeader(path, variant, { ...config, i18n: null }, resolveUrl, routeContext)
+  setStatusAwareLinkHeader(event, safeHeader, successHeader)
+}
+
 function setNegotiationHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
   appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
   // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
-  setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl, routeContext))
+  setLinkHeader(event, path, 'html', config, resolveUrl, routeContext)
 }
 
 function setUncacheableHeaders(event: H3Event) {
@@ -40,7 +52,7 @@ function setUncacheableHeaders(event: H3Event) {
 
 function setMarkdownHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
-  setHeader(event, 'link', buildLinkHeader(path, 'markdown', config, resolveUrl, routeContext))
+  setLinkHeader(event, path, 'markdown', config, resolveUrl, routeContext)
   if (config.markdownCacheHeaders) {
     const { maxAge, swr } = config.markdownCacheHeaders
     const cacheControl = swr
@@ -135,7 +147,7 @@ export default defineEventHandler(async (event) => {
     if (contentNegotiation._tag === 'enabled')
       setNegotiationHeaders(event, path, config, resolveUrl, routeContext)
     else
-      setHeader(event, 'link', buildLinkHeader(path, 'html', config, resolveUrl, routeContext))
+      setLinkHeader(event, path, 'html', config, resolveUrl, routeContext)
     return
   }
 

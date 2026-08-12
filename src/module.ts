@@ -926,6 +926,7 @@ export async function lookupContentPage(event, path) {
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown'),
     })
+    addServerPlugin(resolve('./runtime/server/plugins/link-header'))
 
     // Inject <link rel="alternate" type="text/markdown"> into HTML pages
     addPlugin({
