@@ -1,5 +1,5 @@
 import type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
-import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
+import type { LocalePagePaths, RuntimeI18nConfig, UnlocalizedLocalePage } from 'nuxtseo-shared/i18n-runtime'
 import { resolveI18nConfig as resolveSharedI18nConfig, toRuntimeI18nConfig as toSharedRuntimeI18nConfig } from 'nuxtseo-shared/i18n'
 import { logger } from '../logger'
 
@@ -40,6 +40,12 @@ function collectPagePaths(routes: readonly I18nPageRoute[], parentPath = ''): Ma
   }, new Map<string, string>())
 }
 
+function isUnlocalizedLocalePage(
+  page: LocalePagePaths | UnlocalizedLocalePage | undefined,
+): page is UnlocalizedLocalePage {
+  return page?._tag === 'unlocalized' && typeof page.path === 'string'
+}
+
 export function materializeI18nPages(
   i18n: Pick<RuntimeI18nConfig, 'defaultLocale' | 'locales' | 'pages'>,
   routes: readonly I18nPageRoute[],
@@ -49,6 +55,9 @@ export function materializeI18nPages(
 
   const pagePaths = collectPagePaths(routes)
   return Object.fromEntries(Object.entries(i18n.pages).map(([pageName, pageLocales]) => {
+    if (isUnlocalizedLocalePage(pageLocales))
+      return [pageName, pageLocales]
+
     const defaultPath = pageLocales?.[i18n.defaultLocale]
     const fallbackPath = typeof defaultPath === 'string' ? defaultPath : pagePaths.get(pageName)
     const locales = Object.fromEntries(i18n.locales.flatMap((locale) => {
