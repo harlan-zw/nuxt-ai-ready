@@ -2,6 +2,14 @@ import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
   extends: ['../basic'],
+  aiReady: {
+    apiCatalog: {
+      entries: [{
+        anchor: '/api',
+        serviceDesc: { href: '/openapi.json' },
+      }],
+    },
+  },
   hooks: {
     'nitro:config'(nitro) {
       const config = nitro.runtimeConfig?.['nuxt-ai-ready']

@@ -17,7 +17,22 @@ describe('i18n error response headers', async () => {
     })
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('link')).toContain('hreflang="en"')
+    const link = response.headers.get('link') || ''
+    expect(link).toContain('hreflang="en"')
+    expect(link).toContain('rel="api-catalog"')
+    expect(link.match(/rel="api-catalog"/g)).toHaveLength(1)
+  })
+
+  it('keeps hreflang alternates on redirects', async () => {
+    const response = await fetch(url('/about'), {
+      headers: { Accept: 'text/markdown' },
+      redirect: 'manual',
+    })
+
+    expect(response.status).toBe(307)
+    const link = response.headers.get('link') || ''
+    expect(link).toContain('hreflang="en"')
+    expect(link.match(/rel="api-catalog"/g)).toHaveLength(1)
   })
 
   it('omits hreflang alternates from error responses', async () => {
@@ -26,8 +41,10 @@ describe('i18n error response headers', async () => {
     })
 
     expect(response.status).toBe(404)
-    const link = response.headers.get('link')
+    const link = response.headers.get('link') || ''
     expect(link).toContain('/en/verktoy/supabase-pwn.md')
     expect(link).not.toContain('hreflang=')
+    expect(link).toContain('rel="api-catalog"')
+    expect(link.match(/rel="api-catalog"/g)).toHaveLength(1)
   })
 })

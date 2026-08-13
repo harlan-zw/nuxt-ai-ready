@@ -19,9 +19,13 @@ const INTERNAL_HEADER = 'x-ai-ready-internal'
 type LinkUrlResolver = (path: string) => string
 
 function setLinkHeader(event: H3Event, path: string, variant: 'html' | 'markdown', config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
+  setHeader(event, 'link', buildLinkHeader(path, variant, config, resolveUrl, routeContext))
+}
+
+function setStatusAwareHeader(event: H3Event, path: string, variant: 'html' | 'markdown', config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
   const successHeader = buildLinkHeader(path, variant, config, resolveUrl, routeContext)
   if (!config.i18n) {
-    setStatusAwareLinkHeader(event, successHeader)
+    setHeader(event, 'link', successHeader)
     return
   }
 
@@ -33,6 +37,11 @@ function setNegotiationHeaders(event: H3Event, path: string, config: ModulePubli
   appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
   // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
   setLinkHeader(event, path, 'html', config, resolveUrl, routeContext)
+}
+
+function setStatusAwareNegotiationHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
+  appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
+  setStatusAwareHeader(event, path, 'html', config, resolveUrl, routeContext)
 }
 
 function setUncacheableHeaders(event: H3Event) {
@@ -145,9 +154,9 @@ export default defineEventHandler(async (event) => {
   // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
   if (negotiation === 'html') {
     if (contentNegotiation._tag === 'enabled')
-      setNegotiationHeaders(event, path, config, resolveUrl, routeContext)
+      setStatusAwareNegotiationHeaders(event, path, config, resolveUrl, routeContext)
     else
-      setLinkHeader(event, path, 'html', config, resolveUrl, routeContext)
+      setStatusAwareHeader(event, path, 'html', config, resolveUrl, routeContext)
     return
   }
 
