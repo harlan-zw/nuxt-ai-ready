@@ -301,6 +301,24 @@ describe('toRuntimeI18nConfig', () => {
       .toEqual(['/about', '/fr/a-propos'])
   })
 
+  it('preserves unlocalized page routes during materialization', () => {
+    const config = toRuntimeI18nConfig({
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', _hreflang: 'en', _sitemap: 'en' },
+        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr' },
+      ],
+      pages: {
+        admin: { _tag: 'unlocalized', path: '/admin' },
+      },
+    }, [{ name: 'admin', path: '/admin' }])
+
+    expect(config.pages).toEqual({
+      admin: { _tag: 'unlocalized', path: '/admin' },
+    })
+  })
+
   it('uses Nuxt route paths and default-locale custom path fallbacks', () => {
     const routes = [
       { name: 'services-development', path: '/services/development' },
