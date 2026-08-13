@@ -110,6 +110,15 @@ declare module '#ai-ready-virtual/logger.mjs' {
   export const logger: ConsolaInstance
 }
 
+declare module '#ai-ready-virtual/i18n-runtime.mjs' {
+  export {
+    computeLocaleAlternates,
+    localePath,
+    resolveLocaleAlternates,
+    resolveLocaleFromRoute,
+  } from 'nuxtseo-shared/i18n-runtime'
+}
+
 declare module '#ai-ready-virtual/db-provider.mjs' {
   import type { H3Event } from '#nuxtseo/h3'
   import type { DrizzleDatabase } from '#ai-ready/server/db/drizzle/client'

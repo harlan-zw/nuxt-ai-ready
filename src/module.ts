@@ -140,6 +140,7 @@ export default defineNuxtModule<ModuleOptions>({
   async setup(config, nuxt) {
     const moduleEntryUrl = resolveModuleEntryUrl(import.meta.url)
     const resolveFromModule = createRequire(moduleEntryUrl)
+    const nuxtSeoSharedI18nRuntimePath = resolveFromModule.resolve('nuxtseo-shared/i18n-runtime')
     const nuxtSeoSharedUtilsPath = resolveFromModule.resolve('nuxtseo-shared/utils')
     const { resolve } = createResolver(moduleEntryUrl)
     const { version } = await readPackageJSON(resolve('../package.json'))
@@ -793,6 +794,15 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       nitroConfig.virtual = nitroConfig.virtual || {}
+      const runtimeConfig = nitroConfig.runtimeConfig?.['nuxt-ai-ready'] as ModulePublicRuntimeConfig | undefined
+      nitroConfig.virtual['#ai-ready-virtual/i18n-runtime.mjs'] = runtimeConfig?.i18n
+        ? `export { computeLocaleAlternates, localePath, resolveLocaleAlternates, resolveLocaleFromRoute } from ${JSON.stringify(nuxtSeoSharedI18nRuntimePath)}`
+        : `
+const unavailable = () => {
+  throw new Error('[nuxt-ai-ready] i18n runtime called without i18n configuration.')
+}
+export { unavailable as computeLocaleAlternates, unavailable as localePath, unavailable as resolveLocaleAlternates, unavailable as resolveLocaleFromRoute }
+`
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
       nitroConfig.virtual['#ai-ready-virtual/agent-skills.mjs'] = agentSkillsResult._tag === 'Enabled'
         ? `export const agentSkillsIndex = ${JSON.stringify(agentSkillsResult.index)}\nexport const localAgentSkillArtifacts = ${JSON.stringify(agentSkillsResult.localArtifacts)}`
