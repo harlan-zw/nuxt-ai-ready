@@ -1,6 +1,65 @@
 # Changelog
 
 
+## v1.7.10...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.10...main)
+
+### 🩹 Fixes
+
+- Canonicalise route so '' and '/' cannot collide ([#77](https://github.com/harlan-zw/nuxt-ai-ready/pull/77))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v1.7.9...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.9...main)
+
+### 🩹 Fixes
+
+- Activate prerender capture with crawlLinks ([#76](https://github.com/harlan-zw/nuxt-ai-ready/pull/76))
+- Handle query strings on markdown routes ([#75](https://github.com/harlan-zw/nuxt-ai-ready/pull/75))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v1.7.6...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.6...main)
+
+### 🩹 Fixes
+
+- Respect IndexNow backoff and runtime TTL ([#74](https://github.com/harlan-zw/nuxt-ai-ready/pull/74))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v1.7.5...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.5...main)
+
+### 🔥 Performance
+
+- **db:** Batch writes and reduce indexing round trips ([#72](https://github.com/harlan-zw/nuxt-ai-ready/pull/72))
+
+### 🩹 Fixes
+
+- Resume bounded sitemap crawls ([#73](https://github.com/harlan-zw/nuxt-ai-ready/pull/73))
+- **i18n:** Resolve hreflang alternates through translated routes ([#71](https://github.com/harlan-zw/nuxt-ai-ready/pull/71))
+
+### 🏡 Chore
+
+- Bump ([c9835b7](https://github.com/harlan-zw/nuxt-ai-ready/commit/c9835b7))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+- Daniel Christensen ([@BobTheShoplifter](https://github.com/BobTheShoplifter))
+
 ## v1.7.4...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.4...main)
