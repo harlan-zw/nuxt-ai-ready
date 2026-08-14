@@ -7,12 +7,11 @@ import { getRequestURL } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
-import { formatAvailableLanguagesSection, formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
+import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
 import { toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
-import { resolveLocaleFromRoute } from './server/utils/i18n'
 import { fetchSitemapUrls } from './server/utils/sitemap'
 
 export { normalizeLlmsTxtConfig }
@@ -199,6 +198,9 @@ export async function buildLlmsTxt(event: H3Event) {
   const siteConfig = getSiteConfig(event)
   const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
+  const i18nRuntime = i18n
+    ? { _tag: 'enabled' as const, config: i18n, ...await import('./llms-txt-i18n') }
+    : { _tag: 'disabled' as const }
   const i18nContext = { host: getRequestURL(event).host }
   const baseURL = runtimeConfig.app.baseURL
   const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
@@ -293,7 +295,9 @@ export async function buildLlmsTxt(event: H3Event) {
   const other: PageItem[] = []
   for (const pathname of sitemapPaths) {
     if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
-      const locale = i18n ? resolveLocaleFromRoute(pathname, i18n, i18nContext).locale : undefined
+      const locale = i18nRuntime._tag === 'enabled'
+        ? i18nRuntime.resolveLocaleFromRoute(pathname, i18nRuntime.config, i18nContext).locale
+        : undefined
       other.push({ pathname, locale })
       seenPaths.add(pathname)
     }
@@ -317,28 +321,28 @@ export async function buildLlmsTxt(event: H3Event) {
     page.href = resolvePageHref(page.pathname)
 
   // i18n: filter to default-locale pages, then emit Available Languages header
-  if (i18n) {
+  if (i18nRuntime._tag === 'enabled') {
     const pageCounts = new Map<string, number>()
-    for (const locale of i18n.locales) pageCounts.set(locale.code, 0)
+    for (const locale of i18nRuntime.config.locales) pageCounts.set(locale.code, 0)
     for (const p of [...prerendered, ...other]) {
-      const code = p.locale || resolveLocaleFromRoute(p.pathname, i18n, i18nContext).locale
+      const code = p.locale || i18nRuntime.resolveLocaleFromRoute(p.pathname, i18nRuntime.config, i18nContext).locale
       pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
     }
-    parts.push(...formatAvailableLanguagesSection(i18n, pageCounts, resolvePageHref, i18nContext))
+    parts.push(...i18nRuntime.formatAvailableLanguagesSection(i18nRuntime.config, pageCounts, resolvePageHref, i18nContext))
     parts.push('')
   }
 
   // When i18n active, default-locale pages are inlined; non-default-locale pages
   // are referenced via the Available Languages section above (Anthropic precedent).
   const isDefaultLocale = (item: PageItem): boolean => {
-    if (!i18n)
+    if (i18nRuntime._tag === 'disabled')
       return true
-    const code = item.locale || resolveLocaleFromRoute(item.pathname, i18n, i18nContext).locale
-    return code === i18n.defaultLocale
+    const code = item.locale || i18nRuntime.resolveLocaleFromRoute(item.pathname, i18nRuntime.config, i18nContext).locale
+    return code === i18nRuntime.config.defaultLocale
   }
 
-  const filteredPrerendered = i18n ? prerendered.filter(isDefaultLocale) : prerendered
-  const filteredOther = i18n ? other.filter(isDefaultLocale) : other
+  const filteredPrerendered = i18nRuntime._tag === 'enabled' ? prerendered.filter(isDefaultLocale) : prerendered
+  const filteredOther = i18nRuntime._tag === 'enabled' ? other.filter(isDefaultLocale) : other
 
   // Sort and format pages
   const sortedPrerendered = sortPagesByPath(filteredPrerendered)

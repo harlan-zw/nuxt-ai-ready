@@ -12,6 +12,7 @@ export default defineConfig({
             // Virtual module aliases for unit tests - defaults to sqlite
             '#ai-ready-virtual/db-provider.mjs': resolve('./src/runtime/server/db/drizzle/providers/sqlite.ts'),
             '#ai-ready-virtual/db-schema.mjs': resolve('./src/runtime/server/db/schema/sqlite.ts'),
+            '#ai-ready-virtual/i18n-runtime.mjs': 'nuxtseo-shared/i18n-runtime',
             '#ai-ready-virtual/logger.mjs': resolve('./src/runtime/server/logger.ts'),
             '#nuxtseo/h3': resolve('./test/unit/shims/h3.ts'),
             '#nuxtseo/nitro': resolve('./test/unit/shims/nitro.ts'),

@@ -1,7 +1,8 @@
 import type { LlmsTxtConfig } from '../../src/runtime/types'
 import type { RuntimeI18nConfig } from '../../src/utils/i18n'
 import { describe, expect, it } from 'vitest'
-import { formatAvailableLanguagesSection, formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt-format'
+import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt-format'
+import { formatAvailableLanguagesSection } from '../../src/runtime/llms-txt-i18n'
 
 const RE_H2 = /^## (.+)$/
 const RE_LINK = /^- \[([^\]]+)\]\(([^)]+)\)(?:: (.*))?$/

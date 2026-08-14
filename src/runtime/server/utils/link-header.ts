@@ -1,6 +1,7 @@
 import type { RuntimeI18nConfig, RuntimeRouteContext } from './i18n'
+import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { toMarkdownPath } from '../../markdown-path'
-import { computeLocaleAlternates, resolveLocaleAlternateUrl } from './i18n'
+import { computeLocaleAlternates } from './i18n'
 
 /**
  * Encode a URL path for safe inclusion in an HTTP header value.

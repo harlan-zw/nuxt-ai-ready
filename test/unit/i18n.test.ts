@@ -1,6 +1,7 @@
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
 import { describe, expect, it } from 'vitest'
-import { computeLocaleAlternates, localePath, resolveLocaleAlternateUrl, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
+import { resolveLocaleAlternateUrl } from '../../src/runtime/i18n-url'
+import { computeLocaleAlternates, localePath, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
 import { hasCjkLocale, toRuntimeI18nConfig } from '../../src/utils/i18n'
 
 const en = { code: 'en', hreflang: 'en' }
