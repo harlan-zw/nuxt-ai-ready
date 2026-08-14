@@ -1,10 +1,10 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { useNitroApp } from '#nuxtseo/nitro'
-import type { SitemapRouteSource } from '../utils/sitemap'
+import type { SitemapRouteSource } from '../utils/sitemap-routes'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
-import { mapSitemapRoutes } from '../utils/sitemap'
+import { mapSitemapRoutes } from '../utils/sitemap-routes'
 
 type NitroApp = ReturnType<typeof useNitroApp>
 
