@@ -1,6 +1,7 @@
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
 import { describe, expect, it } from 'vitest'
-import { computeLocaleAlternates, localePath, resolveLocaleAlternateUrl, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
+import { resolveLocaleAlternateUrl } from '../../src/runtime/i18n-url'
+import { computeLocaleAlternates, localePath, resolveLocaleFromRoute } from '../../src/runtime/server/utils/i18n'
 import { hasCjkLocale, toRuntimeI18nConfig } from '../../src/utils/i18n'
 
 const en = { code: 'en', hreflang: 'en' }
@@ -299,6 +300,24 @@ describe('toRuntimeI18nConfig', () => {
     })
     expect(computeLocaleAlternates('/about', config).map(alternate => alternate.path))
       .toEqual(['/about', '/fr/a-propos'])
+  })
+
+  it('preserves unlocalized page routes during materialization', () => {
+    const config = toRuntimeI18nConfig({
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [
+        { code: 'en', _hreflang: 'en', _sitemap: 'en' },
+        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr' },
+      ],
+      pages: {
+        admin: { _tag: 'unlocalized', path: '/admin' },
+      },
+    }, [{ name: 'admin', path: '/admin' }])
+
+    expect(config.pages).toEqual({
+      admin: { _tag: 'unlocalized', path: '/admin' },
+    })
   })
 
   it('uses Nuxt route paths and default-locale custom path fallbacks', () => {

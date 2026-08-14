@@ -42,6 +42,15 @@ declare module '#ai-ready-virtual/db-schema.mjs' {
   export { cronRuns, info, pages, schema, sitemaps } from './runtime/server/db/schema/sqlite'
 }
 
+declare module '#ai-ready-virtual/i18n-runtime.mjs' {
+  export {
+    computeLocaleAlternates,
+    localePath,
+    resolveLocaleAlternates,
+    resolveLocaleFromRoute,
+  } from 'nuxtseo-shared/i18n-runtime'
+}
+
 declare module '#ai-ready-virtual/site-tools.mjs' {
   import type { ResolvedSiteToolsConfig } from './runtime/site-tool-config'
 
