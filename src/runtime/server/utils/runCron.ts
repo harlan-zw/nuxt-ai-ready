@@ -8,7 +8,8 @@ import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
 import { resolveCronPlan, resolveSitemapIntervalMinutes } from './cron-plan'
 import { syncToIndexNow } from './indexnow'
-import { crawlSitemapByRoute, getSitemapsFromConfig, mapSitemapRoutes } from './sitemap'
+import { crawlSitemapByRoute, getSitemapsFromConfig } from './sitemap'
+import { mapSitemapRoutes } from './sitemap-routes'
 
 interface SitemapPingResult {
   name?: string
