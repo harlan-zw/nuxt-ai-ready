@@ -1,85 +1,17 @@
-import type { H3Event } from '#nuxtseo/h3'
-import type { ModulePublicRuntimeConfig } from '../../../module'
-import type { buildFrontmatter } from '../utils/frontmatter'
-import type { RuntimeRouteContext } from '../utils/i18n'
-import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
-import { appendHeader, createError, defineEventHandler, getHeader, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
-import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { withSiteUrl } from '#site-config/server/composables/utils'
+import type { NegotiationContext } from '../utils/negotiation-response'
+import { createError, defineEventHandler, setHeader } from '#nuxtseo/h3'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
-import { toMarkdownPath } from '../../markdown-path'
-import { toDeployedRoute } from '../../route-path'
 import { logger } from '../logger'
-import { setStatusAwareLinkHeader } from '../plugins/link-header'
-import { CONTENT_NEGOTIATION_VARY, resolveContentNegotiation } from '../utils/content-negotiation'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
-import { buildLinkHeader } from '../utils/link-header'
-import { getMarkdownRenderInfo } from '../utils/markdown-request'
-
-const INTERNAL_HEADER = 'x-ai-ready-internal'
-type LinkUrlResolver = (path: string) => string
-
-function setLinkHeader(event: H3Event, path: string, variant: 'html' | 'markdown', config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
-  setHeader(event, 'link', buildLinkHeader(path, variant, config, resolveUrl, routeContext))
-}
-
-function setStatusAwareHeader(event: H3Event, path: string, variant: 'html' | 'markdown', config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
-  const successHeader = buildLinkHeader(path, variant, config, resolveUrl, routeContext)
-  if (!config.i18n) {
-    setHeader(event, 'link', successHeader)
-    return
-  }
-
-  const safeHeader = buildLinkHeader(path, variant, { ...config, i18n: null }, resolveUrl, routeContext)
-  setStatusAwareLinkHeader(event, safeHeader, successHeader)
-}
-
-function setNegotiationHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
-  appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
-  // Advertise the markdown alternate + locale variants so agents can discover them via Link header (RFC 8288)
-  setLinkHeader(event, path, 'html', config, resolveUrl, routeContext)
-}
-
-function setStatusAwareNegotiationHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
-  appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
-  setStatusAwareHeader(event, path, 'html', config, resolveUrl, routeContext)
-}
-
-function setUncacheableHeaders(event: H3Event) {
-  setHeader(event, 'cache-control', 'private, no-store')
-  setHeader(event, 'cdn-cache-control', 'no-store')
-
-  for (const header of [
-    'cloudflare-cdn-cache-control',
-    'netlify-cdn-cache-control',
-    'vercel-cdn-cache-control',
-    'surrogate-control',
-  ] as const) {
-    if (getResponseHeader(event, header) !== undefined)
-      setHeader(event, header, 'no-store')
-  }
-}
-
-function setMarkdownHeaders(event: H3Event, path: string, config: ModulePublicRuntimeConfig, resolveUrl: LinkUrlResolver, routeContext: RuntimeRouteContext) {
-  setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
-  setLinkHeader(event, path, 'markdown', config, resolveUrl, routeContext)
-  if (config.markdownCacheHeaders) {
-    const { maxAge, swr } = config.markdownCacheHeaders
-    const cacheControl = swr
-      ? `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`
-      : `public, max-age=${maxAge}`
-    setHeader(event, 'cache-control', cacheControl)
-  }
-}
+import { INTERNAL_HEADER } from '../utils/negotiation-decision'
+import { applyNegotiation, buildNegotiationContext, decideNegotiation, ensureSiteConfig, setMarkdownHeaders } from '../utils/negotiation-response'
 
 function notFoundMarkdown(
+  ctx: NegotiationContext,
   canonicalUrl: string,
-  path: string,
-  config: ModulePublicRuntimeConfig,
-  resolveUrl: LinkUrlResolver,
-  routeContext: RuntimeRouteContext,
-  build: typeof buildFrontmatter,
+  build: typeof import('../utils/frontmatter').buildFrontmatter,
 ): string {
+  const { path, config, resolveUrl, routeContext } = ctx
   const body = [
     `# Page not found`,
     ``,
@@ -114,64 +46,16 @@ function notFoundMarkdown(
 }
 
 export default defineEventHandler(async (event) => {
-  if (event.path.startsWith('/.well-known/'))
+  const decision = decideNegotiation(event, 'middleware')
+  if (await applyNegotiation(event, decision))
+    return
+  if (decision._tag !== 'render')
     return
 
-  // Skip internal requests to prevent infinite loop
-  if (getHeader(event, INTERNAL_HEADER))
-    return
-
-  const runtimeConfig = useRuntimeConfig(event)
-  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  const contentNegotiation = resolveContentNegotiation({
-    policy: config.contentNegotiation,
-    routeRule: createNitroRouteRuleMatcher(runtimeConfig)(event.path),
-  })
-  const renderInfo = getMarkdownRenderInfo(event, {
-    _tag: 'runtime',
-    contentNegotiation: contentNegotiation._tag === 'enabled',
-  })
-  if (!renderInfo)
-    return
-
-  // Accept header sent but no supported representation matched → 406
-  if ('notAcceptable' in renderInfo) {
-    appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
-    setUncacheableHeaders(event)
-    throw createError({
-      statusCode: 406,
-      statusMessage: 'Not Acceptable',
-      message: 'Supported types: text/html, text/markdown, text/plain',
-    })
-  }
-
-  const { path, isExplicit, negotiation } = renderInfo
-  const baseURL = runtimeConfig.app.baseURL
-  const resolvePath = (path: string) => toDeployedRoute(path, baseURL)
-  const resolveUrl = (path: string) => withSiteUrl(event, resolvePath(path))
-  const routeContext = { host: getRequestURL(event).host }
+  await ensureSiteConfig(event)
+  const ctx = buildNegotiationContext(event, decision.path)
+  const { path, config, resolvePath, resolveUrl, routeContext } = ctx
   const canonicalUrl = resolveUrl(path)
-
-  // Implicit HTML pass-through: set Vary + Link and let Nuxt render HTML
-  if (negotiation === 'html') {
-    if (contentNegotiation._tag === 'enabled')
-      setStatusAwareNegotiationHeaders(event, path, config, resolveUrl, routeContext)
-    else
-      setStatusAwareHeader(event, path, 'html', config, resolveUrl, routeContext)
-    return
-  }
-
-  // Implicit markdown (Accept negotiation, not explicit .md): redirect to .md so
-  // the prerendered static .md file (or .md handler) serves the response. This
-  // avoids inline HTML→markdown conversion and keeps the URL space distinct so
-  // CDNs cache HTML and markdown variants under separate keys — critical for
-  // prerendered routes on Cloudflare Pages where HTML is served from edge cache
-  // without honoring Vary: Accept.
-  if (!isExplicit) {
-    setNegotiationHeaders(event, path, config, resolveUrl, routeContext)
-    setUncacheableHeaders(event)
-    return sendRedirect(event, resolvePath(toMarkdownPath(path)), 307)
-  }
 
   const [
     { tryGetContentMarkdown },
@@ -200,7 +84,7 @@ export default defineEventHandler(async (event) => {
       canonical_url: canonicalUrl,
       last_updated: contentPage.updatedAt || new Date().toISOString(),
     })
-    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+    setMarkdownHeaders(event, ctx)
     return `${frontmatter}\n${contentPage.markdown}`
   }
 
@@ -216,8 +100,8 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!response) {
-    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
+    setMarkdownHeaders(event, ctx)
+    return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -235,14 +119,14 @@ export default defineEventHandler(async (event) => {
 
   // Agents discard 404 bodies; return 200 with helpful markdown instead
   if (!response.ok) {
-    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
+    setMarkdownHeaders(event, ctx)
+    return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
-    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
+    setMarkdownHeaders(event, ctx)
+    return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
   const html = await response.text()
@@ -288,6 +172,6 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+  setMarkdownHeaders(event, ctx)
   return result.markdown
 })

@@ -6,7 +6,7 @@ const NEGOTIATION_CACHE_HEADERS = CONTENT_NEGOTIATION_VARY
   .split(',')
   .map(header => header.trim().toLowerCase())
 
-interface RouteRule {
+export interface NegotiationRouteRule {
   cache?: boolean | Record<string, unknown> & {
     headersOnly?: boolean
     varies?: string[]
@@ -18,7 +18,7 @@ export type ContentNegotiationResolution
   = | { _tag: 'enabled', source: 'default' | 'explicit' }
     | { _tag: 'disabled', source: 'explicit' | 'isr' | 'route-cache' }
 
-function cachesWithoutNegotiationVariation(cache: RouteRule['cache']): boolean {
+function cachesWithoutNegotiationVariation(cache: NegotiationRouteRule['cache']): boolean {
   if (!cache)
     return false
   if (typeof cache !== 'object')
@@ -32,7 +32,7 @@ function cachesWithoutNegotiationVariation(cache: RouteRule['cache']): boolean {
 
 export function resolveContentNegotiation(input: {
   policy: ContentNegotiationPolicy
-  routeRule: RouteRule
+  routeRule: NegotiationRouteRule
 }): ContentNegotiationResolution {
   if (input.policy === 'enabled')
     return { _tag: 'enabled', source: 'explicit' }
