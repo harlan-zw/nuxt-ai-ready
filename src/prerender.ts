@@ -410,8 +410,14 @@ async function processSitemapEntry(
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
   // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
+  //
+  // `retry: 0` because ofetch retries a 500 once by default, and a page that
+  // fails to render at build time fails the same way on the second attempt. The
+  // caller skips the route either way, so the retry only pays for a second full
+  // SSR render of every broken page.
   const res = await globalThis.$fetch(mdUrl, {
     headers: { 'x-nitro-prerender': mdRoute },
+    retry: 0,
     signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
   }).catch((err) => {
     if (err?.name === 'TimeoutError' || err?.name === 'AbortError')
