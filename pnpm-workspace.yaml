@@ -26,6 +26,7 @@ minimumReleaseAgeExclude:
   - '@nuxt/vite-builder@4.5.0'
   - nuxt@4.5.0
   - sitemapd@0.2.2
+  - '@harlan-zw/comark-content@0.1.2'
 shellEmulator: true
 
 trustPolicy: no-downgrade
@@ -45,6 +46,7 @@ overrides:
   schema-utils>ajv: 8.14.0
   vue: ^3.5.41
 catalog:
+  '@harlan-zw/comark-content': 0.1.2
   '@libsql/client': ^0.17.4
   '@mdream/js': ^1.6.2
   '@types/better-sqlite3': ^9.6.0

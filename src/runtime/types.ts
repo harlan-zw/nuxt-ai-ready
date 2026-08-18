@@ -131,6 +131,20 @@ export interface ModuleOptions {
   apiCatalog?: false | ApiCatalogConfig
 
   /**
+   * Read a page's Markdown from the installed content module instead of
+   * rendering the page and converting its HTML.
+   *
+   * Supports @nuxt/content v3 and @harlan-zw/comark-content. When a content
+   * module is present this skips one SSR render per route and keeps the source
+   * Markdown intact, so MDC blocks, tables and code fences survive.
+   *
+   * Set to false to convert the rendered HTML instead. Do that when a page's
+   * meaning depends on what its components render rather than on its source.
+   * @default true
+   */
+  contentSource?: boolean
+
+  /**
    * Options to pass to mdream htmlToMarkdown function
    */
   mdreamOptions?: MdreamOptions

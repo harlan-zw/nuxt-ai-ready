@@ -106,6 +106,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev-lint",
     "@arethetypeswrong/cli": "catalog:dev-build",
+    "@harlan-zw/comark-content": "catalog:",
     "@libsql/client": "catalog:",
     "@nuxt/content": "catalog:nuxt",
     "@nuxt/module-builder": "catalog:nuxt",

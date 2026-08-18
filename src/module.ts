@@ -11,9 +11,10 @@ import { dirname, join } from 'node:path'
 import { addImports, addPlugin, addServerHandler, addServerImports, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
-import { resolveNuxtContentVersion, setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
+import { setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
 import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
 import { createBuildPageDataVirtual } from './build-page-data-virtual'
+import { contentLookupModule, resolveContentSource } from './content-source'
 import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
@@ -346,11 +347,11 @@ export default defineNuxtModule<ModuleOptions>({
         (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
     })
 
-    // Detect @nuxt/content v3 — if present, the markdown middleware will
+    // Detect a content module — if present, the markdown middleware will
     // prefer raw markdown source from content collections over HTML→mdream
-    // conversion, eliminating round-trip lossiness for content-backed routes.
-    const contentVersion = await resolveNuxtContentVersion()
-    const hasNuxtContentV3 = !!(contentVersion && contentVersion.version === 3)
+    // conversion, eliminating round-trip lossiness for content-backed routes
+    // and the SSR render each conversion needs.
+    const contentSource = await resolveContentSource(config.contentSource !== false)
 
     if (typeof config.contentSignal === 'object') {
       // robots may be undefined (no explicit `robots` key) or `false` (disabled); fall back to {} so we can attach groups
@@ -850,40 +851,10 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         cron: !!config.cron,
       })}`
 
-      // Content lookup: when @nuxt/content v3 is installed, this virtual
-      // module bridges to its server APIs (queryCollection + minimark
-      // stringify). Otherwise it exports a no-op stub so middleware code can
-      // import unconditionally without bundling errors.
-      nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = hasNuxtContentV3
-        ? `
-import { queryCollection } from '@nuxt/content/server'
-import manifest from '#content/manifest'
-import { stringify } from 'minimark/stringify'
-
-const pageCollections = Object.entries(manifest)
-  .filter(([, info]) => info.type === 'page')
-  .map(([name]) => name)
-
-export async function lookupContentPage(event, path) {
-  if (!pageCollections.length) return null
-  const candidates = path === '/' ? ['/'] : [path, path.replace(/\\/$/, '')]
-  for (const collection of pageCollections) {
-    for (const candidate of candidates) {
-      const page = await queryCollection(event, collection).path(candidate).first().catch(() => null)
-      if (!page) continue
-      const markdown = stringify({ ...page.body, type: 'minimark' }, { format: 'markdown/html' })
-      return {
-        markdown,
-        title: page.title,
-        description: page.description,
-        updatedAt: page.seo?.articleModifiedTime || page.updatedAt,
-      }
-    }
-  }
-  return null
-}
-`
-        : `export async function lookupContentPage() { return null }`
+      // Content lookup: bridges to the installed content module's server API
+      // so a page's Markdown comes from the collection rather than from a
+      // second SSR render. See src/content-source.ts.
+      nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = contentLookupModule(contentSource)
     })
 
     // Resolve database config
