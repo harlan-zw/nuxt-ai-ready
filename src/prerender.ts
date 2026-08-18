@@ -239,33 +239,90 @@ async function initCrawler(state: CrawlerState): Promise<void> {
   state.initialized = true
 }
 
+/**
+ * PRAGMAs applied to the build-time SQLite database.
+ *
+ * Every `insertPage` runs as its own implicit transaction, so the default
+ * `synchronous = FULL` costs one fsync per page. On a 371 page site that fsync
+ * loop was the single most expensive frame of the whole prerender indexer.
+ *
+ * Durability buys nothing here. This database lives in `.nuxt/.data/ai-ready`,
+ * it is written and read inside one build process, and a failed build discards
+ * it. `synchronous = OFF` only drops the guarantee against OS crash or power
+ * loss; the rollback journal still protects against a process crash, so we
+ * keep the default journal mode.
+ */
+const PRERENDER_PRAGMAS = [
+  'PRAGMA synchronous = OFF',
+  'PRAGMA temp_store = MEMORY',
+]
+
+interface SqliteStatement {
+  all: (...params: never[]) => unknown[]
+  get: (...params: never[]) => unknown
+  run: (...params: never[]) => unknown
+}
+
+interface SqliteDriver {
+  prepare: (sql: string) => SqliteStatement
+  exec: (sql: string) => unknown
+  close: () => void
+}
+
+/**
+ * Wrap a synchronous SQLite driver as a `DatabaseAdapter`.
+ *
+ * Statements are cached by SQL text. The indexer runs the same INSERT once per
+ * page, so re-parsing it every call was pure waste. The cache is dropped on any
+ * parameterless statement, which is how `initSchema` runs its DDL, so a cached
+ * statement can never outlive the table it reads.
+ */
+function createSqliteAdapter(sqlite: SqliteDriver): DatabaseAdapter {
+  const statements = new Map<string, SqliteStatement>()
+
+  function prepare(sql: string): SqliteStatement {
+    let statement = statements.get(sql)
+    if (!statement) {
+      statement = sqlite.prepare(sql)
+      statements.set(sql, statement)
+    }
+    return statement
+  }
+
+  return {
+    all: async <T>(sql: string, params: unknown[] = []) => prepare(sql).all(...params as never[]) as T[],
+    first: async <T>(sql: string, params: unknown[] = []) => prepare(sql).get(...params as never[]) as T | undefined,
+    exec: async (sql: string, params: unknown[] = []) => {
+      if (params.length) {
+        prepare(sql).run(...params as never[])
+        return
+      }
+      statements.clear()
+      sqlite.exec(sql)
+    },
+    close: async () => {
+      statements.clear()
+      sqlite.close()
+    },
+  }
+}
+
 export async function createPrerenderDatabase(dbPath: string): Promise<DatabaseAdapter> {
   const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
 
   if (nodeVersion >= 22) {
     const { DatabaseSync } = await import('node:sqlite')
     const sqlite = new DatabaseSync(dbPath)
-    return {
-      all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params as never[]) as T[],
-      first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params as never[]) as T | undefined,
-      exec: async (sql: string, params: unknown[] = []) => {
-        if (params.length)
-          sqlite.prepare(sql).run(...params as never[])
-        else
-          sqlite.exec(sql)
-      },
-      close: async () => { sqlite.close() },
-    }
+    for (const pragma of PRERENDER_PRAGMAS)
+      sqlite.exec(pragma)
+    return createSqliteAdapter(sqlite as unknown as SqliteDriver)
   }
 
   const { default: Database } = await import('better-sqlite3')
   const sqlite = new Database(dbPath)
-  return {
-    all: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).all(...params) as T[],
-    first: async <T>(sql: string, params: unknown[] = []) => sqlite.prepare(sql).get(...params) as T | undefined,
-    exec: async (sql: string, params: unknown[] = []) => { sqlite.prepare(sql).run(...params) },
-    close: async () => { sqlite.close() },
-  }
+  for (const pragma of PRERENDER_PRAGMAS)
+    sqlite.exec(pragma)
+  return createSqliteAdapter(sqlite as unknown as SqliteDriver)
 }
 
 function flattenHeadings(headings: Array<Record<string, string>> | undefined): string {

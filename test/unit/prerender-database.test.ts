@@ -19,4 +19,16 @@ describe('prerender database', () => {
     expect(await db.first<{ value: string }>('SELECT value FROM proof')).toEqual({ value: 'native' })
     await db.close?.()
   })
+
+  it('opens without per-statement fsync', async () => {
+    // Every page insert runs as its own implicit transaction. At the default
+    // `synchronous = FULL` that is one fsync per page, which dominated the
+    // prerender indexer. The build database is rebuilt every build, so the
+    // durability it buys is worth nothing.
+    const directory = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-'))
+    const db = await createPrerenderDatabase(join(directory, 'index.sqlite'))
+
+    expect(await db.first<{ synchronous: number }>('PRAGMA synchronous')).toEqual({ synchronous: 0 })
+    await db.close?.()
+  })
 })
