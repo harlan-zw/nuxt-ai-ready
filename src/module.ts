@@ -2,6 +2,7 @@ import type { ParsedMarkdownResult } from './prerender'
 import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import type { ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
+import type { ResolvedDatabase } from './utils/database'
 import type { RuntimeI18nConfig } from './utils/i18n'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { createHash, randomBytes } from 'node:crypto'
@@ -22,7 +23,7 @@ import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
-import { refineDatabaseConfig } from './utils/database'
+import { resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
@@ -66,13 +67,7 @@ export interface ModulePublicRuntimeConfig {
   version: string
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
-  database: {
-    type: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
-    filename?: string
-    bindingName?: string
-    url?: string
-    authToken?: string
-  }
+  database: ResolvedDatabase
   runtimeSync: {
     enabled: boolean
     ttl: number
@@ -178,7 +173,30 @@ export default defineNuxtModule<ModuleOptions>({
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
 
-    const siteToolsResult = resolveSiteToolsConfig(config.tools)
+    // Parse the database option once. Everything downstream reads `_tag`,
+    // so a disabled database can never reach a driver or a runtime endpoint.
+    const databaseResolution = resolveDatabaseConfig({
+      database: config.database,
+      rootDir: nuxt.options.rootDir,
+      preset: String(nuxt.options.nitro.preset || ''),
+      // Vercel Postgres sets POSTGRES_URL.
+      hasPostgresUrl: !!(process.env.POSTGRES_URL || process.env.DATABASE_URL || (config.database || undefined)?.url),
+      requested: {
+        runtimeSync: !!config.runtimeSync,
+        cron: !!config.cron,
+        indexNow: !!config.indexNow,
+      },
+    })
+    if (databaseResolution._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${databaseResolution.message}`)
+    for (const log of databaseResolution.logs)
+      logger[log.level](log.message)
+    const database = databaseResolution.database
+    const databaseEnabled = database._tag === 'Enabled'
+    if (!databaseEnabled)
+      logger.debug('Database disabled. Page storage, runtime indexing and site tools are off.')
+
+    const siteToolsResult = resolveSiteToolsConfig(config.tools, { database })
     for (const warning of siteToolsResult.warnings)
       logger.warn(warning)
     const siteToolsConfig = siteToolsResult.config
@@ -273,58 +291,21 @@ export default defineNuxtModule<ModuleOptions>({
       from: resolve('./runtime'),
     })))
 
-    // Auto-detect database type based on deployment preset
-    const preset = String(nuxt.options.nitro.preset || '')
-    const isCloudflare = preset.startsWith('cloudflare')
-    const isVercel = preset === 'vercel' || preset === 'vercel-edge'
-    const isVercelEdge = preset === 'vercel-edge'
-    const isBun = preset === 'bun'
-
-    // Check for Postgres env vars (Vercel Postgres sets POSTGRES_URL)
-    const hasPostgresUrl = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL || config.database?.url)
-
-    let dbType = config.database?.type
-    if (!dbType) {
-      if (isCloudflare) {
-        dbType = 'd1'
-        logger.debug(`Auto-detected Cloudflare preset "${preset}", using D1 database`)
-      }
-      else if (isVercel && hasPostgresUrl) {
-        // Vercel with Postgres URL - use Neon serverless (works on both serverless & edge)
-        dbType = 'neon'
-        logger.debug(`Auto-detected Vercel preset with POSTGRES_URL, using Neon serverless driver`)
-      }
-      else if (isVercelEdge) {
-        // Vercel Edge without Postgres - warn user
-        logger.warn(`Vercel Edge has no filesystem. Set POSTGRES_URL (Vercel Postgres) or configure database.type: 'libsql' for full functionality.`)
-        dbType = 'neon' // Will fail at runtime with helpful error if no URL
-      }
-      else if (isBun) {
-        dbType = 'bun'
-        logger.debug(`Auto-detected Bun preset, using bun:sqlite driver`)
-      }
-      else {
-        dbType = 'sqlite'
-      }
-    }
-    // Database type is passed to runtime config - the drizzle client handles provider selection
-
     // The sqlite provider drives drizzle through better-sqlite3, but it's an
     // optional peer (drizzle has no node:sqlite driver), so package managers
     // won't auto-install it. Resolve it from the app now and fail fast with an
     // actionable message instead of a cryptic runtime "Cannot find package
     // 'better-sqlite3'" during indexing in production builds (#557).
-    if (dbType === 'sqlite') {
-      const hasBetterSqlite3 = await resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
-        .then(() => true)
-        .catch(() => false)
-      if (!hasBetterSqlite3) {
-        throw new Error(
-          `[nuxt-ai-ready] The SQLite database driver requires "better-sqlite3", which isn't installed. `
-          + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
-          + `For serverless/edge deployments set \`aiReady.database.type\` to 'd1' (Cloudflare), 'neon' (Postgres), 'libsql' (Turso), or 'bun' instead.`,
-        )
-      }
+    const hasBetterSqlite3 = await resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
+      .then(() => true)
+      .catch(() => false)
+    if (database._tag === 'Enabled' && database.type === 'sqlite' && !hasBetterSqlite3) {
+      throw new Error(
+        `[nuxt-ai-ready] The SQLite database driver requires "better-sqlite3", which isn't installed. `
+        + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
+        + `For serverless/edge deployments set \`aiReady.database.type\` to 'd1' (Cloudflare), 'neon' (Postgres), 'libsql' (Turso), or 'bun' instead. `
+        + `If you only need build time llms.txt and Markdown, set \`aiReady.database\` to false.`,
+      )
     }
 
     const mcpToolkitState = resolveMcpToolkitState({
@@ -343,7 +324,7 @@ export default defineNuxtModule<ModuleOptions>({
       const mcpConfig = config.mcp || {}
       if (mcpConfig.tools !== false && hasMcpSiteTools)
         (paths.tools ||= []).push(`${mcpRuntimeDir}/tools`)
-      if (mcpConfig.resources !== false)
+      if (mcpConfig.resources !== false && databaseEnabled)
         (paths.resources ||= []).push(`${mcpRuntimeDir}/resources`)
     })
 
@@ -420,15 +401,33 @@ export default defineNuxtModule<ModuleOptions>({
     const webmcpResult = resolveWebMcpConfig(config.webmcp, siteToolsConfig)
     const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
 
-    // IndexNow: auto-read key from env, derive from site URL if true
-    const indexNow = config.indexNow === true
-      ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
-      : config.indexNow || process.env.NUXT_AI_READY_INDEX_NOW_KEY
+    // IndexNow: auto-read key from env, derive from site URL if true.
+    // IndexNow submits routes from the page store, so a disabled database
+    // drops the key. An explicit `indexNow` option fails the build earlier.
+    const envIndexNowKey = process.env.NUXT_AI_READY_INDEX_NOW_KEY
+    if (!databaseEnabled && envIndexNowKey)
+      logger.warn('The database is disabled, so NUXT_AI_READY_INDEX_NOW_KEY is ignored.')
+    const indexNow = !databaseEnabled
+      ? undefined
+      : config.indexNow === true
+        ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
+        : config.indexNow || envIndexNowKey
 
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
     const prerenderEnabled = !!(isStatic || hasPrerenderedRoutes)
+
+    // Build time page indexing writes its own SQLite file. Node 22 provides
+    // `node:sqlite`; older runtimes fall back to better-sqlite3.
+    const nodeMajor = Number.parseInt(process.versions.node?.split('.')[0] || '0')
+    if (prerenderEnabled && nodeMajor < 22 && !hasBetterSqlite3) {
+      throw new Error(
+        `[nuxt-ai-ready] Build time page indexing needs "better-sqlite3" on Node ${nodeMajor}. `
+        + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
+        + `Node 22 and later need no extra package.`,
+      )
+    }
     const isSPA = nuxt.options.ssr === false
 
     let apiCatalogRegistered = false
@@ -468,7 +467,7 @@ export default defineNuxtModule<ModuleOptions>({
           cron: !!config.cron,
           indexNow: !!indexNow,
           apiCatalog: !!apiCatalogConfig,
-          database: dbType,
+          database: databaseEnabled ? database.type : false,
         }
       }
     }
@@ -503,7 +502,8 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       // Hydrate the database before Toolkit resolves its first request.
-      addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
+      if (databaseEnabled)
+        addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
 
       const mcpLink = {
         title: 'MCP',
@@ -827,7 +827,8 @@ import { createModuleLogger } from ${JSON.stringify(nuxtSeoSharedUtilsPath)}
 export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
 `
 
-      // Database provider - tree-shakeable by aliasing to configured provider at build time
+      // Database provider - tree-shakeable by aliasing to configured provider at build time.
+      // A disabled database gets a stub so the driver never enters the bundle.
       const providerMap: Record<string, string> = {
         sqlite: '#ai-ready/server/db/drizzle/providers/sqlite',
         bun: '#ai-ready/server/db/drizzle/providers/bun',
@@ -835,11 +836,14 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         libsql: '#ai-ready/server/db/drizzle/providers/libsql',
         neon: '#ai-ready/server/db/drizzle/providers/neon',
       }
-      const providerPath = providerMap[dbType!] || providerMap.sqlite
-      nitroConfig.virtual['#ai-ready-virtual/db-provider.mjs'] = `export { createClient } from '${providerPath}'`
+      nitroConfig.virtual['#ai-ready-virtual/db-provider.mjs'] = database._tag === 'Enabled'
+        ? `export { createClient } from '${providerMap[database.type] || providerMap.sqlite}'`
+        : `export function createClient() {
+  throw new Error('[nuxt-ai-ready] The database is disabled. Set \`aiReady.database\` to store pages at runtime.')
+}`
 
       // Database schema - tree-shakeable by aliasing to sqlite or postgres at build time
-      const schemaPath = dbType === 'neon'
+      const schemaPath = database._tag === 'Enabled' && database.type === 'neon'
         ? '#ai-ready/server/db/schema/postgres'
         : '#ai-ready/server/db/schema/sqlite'
       nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`
@@ -856,9 +860,6 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // second SSR render. See src/content-source.ts.
       nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = contentLookupModule(contentSource)
     })
-
-    // Resolve database config
-    const database = refineDatabaseConfig(config.database || {}, nuxt.options.rootDir)
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
       version: version || '0.0.0',
@@ -1032,7 +1033,8 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
     }
 
     // Add lifecycle plugin to handle database connection cleanup
-    addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
+    if (databaseEnabled)
+      addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
 
     if (nuxt.options.dev) {
       const { setupDevToolsUI } = await import('nuxtseo-shared/devtools')
