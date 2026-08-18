@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
 import { $fetch, fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
@@ -214,6 +215,14 @@ describe('nuxt generate (static build)', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
       expect(llmsTxt).toContain('ssr-renders:1')
       expect(llmsTxt).not.toContain('ssr-renders:2')
+    })
+
+    it('renders a sitemap route that fails only once', async () => {
+      // /docs/faq throws during render, so its .md fetch answers 500. ofetch
+      // retries a 500 once by default, which rendered every broken page a
+      // second time for a result the indexer discards either way.
+      const counts = JSON.parse(await readFile(resolve('../fixtures/basic/.data/render-counts.json'), 'utf-8'))
+      expect(counts['/docs/faq']).toBe(1)
     })
   })
 
