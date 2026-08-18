@@ -1,0 +1,10 @@
+{
+  "name": "test-fixture-comark-content",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "nuxi build",
+    "generate": "nuxi generate"
+  }
+}
