@@ -264,7 +264,7 @@ export interface ModuleOptions {
    * Storage stays off until a runtime feature or page tool needs it.
    * Set to `false` (or `{ type: 'none' }`) to force it off.
    * Build time llms.txt, llms-full.txt and `.md` generation still work.
-   * A disabled database cannot run `runtimeSync`, `cron` or `indexNow`.
+   * A disabled database cannot run `runtimeSync` or `cron`.
    */
   database?: false | {
     /**

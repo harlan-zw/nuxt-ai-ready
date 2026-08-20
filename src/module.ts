@@ -198,7 +198,6 @@ export default defineNuxtModule<ModuleOptions>({
       requested: {
         runtimeSync: !!config.runtimeSync,
         cron: !!config.cron,
-        indexNow: false,
         mcp: mcpNeedsDatabase,
         webmcp: webmcpNeedsDatabase,
       },

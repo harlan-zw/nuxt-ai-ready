@@ -47,7 +47,7 @@ export interface DatabaseLog {
 }
 
 /** Module options that cannot run without a database. */
-export const DATABASE_DEPENDENT_OPTIONS = ['runtimeSync', 'cron', 'indexNow'] as const
+export const DATABASE_DEPENDENT_OPTIONS = ['runtimeSync', 'cron'] as const
 
 export type DatabaseDependentOption = typeof DATABASE_DEPENDENT_OPTIONS[number]
 
