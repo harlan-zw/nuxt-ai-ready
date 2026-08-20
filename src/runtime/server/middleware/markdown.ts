@@ -3,7 +3,7 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { buildFrontmatter } from '../utils/frontmatter'
 import type { RuntimeRouteContext } from '../utils/i18n'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
-import { appendHeader, createError, defineEventHandler, getHeader, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { appendHeader, createError, defineEventHandler, getHeader, getRequestURL, getResponseHeader, sendRedirect, setHeader, setResponseStatus } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
@@ -217,6 +217,7 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 
@@ -233,15 +234,19 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Agents discard 404 bodies; return 200 with helpful markdown instead
+  // 404 with the guidance body attached, not a bare error. Agents that read
+  // the body still get pointed at llms.txt; agents and crawlers that read the
+  // status are no longer told a missing page exists.
   if (!response.ok) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 
