@@ -1,7 +1,7 @@
 interface BuildPageDataVirtualOptions {
   buildDbPath: string
   markdownLinkAvailabilityPath: string
-  nodeMajor: number
+  nativeNodeSqlite: boolean
   dev?: boolean
 }
 
@@ -15,7 +15,7 @@ export async function readMarkdownLinkAvailabilityFromFilesystem() { return { ru
 `
   }
 
-  const readRows = options.nodeMajor >= 22
+  const readRows = options.nativeNodeSqlite
     ? `const { DatabaseSync } = await import('node' + ':sqlite')
   const db = new DatabaseSync(dbPath, { open: true })
   const rows = db.prepare(${JSON.stringify(SELECT_PAGE_DATA)}).all()

@@ -17,6 +17,7 @@ import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
+import { supportsNativeNodeSqlite } from './utils/database'
 
 const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
 
@@ -228,9 +229,7 @@ function createSqliteAdapter(sqlite: SqliteDriver): DatabaseAdapter {
 }
 
 export async function createPrerenderDatabase(dbPath: string): Promise<DatabaseAdapter> {
-  const nodeVersion = Number.parseInt(process.versions.node?.split('.')[0] || '0')
-
-  if (nodeVersion >= 22) {
+  if (supportsNativeNodeSqlite(process.versions.node || '')) {
     const { DatabaseSync } = await import('node:sqlite')
     const sqlite = new DatabaseSync(dbPath)
     for (const pragma of PRERENDER_PRAGMAS)

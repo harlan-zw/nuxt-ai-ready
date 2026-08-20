@@ -283,7 +283,7 @@ export default eventHandler(async (event) => {
     cloudflareKeys: event.context?.cloudflare ? Object.keys(event.context.cloudflare) : [],
     cloudflareEnvKeys: event.context?.cloudflare?.env ? Object.keys(event.context.cloudflare.env) : [],
     databaseConfig: {
-      type: runtimeConfig.database?.type || 'unknown',
+      type: runtimeConfig.database?._tag === 'Disabled' ? 'none' : runtimeConfig.database?.type || 'unknown',
       bindingName: runtimeConfig.database?.bindingName,
     },
   }

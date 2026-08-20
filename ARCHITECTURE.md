@@ -551,8 +551,8 @@ interface ModuleOptions {
   contentSignal?: false | { aiTrain?: boolean, contentUsage?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
   llmsTxtCacheSeconds?: number
-  database?: {
-    type?: 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
+  database?: false | { // omitted disables unused storage; false forces it off
+    type?: 'none' | 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     filename?: string
     bindingName?: string
     url?: string

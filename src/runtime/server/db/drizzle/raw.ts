@@ -8,7 +8,7 @@ import { useDrizzle } from './client'
 
 // Store underlying driver references alongside Drizzle instance
 const driverCache = new WeakMap<DrizzleDatabase['db'], {
-  type: 'better-sqlite3' | 'libsql' | 'neon' | 'd1'
+  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'd1'
   driver: unknown
 }>()
 
@@ -17,7 +17,7 @@ const driverCache = new WeakMap<DrizzleDatabase['db'], {
  */
 export function registerDriver(
   db: DrizzleDatabase['db'],
-  type: 'better-sqlite3' | 'libsql' | 'neon' | 'd1',
+  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'd1',
   driver: unknown,
 ): void {
   driverCache.set(db, { type, driver })
@@ -54,6 +54,10 @@ export function getRawExecutor(client: DrizzleDatabase) {
           const db = driver as { prepare: (sql: string) => { all: (...p: unknown[]) => unknown[] } }
           return db.prepare(query).all(...params) as T[]
         }
+        case 'node-sqlite': {
+          const db = driver as { prepare: (sql: string) => { all: (...p: never[]) => unknown[] } }
+          return db.prepare(query).all(...params as never[]) as T[]
+        }
         case 'libsql': {
           const client = driver as { execute: (opts: { sql: string, args: unknown[] }) => Promise<{ rows: unknown[] }> }
           const result = await client.execute({ sql: query, args: params })
@@ -85,6 +89,11 @@ export function getRawExecutor(client: DrizzleDatabase) {
         case 'better-sqlite3': {
           const db = driver as { prepare: (sql: string) => { run: (...p: unknown[]) => void } }
           db.prepare(query).run(...params)
+          break
+        }
+        case 'node-sqlite': {
+          const db = driver as { prepare: (sql: string) => { run: (...p: never[]) => void } }
+          db.prepare(query).run(...params as never[])
           break
         }
         case 'libsql': {
@@ -126,6 +135,23 @@ export function getRawExecutor(client: DrizzleDatabase) {
               sqlite.prepare(q.sql).run(...(q.params || []))
           })
           tx()
+          break
+        }
+        case 'node-sqlite': {
+          const sqlite = driver as {
+            exec: (sql: string) => void
+            prepare: (sql: string) => { run: (...p: never[]) => void }
+          }
+          sqlite.exec('BEGIN')
+          try {
+            for (const q of queries)
+              sqlite.prepare(q.sql).run(...(q.params || []) as never[])
+            sqlite.exec('COMMIT')
+          }
+          catch (error) {
+            sqlite.exec('ROLLBACK')
+            throw error
+          }
           break
         }
         case 'libsql': {
@@ -190,6 +216,11 @@ export function closeDriver(db: DrizzleDatabase['db']): void {
 
   switch (type) {
     case 'better-sqlite3': {
+      const sqlite = driver as { close?: () => void }
+      sqlite.close?.()
+      break
+    }
+    case 'node-sqlite': {
       const sqlite = driver as { close?: () => void }
       sqlite.close?.()
       break

@@ -1,7 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
-import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
@@ -20,7 +19,7 @@ export async function createClient(event?: H3Event) {
   logger.debug(`[drizzle] Connecting to Neon Postgres`)
 
   const sqlFn = neon(connectionString)
-  const db = drizzle(sqlFn, { schema })
+  const db = drizzle({ client: sqlFn })
   registerDriver(db, 'neon', sqlFn)
   return { dialect: 'postgres' as const, db }
 }

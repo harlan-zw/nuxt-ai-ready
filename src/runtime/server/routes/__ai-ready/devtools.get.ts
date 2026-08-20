@@ -26,7 +26,7 @@ export default eventHandler(async (event) => {
     siteConfigUrl,
     isDev: import.meta.dev,
     config: {
-      database: { type: runtimeConfig.database?.type || 'sqlite' },
+      database: { type: runtimeConfig.database?._tag === 'Disabled' ? 'none' : runtimeConfig.database?.type || 'sqlite' },
       runtimeSync: runtimeConfig.runtimeSync,
       sitemapPrerendered: runtimeConfig.sitemapPrerendered,
       markdownCacheHeaders: runtimeConfig.markdownCacheHeaders,

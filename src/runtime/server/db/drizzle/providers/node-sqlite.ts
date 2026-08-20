@@ -1,6 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
-import Database from 'better-sqlite3'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { DatabaseSync } from 'node:sqlite'
+import { drizzle } from 'drizzle-orm/node-sqlite'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
@@ -12,10 +12,10 @@ export async function createClient(event?: H3Event) {
   }
 
   const dbPath = await resolveWritableDbPath(config.database.filename || '.data/ai-ready/pages.db')
-  logger.debug(`[drizzle] Opening SQLite database: ${dbPath}`)
+  logger.debug(`[drizzle] Opening native SQLite database: ${dbPath}`)
 
-  const sqlite = new Database(dbPath)
+  const sqlite = new DatabaseSync(dbPath)
   const db = drizzle({ client: sqlite })
-  registerDriver(db, 'better-sqlite3', sqlite)
+  registerDriver(db, 'node-sqlite', sqlite)
   return { dialect: 'sqlite' as const, db }
 }
