@@ -1,5 +1,7 @@
 import type { NegotiationContext } from '../utils/negotiation-response'
-import { createError, defineEventHandler, setHeader } from '#nuxtseo/h3'
+import type { MarkdownSourceContext } from '../../types'
+import { createError, defineEventHandler, setHeader, setResponseStatus } from '#nuxtseo/h3'
+import { useNitroApp } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { logger } from '../logger'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
@@ -60,12 +62,29 @@ export default defineEventHandler(async (event) => {
   const [
     { tryGetContentMarkdown },
     { fetchRawWithEvent },
-    { buildFrontmatter },
+    { buildFrontmatter, layerFrontmatter },
   ] = await Promise.all([
     import('../utils/content'),
     import('../utils/fetch'),
     import('../utils/frontmatter'),
   ])
+
+  // A site that already holds the markdown a page was rendered from can serve
+  // it verbatim. That is better than converting the rendering back, and it
+  // skips the internal subrequest that fetches the HTML.
+  const sourceContext: MarkdownSourceContext = { route: path, event, source: null }
+  await useNitroApp().hooks.callHook('ai-ready:markdown:source', sourceContext)
+  if (sourceContext.source) {
+    const { markdown, title, description, updatedAt } = sourceContext.source
+    const responseMarkdown = layerFrontmatter({
+      title: title ?? path,
+      description,
+      canonical_url: canonicalUrl,
+      last_updated: updatedAt || new Date().toISOString(),
+    }, markdown)
+    setMarkdownHeaders(event, ctx)
+    return responseMarkdown
+  }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
   // pages as a structural AST (minimark) that round-trips to markdown without
@@ -100,8 +119,10 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!response) {
-    setMarkdownHeaders(event, ctx)
-    return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Bad Gateway',
+    })
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -117,15 +138,21 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Agents discard 404 bodies; return 200 with helpful markdown instead
-  if (!response.ok) {
+  // Keep application errors intact, including their body and headers. Only a
+  // missing page gets the Markdown guidance response.
+  if (!response.ok && response.status !== 404)
+    return response
+
+  if (response.status === 404) {
     setMarkdownHeaders(event, ctx)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
     setMarkdownHeaders(event, ctx)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
