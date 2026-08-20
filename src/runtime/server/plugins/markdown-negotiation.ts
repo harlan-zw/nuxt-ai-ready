@@ -15,8 +15,6 @@ interface H3AppLike {
 
 interface H3CoreLike {
   '~middleware': unknown[]
-  '~dispatch'?: unknown
-  '~composed'?: unknown
 }
 
 type H3Runtime
@@ -73,8 +71,6 @@ export default defineNitroPlugin((nitro) => {
     // Nitro 3 exposes H3 2's global middleware list after static assets are
     // registered. Route-rule middleware stays ahead through ~getMiddleware.
     runtime.app['~middleware'].unshift(negotiationHandler)
-    runtime.app['~dispatch'] = undefined
-    runtime.app['~composed'] = undefined
     return
   }
 
