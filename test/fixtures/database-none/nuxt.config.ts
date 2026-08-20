@@ -16,7 +16,7 @@ export default defineNuxtConfig({
   },
 
   aiReady: {
-    // No database driver. Build time generation must still work.
-    database: false,
+    // The repository .nuxtrc enables WebMCP. Disable it to prove zero storage.
+    webmcp: false,
   },
 })

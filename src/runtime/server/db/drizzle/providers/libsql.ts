@@ -1,7 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
 import { createClient as createLibSQLClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
@@ -28,7 +27,7 @@ export async function createClient(event?: H3Event) {
   logger.debug(`[drizzle] Connecting to LibSQL: ${dbUrl}`)
 
   const client = createLibSQLClient({ url: dbUrl, authToken: config.database.authToken })
-  const db = drizzle(client, { schema })
+  const db = drizzle({ client })
   registerDriver(db, 'libsql', client)
   return { dialect: 'sqlite' as const, db }
 }

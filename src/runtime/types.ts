@@ -261,7 +261,8 @@ export interface ModuleOptions {
    * Database configuration for page storage
    * Supports SQLite, LibSQL/Turso, Cloudflare D1, and Neon Postgres
    *
-   * Set to `false` (or `{ type: 'none' }`) to run without a database.
+   * Storage stays off until a runtime feature or page tool needs it.
+   * Set to `false` (or `{ type: 'none' }`) to force it off.
    * Build time llms.txt, llms-full.txt and `.md` generation still work.
    * A disabled database cannot run `runtimeSync`, `cron` or `indexNow`.
    */
@@ -269,12 +270,12 @@ export interface ModuleOptions {
     /**
      * Database type - auto-detected if not specified
      * - 'none': No database. Build time generation only.
-     * - 'sqlite': Local SQLite via better-sqlite3 (default for Node.js)
+     * - 'sqlite': Local SQLite via node:sqlite or better-sqlite3 (default for Node.js)
      * - 'd1': Cloudflare D1 (auto-detected on Cloudflare)
      * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun) [experimental]
      * - 'libsql': Turso/LibSQL [experimental]
      * - 'neon': Vercel Postgres via Neon serverless (auto-detected on Vercel with POSTGRES_URL) [experimental]
-     * @default 'sqlite' (auto-detects based on platform)
+     * @default 'sqlite' when a requested feature needs storage
      */
     type?: 'none' | 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     /**

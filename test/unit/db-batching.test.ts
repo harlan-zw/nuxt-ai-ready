@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, DumpRow } from '../../src/runtime/server/db/shared'
+import { DatabaseSync } from 'node:sqlite'
 import { gunzipSync } from 'node:zlib'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -295,6 +296,39 @@ describe('db: exportDbDump keyset pagination (shared.ts)', () => {
 })
 
 describe('db: raw executor batch (drizzle/raw.ts)', () => {
+  it('node:sqlite commits a batch', async () => {
+    const db = new DatabaseSync(':memory:')
+    db.exec('CREATE TABLE proof (value TEXT UNIQUE)')
+    const client = fakeClient(db as unknown as Record<string, unknown>)
+    registerDriver(client.db, 'node-sqlite', db)
+
+    await getRawExecutor(client).batch([
+      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['one'] },
+      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['two'] },
+    ])
+
+    expect(db.prepare('SELECT value FROM proof ORDER BY value').all()).toEqual([
+      { value: 'one' },
+      { value: 'two' },
+    ])
+    db.close()
+  })
+
+  it('node:sqlite rolls back a failed batch', async () => {
+    const db = new DatabaseSync(':memory:')
+    db.exec('CREATE TABLE proof (value TEXT UNIQUE)')
+    const client = fakeClient(db as unknown as Record<string, unknown>)
+    registerDriver(client.db, 'node-sqlite', db)
+
+    await expect(getRawExecutor(client).batch([
+      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['same'] },
+      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['same'] },
+    ])).rejects.toThrow()
+
+    expect(db.prepare('SELECT COUNT(*) AS count FROM proof').get()).toEqual({ count: 0 })
+    db.close()
+  })
+
   it('better-sqlite3: runs statements inside a transaction', async () => {
     const db = schemaDb()
     const client = fakeClient(db)

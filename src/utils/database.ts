@@ -2,6 +2,16 @@ import { isAbsolute, join } from 'pathe'
 
 export type DatabaseType = 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
 
+/** Node versions that expose `node:sqlite` without a command flag. */
+export function supportsNativeNodeSqlite(version: string): boolean {
+  const [major = 0, minor = 0] = version.split('.').map(Number)
+  if (major === 22)
+    return minor >= 13
+  if (major === 23)
+    return minor >= 4
+  return major > 23
+}
+
 /** Explicit opt-out value for `aiReady.database.type`. */
 export const DATABASE_TYPE_NONE = 'none'
 
@@ -41,6 +51,8 @@ export const DATABASE_DEPENDENT_OPTIONS = ['runtimeSync', 'cron', 'indexNow'] as
 
 export type DatabaseDependentOption = typeof DATABASE_DEPENDENT_OPTIONS[number]
 
+export type DatabaseConsumer = DatabaseDependentOption | 'mcp' | 'webmcp'
+
 export interface ResolveDatabaseInput {
   database: DatabaseInput | undefined
   /** Project root, used to make a relative SQLite filename absolute. */
@@ -49,8 +61,8 @@ export interface ResolveDatabaseInput {
   preset: string
   /** True when a Postgres connection string is available. */
   hasPostgresUrl: boolean
-  /** Database dependent options the user turned on. */
-  requested: Record<DatabaseDependentOption, boolean>
+  /** Features that use stored pages. */
+  requested: Record<DatabaseConsumer, boolean>
 }
 
 export type DatabaseResolution
@@ -105,14 +117,18 @@ function resolveDatabaseType(
  */
 export function resolveDatabaseConfig(input: ResolveDatabaseInput): DatabaseResolution {
   const options = input.database === false ? undefined : input.database
-  const disabled = input.database === false || options?.type === DATABASE_TYPE_NONE
+  const explicitlyDisabled = input.database === false || options?.type === DATABASE_TYPE_NONE
 
-  if (disabled) {
+  if (explicitlyDisabled) {
     const conflicts = DATABASE_DEPENDENT_OPTIONS.filter(option => input.requested[option])
     if (conflicts.length > 0)
       return { _tag: 'Invalid', conflicts, message: formatConflictMessage(conflicts) }
     return { _tag: 'Resolved', database: { _tag: 'Disabled' }, logs: [] }
   }
+
+  const databaseNeeded = Object.values(input.requested).some(Boolean)
+  if (input.database === undefined && !databaseNeeded)
+    return { _tag: 'Resolved', database: { _tag: 'Disabled' }, logs: [] }
 
   const logs: DatabaseLog[] = []
   const config = options || {}

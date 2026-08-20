@@ -23,7 +23,7 @@ import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
-import { resolveDatabaseConfig } from './utils/database'
+import { resolveDatabaseConfig, supportsNativeNodeSqlite } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
@@ -173,8 +173,23 @@ export default defineNuxtModule<ModuleOptions>({
       logger.warn('`mdreamOptions.preset` is deprecated. Use `mdreamOptions: { minimal: true }` instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
     }
 
-    // Parse the database option once. Everything downstream reads `_tag`,
-    // so a disabled database can never reach a driver or a runtime endpoint.
+    const requestedSiteTools = resolveSiteToolsConfig(config.tools)
+    const mcpToolkitState = resolveMcpToolkitState({
+      installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
+        || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
+      options: nuxt.options.mcp,
+      static: nuxt.options.nitro.static === true,
+      generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
+    })
+    const mcpNeedsDatabase = mcpToolkitState._tag === 'Enabled'
+      && (config.mcp?.resources !== false
+        || (config.mcp?.tools !== false
+          && Object.values(requestedSiteTools.config).some(tool => tool.mcp.enabled)))
+    const webmcpNeedsDatabase = !!config.webmcp
+      && (config.webmcp === true || config.webmcp.tools !== false)
+      && Object.values(requestedSiteTools.config).some(tool => tool.webmcp.enabled)
+
+    // Parse the database option once. Features opt into storage as needed.
     const databaseResolution = resolveDatabaseConfig({
       database: config.database,
       rootDir: nuxt.options.rootDir,
@@ -185,6 +200,8 @@ export default defineNuxtModule<ModuleOptions>({
         runtimeSync: !!config.runtimeSync,
         cron: !!config.cron,
         indexNow: !!config.indexNow,
+        mcp: mcpNeedsDatabase,
+        webmcp: webmcpNeedsDatabase,
       },
     })
     if (databaseResolution._tag === 'Invalid')
@@ -196,7 +213,9 @@ export default defineNuxtModule<ModuleOptions>({
     if (!databaseEnabled)
       logger.debug('Database disabled. Page storage, runtime indexing and site tools are off.')
 
-    const siteToolsResult = resolveSiteToolsConfig(config.tools, { database })
+    const siteToolsResult = databaseEnabled
+      ? requestedSiteTools
+      : resolveSiteToolsConfig(config.tools, { database })
     for (const warning of siteToolsResult.warnings)
       logger.warn(warning)
     const siteToolsConfig = siteToolsResult.config
@@ -291,30 +310,27 @@ export default defineNuxtModule<ModuleOptions>({
       from: resolve('./runtime'),
     })))
 
-    // The sqlite provider drives drizzle through better-sqlite3, but it's an
-    // optional peer (drizzle has no node:sqlite driver), so package managers
-    // won't auto-install it. Resolve it from the app now and fail fast with an
-    // actionable message instead of a cryptic runtime "Cannot find package
-    // 'better-sqlite3'" during indexing in production builds (#557).
-    const hasBetterSqlite3 = await resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
-      .then(() => true)
-      .catch(() => false)
-    if (database._tag === 'Enabled' && database.type === 'sqlite' && !hasBetterSqlite3) {
+    // Older Node versions need the optional better-sqlite3 fallback.
+    let betterSqlite3Availability: Promise<boolean> | undefined
+    const hasBetterSqlite3 = () => {
+      betterSqlite3Availability ||= resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
+        .then(
+          () => true,
+          // Missing is expected when no requested feature uses SQLite.
+          () => false,
+        )
+      return betterSqlite3Availability
+    }
+    const nativeNodeSqlite = supportsNativeNodeSqlite(process.versions.node || '')
+    if (database._tag === 'Enabled' && database.type === 'sqlite' && !nativeNodeSqlite && !await hasBetterSqlite3()) {
       throw new Error(
-        `[nuxt-ai-ready] The SQLite database driver requires "better-sqlite3", which isn't installed. `
+        `[nuxt-ai-ready] SQLite needs "better-sqlite3" on Node ${process.versions.node}, but it isn't installed. `
         + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
-        + `For serverless/edge deployments set \`aiReady.database.type\` to 'd1' (Cloudflare), 'neon' (Postgres), 'libsql' (Turso), or 'bun' instead. `
-        + `If you only need build time llms.txt and Markdown, set \`aiReady.database\` to false.`,
+        + `Node 22.13 and later use built-in \`node:sqlite\`. `
+        + `For edge deployments, configure D1, Neon, LibSQL, or Bun instead.`,
       )
     }
 
-    const mcpToolkitState = resolveMcpToolkitState({
-      installed: hasNuxtModule('@nuxtjs/mcp-toolkit')
-        || hasConfiguredNuxtModule(nuxt.options.modules, '@nuxtjs/mcp-toolkit'),
-      options: nuxt.options.mcp,
-      static: nuxt.options.nitro.static === true,
-      generating: (nuxt.options as typeof nuxt.options & { _generate?: boolean })._generate === true,
-    })
     let mcpAvailable = mcpToolkitState._tag === 'Enabled'
 
     // Register definition paths before later wrapper modules install Toolkit.
@@ -416,16 +432,15 @@ export default defineNuxtModule<ModuleOptions>({
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
-    const prerenderEnabled = !!(isStatic || hasPrerenderedRoutes)
+    const preparing = (nuxt.options as typeof nuxt.options & { _prepare?: boolean })._prepare === true
+    const prerenderEnabled = !preparing && !!(isStatic || hasPrerenderedRoutes)
 
-    // Build time page indexing writes its own SQLite file. Node 22 provides
-    // `node:sqlite`; older runtimes fall back to better-sqlite3.
-    const nodeMajor = Number.parseInt(process.versions.node?.split('.')[0] || '0')
-    if (prerenderEnabled && nodeMajor < 22 && !hasBetterSqlite3) {
+    // Build time page indexing writes its own SQLite file.
+    if (prerenderEnabled && !nativeNodeSqlite && !await hasBetterSqlite3()) {
       throw new Error(
-        `[nuxt-ai-ready] Build time page indexing needs "better-sqlite3" on Node ${nodeMajor}. `
+        `[nuxt-ai-ready] Build time page indexing needs "better-sqlite3" on Node ${process.versions.node}. `
         + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
-        + `Node 22 and later need no extra package.`,
+        + `Node 22.13 and later need no extra package.`,
       )
     }
     const isSPA = nuxt.options.ssr === false
@@ -815,7 +830,7 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = createBuildPageDataVirtual({
         buildDbPath,
         markdownLinkAvailabilityPath,
-        nodeMajor: Number.parseInt(process.versions.node?.split('.')[0] || '0'),
+        nativeNodeSqlite,
         dev: nuxt.options.dev,
       })
       // Runtime module exports empty arrays (pages read from database at runtime)
@@ -830,7 +845,9 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // Database provider - tree-shakeable by aliasing to configured provider at build time.
       // A disabled database gets a stub so the driver never enters the bundle.
       const providerMap: Record<string, string> = {
-        sqlite: '#ai-ready/server/db/drizzle/providers/sqlite',
+        sqlite: nativeNodeSqlite
+          ? '#ai-ready/server/db/drizzle/providers/node-sqlite'
+          : '#ai-ready/server/db/drizzle/providers/sqlite',
         bun: '#ai-ready/server/db/drizzle/providers/bun',
         d1: '#ai-ready/server/db/drizzle/providers/d1',
         libsql: '#ai-ready/server/db/drizzle/providers/libsql',

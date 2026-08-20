@@ -560,7 +560,7 @@ interface ModuleOptions {
   contentSignal?: false | { aiTrain?: boolean, contentUsage?: boolean, search?: boolean, aiInput?: boolean }
   mcp?: { tools?: boolean, resources?: boolean }
   llmsTxtCacheSeconds?: number
-  database?: false | { // false disables page storage entirely
+  database?: false | { // omitted disables unused storage; false forces it off
     type?: 'none' | 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
     filename?: string
     bindingName?: string

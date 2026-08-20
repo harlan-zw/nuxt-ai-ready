@@ -1,6 +1,6 @@
 import type { DatabaseInput, ResolveDatabaseInput } from '../../src/utils/database'
 import { describe, expect, it } from 'vitest'
-import { resolveDatabaseConfig } from '../../src/utils/database'
+import { resolveDatabaseConfig, supportsNativeNodeSqlite } from '../../src/utils/database'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from '../../src/utils/webmcp'
 
 function input(overrides: Partial<ResolveDatabaseInput> = {}): ResolveDatabaseInput {
@@ -9,7 +9,7 @@ function input(overrides: Partial<ResolveDatabaseInput> = {}): ResolveDatabaseIn
     rootDir: '/app',
     preset: '',
     hasPostgresUrl: false,
-    requested: { runtimeSync: false, cron: false, indexNow: false },
+    requested: { runtimeSync: false, cron: false, indexNow: false, mcp: false, webmcp: false },
     ...overrides,
   }
 }
@@ -21,9 +21,47 @@ function resolveDatabase(database: DatabaseInput | undefined, overrides: Partial
   return result.database
 }
 
+describe('supportsNativeNodeSqlite', () => {
+  it.each([
+    ['22.12.0', false],
+    ['22.13.0', true],
+    ['23.3.0', false],
+    ['23.4.0', true],
+    ['24.0.0', true],
+  ] as const)('returns %s support as %s', (version, supported) => {
+    expect(supportsNativeNodeSqlite(version)).toBe(supported)
+  })
+})
+
 describe('resolveDatabaseConfig', () => {
-  it('defaults to sqlite with an absolute filename', () => {
-    expect(resolveDatabase(undefined)).toEqual({
+  it('disables the database when no feature needs it', () => {
+    expect(resolveDatabase(undefined)).toEqual({ _tag: 'Disabled' })
+  })
+
+  it('enables sqlite when runtime sync needs storage', () => {
+    expect(resolveDatabase(undefined, {
+      requested: { runtimeSync: true, cron: false, indexNow: false, mcp: false, webmcp: false },
+    })).toEqual({
+      _tag: 'Enabled',
+      type: 'sqlite',
+      filename: '/app/.data/ai-ready/pages.db',
+    })
+  })
+
+  it.each(['mcp', 'webmcp'] as const)('enables sqlite when %s page tools need storage', (feature) => {
+    expect(resolveDatabase(undefined, {
+      requested: {
+        runtimeSync: false,
+        cron: false,
+        indexNow: false,
+        mcp: feature === 'mcp',
+        webmcp: feature === 'webmcp',
+      },
+    })).toMatchObject({ _tag: 'Enabled', type: 'sqlite' })
+  })
+
+  it('honours explicit database config when no feature needs it', () => {
+    expect(resolveDatabase({})).toEqual({
       _tag: 'Enabled',
       type: 'sqlite',
       filename: '/app/.data/ai-ready/pages.db',
@@ -39,7 +77,7 @@ describe('resolveDatabaseConfig', () => {
   })
 
   it('picks D1 for a Cloudflare preset', () => {
-    expect(resolveDatabase(undefined, { preset: 'cloudflare_module' })).toEqual({
+    expect(resolveDatabase({}, { preset: 'cloudflare_module' })).toEqual({
       _tag: 'Enabled',
       type: 'd1',
       bindingName: 'DB',
@@ -47,7 +85,7 @@ describe('resolveDatabaseConfig', () => {
   })
 
   it('picks Neon for Vercel with a Postgres URL', () => {
-    expect(resolveDatabase(undefined, { preset: 'vercel', hasPostgresUrl: true })).toEqual({
+    expect(resolveDatabase({}, { preset: 'vercel', hasPostgresUrl: true })).toEqual({
       _tag: 'Enabled',
       type: 'neon',
       url: undefined,
@@ -55,7 +93,7 @@ describe('resolveDatabaseConfig', () => {
   })
 
   it('warns about Vercel Edge without a Postgres URL', () => {
-    const result = resolveDatabaseConfig(input({ preset: 'vercel-edge' }))
+    const result = resolveDatabaseConfig(input({ database: {}, preset: 'vercel-edge' }))
     expect(result._tag).toBe('Resolved')
     expect(result._tag === 'Resolved' && result.logs.some(log => log.level === 'warn')).toBe(true)
   })
@@ -85,10 +123,16 @@ describe('resolveDatabaseConfig', () => {
     expect(resolveDatabase(false, { preset: 'cloudflare_module' })).toEqual({ _tag: 'Disabled' })
   })
 
+  it('keeps explicit disable for optional page tools', () => {
+    expect(resolveDatabase(false, {
+      requested: { runtimeSync: false, cron: false, indexNow: false, mcp: true, webmcp: true },
+    })).toEqual({ _tag: 'Disabled' })
+  })
+
   it('rejects a disabled database with runtimeSync', () => {
     const result = resolveDatabaseConfig(input({
       database: false,
-      requested: { runtimeSync: true, cron: false, indexNow: false },
+      requested: { runtimeSync: true, cron: false, indexNow: false, mcp: false, webmcp: false },
     }))
     expect(result._tag).toBe('Invalid')
     expect(result._tag === 'Invalid' && result.conflicts).toEqual(['runtimeSync'])
@@ -98,14 +142,14 @@ describe('resolveDatabaseConfig', () => {
   it('reports every conflicting option at once', () => {
     const result = resolveDatabaseConfig(input({
       database: { type: 'none' },
-      requested: { runtimeSync: true, cron: true, indexNow: true },
+      requested: { runtimeSync: true, cron: true, indexNow: true, mcp: false, webmcp: false },
     }))
     expect(result._tag === 'Invalid' && result.conflicts).toEqual(['runtimeSync', 'cron', 'indexNow'])
   })
 
   it('allows those options when the database is enabled', () => {
     const result = resolveDatabaseConfig(input({
-      requested: { runtimeSync: true, cron: true, indexNow: true },
+      requested: { runtimeSync: true, cron: true, indexNow: true, mcp: false, webmcp: false },
     }))
     expect(result._tag).toBe('Resolved')
   })

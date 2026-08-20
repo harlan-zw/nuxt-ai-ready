@@ -4,7 +4,6 @@ import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getNextSitemapToCrawl, getSitemapStatus, markSitemapCrawled, markSitemapCrawlPartial, markSitemapSeeded, syncSitemaps } from '../../src/runtime/server/db/drizzle/queries'
-import * as schema from '../../src/runtime/server/db/schema/sqlite'
 
 vi.mock('nitropack/runtime', () => ({
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': {} }),
@@ -42,7 +41,7 @@ describe('sitemap continuation database state', () => {
         crawl_state TEXT
       )
     `)
-    const db = drizzle(sqlite, { schema })
+    const db = drizzle({ client: sqlite })
     event = {
       context: {
         _aiReadyDrizzle: { dialect: 'sqlite', db },

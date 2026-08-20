@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createBuildPageDataVirtual } from '../../src/build-page-data-virtual'
 
 describe('build page data virtual module', () => {
-  it('emits only node:sqlite on Node 22+', () => {
+  it('emits only node:sqlite when Node supports it', () => {
     const source = createBuildPageDataVirtual({
       buildDbPath: '/tmp/index.sqlite',
       markdownLinkAvailabilityPath: '/tmp/markdown-links.json',
-      nodeMajor: 24,
+      nativeNodeSqlite: true,
     })
 
     expect(source).toContain(`import('node' + ':sqlite')`)
@@ -17,7 +17,7 @@ describe('build page data virtual module', () => {
     const source = createBuildPageDataVirtual({
       buildDbPath: '/tmp/index.sqlite',
       markdownLinkAvailabilityPath: '/tmp/markdown-links.json',
-      nodeMajor: 20,
+      nativeNodeSqlite: false,
     })
 
     expect(source).toContain(`import('better-sqlite3')`)

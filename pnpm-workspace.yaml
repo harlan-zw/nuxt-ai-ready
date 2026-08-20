@@ -55,7 +55,7 @@ catalog:
   citty: ^0.2.2
   consola: ^3.4.2
   defu: ^6.1.7
-  drizzle-orm: ^0.45.2
+  drizzle-orm: 1.0.0-rc.4
   eslint-plugin-harlanzw: ^0.17.1
   execa: ^10.0.1
   h3: ^1.15.11
