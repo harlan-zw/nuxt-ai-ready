@@ -1,10 +1,11 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { MarkdownSourceContext } from '../../types'
 import type { buildFrontmatter } from '../utils/frontmatter'
 import type { RuntimeRouteContext } from '../utils/i18n'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { appendHeader, createError, defineEventHandler, getHeader, getRequestURL, getResponseHeader, sendRedirect, setHeader, setResponseStatus } from '#nuxtseo/h3'
-import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { toMarkdownPath } from '../../markdown-path'
@@ -182,6 +183,23 @@ export default defineEventHandler(async (event) => {
     import('../utils/fetch'),
     import('../utils/frontmatter'),
   ])
+
+  // A site that already holds the markdown a page was rendered from can serve
+  // it verbatim. That is better than converting the rendering back, and it
+  // skips the internal subrequest that fetches the HTML.
+  const sourceContext: MarkdownSourceContext = { route: path, event, source: null }
+  await useNitroApp().hooks.callHook('ai-ready:markdown:source', sourceContext)
+  if (sourceContext.source) {
+    const { markdown, title, description, updatedAt } = sourceContext.source
+    const frontmatter = buildFrontmatter({
+      title: title ?? path,
+      description,
+      canonical_url: canonicalUrl,
+      last_updated: updatedAt || new Date().toISOString(),
+    })
+    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
+    return `${frontmatter}\n${markdown}`
+  }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
   // pages as a structural AST (minimark) that round-trips to markdown without

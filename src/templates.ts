@@ -61,6 +61,7 @@ declare global {
 export function registerTypeTemplates(ctx: TemplateContext) {
   const nitroTypes = renderNitroTypeAugmentations(ctx.nitroCompatibility, {
     runtimeHooks: `'ai-ready:page:markdown': (context: MarkdownContext) => void | Promise<void>
+'ai-ready:markdown:source': (context: MarkdownSourceContext) => void | Promise<void>
 'ai-ready:mdreamConfig': (config: MdreamOptions) => void | Promise<void>
 'ai-ready:page:indexed': (context: PageIndexedContext) => void | Promise<void>`,
   })
