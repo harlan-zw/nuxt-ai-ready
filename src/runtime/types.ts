@@ -439,6 +439,47 @@ export interface MarkdownContext {
 }
 
 /**
+ * Markdown a site already holds for a route, supplied instead of converting the
+ * page's HTML.
+ */
+export interface MarkdownSource {
+  /** The markdown body. Module frontmatter is layered on top of it. */
+  markdown: string
+  /** Page title. Falls back to the route when omitted. */
+  title?: string
+  /** Page description. */
+  description?: string
+  /** ISO timestamp for `last_updated`. Defaults to now. */
+  updatedAt?: string
+}
+
+/**
+ * Context for `ai-ready:markdown:source`.
+ *
+ * Set `source` to serve markdown the site already holds, such as the original
+ * file a page was rendered from. That skips both the HTML round trip and the
+ * internal subrequest that fetches it, so the answer is the source text rather
+ * than a conversion of its rendering. Leave `source` null to convert as usual.
+ *
+ * @example
+ * export default defineNitroPlugin((nitroApp) => {
+ *   nitroApp.hooks.hook('ai-ready:markdown:source', async (context) => {
+ *     const doc = await findDocForRoute(context.route)
+ *     if (doc)
+ *       context.source = { markdown: doc.raw, title: doc.title }
+ *   })
+ * })
+ */
+export interface MarkdownSourceContext {
+  /** The route being served, without the `.md` suffix (e.g. '/about') */
+  route: string
+  /** The H3 event object for accessing request/response */
+  event: H3Event
+  /** Set this to short-circuit HTML conversion. Null means convert as usual. */
+  source: MarkdownSource | null
+}
+
+/**
  * Link in llms.txt section
  */
 export interface LlmsTxtLink {

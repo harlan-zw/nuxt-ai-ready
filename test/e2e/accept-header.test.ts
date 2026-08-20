@@ -226,10 +226,10 @@ describe('accept header content negotiation', async () => {
   })
 
   describe('error handling', () => {
-    it('returns 200 with markdown body for non-existent .md route', async () => {
+    it('returns 404 with markdown body for non-existent .md route', async () => {
       const response = await fetch(url('/non-existent-page.md'))
 
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(404)
       expect(response.headers.get('content-type')).toContain('text/markdown')
 
       const content = await response.text()
