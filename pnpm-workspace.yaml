@@ -6,7 +6,7 @@ cleanupUnusedCatalogs: true
 minimumReleaseAgeExclude:
   - nuxtseo-layer-devtools
   - nuxtseo-shared
-  - '@nuxtjs/sitemap@8.3.2'
+  - '@nuxtjs/sitemap@8.4.0'
   - nuxt-site-config-kit@4.1.1 || 4.1.4
   - nuxt-site-config@4.1.1 || 4.1.4
   - site-config-stack@4.1.1 || 4.1.4
@@ -99,7 +99,7 @@ catalogs:
     '@nuxt/ui': ^4.10.0
     '@nuxtjs/mcp-toolkit': ^0.19.0
     '@nuxtjs/robots': ^6.1.5
-    '@nuxtjs/sitemap': ^8.3.4
+    '@nuxtjs/sitemap': ^8.4.0
     '@vueuse/nuxt': ^14.4.0
     nuxt: ^4.5.2
     nuxt-site-config: ^4.2.3
