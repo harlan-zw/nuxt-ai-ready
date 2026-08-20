@@ -910,6 +910,9 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       handler: resolve('./runtime/server/middleware/markdown'),
     })
     addServerPlugin(resolve('./runtime/server/plugins/link-header'))
+    // Runs Accept negotiation ahead of Nitro's static asset handler, which is
+    // unshifted in front of every middleware when serveStatic is on (#82).
+    addServerPlugin(resolve('./runtime/server/plugins/markdown-negotiation'))
 
     // Inject <link rel="alternate" type="text/markdown"> into HTML pages
     addPlugin({

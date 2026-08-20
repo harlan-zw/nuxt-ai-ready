@@ -68,6 +68,7 @@ SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_re
 
 - **db-restore.ts**: Restores prerendered data from compressed dump on cold start
 - **sitemap-seeder.ts**: Seeds routes from sitemap into DB on first request (with TTL)
+- **markdown-negotiation.ts**: Splices the Accept negotiation handler into the h3 stack ahead of Nitro's static asset handler, which otherwise answers prerendered routes before any middleware
 
 ### Runtime Indexing Flow
 

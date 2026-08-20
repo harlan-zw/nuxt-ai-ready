@@ -44,6 +44,15 @@ try {
   const markdown = await markdownResponse.text()
   if (!markdown.includes('# Nuxt 5 compatibility'))
     throw new Error(`Unexpected markdown response: ${markdown}`)
+
+  const negotiatedResponse = await fetch(`${origin}/prebuilt`, {
+    headers: { accept: 'text/markdown' },
+    redirect: 'manual',
+  })
+  if (negotiatedResponse.status !== 307)
+    throw new Error(`Negotiated Markdown returned ${negotiatedResponse.status}`)
+  if (negotiatedResponse.headers.get('location') !== '/prebuilt.md')
+    throw new Error(`Unexpected Markdown redirect: ${negotiatedResponse.headers.get('location')}`)
 }
 finally {
   server.kill('SIGTERM')
