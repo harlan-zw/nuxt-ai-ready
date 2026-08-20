@@ -131,6 +131,20 @@ export interface ModuleOptions {
   apiCatalog?: false | ApiCatalogConfig
 
   /**
+   * Read a page's Markdown from the installed content module instead of
+   * rendering the page and converting its HTML.
+   *
+   * Supports @nuxt/content v3 and @harlan-zw/comark-content. When a content
+   * module is present this skips one SSR render per route and keeps the source
+   * Markdown intact, so MDC blocks, tables and code fences survive.
+   *
+   * Set to false to convert the rendered HTML instead. Do that when a page's
+   * meaning depends on what its components render rather than on its source.
+   * @default true
+   */
+  contentSource?: boolean
+
+  /**
    * Options to pass to mdream htmlToMarkdown function
    */
   mdreamOptions?: MdreamOptions
@@ -414,6 +428,47 @@ export interface MarkdownContext {
   isPrerender: boolean
   /** The H3 event object for accessing request/response */
   event: H3Event
+}
+
+/**
+ * Markdown a site already holds for a route, supplied instead of converting the
+ * page's HTML.
+ */
+export interface MarkdownSource {
+  /** The markdown body. Module frontmatter is layered on top of it. */
+  markdown: string
+  /** Page title. Falls back to the route when omitted. */
+  title?: string
+  /** Page description. */
+  description?: string
+  /** ISO timestamp for `last_updated`. Defaults to now. */
+  updatedAt?: string
+}
+
+/**
+ * Context for `ai-ready:markdown:source`.
+ *
+ * Set `source` to serve markdown the site already holds, such as the original
+ * file a page was rendered from. That skips both the HTML round trip and the
+ * internal subrequest that fetches it, so the answer is the source text rather
+ * than a conversion of its rendering. Leave `source` null to convert as usual.
+ *
+ * @example
+ * export default defineNitroPlugin((nitroApp) => {
+ *   nitroApp.hooks.hook('ai-ready:markdown:source', async (context) => {
+ *     const doc = await findDocForRoute(context.route)
+ *     if (doc)
+ *       context.source = { markdown: doc.raw, title: doc.title }
+ *   })
+ * })
+ */
+export interface MarkdownSourceContext {
+  /** The route being served, without the `.md` suffix (e.g. '/about') */
+  route: string
+  /** The H3 event object for accessing request/response */
+  event: H3Event
+  /** Set this to short-circuit HTML conversion. Null means convert as usual. */
+  source: MarkdownSource | null
 }
 
 /**
