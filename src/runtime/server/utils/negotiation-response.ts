@@ -29,6 +29,8 @@ export interface NegotiationContext {
   routeContext: RuntimeRouteContext
 }
 
+type NegotiationResponse = Awaited<ReturnType<typeof sendRedirect>> | undefined
+
 export function setLinkHeader(event: H3Event, ctx: NegotiationContext, variant: 'html' | 'markdown') {
   setHeader(event, 'link', buildLinkHeader(ctx.path, variant, ctx.config, ctx.resolveUrl, ctx.routeContext))
 }
@@ -120,18 +122,18 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
 /**
  * Apply one negotiation decision to the response.
  *
- * Returns true when the response is complete. `render` decisions return false,
- * because the caller owns Markdown rendering.
+ * Returns the response value when H3 requires one. Pass-through and `render`
+ * decisions return undefined because the caller owns the next step.
  */
-export async function applyNegotiation(event: H3Event, decision: NegotiationDecision): Promise<boolean> {
+export async function applyNegotiation(event: H3Event, decision: NegotiationDecision): Promise<NegotiationResponse> {
   if (decision._tag === 'skip' || decision._tag === 'render')
-    return false
+    return
 
   // The early handler and the middleware both run for a pass-through request.
   // Without this guard the second pass appends a duplicate Vary header.
   const context = event.context as Record<string, unknown>
   if (context[APPLIED_KEY])
-    return false
+    return
   context[APPLIED_KEY] = true
 
   if (decision._tag === 'not-acceptable') {
@@ -153,7 +155,7 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
     if (decision.negotiation._tag === 'enabled')
       appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
     setStatusAwareHeader(event, ctx, 'html')
-    return false
+    return
   }
 
   // Implicit markdown: redirect to the `.md` twin so the prerendered file (or
@@ -162,6 +164,5 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
   setLinkHeader(event, ctx, 'html')
   setUncacheableHeaders(event)
-  await sendRedirect(event, ctx.resolvePath(toMarkdownPath(decision.path)), 307)
-  return true
+  return sendRedirect(event, ctx.resolvePath(toMarkdownPath(decision.path)), 307)
 }

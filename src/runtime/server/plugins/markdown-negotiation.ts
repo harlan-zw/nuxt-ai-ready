@@ -13,18 +13,43 @@ interface H3AppLike {
   use: (route: string, handler: unknown) => unknown
 }
 
-function toH3App(candidate: unknown): H3AppLike | null {
-  if (!candidate || typeof candidate !== 'object')
-    return null
-  const app = candidate as Partial<H3AppLike>
-  if (!Array.isArray(app.stack) || typeof app.use !== 'function')
-    return null
-  return app as H3AppLike
+interface H3CoreLike {
+  '~middleware': unknown[]
+  '~dispatch'?: unknown
+  '~composed'?: unknown
 }
 
-const negotiationHandler = defineEventHandler(async (event) => {
-  await applyNegotiation(event, decideNegotiation(event, 'early'))
-})
+type H3Runtime
+  = | { _tag: 'h3-v1', app: H3AppLike }
+    | { _tag: 'h3-v2', app: H3CoreLike }
+    | { _tag: 'unsupported' }
+
+function isH3App(candidate: unknown): candidate is H3AppLike {
+  if (!candidate || typeof candidate !== 'object')
+    return false
+  const app = candidate as Partial<H3AppLike>
+  return Array.isArray(app.stack) && typeof app.use === 'function'
+}
+
+function isH3Core(candidate: unknown): candidate is H3CoreLike {
+  return !!candidate
+    && typeof candidate === 'object'
+    && Array.isArray((candidate as Partial<H3CoreLike>)['~middleware'])
+}
+
+function resolveH3Runtime(candidate: unknown): H3Runtime {
+  if (!candidate || typeof candidate !== 'object')
+    return { _tag: 'unsupported' }
+
+  const nitro = candidate as { h3App?: unknown, h3?: unknown }
+  if (isH3App(nitro.h3App))
+    return { _tag: 'h3-v1', app: nitro.h3App }
+  if (isH3Core(nitro.h3))
+    return { _tag: 'h3-v2', app: nitro.h3 }
+  return { _tag: 'unsupported' }
+}
+
+const negotiationHandler = defineEventHandler(event => applyNegotiation(event, decideNegotiation(event, 'early')))
 
 /**
  * Run Accept negotiation in front of the Nitro static asset handler.
@@ -34,19 +59,26 @@ const negotiationHandler = defineEventHandler(async (event) => {
  * prerendered route is then answered before the Markdown middleware runs, so
  * negotiation never happens. See issue #82.
  *
- * The handler is spliced in at stack position 1. Position 0 holds the Nitro
- * route-rules layer, which must stay first. It applies the `headers`, `redirect`
- * and `proxy` rules, and h3 runs it even after the response ended.
+ * H3 1 uses stack position 1, after Nitro's route-rules layer. H3 2 prepends
+ * the global middleware list. Its dispatcher adds route-rule middleware first.
  */
 export default defineNitroPlugin((nitro) => {
-  const app = toH3App((nitro as { h3App?: unknown }).h3App)
-  if (!app) {
-    // Nitro v3 does not expose an h3 stack. The Markdown middleware still
-    // negotiates every route the server renders.
+  const runtime = resolveH3Runtime(nitro)
+  if (runtime._tag === 'unsupported') {
     logger.debug('[markdown] No h3 stack found. Accept negotiation stays in the middleware.')
     return
   }
 
+  if (runtime._tag === 'h3-v2') {
+    // Nitro 3 exposes H3 2's global middleware list after static assets are
+    // registered. Route-rule middleware stays ahead through ~getMiddleware.
+    runtime.app['~middleware'].unshift(negotiationHandler)
+    runtime.app['~dispatch'] = undefined
+    runtime.app['~composed'] = undefined
+    return
+  }
+
+  const app = runtime.app
   const baseURL = useRuntimeConfig().app?.baseURL || '/'
   app.use(`${baseURL}/`.replace(/\/+/g, '/'), negotiationHandler)
 

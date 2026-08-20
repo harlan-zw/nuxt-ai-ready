@@ -1,5 +1,5 @@
-import type { NegotiationContext } from '../utils/negotiation-response'
 import type { MarkdownSourceContext } from '../../types'
+import type { NegotiationContext } from '../utils/negotiation-response'
 import { createError, defineEventHandler, setHeader, setResponseStatus } from '#nuxtseo/h3'
 import { useNitroApp } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
@@ -49,10 +49,9 @@ function notFoundMarkdown(
 
 export default defineEventHandler(async (event) => {
   const decision = decideNegotiation(event, 'middleware')
-  if (await applyNegotiation(event, decision))
-    return
+  const negotiationResponse = await applyNegotiation(event, decision)
   if (decision._tag !== 'render')
-    return
+    return negotiationResponse
 
   await ensureSiteConfig(event)
   const ctx = buildNegotiationContext(event, decision.path)
