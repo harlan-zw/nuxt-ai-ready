@@ -3,7 +3,7 @@
  * Used by shared.ts during nuxi generate/build
  */
 
-export const SCHEMA_VERSION = 'v2.2.0'
+export const SCHEMA_VERSION = 'v2.3.0'
 
 /**
  * Allowed FTS5 tokenizer values. The configured value gets interpolated into the
@@ -55,7 +55,6 @@ export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
       last_seen_at INTEGER,
-      indexnow_synced_at INTEGER,
       locale TEXT NOT NULL DEFAULT ''
     )`,
     // Info table (schema version tracking)
@@ -74,18 +73,8 @@ export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
       duration_ms INTEGER,
       pages_indexed INTEGER DEFAULT 0,
       pages_remaining INTEGER DEFAULT 0,
-      indexnow_submitted INTEGER DEFAULT 0,
-      indexnow_remaining INTEGER DEFAULT 0,
       errors TEXT DEFAULT '[]',
       status TEXT DEFAULT 'running'
-    )`,
-    // IndexNow log table
-    `CREATE TABLE IF NOT EXISTS ai_ready_indexnow_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      submitted_at INTEGER NOT NULL,
-      url_count INTEGER NOT NULL,
-      success INTEGER NOT NULL DEFAULT 0,
-      error TEXT
     )`,
     // Sitemaps table
     `CREATE TABLE IF NOT EXISTS ai_ready_sitemaps (
@@ -139,6 +128,7 @@ export const DROP_TABLES_SQL = [
   'DROP TABLE IF EXISTS ai_ready_pages',
   'DROP TABLE IF EXISTS _ai_ready_info',
   'DROP TABLE IF EXISTS ai_ready_cron_runs',
+  // Remove the table created by pre-v2.3 releases during the schema rebuild.
   'DROP TABLE IF EXISTS ai_ready_indexnow_log',
   'DROP TABLE IF EXISTS ai_ready_sitemaps',
 ]

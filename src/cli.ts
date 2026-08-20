@@ -49,7 +49,7 @@ const main = defineCommand({
     status: () => defineCommand({
       meta: {
         name: 'status',
-        description: 'Show indexing status and IndexNow sync progress',
+        description: 'Show indexing status and sync progress',
       },
       args: {
         url: {
@@ -95,24 +95,6 @@ const main = defineCommand({
               const agoStr = ago < 60000 ? `${Math.round(ago / 1000)}s` : ago < 3600000 ? `${Math.round(ago / 60000)}m` : `${Math.round(ago / 3600000)}h`
               consola.info(`    ${colors.dim(`${agoStr} ago`)} ${p.route} ${colors.dim(p.title || '')}`)
             }
-          }
-        }
-
-        if (res.indexNow) {
-          consola.log('')
-          consola.info(colors.bold('IndexNow:'))
-          consola.info(`  Pending: ${colors.yellow(res.indexNow.pending?.toString() || '0')}`)
-          consola.info(`  Total submitted: ${colors.green(res.indexNow.totalSubmitted?.toString() || '0')}`)
-          if (res.indexNow.lastSubmittedAt) {
-            const date = new Date(res.indexNow.lastSubmittedAt)
-            consola.info(`  Last sync: ${colors.dim(date.toISOString())}`)
-          }
-          if (res.indexNow.lastError) {
-            consola.info(`  Last error: ${colors.red(res.indexNow.lastError)}`)
-          }
-          if (res.indexNow.backoff?.active) {
-            const remainMin = Math.ceil((res.indexNow.backoff.remainingMs || 0) / 60000)
-            consola.warn(`  Backoff: ${colors.yellow(`${remainMin}m remaining`)} (attempt ${res.indexNow.backoff.attempt})`)
           }
         }
 
@@ -321,56 +303,6 @@ const main = defineCommand({
       },
     }),
 
-    indexnow: () => defineCommand({
-      meta: {
-        name: 'indexnow',
-        description: 'Trigger IndexNow sync',
-      },
-      args: {
-        url: {
-          type: 'string',
-          alias: 'u',
-          description: 'Site URL (default: http://localhost:3000)',
-          default: 'http://localhost:3000',
-        },
-        limit: {
-          type: 'string',
-          alias: 'l',
-          description: 'Max URLs to submit',
-          default: '100',
-        },
-        cwd: {
-          type: 'string',
-          description: 'Working directory',
-          default: '.',
-        },
-      },
-      async run({ args }) {
-        const cwd = resolve(args.cwd || '.')
-        const secret = await requireSecret(cwd)
-        if (!secret)
-          return
-
-        const params = new URLSearchParams({
-          limit: args.limit || '100',
-        })
-
-        const url = `${args.url}/__ai-ready/indexnow?${params}`
-        consola.info(`Triggering IndexNow sync at ${args.url}...`)
-
-        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
-
-        if (res.success) {
-          consola.success(`Submitted: ${colors.green(res.submitted?.toString() || '0')} URLs`)
-          consola.info(`Remaining: ${colors.yellow(res.remaining?.toString() || '0')}`)
-        }
-        else {
-          consola.error(`Failed: ${res.error || 'Unknown error'}`)
-        }
-      },
-    }),
   },
 })
 

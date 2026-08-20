@@ -286,7 +286,6 @@ export interface DumpRow {
   indexed: number
   source: string
   last_seen_at: number | null
-  indexnow_synced_at: number | null
   locale: string | null
 }
 
@@ -326,7 +325,7 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
     // from the start on every page, degrading to O(N) on large tables.
     while (true) {
       const rows = await db.all<DumpRow>(`
-        SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale
+        SELECT route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale
         FROM ai_ready_pages
         ${lastRoute ? 'WHERE route > ?' : ''}
         ORDER BY route
@@ -375,15 +374,14 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
 
 /**
  * Import dump into database
- * Sets indexed=1, last_seen_at=indexed_at, indexnow_synced_at=indexed_at
- * (pages from dump were already indexed and synced during build, no need to re-notify)
+ * Sets indexed=1 and last_seen_at=indexed_at.
  *
- * Rows are packed into multi-row INSERTs (15 bind params per row, 5 rows per
- * statement stays under D1's 100-param cap) and fired through `db.batch` so a
+ * Rows are packed into multi-row INSERTs (14 bind params per row, 7 rows per
+ * statement stay under D1's 100-param cap) and fired through `db.batch` so a
  * cold-start restore of thousands of pages is a handful of round-trips, not one
  * per page.
  */
-const IMPORT_ROWS_PER_STATEMENT = 5
+const IMPORT_ROWS_PER_STATEMENT = 7
 
 export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promise<void> {
   if (rows.length === 0)
@@ -403,7 +401,7 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < canonical.length; i += IMPORT_ROWS_PER_STATEMENT) {
     const batch = canonical.slice(i, i + IMPORT_ROWS_PER_STATEMENT)
-    const valuesSql = batch.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).join(', ')
+    const valuesSql = batch.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).join(', ')
     const params = batch.flatMap((row) => {
       const source = row.source || 'prerender'
       return [
@@ -420,13 +418,12 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
         row.is_error,
         source,
         row.indexed_at,
-        row.indexed_at,
         row.locale || '',
       ]
     })
     stmts.push({
       sql: `
-        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, indexnow_synced_at, locale)
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
         ON CONFLICT(route) DO UPDATE SET
           route_key = excluded.route_key,
@@ -442,7 +439,6 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
           indexed = excluded.indexed,
           source = excluded.source,
           last_seen_at = excluded.last_seen_at,
-          indexnow_synced_at = excluded.indexnow_synced_at,
           locale = excluded.locale
       `,
       params,

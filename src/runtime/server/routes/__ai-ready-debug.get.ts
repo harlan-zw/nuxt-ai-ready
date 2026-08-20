@@ -2,7 +2,7 @@ import type { PageEntry } from '../db/queries'
 import { createError, eventHandler, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { useRawDb } from '../db'
-import { countPages, countPagesNeedingIndexNowSync, getIndexNowLog, getIndexNowStats, getRecentCronRuns, queryPages } from '../db/queries'
+import { countPages, getRecentCronRuns, queryPages } from '../db/queries'
 import { fetchPublicAsset, hasAssets } from '../utils/cloudflare'
 
 interface BuildMeta {
@@ -19,8 +19,6 @@ interface CronRunInfo {
   status: string
   pagesIndexed: number
   pagesRemaining: number
-  indexNowSubmitted: number
-  indexNowRemaining: number
   errors: string[]
 }
 
@@ -43,24 +41,6 @@ interface DebugInfo {
     pending: number
     errors: number
   }
-  indexNow?: {
-    pending: number
-    totalSubmitted: number
-    lastSubmittedAt: string | null
-    lastError: string | null
-    backoff?: {
-      until: string
-      minutesRemaining: number
-      attempt: number
-    } | null
-  }
-  indexNowLog?: Array<{
-    id: number
-    submittedAt: string
-    urlCount: number
-    success: boolean
-    error: string | null
-  }>
   cronRuns?: CronRunInfo[]
   pageData: {
     source: string
@@ -229,8 +209,6 @@ export default eventHandler(async (event) => {
 
   // Fetch runtime sync stats (only in production)
   let runtimeSyncInfo: DebugInfo['runtimeSync']
-  let indexNowInfo: DebugInfo['indexNow']
-  let indexNowLogInfo: DebugInfo['indexNowLog']
   let cronRunsInfo: CronRunInfo[] | undefined
   let buildInfo: DebugInfo['buildInfo']
 
@@ -260,58 +238,7 @@ export default eventHandler(async (event) => {
           status: run.status,
           pagesIndexed: run.pagesIndexed,
           pagesRemaining: run.pagesRemaining,
-          indexNowSubmitted: run.indexNowSubmitted,
-          indexNowRemaining: run.indexNowRemaining,
           errors: run.errors,
-        }))
-      }
-
-      // IndexNow stats if configured
-      if (runtimeConfig.indexNow) {
-        const [indexNowPending, indexNowStats, indexNowLogEntries] = await Promise.all([
-          countPagesNeedingIndexNowSync(event),
-          getIndexNowStats(event),
-          getIndexNowLog(event, 20),
-        ])
-
-        // Get backoff info
-        const db = await useRawDb(event)
-        const backoffRow = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['indexnow_backoff'])
-        let backoffInfo: { until: string, minutesRemaining: number, attempt: number } | null = null
-        if (backoffRow) {
-          let parsed: { until: number, attempt: number } | null = null
-          try {
-            parsed = JSON.parse(backoffRow.value)
-          }
-          catch {
-            // Malformed backoff JSON in the info table is treated as no backoff;
-            // the next setBackoffInfo() call will overwrite it.
-          }
-          const now = Date.now()
-          if (parsed && parsed.until > now) {
-            backoffInfo = {
-              until: new Date(parsed.until).toISOString(),
-              minutesRemaining: Math.ceil((parsed.until - now) / 60000),
-              attempt: parsed.attempt,
-            }
-          }
-        }
-
-        indexNowInfo = {
-          pending: indexNowPending,
-          totalSubmitted: indexNowStats.totalSubmitted,
-          lastSubmittedAt: indexNowStats.lastSubmittedAt
-            ? new Date(indexNowStats.lastSubmittedAt).toISOString()
-            : null,
-          lastError: indexNowStats.lastError,
-          backoff: backoffInfo,
-        }
-        indexNowLogInfo = indexNowLogEntries.map(entry => ({
-          id: entry.id,
-          submittedAt: new Date(entry.submittedAt).toISOString(),
-          urlCount: entry.urlCount,
-          success: entry.success,
-          error: entry.error,
         }))
       }
 
@@ -375,8 +302,6 @@ export default eventHandler(async (event) => {
       mdreamOptions: runtimeConfig.mdreamOptions,
     },
     runtimeSync: runtimeSyncInfo,
-    indexNow: indexNowInfo,
-    indexNowLog: indexNowLogInfo,
     cronRuns: cronRunsInfo,
     buildInfo,
     pageData: {

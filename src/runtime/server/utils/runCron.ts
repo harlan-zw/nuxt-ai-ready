@@ -7,7 +7,6 @@ import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
 import { resolveCronPlan, resolveSitemapIntervalMinutes } from './cron-plan'
-import { syncToIndexNow } from './indexnow'
 import { crawlSitemapByRoute, getSitemapsFromConfig } from './sitemap'
 import { mapSitemapRoutes } from './sitemap-routes'
 
@@ -35,11 +34,6 @@ export interface CronResult {
     errors?: string[]
     complete: boolean
   }
-  indexNow?: {
-    submitted: number
-    remaining: number
-    error?: string
-  }
 }
 
 /**
@@ -56,7 +50,6 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   const results: CronResult = {}
   const allErrors: string[] = []
   const sitemapIntervalMinutes = resolveSitemapIntervalMinutes(config.runtimeSync.ttl)
-  let runIndexNow = !!config.indexNow
 
   // Prevent overlapping cron runs
   const acquired = await tryAcquireCronLock(event)
@@ -68,7 +61,7 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   }
 
   if (debug) {
-    logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize}, indexNow: ${!!config.indexNow})`)
+    logger.info(`[cron] Starting cron run (batchSize: ${options?.batchSize ?? config.runtimeSync.batchSize})`)
   }
 
   try {
@@ -81,11 +74,8 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
         const plan = resolveCronPlan({
           status,
           runtimeSyncTtlSeconds: config.runtimeSync.ttl,
-          indexNowEnabled: !!config.indexNow,
           staleCheckNeeded,
-          now,
         })
-        runIndexNow = plan.runIndexNow
 
         if (!plan.hasWork) {
           if (debug) {
@@ -95,12 +85,11 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
           return {
             stale: { action: 'none', dbCount: status.totalPages, reason: 'fast_path_no_work' },
             index: { indexed: 0, remaining: 0, complete: true },
-            indexNow: config.indexNow ? { submitted: 0, remaining: status.indexNowPending } : undefined,
           }
         }
 
         if (debug) {
-          logger.info(`[cron] Work needed: stale=${staleCheckNeeded}, pending=${status.pendingPages}, sitemaps=${status.sitemapsNeedCrawl}, indexNow=${status.indexNowPending}`)
+          logger.info(`[cron] Work needed: stale=${staleCheckNeeded}, pending=${status.pendingPages}, sitemaps=${status.sitemapsNeedCrawl}`)
         }
       }
     }
@@ -163,35 +152,11 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
       }
     }
 
-    // Run IndexNow sync if key is configured
-    if (runIndexNow) {
-      const indexNowResult = await syncToIndexNow(event, 100).catch((err) => {
-        logger.warn('[ai-ready:cron] IndexNow sync failed:', err.message)
-        return { success: false, submitted: 0, remaining: 0, error: err.message }
-      })
-      results.indexNow = {
-        submitted: indexNowResult.submitted,
-        remaining: indexNowResult.remaining,
-        error: indexNowResult.error,
-      }
-      if (indexNowResult.error) {
-        allErrors.push(`IndexNow: ${indexNowResult.error}`)
-      }
-      if (debug) {
-        const status = indexNowResult.error
-          ? `error: ${indexNowResult.error}`
-          : `${indexNowResult.submitted} submitted (${indexNowResult.remaining} remaining)`
-        logger.info(`[cron] IndexNow: ${status}`)
-      }
-    }
-
     // Complete the cron run log (only if debugCron enabled)
     if (runId && config.debugCron) {
       await completeCronRun(event, runId, {
         pagesIndexed: results.index?.indexed || 0,
         pagesRemaining: results.index?.remaining || 0,
-        indexNowSubmitted: results.indexNow?.submitted || 0,
-        indexNowRemaining: results.indexNow?.remaining || 0,
         errors: allErrors,
       })
 
@@ -209,8 +174,6 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
         parts.push(`pinged ${results.sitemap.name}`)
       if (results.index?.indexed)
         parts.push(`${results.index.indexed} indexed`)
-      if (results.indexNow?.submitted)
-        parts.push(`${results.indexNow.submitted} submitted to IndexNow`)
       if (allErrors.length > 0)
         parts.push(`${allErrors.length} errors`)
       logger.info(`[cron] Complete in ${duration}ms${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`)

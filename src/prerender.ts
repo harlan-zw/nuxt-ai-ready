@@ -2,7 +2,6 @@ import type { Nuxt } from '@nuxt/schema'
 import type { Nitro, PrerenderRoute } from 'nitropack/types'
 import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
-import type { BuildMeta, BuildMetaChanges } from './runtime/server/utils/indexnow-shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
@@ -17,11 +16,9 @@ import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
-import { comparePageHashes, submitToIndexNowShared } from './runtime/server/utils/indexnow-shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 import { supportsNativeNodeSqlite } from './utils/database'
 
-const BUILD_FETCH_TIMEOUT = 15000 // 15s timeout for build-time fetches
 const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
 
 const RE_HTML_MD_EXT = /\.(html|md)$/
@@ -95,80 +92,6 @@ async function findOutputMarkdownPaths(
   return [...paths].sort()
 }
 
-/**
- * Fetch previous build meta from live site for hash comparison
- * Must be called BEFORE writing new pages.meta.json
- */
-async function fetchPreviousMeta(
-  siteUrl: string,
-  indexNow: string,
-): Promise<BuildMeta | null> {
-  // Fetch previous build meta from live site
-  const metaUrl = withBase('/__ai-ready/pages.meta.json', siteUrl)
-  logger.info(`Fetching previous build meta from ${metaUrl}`)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), BUILD_FETCH_TIMEOUT)
-
-  const prevMeta = await fetch(metaUrl, { signal: controller.signal })
-    .then(r => r.ok ? r.json() as Promise<BuildMeta> : null)
-    .catch((err) => {
-      if (err.name === 'AbortError') {
-        logger.warn(`Timeout fetching previous meta (${BUILD_FETCH_TIMEOUT}ms)`)
-      }
-      return null
-    })
-    .finally(() => clearTimeout(timeoutId))
-
-  if (!prevMeta?.pages) {
-    logger.info('First deploy or no previous meta - will index all pages')
-    return null
-  }
-
-  logger.info(`Previous build: ${prevMeta.pageCount} pages (buildId: ${prevMeta.buildId})`)
-
-  // Verify key file is live (required for IndexNow to work)
-  if (indexNow) {
-    const keyUrl = withBase(`/${indexNow}.txt`, siteUrl)
-    const keyLive = await fetch(keyUrl, { signal: AbortSignal.timeout(5000) })
-      .then(r => r.ok)
-      .catch(() => false)
-
-    if (!keyLive) {
-      logger.info('IndexNow key file not live yet - IndexNow submission will be skipped')
-    }
-  }
-
-  return prevMeta
-}
-
-/**
- * Submit changed pages to IndexNow at build time
- */
-async function submitIndexNow(
-  changedRoutes: string[],
-  addedRoutes: string[],
-  siteUrl: string,
-  indexNow: string,
-): Promise<void> {
-  const allRoutes = [...changedRoutes, ...addedRoutes]
-  if (allRoutes.length === 0) {
-    logger.debug('[indexnow] No content changes detected')
-    return
-  }
-
-  logger.info(`[indexnow] Submitting ${allRoutes.length} changed pages (${changedRoutes.length} modified, ${addedRoutes.length} new)`)
-
-  const result = await submitToIndexNowShared(allRoutes, indexNow, siteUrl, { logger })
-
-  if (result.success) {
-    logger.info(`[indexnow] Successfully notified search engines of ${allRoutes.length} changes`)
-  }
-  else {
-    logger.warn(`[indexnow] Failed to submit: ${result.error}`)
-  }
-}
-
 export type PrerenderI18nConfig = RuntimeI18nConfig
 
 export interface CrawlerState {
@@ -181,7 +104,6 @@ export interface CrawlerState {
   llmsFullTxtPath?: string
   siteInfo?: SiteInfo
   llmsTxtConfig?: LlmsTxtConfig
-  indexNow?: string
   concurrency: number
   ftsTokenizer?: string
   i18n?: PrerenderI18nConfig | null
@@ -192,7 +114,6 @@ function createCrawlerState(
   llmsFullTxtPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
-  indexNow?: string,
   concurrency = 10,
   ftsTokenizer?: string,
   i18n?: PrerenderI18nConfig | null,
@@ -206,7 +127,6 @@ function createCrawlerState(
     llmsFullTxtPath,
     siteInfo,
     llmsTxtConfig,
-    indexNow,
     concurrency,
     ftsTokenizer,
     i18n,
@@ -573,7 +493,6 @@ export function setupPrerenderHandler(
   dbPath?: string,
   siteInfo?: SiteInfo,
   llmsTxtConfig?: LlmsTxtConfig,
-  indexNow?: string,
   extras: PrerenderHandlerOptions = {},
 ) {
   const nuxt = useNuxt()
@@ -586,7 +505,6 @@ export function setupPrerenderHandler(
       llmsFullTxtPath,
       siteInfo,
       llmsTxtConfig,
-      indexNow,
       options.prerender?.concurrency,
       extras.ftsTokenizer,
       extras.i18n,
@@ -686,61 +604,16 @@ export function setupPrerenderHandler(
         await writeFile(dumpPath, dumpData, 'utf-8')
         logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
-        // Build page hashes for static IndexNow comparison (object format for smaller payload)
-        const pageHashes: Record<string, string> = {}
-        for (const p of pages) {
-          if (p.contentHash)
-            pageHashes[p.route] = p.contentHash
-        }
-
-        // Fetch previous meta BEFORE writing new one (for comparison)
-        let prevMeta: BuildMeta | null = null
-        if (state.siteInfo?.url) {
-          prevMeta = await fetchPreviousMeta(state.siteInfo.url, state.indexNow || '')
-        }
-
-        // Compare hashes with previous build
-        const { changed, added, removed } = comparePageHashes(pageHashes, prevMeta)
-        const debug = useNuxt().options.runtimeConfig['nuxt-ai-ready']?.debug
-
-        // Build changes object for meta
-        const changes: BuildMetaChanges = {
-          changed: changed.length,
-          added: added.length,
-          removed: removed.length,
-        }
-        // Include route details in debug mode
-        if (debug) {
-          if (changed.length > 0)
-            changes.changedRoutes = changed
-          if (added.length > 0)
-            changes.addedRoutes = added
-          if (removed.length > 0)
-            changes.removedRoutes = removed
-        }
-
-        // Write build metadata with page hashes for stale detection
+        // Write build metadata for runtime stale detection.
         const buildId = Date.now().toString(36)
         const metaContent = JSON.stringify({
           buildId,
           pageCount: pages.length,
           createdAt: new Date().toISOString(),
-          changes: prevMeta ? changes : undefined,
-          pages: pageHashes,
         })
         logger.debug(`Writing pages.meta.json (${(metaContent.length / 1024).toFixed(1)}kb)`)
         await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
-        logger.debug(`Wrote build metadata: buildId=${buildId}, ${Object.keys(pageHashes).length} page hashes`)
-
-        // Log changes summary
-        if (prevMeta && (changed.length > 0 || added.length > 0 || removed.length > 0)) {
-          logger.info(`Content changes: ${changed.length} modified, ${added.length} new, ${removed.length} removed`)
-        }
-
-        // Submit to IndexNow for static sites
-        if (state.indexNow && state.siteInfo?.url && prevMeta) {
-          await submitIndexNow(changed, added, state.siteInfo.url, state.indexNow)
-        }
+        logger.debug(`Wrote build metadata: buildId=${buildId}`)
       }
 
       // Record only Markdown URLs that will actually be available after

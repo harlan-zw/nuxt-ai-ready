@@ -177,7 +177,6 @@ export interface PageRow {
   indexed: number
   source: 'prerender' | 'runtime'
   last_seen_at: number | null
-  indexnow_synced_at: number | null
   locale: string | null
 }
 
@@ -586,6 +585,13 @@ export async function getPageHash(event: H3Event | undefined, route: string): Pr
 // Sitemap Seeding & Pruning
 // ============================================================================
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const result: T[][] = []
+  for (let i = 0; i < items.length; i += size)
+    result.push(items.slice(i, i + size))
+  return result
+}
+
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
@@ -706,304 +712,6 @@ export async function getStaleRoutes(event: H3Event | undefined, staleThresholdS
 }
 
 // ============================================================================
-// IndexNow Sync
-// ============================================================================
-
-/**
- * Get pages needing IndexNow sync (content changed since last sync)
- */
-export async function getPagesNeedingIndexNowSync(
-  event: H3Event | undefined,
-  limit = 100,
-): Promise<{ route: string }[]> {
-  const db = await getDb(event)
-  if (!db)
-    return []
-
-  return db.all<{ route: string }>(`
-    SELECT route FROM ai_ready_pages
-    WHERE indexed = 1
-      AND is_error = 0
-      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
-    LIMIT ?
-  `, [limit])
-}
-
-/**
- * Count pages needing IndexNow sync
- */
-export async function countPagesNeedingIndexNowSync(
-  event: H3Event | undefined,
-): Promise<number> {
-  const db = await getDb(event)
-  if (!db)
-    return 0
-
-  const row = await db.first<{ count: number }>(`
-    SELECT COUNT(*) as count FROM ai_ready_pages
-    WHERE indexed = 1
-      AND is_error = 0
-      AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)
-  `)
-  return row?.count || 0
-}
-
-/**
- * D1/SQLite caps prepared-statement parameters at 100. Chunk IN-clause routes
- * so each UPDATE binds at most 100 vars (99 routes + 1 timestamp).
- */
-const D1_MAX_IN_ROUTES = 99
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < items.length; i += size)
-    out.push(items.slice(i, i + size))
-  return out
-}
-
-async function markRoutesSyncedChunked(
-  db: RawExecutor,
-  routes: string[],
-  now: number,
-): Promise<void> {
-  const stmts: { sql: string, params: unknown[] }[] = []
-  for (const batch of chunk(routes, D1_MAX_IN_ROUTES)) {
-    const placeholders = batch.map(() => '?').join(',')
-    stmts.push({
-      sql: `UPDATE ai_ready_pages SET indexnow_synced_at = ? WHERE route IN (${placeholders})`,
-      params: [now, ...batch],
-    })
-  }
-  await db.batch(stmts)
-}
-
-/**
- * Mark pages as synced to IndexNow
- */
-export async function markIndexNowSynced(
-  event: H3Event | undefined,
-  routes: string[],
-): Promise<void> {
-  const db = await getDb(event)
-  if (!db || routes.length === 0)
-    return
-
-  await markRoutesSyncedChunked(db, routes, Date.now())
-}
-
-/**
- * Update IndexNow stats after submission
- * Uses atomic SQL to handle concurrent updates safely
- */
-export async function updateIndexNowStats(
-  event: H3Event | undefined,
-  submitted: number,
-  error?: string,
-): Promise<void> {
-  const db = await getDb(event)
-  if (!db)
-    return
-
-  const now = Date.now()
-
-  if (error) {
-    await db.exec(
-      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
-      ['indexnow_last_error', error],
-    )
-  }
-  else {
-    // Atomic increment of total submitted count
-    await db.exec(`
-      INSERT INTO _ai_ready_info (id, value) VALUES (?, ?)
-      ON CONFLICT(id) DO UPDATE SET value = CAST((CAST(value AS INTEGER) + ?) AS TEXT)
-    `, ['indexnow_total_submitted', String(submitted), submitted])
-
-    await db.exec(
-      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
-      ['indexnow_last_submitted_at', String(now)],
-    )
-    await db.exec(
-      'DELETE FROM _ai_ready_info WHERE id = ?',
-      ['indexnow_last_error'],
-    )
-  }
-}
-
-/**
- * Batch update for IndexNow: mark pages synced + update stats
- * Runs all queries in parallel for speed
- */
-export async function batchIndexNowUpdate(
-  event: H3Event | undefined,
-  routes: string[],
-  submitted: number,
-): Promise<void> {
-  const db = await getDb(event)
-  if (!db || routes.length === 0)
-    return
-
-  const now = Date.now()
-
-  // Run all updates in parallel; route IN-clause is chunked to respect D1's
-  // 100-parameter cap per prepared statement.
-  await Promise.all([
-    markRoutesSyncedChunked(db, routes, now),
-    // Atomic increment total submitted
-    db.exec(`
-      INSERT INTO _ai_ready_info (id, value) VALUES ('indexnow_total_submitted', ?)
-      ON CONFLICT(id) DO UPDATE SET value = CAST((CAST(value AS INTEGER) + ?) AS TEXT)
-    `, [String(submitted), submitted]),
-    // Update last submitted timestamp
-    db.exec(
-      'INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)',
-      ['indexnow_last_submitted_at', String(now)],
-    ),
-    // Clear any previous error
-    db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['indexnow_last_error']),
-  ])
-}
-
-export interface IndexNowStats {
-  totalSubmitted: number
-  lastSubmittedAt: number | null
-  lastError: string | null
-}
-
-/**
- * Get IndexNow stats
- */
-export async function getIndexNowStats(
-  event: H3Event | undefined,
-): Promise<IndexNowStats> {
-  const db = await getDb(event)
-  if (!db)
-    return { totalSubmitted: 0, lastSubmittedAt: null, lastError: null }
-
-  const rows = await db.all<{ id: string, value: string }>(
-    'SELECT id, value FROM _ai_ready_info WHERE id LIKE ?',
-    ['indexnow_%'],
-  )
-
-  const stats: Record<string, string> = {}
-  for (const row of rows) {
-    stats[row.id] = row.value
-  }
-
-  return {
-    totalSubmitted: Number.parseInt(stats.indexnow_total_submitted || '0', 10) || 0,
-    lastSubmittedAt: stats.indexnow_last_submitted_at ? Number.parseInt(stats.indexnow_last_submitted_at, 10) : null,
-    lastError: stats.indexnow_last_error || null,
-  }
-}
-
-export interface IndexNowBackoffStatus {
-  active: boolean
-  until: number | null
-  remainingMs: number | null
-  attempt: number | null
-}
-
-/**
- * Get IndexNow backoff status for status endpoint
- */
-export async function getIndexNowBackoff(
-  event: H3Event | undefined,
-): Promise<IndexNowBackoffStatus> {
-  const db = await getDb(event)
-  if (!db)
-    return { active: false, until: null, remainingMs: null, attempt: null }
-
-  const row = await db.first<{ value: string }>(
-    'SELECT value FROM _ai_ready_info WHERE id = ?',
-    ['indexnow_backoff'],
-  )
-
-  if (!row)
-    return { active: false, until: null, remainingMs: null, attempt: null }
-
-  const parsed = safeJsonParse<{ until: number, attempt: number } | null>(row.value, null)
-  if (!parsed)
-    return { active: false, until: null, remainingMs: null, attempt: null }
-
-  const now = Date.now()
-  const active = now < parsed.until
-
-  return {
-    active,
-    until: parsed.until,
-    remainingMs: active ? parsed.until - now : null,
-    attempt: parsed.attempt,
-  }
-}
-
-// ============================================================================
-// IndexNow Submission Log (debug mode only)
-// ============================================================================
-
-export interface IndexNowLogEntry {
-  id: number
-  submittedAt: number
-  urlCount: number
-  success: boolean
-  error: string | null
-}
-
-/**
- * Log an IndexNow submission attempt (for debug mode)
- */
-export async function logIndexNowSubmission(
-  event: H3Event | undefined,
-  urlCount: number,
-  success: boolean,
-  error?: string,
-): Promise<void> {
-  const db = await getDb(event)
-  if (!db)
-    return
-
-  await db.exec(
-    'INSERT INTO ai_ready_indexnow_log (submitted_at, url_count, success, error) VALUES (?, ?, ?, ?)',
-    [Date.now(), urlCount, success ? 1 : 0, error || null],
-  )
-
-  // Keep only last 100 entries
-  await db.exec(`
-    DELETE FROM ai_ready_indexnow_log WHERE id NOT IN (
-      SELECT id FROM ai_ready_indexnow_log ORDER BY submitted_at DESC LIMIT 100
-    )
-  `)
-}
-
-/**
- * Get recent IndexNow submission log entries
- */
-export async function getIndexNowLog(
-  event: H3Event | undefined,
-  limit = 20,
-): Promise<IndexNowLogEntry[]> {
-  const db = await getDb(event)
-  if (!db)
-    return []
-
-  const rows = await db.all<{
-    id: number
-    submitted_at: number
-    url_count: number
-    success: number
-    error: string | null
-  }>('SELECT * FROM ai_ready_indexnow_log ORDER BY submitted_at DESC LIMIT ?', [limit])
-
-  return rows.map(row => ({
-    id: row.id,
-    submittedAt: row.submitted_at,
-    urlCount: row.url_count,
-    success: row.success === 1,
-    error: row.error,
-  }))
-}
-
-// ============================================================================
 // Cron Run Logging
 // ============================================================================
 
@@ -1014,8 +722,6 @@ export interface CronRunRow {
   duration_ms: number | null
   pages_indexed: number
   pages_remaining: number
-  indexnow_submitted: number
-  indexnow_remaining: number
   errors: string
   status: 'running' | 'success' | 'partial' | 'error'
 }
@@ -1027,8 +733,6 @@ export interface CronRun {
   durationMs: number | null
   pagesIndexed: number
   pagesRemaining: number
-  indexNowSubmitted: number
-  indexNowRemaining: number
   errors: string[]
   status: 'running' | 'success' | 'partial' | 'error'
 }
@@ -1041,8 +745,6 @@ function rowToCronRun(row: CronRunRow): CronRun {
     durationMs: row.duration_ms,
     pagesIndexed: row.pages_indexed,
     pagesRemaining: row.pages_remaining,
-    indexNowSubmitted: row.indexnow_submitted,
-    indexNowRemaining: row.indexnow_remaining,
     errors: safeJsonParse<string[]>(row.errors, []),
     status: row.status,
   }
@@ -1075,8 +777,6 @@ export async function completeCronRun(
   result: {
     pagesIndexed: number
     pagesRemaining: number
-    indexNowSubmitted: number
-    indexNowRemaining: number
     errors: string[]
   },
 ): Promise<void> {
@@ -1098,12 +798,10 @@ export async function completeCronRun(
       duration_ms = ?,
       pages_indexed = ?,
       pages_remaining = ?,
-      indexnow_submitted = ?,
-      indexnow_remaining = ?,
       errors = ?,
       status = ?
     WHERE id = ?
-  `, [now, durationMs, result.pagesIndexed, result.pagesRemaining, result.indexNowSubmitted, result.indexNowRemaining, JSON.stringify(result.errors), status, runId])
+  `, [now, durationMs, result.pagesIndexed, result.pagesRemaining, JSON.stringify(result.errors), status, runId])
 }
 
 /**
@@ -1184,10 +882,8 @@ export async function pruneCronRunsByAge(
 export interface CronFastPathStatus {
   totalPages: number
   pendingPages: number
-  indexNowPending: number
   lastStaleCheck: number | null
   buildId: string | null
-  indexNowBackoff: { until: number, attempt: number } | null
   sitemapsNeedCrawl: number
 }
 
@@ -1208,19 +904,15 @@ export async function getCronFastPathStatus(
   const row = await db.first<{
     total_pages: number
     pending_pages: number
-    indexnow_pending: number
     last_stale_check: string | null
     build_id: string | null
-    indexnow_backoff: string | null
     sitemaps_need_crawl: number
   }>(`
     SELECT
       (SELECT COUNT(*) FROM ai_ready_pages) as total_pages,
       (SELECT COUNT(*) FROM ai_ready_pages WHERE indexed = 0 AND is_error = 0) as pending_pages,
-      (SELECT COUNT(*) FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0 AND (indexnow_synced_at IS NULL OR indexnow_synced_at < indexed_at)) as indexnow_pending,
       (SELECT value FROM _ai_ready_info WHERE id = 'last_stale_check') as last_stale_check,
       (SELECT value FROM _ai_ready_info WHERE id = 'build_id') as build_id,
-      (SELECT value FROM _ai_ready_info WHERE id = 'indexnow_backoff') as indexnow_backoff,
       (SELECT COUNT(*) FROM ai_ready_sitemaps WHERE (crawl_state IS NOT NULL OR last_crawled_at IS NULL OR last_crawled_at < ?) AND error_count < 10) as sitemaps_need_crawl
   `, [sitemapThreshold])
 
@@ -1230,10 +922,8 @@ export async function getCronFastPathStatus(
   return {
     totalPages: row.total_pages,
     pendingPages: row.pending_pages,
-    indexNowPending: row.indexnow_pending,
     lastStaleCheck: row.last_stale_check ? Number.parseInt(row.last_stale_check, 10) : null,
     buildId: row.build_id,
-    indexNowBackoff: safeJsonParse<{ until: number, attempt: number } | null>(row.indexnow_backoff, null),
     sitemapsNeedCrawl: row.sitemaps_need_crawl,
   }
 }

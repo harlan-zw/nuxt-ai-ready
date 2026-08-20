@@ -1,7 +1,6 @@
 export interface DevtoolsConfig {
   database: { type: string }
   runtimeSync: { enabled: boolean, ttl: number, batchSize: number, pruneTtl: number }
-  indexNow: boolean
   sitemapPrerendered: boolean
   markdownCacheHeaders: { maxAge: number, swr: boolean }
   llmsTxtCacheSeconds: number

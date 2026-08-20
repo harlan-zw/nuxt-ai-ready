@@ -5,7 +5,7 @@ import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedDatabase } from './utils/database'
 import type { RuntimeI18nConfig } from './utils/i18n'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -75,7 +75,6 @@ export interface ModulePublicRuntimeConfig {
     pruneTtl: number
   }
   runtimeSyncSecret?: string
-  indexNow?: string
   sitemapPrerendered: boolean
   i18n?: RuntimeI18nConfig | null
   ftsTokenizer?: string
@@ -199,7 +198,6 @@ export default defineNuxtModule<ModuleOptions>({
       requested: {
         runtimeSync: !!config.runtimeSync,
         cron: !!config.cron,
-        indexNow: !!config.indexNow,
         mcp: mcpNeedsDatabase,
         webmcp: webmcpNeedsDatabase,
       },
@@ -417,18 +415,6 @@ export default defineNuxtModule<ModuleOptions>({
     const webmcpResult = resolveWebMcpConfig(config.webmcp, siteToolsConfig)
     const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
 
-    // IndexNow: auto-read key from env, derive from site URL if true.
-    // IndexNow submits routes from the page store, so a disabled database
-    // drops the key. An explicit `indexNow` option fails the build earlier.
-    const envIndexNowKey = process.env.NUXT_AI_READY_INDEX_NOW_KEY
-    if (!databaseEnabled && envIndexNowKey)
-      logger.warn('The database is disabled, so NUXT_AI_READY_INDEX_NOW_KEY is ignored.')
-    const indexNow = !databaseEnabled
-      ? undefined
-      : config.indexNow === true
-        ? createHash('sha256').update(useSiteConfig().url || 'nuxt-ai-ready').digest('hex').slice(0, 32)
-        : config.indexNow || envIndexNowKey
-
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
@@ -480,7 +466,6 @@ export default defineNuxtModule<ModuleOptions>({
           agentSkills: agentSkillsResult._tag === 'Enabled',
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
-          indexNow: !!indexNow,
           apiCatalog: !!apiCatalogConfig,
           database: databaseEnabled ? database.type : false,
         }
@@ -903,7 +888,6 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
       runtimeSyncSecret,
-      indexNow,
       sitemapPrerendered,
       i18n: i18nConfig,
       ftsTokenizer,
@@ -1011,18 +995,6 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
     }
 
-    // IndexNow endpoints (only if key is configured)
-    if (indexNow) {
-      // Key verification route: /{key}.txt
-      addServerHandler({ route: `/${indexNow}.txt`, handler: resolve('./runtime/server/routes/indexnow-key.get'), lazy: true })
-      // Sync endpoint
-      addServerHandler({ route: '/__ai-ready/indexnow', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/indexnow.post'), lazy: true })
-      // Status endpoint needed for IndexNow stats (may not have runtimeSync)
-      if (!runtimeSyncEnabled) {
-        addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get'), lazy: true })
-      }
-    }
-
     // Cron endpoint (for Vercel and other HTTP-based cron systems)
     if (config.cron && !nuxt.options.dev) {
       addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get'), lazy: true })
@@ -1049,7 +1021,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
         description: siteConfig.description,
-      }, mergedLlmsTxt, indexNow, { ftsTokenizer, i18n: i18nConfig })
+      }, mergedLlmsTxt, { ftsTokenizer, i18n: i18nConfig })
     }
 
     // Add lifecycle plugin to handle database connection cleanup
