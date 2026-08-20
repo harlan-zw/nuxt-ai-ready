@@ -234,9 +234,10 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!response) {
-    setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    setResponseStatus(event, 502)
-    return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Bad Gateway',
+    })
   }
 
   // Forward upstream redirects, adding .md suffix to the target
@@ -252,12 +253,14 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 404 with the guidance body attached, not a bare error. Agents that read
-  // the body still get pointed at llms.txt; agents and crawlers that read the
-  // status are no longer told a missing page exists.
-  if (!response.ok) {
+  // Keep application errors intact, including their body and headers. Only a
+  // missing page gets the Markdown guidance response.
+  if (!response.ok && response.status !== 404)
+    return response
+
+  if (response.status === 404) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    setResponseStatus(event, response.status)
+    setResponseStatus(event, 404)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 

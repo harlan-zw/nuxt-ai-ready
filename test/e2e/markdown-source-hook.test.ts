@@ -49,7 +49,11 @@ describe('markdown source hook', async () => {
 
   it('preserves an upstream error status', async () => {
     const response = await fetch(url('/failure.md'))
+    const body = await response.text()
 
     expect(response.status).toBe(503)
+    expect(response.headers.get('x-upstream-error')).toBe('preserved')
+    expect(response.headers.get('content-type')).not.toContain('text/markdown')
+    expect(body).not.toContain('# Page not found')
   })
 })

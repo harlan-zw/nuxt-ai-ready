@@ -1,5 +1,6 @@
-import { createError, defineEventHandler } from 'h3'
+import { createError, defineEventHandler, setHeader } from 'h3'
 
-export default defineEventHandler(() => {
+export default defineEventHandler((event) => {
+  setHeader(event, 'x-upstream-error', 'preserved')
   throw createError({ statusCode: 503 })
 })
