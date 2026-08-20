@@ -5,11 +5,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { createPrerenderDatabase } from '../../src/prerender'
 
 vi.mock('better-sqlite3', () => {
-  throw new Error('better-sqlite3 must not load on Node 22+')
+  throw new Error('better-sqlite3 must not load when Node has native SQLite')
 })
 
 describe('prerender database', () => {
-  it('uses native node:sqlite on Node 22+', async () => {
+  it('uses native node:sqlite when Node supports it', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-'))
     const db = await createPrerenderDatabase(join(directory, 'index.sqlite'))
 

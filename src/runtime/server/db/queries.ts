@@ -61,6 +61,13 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
 
   // Runtime: use raw database executor
   const resolvedEvent = getEventFromContext(event)
+
+  // `aiReady.database: false` ships no driver. Callers treat a null database
+  // as "no page data", the same as dev, so llms.txt degrades to the sitemap.
+  const cfg = useRuntimeConfig(resolvedEvent) as { 'nuxt-ai-ready'?: { database?: { _tag?: string } } }
+  if (cfg['nuxt-ai-ready']?.database?._tag === 'Disabled')
+    return null
+
   const db = await useRawDb(resolvedEvent)
 
   // Initialize schema on first connection

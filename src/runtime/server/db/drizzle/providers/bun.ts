@@ -1,7 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import * as schema from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
@@ -16,7 +15,7 @@ export async function createClient(event?: H3Event) {
   logger.debug(`[drizzle] Opening Bun SQLite database: ${dbPath}`)
 
   const sqlite = new Database(dbPath)
-  const db = drizzle(sqlite, { schema })
+  const db = drizzle({ client: sqlite })
   registerDriver(db, 'better-sqlite3', sqlite) // Same API as better-sqlite3
   return { dialect: 'sqlite' as const, db }
 }

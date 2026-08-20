@@ -1,17 +1,17 @@
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
+import type { SQLiteBunDatabase } from 'drizzle-orm/bun-sqlite'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
-import type * as schema from '#ai-ready-virtual/db-schema.mjs'
+import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { H3Event } from '#nuxtseo/h3'
 import { DB_CONTEXT_KEY } from '../context'
 import { closeDriver } from './raw'
 
 export type DatabaseDialect = 'sqlite' | 'postgres'
 
-type SQLiteDB = BetterSQLite3Database<typeof schema> | BunSQLiteDatabase<typeof schema> | LibSQLDatabase<typeof schema> | DrizzleD1Database<typeof schema>
-type PostgresDB = NeonHttpDatabase<typeof schema>
+type SQLiteDB = BetterSQLite3Database | SQLiteBunDatabase | LibSQLDatabase | DrizzleD1Database | NodeSQLiteDatabase
+type PostgresDB = NeonHttpDatabase
 
 export interface DrizzleDatabase {
   dialect: DatabaseDialect

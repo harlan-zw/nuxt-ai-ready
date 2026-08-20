@@ -6,6 +6,7 @@ import type {
   WebMcpSiteToolAttachmentOptions,
 } from '../runtime/site-tool-config'
 import type { ModuleOptions } from '../runtime/types'
+import type { ResolvedDatabase } from './database'
 
 const DEFAULT_MAX_OUTPUT_CHARS = 1500
 const DEFAULT_LIST_LIMIT = 20
@@ -20,6 +21,22 @@ export interface ResolvedWebMcpConfig {
 export interface ResolveSiteToolsConfigResult {
   config: ResolvedSiteToolsConfig
   warnings: string[]
+}
+
+export interface ResolveSiteToolsOptions {
+  /**
+   * Every site tool reads the page index. A disabled database has no index,
+   * so the tools are detached from both MCP and WebMCP.
+   */
+  database?: ResolvedDatabase
+}
+
+function detachedSiteTools(): ResolvedSiteToolsConfig {
+  return {
+    listPages: { defaultLimit: DEFAULT_LIST_LIMIT, mcp: { enabled: false }, webmcp: { enabled: false } },
+    searchPages: { defaultLimit: DEFAULT_SEARCH_LIMIT, mcp: { enabled: false }, webmcp: { enabled: false } },
+    getPageMarkdown: { mcp: { enabled: false }, webmcp: { enabled: false } },
+  }
 }
 
 export type ResolveWebMcpConfigResult
@@ -70,7 +87,13 @@ function resolveWebMcpAttachment(
   }
 }
 
-export function resolveSiteToolsConfig(input: SiteToolsConfig | undefined): ResolveSiteToolsConfigResult {
+export function resolveSiteToolsConfig(
+  input: SiteToolsConfig | undefined,
+  options: ResolveSiteToolsOptions = {},
+): ResolveSiteToolsConfigResult {
+  if (options.database?._tag === 'Disabled')
+    return { config: detachedSiteTools(), warnings: [] }
+
   const warnings: string[] = []
   return {
     config: {
