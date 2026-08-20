@@ -177,7 +177,7 @@ export default defineEventHandler(async (event) => {
   const [
     { tryGetContentMarkdown },
     { fetchRawWithEvent },
-    { buildFrontmatter },
+    { buildFrontmatter, layerFrontmatter },
   ] = await Promise.all([
     import('../utils/content'),
     import('../utils/fetch'),
@@ -191,14 +191,14 @@ export default defineEventHandler(async (event) => {
   await useNitroApp().hooks.callHook('ai-ready:markdown:source', sourceContext)
   if (sourceContext.source) {
     const { markdown, title, description, updatedAt } = sourceContext.source
-    const frontmatter = buildFrontmatter({
+    const responseMarkdown = layerFrontmatter({
       title: title ?? path,
       description,
       canonical_url: canonicalUrl,
       last_updated: updatedAt || new Date().toISOString(),
-    })
+    }, markdown)
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    return `${frontmatter}\n${markdown}`
+    return responseMarkdown
   }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
@@ -235,7 +235,7 @@ export default defineEventHandler(async (event) => {
 
   if (!response) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    setResponseStatus(event, 404)
+    setResponseStatus(event, 502)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 
@@ -257,7 +257,7 @@ export default defineEventHandler(async (event) => {
   // status are no longer told a missing page exists.
   if (!response.ok) {
     setMarkdownHeaders(event, path, config, resolveUrl, routeContext)
-    setResponseStatus(event, 404)
+    setResponseStatus(event, response.status)
     return notFoundMarkdown(canonicalUrl, path, config, resolveUrl, routeContext, buildFrontmatter)
   }
 

@@ -100,7 +100,10 @@ describe('ai-ready routes beneath an app base URL', async () => {
   })
 
   it('uses deployed URLs in fallback Markdown and llms-full.txt', async () => {
-    const notFound = await $fetch('/docs/not-found.md') as string
+    const notFoundResponse = await fetch(url('/docs/not-found.md'))
+    const notFound = await notFoundResponse.text()
+
+    expect(notFoundResponse.status).toBe(404)
     expect(notFound).toContain('[Sitemap](https://test.example.com/docs/sitemap.xml)')
     expect(notFound).toContain('[llms.txt](https://test.example.com/docs/llms.txt)')
 

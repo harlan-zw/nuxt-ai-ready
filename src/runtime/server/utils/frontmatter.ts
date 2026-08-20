@@ -2,6 +2,8 @@
 // through mdream (e.g. the friendly 404 markdown response). For HTML-derived
 // pages, prefer mdream's `additionalFields` so the engine owns emission.
 
+import { isMap, parseDocument } from 'yaml'
+
 interface FrontmatterAlternate {
   hreflang: string
   href: string
@@ -39,4 +41,24 @@ export function buildFrontmatter(fields: FrontmatterFields): string {
   }
   lines.push('---', '')
   return lines.join('\n')
+}
+
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
+
+export function layerFrontmatter(fields: FrontmatterFields, markdown: string): string {
+  const match = markdown.match(FRONTMATTER_RE)
+  if (!match)
+    return `${buildFrontmatter(fields)}\n${markdown}`
+
+  const document = parseDocument(match[1]!)
+  if (document.errors.length || !isMap(document.contents))
+    return `${buildFrontmatter(fields)}\n${markdown}`
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined && value !== '')
+      document.set(key, value)
+  }
+
+  const body = markdown.slice(match[0].length).replace(/^\r?\n/, '')
+  return `---\n${document.toString({ lineWidth: 0 }).trimEnd()}\n---\n\n${body}`
 }
