@@ -48,7 +48,7 @@ overrides:
 catalog:
   '@harlan-zw/comark-content': 0.1.4
   '@libsql/client': ^0.17.4
-  '@mdream/js': ^1.6.3
+  '@mdream/js': ^1.7.0
   '@types/better-sqlite3': ^9.6.0
   better-sqlite3: ^13.0.3
   bumpp: ^12.2.1
@@ -59,9 +59,9 @@ catalog:
   eslint-plugin-harlanzw: ^0.20.0
   execa: ^10.0.1
   h3: ^1.15.11
-  mdream: ^1.6.3
+  mdream: ^1.7.0
   nitropack: ^2.13.4
-  nuxtseo-layer-devtools: ^5.3.12
+  nuxtseo-layer-devtools: ^5.3.14
   nuxtseo-shared: ^5.3.14
   pathe: ^2.0.3
   pkg-types: ^2.3.1

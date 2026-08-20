@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v1.8.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.8.0...main)
+
+### 🚀 Enhancements
+
+- **markdown:** Serve source Markdown without masking errors ([#89](https://github.com/harlan-zw/nuxt-ai-ready/pull/89))
+- ⚠️  Remove IndexNow support ([#78](https://github.com/harlan-zw/nuxt-ai-ready/pull/78))
+
+### 🩹 Fixes
+
+- **markdown:** Run Accept negotiation before the static handler ([#88](https://github.com/harlan-zw/nuxt-ai-ready/pull/88))
+- **database:** Use storage only when needed ([#87](https://github.com/harlan-zw/nuxt-ai-ready/pull/87))
+
+### 🏡 Chore
+
+- Bump ([d12400a](https://github.com/harlan-zw/nuxt-ai-ready/commit/d12400a))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Remove IndexNow support ([#78](https://github.com/harlan-zw/nuxt-ai-ready/pull/78))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v1.7.11...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v1.7.11...main)
