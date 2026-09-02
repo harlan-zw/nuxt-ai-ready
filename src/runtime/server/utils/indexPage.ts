@@ -8,9 +8,7 @@ import { logger } from '../logger'
 import { convertHtmlToMarkdown } from '../utils'
 import { createUniversalContext } from './context'
 import { extractKeywords } from './keywords'
-
-// Header to identify internal indexing requests
-export const INDEXING_HEADER = 'x-ai-ready-indexing'
+import { INTERNAL_HEADER } from './negotiation-decision'
 
 export interface IndexPageOptions {
   /** Skip if page was indexed within TTL (uses config ttl if not specified) */
@@ -145,11 +143,11 @@ export async function indexPageByRoute(
   logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
   const html = await (event
     ? fetchWithEvent(event, route, {
-        headers: { [INDEXING_HEADER]: '1' },
+        headers: { accept: 'text/html', [INTERNAL_HEADER]: '1' },
         timeout: 10000,
       })
     : globalThis.$fetch(route, {
-        headers: { [INDEXING_HEADER]: '1' },
+        headers: { accept: 'text/html', [INTERNAL_HEADER]: '1' },
         timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
       })).catch((err: Error) => {
     logger.warn(`[indexPageByRoute] Failed to fetch ${route}:`, err.message)
