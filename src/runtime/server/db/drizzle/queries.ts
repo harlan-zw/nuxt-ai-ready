@@ -8,7 +8,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { useDrizzle } from './client'
-import { useRawDb } from './raw'
+import { getRawExecutor, useRawDb } from './raw'
 
 function resolveFtsTokenizer(event?: H3Event): FtsTokenizer {
   const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
@@ -445,6 +445,7 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // ============================================================================
 
 const SQLITE_SCHEMA_VERSION = 'v2.3.0-drizzle'
+const LEGACY_POSTGRES_INTEGER_SCHEMA_VERSION = 'v2.3.0-drizzle'
 const POSTGRES_SCHEMA_VERSION = 'v2.3.0-drizzle-postgres-bigint'
 
 /**
@@ -465,6 +466,11 @@ export async function initSchema(event?: H3Event): Promise<void> {
 
   if (versionMatches && tokenizerMatches)
     return
+
+  if (client.dialect === 'postgres' && currentVersion === LEGACY_POSTGRES_INTEGER_SCHEMA_VERSION) {
+    await migratePostgresIntegerTimestamps(client)
+    return
+  }
 
   // Drop tables on any mismatch (version bump or tokenizer change). Pages get re-indexed on next run.
   if (currentVersion) {
@@ -581,6 +587,20 @@ async function dropSQLiteTables(client: DrizzleDatabase): Promise<void> {
 async function dropPostgresTables(client: DrizzleDatabase): Promise<void> {
   for (const stmt of POSTGRES_DROP_STATEMENTS)
     await (client.db as any).execute(stmt)
+}
+
+async function migratePostgresIntegerTimestamps(client: DrizzleDatabase): Promise<void> {
+  await getRawExecutor(client).batch([
+    { sql: 'ALTER TABLE ai_ready_pages ALTER COLUMN indexed_at TYPE BIGINT USING indexed_at::BIGINT' },
+    { sql: 'ALTER TABLE ai_ready_pages ALTER COLUMN last_seen_at TYPE BIGINT USING last_seen_at::BIGINT' },
+    { sql: 'ALTER TABLE ai_ready_cron_runs ALTER COLUMN started_at TYPE BIGINT USING started_at::BIGINT' },
+    { sql: 'ALTER TABLE ai_ready_cron_runs ALTER COLUMN finished_at TYPE BIGINT USING finished_at::BIGINT' },
+    { sql: 'ALTER TABLE ai_ready_sitemaps ALTER COLUMN last_crawled_at TYPE BIGINT USING last_crawled_at::BIGINT' },
+    {
+      sql: 'UPDATE _ai_ready_info SET version = ? WHERE id = \'schema\'',
+      params: [POSTGRES_SCHEMA_VERSION],
+    },
+  ])
 }
 
 async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string): Promise<void> {

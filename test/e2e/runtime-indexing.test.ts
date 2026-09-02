@@ -17,12 +17,34 @@ describe('runtime indexing', async () => {
 
   it.runIf(postgresUrl)('postgres: migrates legacy integer timestamps to bigint', async () => {
     const result = await fetch('/api/__db-test?action=migrate-legacy-postgres-schema') as {
-      dataType: string
-      indexedAt: number
+      columnTypes: Record<string, string>
+      preserved: {
+        pageRoute: string
+        cronStatus: string
+        sitemapName: string
+        sitemapState: string
+        metadataValue: string
+      }
+      persistedAt: number
+      storedTimestamps: number[]
     }
 
-    expect(result.dataType).toBe('bigint')
-    expect(result.indexedAt).toBeGreaterThan(2_147_483_647)
+    expect(result.columnTypes).toEqual({
+      'ai_ready_cron_runs.finished_at': 'bigint',
+      'ai_ready_cron_runs.started_at': 'bigint',
+      'ai_ready_pages.indexed_at': 'bigint',
+      'ai_ready_pages.last_seen_at': 'bigint',
+      'ai_ready_sitemaps.last_crawled_at': 'bigint',
+    })
+    expect(result.preserved).toEqual({
+      pageRoute: '/legacy-postgres',
+      cronStatus: 'success',
+      sitemapName: 'sitemap.xml',
+      sitemapState: 'complete',
+      metadataValue: 'preserved',
+    })
+    expect(result.persistedAt).toBeGreaterThan(2_147_483_647)
+    expect(result.storedTimestamps).toEqual(Array.from({ length: 5 }).fill(result.persistedAt))
   })
 
   it('sitemap: records the first deferred seed', async () => {
