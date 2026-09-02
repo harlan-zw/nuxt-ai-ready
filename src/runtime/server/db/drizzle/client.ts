@@ -6,7 +6,7 @@ import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { H3Event } from '#nuxtseo/h3'
-import { DB_CONTEXT_KEY, DB_WORK_CONTEXT_KEY } from '../context'
+import { DB_CONTEXT_KEY, DB_PROMISE_CONTEXT_KEY, DB_WORK_CONTEXT_KEY } from '../context'
 import { closeDriver } from './raw'
 
 export type DatabaseDialect = 'sqlite' | 'postgres'
@@ -20,6 +20,12 @@ export interface DrizzleDatabase {
 }
 
 let fallbackClient: DrizzleDatabase | undefined
+let fallbackClientPromise: Promise<DrizzleDatabase> | undefined
+
+function createDrizzleClient(event?: H3Event): Promise<DrizzleDatabase> {
+  return import('#ai-ready-virtual/db-provider.mjs')
+    .then(({ createClient }) => createClient(event) as Promise<DrizzleDatabase>)
+}
 
 type DrizzleWorkState
   = | { _tag: 'ResponseOpen', pending: Set<Promise<unknown>> }
@@ -61,32 +67,62 @@ export async function useDrizzle(event?: H3Event): Promise<DrizzleDatabase> {
     return event.context[DB_CONTEXT_KEY] as DrizzleDatabase
   }
 
+  if (event?.context?.[DB_PROMISE_CONTEXT_KEY]) {
+    return event.context[DB_PROMISE_CONTEXT_KEY] as Promise<DrizzleDatabase>
+  }
+
   if (!event && fallbackClient) {
     return fallbackClient
   }
 
-  // Import from build-time aliased virtual module (tree-shakeable)
-  const { createClient } = await import('#ai-ready-virtual/db-provider.mjs')
-  const client = await createClient(event) as DrizzleDatabase
+  if (!event && fallbackClientPromise)
+    return fallbackClientPromise
 
   if (event?.context) {
-    event.context[DB_CONTEXT_KEY] = client
-  }
-  else {
-    fallbackClient = client
+    const context = event.context
+    const promise = createDrizzleClient(event)
+      .then((client) => {
+        context[DB_CONTEXT_KEY] = client
+        return client
+      })
+      .finally(() => {
+        if (context[DB_PROMISE_CONTEXT_KEY] === promise)
+          delete context[DB_PROMISE_CONTEXT_KEY]
+      })
+    context[DB_PROMISE_CONTEXT_KEY] = promise
+    return promise
   }
 
-  return client
+  const promise = createDrizzleClient()
+    .then((client) => {
+      fallbackClient = client
+      return client
+    })
+    .finally(() => {
+      if (fallbackClientPromise === promise)
+        fallbackClientPromise = undefined
+    })
+  fallbackClientPromise = promise
+  return promise
 }
 
 export async function closeDrizzle(event?: H3Event): Promise<void> {
-  if (event?.context?.[DB_CONTEXT_KEY]) {
-    const client = event.context[DB_CONTEXT_KEY] as DrizzleDatabase
+  if (event?.context) {
+    const context = event.context
+    const client = context[DB_CONTEXT_KEY] as DrizzleDatabase | undefined
+      ?? await (context[DB_PROMISE_CONTEXT_KEY] as Promise<DrizzleDatabase> | undefined)
+    if (!client)
+      return
     await closeDriver(client.db)
-    delete event.context[DB_CONTEXT_KEY]
+    delete context[DB_CONTEXT_KEY]
+    delete context[DB_PROMISE_CONTEXT_KEY]
   }
-  else if (!event && fallbackClient) {
-    await closeDriver(fallbackClient.db)
+  else if (!event) {
+    const client = fallbackClient ?? await fallbackClientPromise
+    if (!client)
+      return
+    await closeDriver(client.db)
     fallbackClient = undefined
+    fallbackClientPromise = undefined
   }
 }

@@ -506,26 +506,54 @@ export async function initSchema(event?: H3Event): Promise<void> {
 
 async function getSchemaVersion(client: DrizzleDatabase): Promise<string | null> {
   try {
-    const result = await (client.db as any).all(
-      sql`SELECT version FROM _ai_ready_info WHERE id = 'schema'`,
-    )
-    return result?.[0]?.version || null
+    const [row] = await (client.db as any)
+      .select({ version: info.version })
+      .from(info)
+      .where(eq(info.id, 'schema'))
+      .limit(1)
+    return row?.version || null
   }
-  catch {
-    return null
+  catch (error) {
+    if (isMissingInfoTableError(error))
+      return null
+    throw error
   }
 }
 
 async function getStoredTokenizer(client: DrizzleDatabase): Promise<string | null> {
   try {
-    const result = await (client.db as any).all(
-      sql`SELECT value FROM _ai_ready_info WHERE id = 'fts_tokenizer'`,
-    )
-    return result?.[0]?.value || null
+    const [row] = await (client.db as any)
+      .select({ value: info.value })
+      .from(info)
+      .where(eq(info.id, 'fts_tokenizer'))
+      .limit(1)
+    return row?.value || null
   }
-  catch {
-    return null
+  catch (error) {
+    if (isMissingInfoTableError(error))
+      return null
+    throw error
   }
+}
+
+function isMissingInfoTableError(error: unknown): boolean {
+  let current = error
+  const seen = new Set<unknown>()
+
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const candidate = current as { cause?: unknown, code?: unknown, message?: unknown }
+    if (candidate.code === '42P01')
+      return true
+    if (typeof candidate.message === 'string'
+      && candidate.message.includes('no such table')
+      && candidate.message.includes('_ai_ready_info')) {
+      return true
+    }
+    current = candidate.cause
+  }
+
+  return false
 }
 
 const SQLITE_DROP_STATEMENTS = [

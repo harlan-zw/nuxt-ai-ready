@@ -1,13 +1,16 @@
 import type { useNitroApp } from '#nuxtseo/nitro'
-import { DB_CONTEXT_KEY, DB_WORK_CONTEXT_KEY } from '../db/context'
+import { DB_CONTEXT_KEY, DB_PROMISE_CONTEXT_KEY, DB_WORK_CONTEXT_KEY } from '../db/context'
 
 type NitroApp = ReturnType<typeof useNitroApp>
 
 export default function dbLifecyclePlugin(nitroApp: NitroApp) {
   // Close request-scoped database connection
   nitroApp.hooks.hook('afterResponse', async (event) => {
-    if (!event.context?.[DB_CONTEXT_KEY] && !event.context?.[DB_WORK_CONTEXT_KEY])
+    if (!event.context?.[DB_CONTEXT_KEY]
+      && !event.context?.[DB_PROMISE_CONTEXT_KEY]
+      && !event.context?.[DB_WORK_CONTEXT_KEY]) {
       return
+    }
     const { finishDrizzleResponse } = await import('../db')
     await finishDrizzleResponse(event)
   })

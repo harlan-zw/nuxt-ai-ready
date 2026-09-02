@@ -39,7 +39,12 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
 }
 
 let devWarningShown = false
-let schemaInitialized = false
+type SchemaInitializationState
+  = | { _tag: 'Uninitialized' }
+    | { _tag: 'Initializing', promise: Promise<void> }
+    | { _tag: 'Initialized' }
+
+let schemaInitializationState: SchemaInitializationState = { _tag: 'Uninitialized' }
 
 const RE_FTS_CHARS = /[*:^"()]/g
 const RE_WHITESPACE = /\s+/
@@ -70,11 +75,19 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
 
   const db = await useRawDb(resolvedEvent)
 
-  // Initialize schema on first connection
-  if (!schemaInitialized) {
-    await initSchema(resolvedEvent)
-    schemaInitialized = true
+  if (schemaInitializationState._tag === 'Uninitialized') {
+    const promise = initSchema(resolvedEvent)
+      .then(() => {
+        schemaInitializationState = { _tag: 'Initialized' }
+      })
+      .catch((error) => {
+        schemaInitializationState = { _tag: 'Uninitialized' }
+        throw error
+      })
+    schemaInitializationState = { _tag: 'Initializing', promise }
   }
+  if (schemaInitializationState._tag === 'Initializing')
+    await schemaInitializationState.promise
 
   return db
 }

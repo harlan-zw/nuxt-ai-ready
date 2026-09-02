@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getPageIndexState } from '../../src/runtime/server/db/queries'
 
 const mocks = vi.hoisted(() => ({
   first: vi.fn(),
@@ -24,13 +23,16 @@ vi.mock('#nuxtseo/nitro', () => ({
 
 describe('getPageIndexState', () => {
   beforeEach(() => {
+    vi.resetModules()
     mocks.first.mockReset()
     mocks.initSchema.mockReset()
+    mocks.initSchema.mockResolvedValue(undefined)
     mocks.useRawDb.mockReset()
     mocks.useRawDb.mockResolvedValue({ first: mocks.first })
   })
 
   it('maps storage column names without relying on case-sensitive aliases', async () => {
+    const { getPageIndexState } = await import('../../src/runtime/server/db/queries')
     mocks.first.mockResolvedValue({
       indexed_at: 123,
       content_hash: 'hash-123',
@@ -44,5 +46,33 @@ describe('getPageIndexState', () => {
       'SELECT indexed_at, content_hash FROM ai_ready_pages WHERE route = ?',
       ['/page'],
     )
+  })
+
+  it('shares schema initialization across parallel queries', async () => {
+    let finishInitialization: (() => void) | undefined
+    mocks.initSchema.mockImplementation(() => new Promise<void>((resolve) => {
+      finishInitialization = resolve
+    }))
+    mocks.first.mockResolvedValue(undefined)
+    const { getPageIndexState } = await import('../../src/runtime/server/db/queries')
+
+    const queries = Array.from({ length: 5 }, () => getPageIndexState(undefined, '/page'))
+    await vi.waitFor(() => expect(mocks.initSchema).toHaveBeenCalledTimes(1))
+    finishInitialization?.()
+
+    await expect(Promise.all(queries)).resolves.toEqual(Array.from({ length: 5 }).fill(undefined))
+  })
+
+  it('retries schema initialization after a failure', async () => {
+    mocks.initSchema
+      .mockRejectedValueOnce(new Error('database unavailable'))
+      .mockResolvedValueOnce(undefined)
+    mocks.first.mockResolvedValue(undefined)
+    const { getPageIndexState } = await import('../../src/runtime/server/db/queries')
+
+    await expect(getPageIndexState(undefined, '/page')).rejects.toThrow('database unavailable')
+    await expect(getPageIndexState(undefined, '/page')).resolves.toBeUndefined()
+
+    expect(mocks.initSchema).toHaveBeenCalledTimes(2)
   })
 })

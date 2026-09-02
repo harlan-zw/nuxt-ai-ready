@@ -15,6 +15,16 @@ describe('runtime indexing', async () => {
     server: true,
   })
 
+  it.runIf(postgresUrl)('postgres: migrates legacy integer timestamps to bigint', async () => {
+    const result = await fetch('/api/__db-test?action=migrate-legacy-postgres-schema') as {
+      dataType: string
+      indexedAt: number
+    }
+
+    expect(result.dataType).toBe('bigint')
+    expect(result.indexedAt).toBeGreaterThan(2_147_483_647)
+  })
+
   it('sitemap: records the first deferred seed', async () => {
     await fetch('/api/__db-test?action=count')
     await fetch('/api/__db-test?action=prepare-sitemap-seed')
@@ -31,6 +41,8 @@ describe('runtime indexing', async () => {
   it.runIf(postgresUrl)('postgres: closes the deferred seed pool', async () => {
     if (!postgresUrl)
       return
+
+    await fetch('/__ai-ready/status', { headers: authHeaders })
 
     const admin = postgres(postgresUrl, { max: 1, prepare: false })
     await expect.poll(async () => {
