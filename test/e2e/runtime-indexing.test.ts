@@ -15,6 +15,21 @@ describe('runtime indexing', async () => {
     server: true,
   })
 
+  it.runIf(postgresUrl)('postgres: initializes a fresh schema', async () => {
+    const result = await fetch('/api/__db-test?action=initialize-fresh-postgres-schema') as {
+      schemaVersion: string
+      tables: string[]
+    }
+
+    expect(result.schemaVersion).toBe('v2.3.0-drizzle-postgres-bigint')
+    expect(result.tables).toEqual([
+      '_ai_ready_info',
+      'ai_ready_cron_runs',
+      'ai_ready_pages',
+      'ai_ready_sitemaps',
+    ])
+  })
+
   it.runIf(postgresUrl)('postgres: migrates legacy integer timestamps to bigint', async () => {
     const result = await fetch('/api/__db-test?action=migrate-legacy-postgres-schema') as {
       columnTypes: Record<string, string>

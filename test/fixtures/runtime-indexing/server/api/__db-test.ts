@@ -6,6 +6,38 @@ export default defineEventHandler(async (event) => {
   const { action, ...params } = getQuery(event) as { action: string, [k: string]: unknown }
 
   switch (action) {
+    case 'initialize-fresh-postgres-schema': {
+      const db = await useRawDb(event)
+      await db.exec('DROP TABLE IF EXISTS ai_ready_pages CASCADE')
+      await db.exec('DROP TABLE IF EXISTS _ai_ready_info CASCADE')
+      await db.exec('DROP TABLE IF EXISTS ai_ready_cron_runs CASCADE')
+      await db.exec('DROP TABLE IF EXISTS ai_ready_indexnow_log CASCADE')
+      await db.exec('DROP TABLE IF EXISTS ai_ready_sitemaps CASCADE')
+
+      await initSchema(event)
+
+      const schema = await db.first<{ version: string }>(
+        "SELECT version FROM _ai_ready_info WHERE id = 'schema'",
+      )
+      const tables = await db.all<{ table_name: string }>(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name IN (
+            '_ai_ready_info',
+            'ai_ready_cron_runs',
+            'ai_ready_pages',
+            'ai_ready_sitemaps'
+          )
+        ORDER BY table_name
+      `)
+
+      return {
+        schemaVersion: schema?.version,
+        tables: tables.map(table => table.table_name),
+      }
+    }
+
     case 'migrate-legacy-postgres-schema': {
       const db = await useRawDb(event)
       await db.exec('DROP TABLE IF EXISTS ai_ready_pages CASCADE')
