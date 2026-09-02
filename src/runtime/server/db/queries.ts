@@ -39,7 +39,12 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
 }
 
 let devWarningShown = false
-let schemaInitialized = false
+type SchemaInitializationState
+  = | { _tag: 'Uninitialized' }
+    | { _tag: 'Initializing', promise: Promise<void> }
+    | { _tag: 'Initialized' }
+
+let schemaInitializationState: SchemaInitializationState = { _tag: 'Uninitialized' }
 
 const RE_FTS_CHARS = /[*:^"()]/g
 const RE_WHITESPACE = /\s+/
@@ -70,11 +75,19 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
 
   const db = await useRawDb(resolvedEvent)
 
-  // Initialize schema on first connection
-  if (!schemaInitialized) {
-    await initSchema(resolvedEvent)
-    schemaInitialized = true
+  if (schemaInitializationState._tag === 'Uninitialized') {
+    const promise = initSchema(resolvedEvent)
+      .then(() => {
+        schemaInitializationState = { _tag: 'Initialized' }
+      })
+      .catch((error) => {
+        schemaInitializationState = { _tag: 'Uninitialized' }
+        throw error
+      })
+    schemaInitializationState = { _tag: 'Initializing', promise }
   }
+  if (schemaInitializationState._tag === 'Initializing')
+    await schemaInitializationState.promise
 
   return db
 }
@@ -257,6 +270,16 @@ function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
   }
 }
 
+type DatabaseNumber = number | string | bigint
+
+function toNumber(value: DatabaseNumber | null | undefined, fallback = 0): number {
+  return value === null || value === undefined ? fallback : Number(value)
+}
+
+function toNullableNumber(value: DatabaseNumber | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value)
+}
+
 function rowToEntry(row: PageRow): PageEntry {
   return {
     route: row.route,
@@ -410,11 +433,11 @@ export async function countPages(event?: H3Event, options: CountPagesOptions = {
     return 0
 
   const { sql: whereClause, params } = buildWhereClause(options.where)
-  const row = await db.first<{ count: number }>(
+  const row = await db.first<{ count: DatabaseNumber }>(
     `SELECT COUNT(*) as count FROM ai_ready_pages ${whereClause}`,
     params,
   )
-  return row?.count || 0
+  return toNumber(row?.count)
 }
 
 // ============================================================================
@@ -426,7 +449,7 @@ export interface SearchPagesOptions {
 }
 
 /**
- * Full-text search using FTS5
+ * Full-text search using FTS5 or PostgreSQL ILIKE
  * Note: FTS is only available at runtime, not during prerender
  */
 export async function searchPages(
@@ -448,6 +471,18 @@ export async function searchPages(
   const sanitized = query.replace(RE_FTS_CHARS, ' ').trim()
   if (!sanitized)
     return []
+
+  if (db.dialect === 'postgres') {
+    const searchTerm = `%${sanitized}%`
+    return db.all<SearchResult>(`
+      SELECT route, title, description, 0 AS score
+      FROM ai_ready_pages
+      WHERE is_error = 0
+        AND (title ILIKE ? OR description ILIKE ? OR markdown ILIKE ? OR headings ILIKE ?)
+      ORDER BY route
+      LIMIT ?
+    `, [searchTerm, searchTerm, searchTerm, searchTerm, limit])
+  }
 
   // Add prefix matching for partial words
   const terms = sanitized.split(RE_WHITESPACE).map(t => `${t}*`).join(' ')
@@ -528,10 +563,10 @@ export async function isPageFresh(event: H3Event | undefined, route: string, ttl
   if (!db)
     return false
 
-  const row = await db.first<{ indexed_at: number }>('SELECT indexed_at FROM ai_ready_pages WHERE route = ?', [route])
+  const row = await db.first<{ indexed_at: DatabaseNumber }>('SELECT indexed_at FROM ai_ready_pages WHERE route = ?', [route])
   if (!row)
     return false
-  const age = (Date.now() - row.indexed_at) / 1000
+  const age = (Date.now() - toNumber(row.indexed_at)) / 1000
   return age < ttlSeconds
 }
 
@@ -541,7 +576,7 @@ export interface PageIndexState {
 }
 
 interface PageIndexStateRow {
-  indexed_at: number
+  indexed_at: DatabaseNumber
   content_hash: string | null
 }
 
@@ -564,7 +599,7 @@ export async function getPageIndexState(
     [route],
   )
   return row
-    ? { indexedAt: row.indexed_at, contentHash: row.content_hash }
+    ? { indexedAt: toNumber(row.indexed_at), contentHash: row.content_hash }
     : undefined
 }
 
@@ -662,7 +697,10 @@ export async function setSitemapSeededAt(event: H3Event | undefined, timestamp: 
   if (!db)
     return
 
-  await db.exec('INSERT OR REPLACE INTO _ai_ready_info (id, value) VALUES (?, ?)', ['sitemap_seeded_at', String(timestamp)])
+  await db.exec(`
+    INSERT INTO _ai_ready_info (id, value) VALUES (?, ?)
+    ON CONFLICT(id) DO UPDATE SET value = excluded.value
+  `, ['sitemap_seeded_at', String(timestamp)])
 }
 
 /**
@@ -683,11 +721,11 @@ export async function pruneStaleRoutes(
     ? staleThreshold
     : Math.min(staleThreshold, protectedSince)
 
-  const countRow = await db.first<{ count: number }>(
+  const countRow = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
     ['runtime', threshold],
   )
-  const count = countRow?.count || 0
+  const count = toNumber(countRow?.count)
 
   if (count > 0) {
     await db.exec('DELETE FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?', ['runtime', threshold])
@@ -717,11 +755,11 @@ export async function getStaleRoutes(event: H3Event | undefined, staleThresholdS
 
 export interface CronRunRow {
   id: number
-  started_at: number
-  finished_at: number | null
-  duration_ms: number | null
-  pages_indexed: number
-  pages_remaining: number
+  started_at: DatabaseNumber
+  finished_at: DatabaseNumber | null
+  duration_ms: DatabaseNumber | null
+  pages_indexed: DatabaseNumber
+  pages_remaining: DatabaseNumber
   errors: string
   status: 'running' | 'success' | 'partial' | 'error'
 }
@@ -740,11 +778,11 @@ export interface CronRun {
 function rowToCronRun(row: CronRunRow): CronRun {
   return {
     id: row.id,
-    startedAt: row.started_at,
-    finishedAt: row.finished_at,
-    durationMs: row.duration_ms,
-    pagesIndexed: row.pages_indexed,
-    pagesRemaining: row.pages_remaining,
+    startedAt: toNumber(row.started_at),
+    finishedAt: toNullableNumber(row.finished_at),
+    durationMs: toNullableNumber(row.duration_ms),
+    pagesIndexed: toNumber(row.pages_indexed),
+    pagesRemaining: toNumber(row.pages_remaining),
     errors: safeJsonParse<string[]>(row.errors, []),
     status: row.status,
   }
@@ -759,13 +797,11 @@ export async function startCronRun(event: H3Event | undefined): Promise<number |
     return null
 
   const now = Date.now()
-  await db.exec(
-    'INSERT INTO ai_ready_cron_runs (started_at, status) VALUES (?, ?)',
+  const row = await db.first<{ id: DatabaseNumber }>(
+    'INSERT INTO ai_ready_cron_runs (started_at, status) VALUES (?, ?) RETURNING id',
     [now, 'running'],
   )
-
-  const row = await db.first<{ id: number }>('SELECT last_insert_rowid() as id')
-  return row?.id || null
+  return row ? toNumber(row.id) : null
 }
 
 /**
@@ -785,8 +821,8 @@ export async function completeCronRun(
     return
 
   const now = Date.now()
-  const row = await db.first<{ started_at: number }>('SELECT started_at FROM ai_ready_cron_runs WHERE id = ?', [runId])
-  const durationMs = row ? now - row.started_at : null
+  const row = await db.first<{ started_at: DatabaseNumber }>('SELECT started_at FROM ai_ready_cron_runs WHERE id = ?', [runId])
+  const durationMs = row ? now - toNumber(row.started_at) : null
 
   const status = result.errors.length > 0
     ? (result.pagesIndexed > 0 ? 'partial' : 'error')
@@ -833,8 +869,8 @@ export async function cleanupOldCronRuns(
   if (!db)
     return 0
 
-  const countRow = await db.first<{ count: number }>('SELECT COUNT(*) as count FROM ai_ready_cron_runs')
-  const total = countRow?.count || 0
+  const countRow = await db.first<{ count: DatabaseNumber }>('SELECT COUNT(*) as count FROM ai_ready_cron_runs')
+  const total = toNumber(countRow?.count)
 
   if (total <= keepCount)
     return 0
@@ -862,11 +898,11 @@ export async function pruneCronRunsByAge(
 
   const threshold = Date.now() - maxAgeMs
 
-  const countRow = await db.first<{ count: number }>(
+  const countRow = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_cron_runs WHERE started_at < ?',
     [threshold],
   )
-  const count = countRow?.count || 0
+  const count = toNumber(countRow?.count)
 
   if (count > 0) {
     await db.exec('DELETE FROM ai_ready_cron_runs WHERE started_at < ?', [threshold])
@@ -902,11 +938,11 @@ export async function getCronFastPathStatus(
   const sitemapThreshold = Date.now() - sitemapIntervalMinutes * 60 * 1000
 
   const row = await db.first<{
-    total_pages: number
-    pending_pages: number
+    total_pages: DatabaseNumber
+    pending_pages: DatabaseNumber
     last_stale_check: string | null
     build_id: string | null
-    sitemaps_need_crawl: number
+    sitemaps_need_crawl: DatabaseNumber
   }>(`
     SELECT
       (SELECT COUNT(*) FROM ai_ready_pages) as total_pages,
@@ -920,11 +956,11 @@ export async function getCronFastPathStatus(
     return null
 
   return {
-    totalPages: row.total_pages,
-    pendingPages: row.pending_pages,
+    totalPages: toNumber(row.total_pages),
+    pendingPages: toNumber(row.pending_pages),
     lastStaleCheck: row.last_stale_check ? Number.parseInt(row.last_stale_check, 10) : null,
     buildId: row.build_id,
-    sitemapsNeedCrawl: row.sitemaps_need_crawl,
+    sitemapsNeedCrawl: toNumber(row.sitemaps_need_crawl),
   }
 }
 
@@ -950,7 +986,7 @@ export async function tryAcquireCronLock(event: H3Event | undefined): Promise<bo
   await db.exec(`
     INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
     ON CONFLICT(id) DO UPDATE SET value = ?
-    WHERE CAST(value AS INTEGER) < ?
+    WHERE CAST(_ai_ready_info.value AS BIGINT) < ?
   `, [String(now), String(now), staleThreshold])
 
   // Verify we hold the lock (our timestamp was written)
@@ -1026,9 +1062,9 @@ export interface SitemapStatusEntry extends Omit<SitemapEntry, 'crawlState'> {
 interface SitemapRow {
   name: string
   route: string
-  last_crawled_at: number | null
-  url_count: number
-  error_count: number
+  last_crawled_at: DatabaseNumber | null
+  url_count: DatabaseNumber
+  error_count: DatabaseNumber
   last_error: string | null
   crawl_state: string | null
 }
@@ -1041,9 +1077,9 @@ function rowToSitemapEntry(row: SitemapRow): SitemapEntry {
   return {
     name: row.name,
     route: row.route,
-    lastCrawledAt: row.last_crawled_at,
-    urlCount: row.url_count || 0,
-    errorCount: row.error_count || 0,
+    lastCrawledAt: toNullableNumber(row.last_crawled_at),
+    urlCount: toNumber(row.url_count),
+    errorCount: toNumber(row.error_count),
     lastError: row.last_error,
     crawlState: parsedState.state,
   }
@@ -1174,11 +1210,11 @@ export async function getSitemapLastCrawledAt(
   if (!db)
     return null
 
-  const row = await db.first<{ last_crawled_at: number | null }>(
+  const row = await db.first<{ last_crawled_at: DatabaseNumber | null }>(
     'SELECT last_crawled_at FROM ai_ready_sitemaps WHERE name = ?',
     [name],
   )
-  return row?.last_crawled_at ?? null
+  return toNullableNumber(row?.last_crawled_at)
 }
 
 /**
@@ -1218,6 +1254,11 @@ export async function markSitemapSeeded(
   if (!db)
     return
 
+  const expectedClause = expectedLastCrawledAt === null
+    ? 'last_crawled_at IS NULL'
+    : 'last_crawled_at = ?'
+  const expectedParams = expectedLastCrawledAt === null ? [] : [expectedLastCrawledAt]
+
   await db.exec(`
     UPDATE ai_ready_sitemaps SET
       last_crawled_at = ?,
@@ -1227,8 +1268,8 @@ export async function markSitemapSeeded(
     WHERE name = ?
       AND crawl_state IS NULL
       AND error_count = 0
-      AND ((? IS NULL AND last_crawled_at IS NULL) OR last_crawled_at = ?)
-  `, [Date.now(), urlCount, name, expectedLastCrawledAt, expectedLastCrawledAt])
+      AND ${expectedClause}
+  `, [Date.now(), urlCount, name, ...expectedParams])
 }
 
 /** Persist a resumable sitemap crawl without incrementing its error budget. */
@@ -1282,10 +1323,10 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
   if (!db)
     return 0
 
-  const countRow = await db.first<{ count: number }>(
+  const countRow = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_sitemaps WHERE error_count > 0 OR crawl_state IS NOT NULL',
   )
-  const count = countRow?.count || 0
+  const count = toNumber(countRow?.count)
 
   if (count > 0) {
     await db.exec('UPDATE ai_ready_sitemaps SET error_count = 0, last_error = NULL, last_crawled_at = NULL, crawl_state = NULL')
@@ -1332,11 +1373,11 @@ export async function getRecentlyIndexedPages(
   if (!db)
     return []
 
-  const rows = await db.all<{ route: string, title: string, indexed_at: number }>(
+  const rows = await db.all<{ route: string, title: string, indexed_at: DatabaseNumber }>(
     'SELECT route, title, indexed_at FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0 ORDER BY indexed_at DESC LIMIT ?',
     [limit],
   )
-  return rows.map(r => ({ route: r.route, title: r.title, indexedAt: r.indexed_at }))
+  return rows.map(r => ({ route: r.route, title: r.title, indexedAt: toNumber(r.indexed_at) }))
 }
 
 /**
@@ -1351,9 +1392,9 @@ export async function countRecentlyIndexed(
     return 0
 
   const threshold = Date.now() - sinceMs
-  const row = await db.first<{ count: number }>(
+  const row = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_pages WHERE indexed = 1 AND indexed_at > ?',
     [threshold],
   )
-  return row?.count || 0
+  return toNumber(row?.count)
 }

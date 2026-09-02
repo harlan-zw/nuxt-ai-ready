@@ -259,7 +259,7 @@ export interface ModuleOptions {
 
   /**
    * Database configuration for page storage
-   * Supports SQLite, LibSQL/Turso, Cloudflare D1, and Neon Postgres
+   * Supports SQLite, LibSQL/Turso, Cloudflare D1, Neon, and PostgreSQL
    *
    * Storage stays off until a runtime feature or page tool needs it.
    * Set to `false` (or `{ type: 'none' }`) to force it off.
@@ -275,9 +275,10 @@ export interface ModuleOptions {
      * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun) [experimental]
      * - 'libsql': Turso/LibSQL [experimental]
      * - 'neon': Vercel Postgres via Neon serverless (auto-detected on Vercel with POSTGRES_URL) [experimental]
+     * - 'postgres': PostgreSQL via Postgres.js [experimental]
      * @default 'sqlite' when a requested feature needs storage
      */
-    type?: 'none' | 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
+    type?: 'none' | 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon' | 'postgres'
     /**
      * SQLite filename (relative to rootDir or absolute)
      * @default '.data/ai-ready/pages.db'
@@ -289,8 +290,8 @@ export interface ModuleOptions {
      */
     bindingName?: string
     /**
-     * Database URL for LibSQL/Turso or Neon/Vercel Postgres
-     * For Vercel: auto-reads from POSTGRES_URL env var
+     * Database URL for LibSQL/Turso, Neon, or PostgreSQL
+     * PostgreSQL drivers also read POSTGRES_URL or DATABASE_URL.
      */
     url?: string
     /**

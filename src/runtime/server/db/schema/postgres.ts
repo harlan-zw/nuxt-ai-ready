@@ -1,4 +1,4 @@
-import { index, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
+import { bigint, index, integer, pgTable, serial, text } from 'drizzle-orm/pg-core'
 
 // Main pages table
 export const pages = pgTable('ai_ready_pages', {
@@ -12,11 +12,11 @@ export const pages = pgTable('ai_ready_pages', {
   keywords: text('keywords').notNull().default('[]'),
   contentHash: text('content_hash'),
   updatedAt: text('updated_at').notNull(),
-  indexedAt: integer('indexed_at').notNull(),
+  indexedAt: bigint('indexed_at', { mode: 'number' }).notNull(),
   isError: integer('is_error').notNull().default(0),
   indexed: integer('indexed').notNull().default(0),
   source: text('source').notNull().default('prerender'),
-  lastSeenAt: integer('last_seen_at'),
+  lastSeenAt: bigint('last_seen_at', { mode: 'number' }),
   locale: text('locale').notNull().default(''),
 }, table => [
   index('idx_ai_ready_pages_route').on(table.route),
@@ -39,8 +39,8 @@ export const info = pgTable('_ai_ready_info', {
 // Cron run history
 export const cronRuns = pgTable('ai_ready_cron_runs', {
   id: serial('id').primaryKey(),
-  startedAt: integer('started_at').notNull(),
-  finishedAt: integer('finished_at'),
+  startedAt: bigint('started_at', { mode: 'number' }).notNull(),
+  finishedAt: bigint('finished_at', { mode: 'number' }),
   durationMs: integer('duration_ms'),
   pagesIndexed: integer('pages_indexed').default(0),
   pagesRemaining: integer('pages_remaining').default(0),
@@ -54,7 +54,7 @@ export const cronRuns = pgTable('ai_ready_cron_runs', {
 export const sitemaps = pgTable('ai_ready_sitemaps', {
   name: text('name').primaryKey(),
   route: text('route').notNull(),
-  lastCrawledAt: integer('last_crawled_at'),
+  lastCrawledAt: bigint('last_crawled_at', { mode: 'number' }),
   urlCount: integer('url_count').default(0),
   errorCount: integer('error_count').default(0),
   lastError: text('last_error'),

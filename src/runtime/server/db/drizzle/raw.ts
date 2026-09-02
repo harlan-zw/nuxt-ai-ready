@@ -8,7 +8,7 @@ import { useDrizzle } from './client'
 
 // Store underlying driver references alongside Drizzle instance
 const driverCache = new WeakMap<DrizzleDatabase['db'], {
-  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'd1'
+  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'postgres' | 'd1'
   driver: unknown
 }>()
 
@@ -17,7 +17,7 @@ const driverCache = new WeakMap<DrizzleDatabase['db'], {
  */
 export function registerDriver(
   db: DrizzleDatabase['db'],
-  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'd1',
+  type: 'better-sqlite3' | 'node-sqlite' | 'libsql' | 'neon' | 'postgres' | 'd1',
   driver: unknown,
 ): void {
   driverCache.set(db, { type, driver })
@@ -26,13 +26,16 @@ export function registerDriver(
 const RE_PARAM_PLACEHOLDER = /\?/g
 
 /**
- * Remote drivers (D1, libsql, neon) pay a network round-trip per statement.
- * Drivers expose a batched API (D1 `batch`, libsql `batch`, neon `transaction`)
- * that runs many statements in a single request. Local drivers wrap in a
- * transaction for a similar speedup. All drivers cap a batch's statement count;
- * chunk conservatively so callers never need to think about limits.
+ * Remote drivers pay a network round-trip per statement. Their batch or
+ * transaction interface keeps chunks ordered and avoids oversized requests.
+ * Local drivers wrap each batch in a transaction for the same interface.
  */
 const MAX_BATCH_STATEMENTS = 100
+
+function toPostgresQuery(query: string): string {
+  let index = 0
+  return query.replace(RE_PARAM_PLACEHOLDER, () => `$${++index}`)
+}
 
 /**
  * Get raw SQL executor for a Drizzle client
@@ -70,11 +73,12 @@ export function getRawExecutor(client: DrizzleDatabase) {
         }
         case 'neon': {
           const sqlFn = driver as { query: (sql: string, params: unknown[]) => Promise<{ rows: unknown[] } | unknown[]> }
-          // Convert ? to $1, $2, etc
-          let idx = 0
-          const pgQuery = query.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
-          const result = await sqlFn.query(pgQuery, params)
+          const result = await sqlFn.query(toPostgresQuery(query), params)
           return ((result as any).rows || result) as T[]
+        }
+        case 'postgres': {
+          const sqlClient = driver as { unsafe: (sql: string, params: unknown[]) => Promise<unknown[]> }
+          return await sqlClient.unsafe(toPostgresQuery(query), params) as T[]
         }
       }
     },
@@ -108,9 +112,12 @@ export function getRawExecutor(client: DrizzleDatabase) {
         }
         case 'neon': {
           const sqlFn = driver as { query: (sql: string, params: unknown[]) => Promise<void> }
-          let idx = 0
-          const pgQuery = query.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
-          await sqlFn.query(pgQuery, params)
+          await sqlFn.query(toPostgresQuery(query), params)
+          break
+        }
+        case 'postgres': {
+          const sqlClient = driver as { unsafe: (sql: string, params: unknown[]) => Promise<unknown> }
+          await sqlClient.unsafe(toPostgresQuery(query), params)
           break
         }
       }
@@ -181,11 +188,24 @@ export function getRawExecutor(client: DrizzleDatabase) {
           for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
             const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
             const pgQueries = chunk.map((q) => {
-              let idx = 0
-              const pgQuery = q.sql.replace(RE_PARAM_PLACEHOLDER, () => `$${++idx}`)
-              return sqlFn.query(pgQuery, q.params || [])
+              return sqlFn.query(toPostgresQuery(q.sql), q.params || [])
             })
             await sqlFn.transaction(pgQueries)
+          }
+          break
+        }
+        case 'postgres': {
+          interface TransactionClient {
+            unsafe: (sql: string, params: unknown[]) => Promise<unknown>
+          }
+          const sqlClient = driver as {
+            begin: <T>(run: (transaction: TransactionClient) => Promise<T>) => Promise<T>
+          }
+          for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
+            const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
+            await sqlClient.begin(transaction => Promise.all(chunk.map(q =>
+              transaction.unsafe(toPostgresQuery(q.sql), q.params || []),
+            )))
           }
           break
         }
@@ -207,7 +227,7 @@ export async function useRawDb(event?: H3Event): Promise<RawExecutor> {
 /**
  * Close underlying database driver connection
  */
-export function closeDriver(db: DrizzleDatabase['db']): void {
+export async function closeDriver(db: DrizzleDatabase['db']): Promise<void> {
   const cached = driverCache.get(db)
   if (!cached)
     return
@@ -230,7 +250,12 @@ export function closeDriver(db: DrizzleDatabase['db']): void {
       client.close?.()
       break
     }
-    // d1 and neon are serverless/HTTP - no connection to close
+    case 'postgres': {
+      const sqlClient = driver as { end: () => Promise<void> }
+      await sqlClient.end()
+      break
+    }
+    // D1 and Neon are serverless or HTTP drivers with no connection to close.
   }
 
   driverCache.delete(db)

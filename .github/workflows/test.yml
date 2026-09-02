@@ -20,3 +20,32 @@ permissions:
 jobs:
   ci:
     uses: harlan-zw/nuxt-seo/.github/workflows/reusable-ci.yml@main
+
+  test-postgres:
+    runs-on: ubuntu-24.04-arm
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ai_ready_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_ready_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@lts
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile --trust-lockfile
+      - run: pnpm dev:prepare
+      - run: pnpm vitest run --project=e2e test/e2e/runtime-indexing.test.ts
+        env:
+          NUXT_AI_READY_TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/ai_ready_test

@@ -77,8 +77,8 @@ export async function resolveWritableDbPath(dbPath: string): Promise<string> {
     throw new Error(
       `[ai-ready] Database directory '${dir}' is not writable (${err.code}) and the temp dir fallback `
       + `('${fallbackDir}') also failed: ${fallbackErr.message}. Set database.filename to a `
-      + `writable path, or use a serverless driver: database.type 'd1' (Cloudflare), `
-      + `'neon' (Vercel/Postgres), or 'libsql' (Turso).`,
+      + `writable path, or use a remote driver: database.type 'd1' (Cloudflare), `
+      + `'neon' (Vercel), 'postgres' (PostgreSQL), or 'libsql' (Turso).`,
     )
   }
 

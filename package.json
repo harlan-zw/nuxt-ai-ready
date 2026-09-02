@@ -72,7 +72,8 @@
     "@libsql/client": "^0.14.0",
     "@neondatabase/serverless": "^1.0.0",
     "@nuxtjs/sitemap": ">=8.3.1",
-    "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0"
+    "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0",
+    "postgres": "^3.4.9"
   },
   "peerDependenciesMeta": {
     "@libsql/client": {
@@ -82,6 +83,9 @@
       "optional": true
     },
     "better-sqlite3": {
+      "optional": true
+    },
+    "postgres": {
       "optional": true
     }
   },
@@ -132,6 +136,7 @@
     "nuxtseo-layer-devtools": "catalog:",
     "playwright": "catalog:dev-test",
     "playwright-core": "catalog:dev-test",
+    "postgres": "catalog:",
     "tinyglobby": "catalog:",
     "typescript": "catalog:dev-build",
     "unbuild": "catalog:",

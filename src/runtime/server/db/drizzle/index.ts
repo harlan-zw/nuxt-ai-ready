@@ -6,7 +6,7 @@
 export * from '#ai-ready-virtual/db-schema.mjs'
 
 // Client
-export { closeDrizzle, useDrizzle } from './client'
+export { closeDrizzle, finishDrizzleResponse, trackDrizzleWork, useDrizzle } from './client'
 export type { DatabaseDialect, DrizzleDatabase } from './client'
 
 // Queries
