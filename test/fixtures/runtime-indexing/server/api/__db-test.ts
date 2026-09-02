@@ -58,6 +58,31 @@ export default defineEventHandler(async (event) => {
       return { lastmods: Object.fromEntries(map) }
     }
 
+    case 'prepare-sitemap-seed': {
+      const db = await useRawDb(event)
+      await db.exec(`
+        INSERT INTO ai_ready_sitemaps (name, route, last_crawled_at, url_count, error_count, last_error, crawl_state)
+        VALUES (?, ?, NULL, 0, 0, NULL, NULL)
+        ON CONFLICT(name) DO UPDATE SET
+          route = excluded.route,
+          last_crawled_at = NULL,
+          url_count = 0,
+          error_count = 0,
+          last_error = NULL,
+          crawl_state = NULL
+      `, ['sitemap.xml', '/sitemap.xml'])
+      return { success: true }
+    }
+
+    case 'sitemap-seed-state': {
+      const db = await useRawDb(event)
+      const row = await db.first<{ last_crawled_at: number | string | null }>(
+        'SELECT last_crawled_at FROM ai_ready_sitemaps WHERE name = ?',
+        ['sitemap.xml'],
+      )
+      return { lastCrawledAt: row?.last_crawled_at == null ? null : Number(row.last_crawled_at) }
+    }
+
     default:
       return { error: 'Unknown action' }
   }

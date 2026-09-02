@@ -1,10 +1,12 @@
 import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
+import postgres from 'postgres'
 import { describe, expect, it } from 'vitest'
 
 // Helper to bypass Nuxt's typed route inference which causes TS2321 stack depth errors
 const fetch = (url: string, opts?: Parameters<typeof $fetch>[1]) => $fetch(url as '/', opts)
 const authHeaders = { authorization: 'Bearer test-secret-123' }
+const postgresUrl = process.env.NUXT_AI_READY_TEST_POSTGRES_URL
 
 describe('runtime indexing', async () => {
   await setup({
@@ -12,6 +14,36 @@ describe('runtime indexing', async () => {
     dev: false,
     server: true,
   })
+
+  it('sitemap: records the first deferred seed', async () => {
+    await fetch('/api/__db-test?action=count')
+    await fetch('/api/__db-test?action=prepare-sitemap-seed')
+
+    const sitemap = await fetch('/sitemap.xml')
+    expect(sitemap).toContain('<urlset')
+
+    await expect.poll(async () => {
+      const state = await fetch('/api/__db-test?action=sitemap-seed-state') as { lastCrawledAt: number | null }
+      return state.lastCrawledAt || 0
+    }, { timeout: 5_000 }).toBeGreaterThan(0)
+  }, 10_000)
+
+  it.runIf(postgresUrl)('postgres: closes the deferred seed pool', async () => {
+    if (!postgresUrl)
+      return
+
+    const admin = postgres(postgresUrl, { max: 1, prepare: false })
+    await expect.poll(async () => {
+      const [row] = await admin<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND application_name = 'postgres.js'
+            AND pid <> pg_backend_pid()
+        `
+      return row?.count ?? -1
+    }, { timeout: 5_000 }).toBe(0).finally(() => admin.end())
+  }, 10_000)
 
   it('seeds routes on first visit', async () => {
     // First visit seeds sitemap routes into DB

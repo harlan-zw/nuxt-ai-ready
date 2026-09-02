@@ -2,6 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { useNitroApp } from '#nuxtseo/nitro'
 import type { SitemapRouteSource } from '../utils/sitemap-routes'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { trackDrizzleWork } from '../db/drizzle/client'
 import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
 import { mapSitemapRoutes } from '../utils/sitemap-routes'
@@ -182,9 +183,10 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     }
 
     if (event.waitUntil) {
-      event.waitUntil(seed().catch(err =>
+      const backgroundSeed = trackDrizzleWork(event, seed()).catch(err =>
         logger.error(`[sitemap-seeder] Background seed failed: ${err.message}`),
-      ))
+      )
+      event.waitUntil(backgroundSeed)
     }
     else {
       await seed()

@@ -1241,6 +1241,11 @@ export async function markSitemapSeeded(
   if (!db)
     return
 
+  const expectedClause = expectedLastCrawledAt === null
+    ? 'last_crawled_at IS NULL'
+    : 'last_crawled_at = ?'
+  const expectedParams = expectedLastCrawledAt === null ? [] : [expectedLastCrawledAt]
+
   await db.exec(`
     UPDATE ai_ready_sitemaps SET
       last_crawled_at = ?,
@@ -1250,8 +1255,8 @@ export async function markSitemapSeeded(
     WHERE name = ?
       AND crawl_state IS NULL
       AND error_count = 0
-      AND ((? IS NULL AND last_crawled_at IS NULL) OR last_crawled_at = ?)
-  `, [Date.now(), urlCount, name, expectedLastCrawledAt, expectedLastCrawledAt])
+      AND ${expectedClause}
+  `, [Date.now(), urlCount, name, ...expectedParams])
 }
 
 /** Persist a resumable sitemap crawl without incrementing its error budget. */
