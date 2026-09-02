@@ -10,6 +10,9 @@ rmSync(join(rootDir, 'node_modules/.cache/nuxt-seo/ai-ready'), { recursive: true
 
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
+  site: {
+    url: 'https://test.example.com',
+  },
   aiReady: {
     llmsTxt: {
       markdownLinks: true,
