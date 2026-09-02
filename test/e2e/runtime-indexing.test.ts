@@ -196,6 +196,24 @@ describe('runtime indexing', async () => {
     expect(typeof result.complete).toBe('boolean')
   })
 
+  it('poll: indexes HTML when the caller accepts markdown', async () => {
+    await fetch('/api/__db-test?action=prepare-indexing-route', {
+      method: 'POST',
+      body: { route: '/about' },
+    })
+
+    const result = await fetch('/__ai-ready/poll?limit=1', {
+      method: 'POST',
+      headers: { ...authHeaders, accept: 'text/markdown' },
+    }) as { indexed: number }
+    const { page } = await fetch('/api/__db-test?action=get&route=/about') as {
+      page: { markdown: string }
+    }
+
+    expect(result.indexed).toBe(1)
+    expect(page.markdown).toContain('# About · Test Site — UTF-8 Support')
+  })
+
   it('poll: respects limit parameter', async () => {
     const result = (await fetch('/__ai-ready/poll?limit=1', { method: 'POST', headers: authHeaders })) as { indexed: number }
     expect(result.indexed).toBeLessThanOrEqual(1)

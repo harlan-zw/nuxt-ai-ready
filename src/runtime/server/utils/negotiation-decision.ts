@@ -4,7 +4,7 @@ import type { MarkdownRequest } from './markdown-request'
 import { resolveContentNegotiation } from './content-negotiation'
 import { getRequestRenderInfo } from './markdown-request'
 
-/** Marks the internal HTML fetch that the explicit `.md` handler makes. */
+/** Marks an internal HTML fetch that must bypass content negotiation. */
 export const INTERNAL_HEADER = 'x-ai-ready-internal'
 
 /**
@@ -40,7 +40,7 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   if (path.startsWith('/.well-known/'))
     return { _tag: 'skip', reason: 'well-known' }
 
-  // The explicit `.md` handler fetches its own HTML. Never negotiate that fetch.
+  // Internal module requests need the HTML representation.
   if (request.headers[INTERNAL_HEADER])
     return { _tag: 'skip', reason: 'internal' }
 

@@ -172,7 +172,7 @@ export default defineEventHandler(async (event) => {
       return { pages: await queryPages(event) }
 
     case 'get':
-      return { page: await queryPages(event, { route: params.route as string }) }
+      return { page: await queryPages(event, { route: params.route as string, includeMarkdown: true }) }
 
     case 'search':
       return { results: await searchPages(event, params.q as string, { limit: Number(params.limit) || 10 }) }
@@ -180,6 +180,23 @@ export default defineEventHandler(async (event) => {
     case 'upsert': {
       const body = await readBody(event)
       await upsertPage(event, body)
+      return { success: true }
+    }
+
+    case 'prepare-indexing-route': {
+      const db = await useRawDb(event)
+      const { route: pendingRoute } = await readBody(event) as { route: string }
+      await upsertPage(event, {
+        route: pendingRoute,
+        title: 'Pending',
+        description: '',
+        markdown: 'Pending',
+        headings: '[]',
+        keywords: [],
+        updatedAt: new Date().toISOString(),
+      })
+      await db.exec('UPDATE ai_ready_pages SET indexed = 1')
+      await db.exec('UPDATE ai_ready_pages SET indexed = 0 WHERE route = ?', [pendingRoute])
       return { success: true }
     }
 
