@@ -91,6 +91,14 @@ describe('resolveDatabaseConfig', () => {
     })
   })
 
+  it('configures PostgreSQL with an explicit type', () => {
+    expect(resolveDatabase({ type: 'postgres', url: 'postgresql://localhost/ai_ready' })).toEqual({
+      _tag: 'Enabled',
+      type: 'postgres',
+      url: 'postgresql://localhost/ai_ready',
+    })
+  })
+
   it('warns about Vercel Edge without a Postgres URL', () => {
     const result = resolveDatabaseConfig(input({ database: {}, preset: 'vercel-edge' }))
     expect(result._tag).toBe('Resolved')

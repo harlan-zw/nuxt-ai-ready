@@ -837,6 +837,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         d1: '#ai-ready/server/db/drizzle/providers/d1',
         libsql: '#ai-ready/server/db/drizzle/providers/libsql',
         neon: '#ai-ready/server/db/drizzle/providers/neon',
+        postgres: '#ai-ready/server/db/drizzle/providers/postgres',
       }
       nitroConfig.virtual['#ai-ready-virtual/db-provider.mjs'] = database._tag === 'Enabled'
         ? `export { createClient } from '${providerMap[database.type] || providerMap.sqlite}'`
@@ -845,7 +846,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
 }`
 
       // Database schema - tree-shakeable by aliasing to sqlite or postgres at build time
-      const schemaPath = database._tag === 'Enabled' && database.type === 'neon'
+      const schemaPath = database._tag === 'Enabled' && (database.type === 'neon' || database.type === 'postgres')
         ? '#ai-ready/server/db/schema/postgres'
         : '#ai-ready/server/db/schema/sqlite'
       nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`

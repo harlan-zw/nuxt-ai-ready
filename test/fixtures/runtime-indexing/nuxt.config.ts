@@ -1,3 +1,5 @@
+const postgresUrl = process.env.NUXT_AI_READY_TEST_POSTGRES_URL
+
 export default defineNuxtConfig({
   extends: ['../.pages-layer'],
 
@@ -8,6 +10,9 @@ export default defineNuxtConfig({
   },
 
   aiReady: {
+    ...(postgresUrl
+      ? { database: { type: 'postgres' as const, url: postgresUrl } }
+      : {}),
     cron: true,
     runtimeSyncSecret: 'test-secret-123',
     runtimeSync: {

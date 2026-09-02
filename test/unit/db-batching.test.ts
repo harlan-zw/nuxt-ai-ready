@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { gunzipSync } from 'node:zlib'
 import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
-import { getRawExecutor, registerDriver } from '../../src/runtime/server/db/drizzle/raw'
+import { closeDriver, getRawExecutor, registerDriver } from '../../src/runtime/server/db/drizzle/raw'
 import { buildSchemaSql } from '../../src/runtime/server/db/schema-sql'
 import { exportDbDump, importDbDump } from '../../src/runtime/server/db/shared'
 
@@ -385,5 +385,59 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
 
     // 250 statements, 100 per batch request.
     expect(calls).toEqual([100, 100, 50])
+  })
+
+  it('converts PostgreSQL placeholders and returns rows', async () => {
+    const calls: { sql: string, params: unknown[] }[] = []
+    const driver = {
+      unsafe: async (sql: string, params: unknown[]) => {
+        calls.push({ sql, params })
+        return [{ route: '/docs' }]
+      },
+    }
+    const db = {} as Record<string, unknown>
+    const client = fakeClient(db)
+    registerDriver(client.db, 'postgres', driver)
+
+    const rows = await getRawExecutor(client).all('SELECT route FROM ai_ready_pages WHERE route = ? AND indexed = ?', ['/docs', 1])
+
+    expect(rows).toEqual([{ route: '/docs' }])
+    expect(calls).toEqual([{
+      sql: 'SELECT route FROM ai_ready_pages WHERE route = $1 AND indexed = $2',
+      params: ['/docs', 1],
+    }])
+  })
+
+  it('batches PostgreSQL queries in transactions and closes the client', async () => {
+    const chunks: number[] = []
+    let closed = false
+    const driver = {
+      async begin<T>(run: (transaction: { unsafe: (sql: string, params: unknown[]) => Promise<void> }) => Promise<T>): Promise<T> {
+        let statements = 0
+        const result = await run({
+          unsafe: async () => {
+            statements++
+          },
+        })
+        chunks.push(statements)
+        return result
+      },
+      async end() {
+        closed = true
+      },
+    }
+    const db = {} as Record<string, unknown>
+    const client = fakeClient(db)
+    registerDriver(client.db, 'postgres', driver)
+
+    const queries = Array.from({ length: 250 }, (_, i) => ({
+      sql: 'UPDATE ai_ready_pages SET indexed = ? WHERE route = ?',
+      params: [0, `/r${i}`],
+    }))
+    await getRawExecutor(client).batch(queries)
+    await closeDriver(client.db)
+
+    expect(chunks).toEqual([100, 100, 50])
+    expect(closed).toBe(true)
   })
 })

@@ -4,6 +4,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { H3Event } from '#nuxtseo/h3'
 import { DB_CONTEXT_KEY } from '../context'
 import { closeDriver } from './raw'
@@ -11,7 +12,7 @@ import { closeDriver } from './raw'
 export type DatabaseDialect = 'sqlite' | 'postgres'
 
 type SQLiteDB = BetterSQLite3Database | SQLiteBunDatabase | LibSQLDatabase | DrizzleD1Database | NodeSQLiteDatabase
-type PostgresDB = NeonHttpDatabase
+type PostgresDB = NeonHttpDatabase | PostgresJsDatabase
 
 export interface DrizzleDatabase {
   dialect: DatabaseDialect
@@ -49,11 +50,11 @@ export async function useDrizzle(event?: H3Event): Promise<DrizzleDatabase> {
 export async function closeDrizzle(event?: H3Event): Promise<void> {
   if (event?.context?.[DB_CONTEXT_KEY]) {
     const client = event.context[DB_CONTEXT_KEY] as DrizzleDatabase
-    closeDriver(client.db)
+    await closeDriver(client.db)
     delete event.context[DB_CONTEXT_KEY]
   }
   else if (!event && fallbackClient) {
-    closeDriver(fallbackClient.db)
+    await closeDriver(fallbackClient.db)
     fallbackClient = undefined
   }
 }

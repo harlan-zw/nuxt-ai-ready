@@ -1,6 +1,6 @@
 import { isAbsolute, join } from 'pathe'
 
-export type DatabaseType = 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon'
+export type DatabaseType = 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon' | 'postgres'
 
 /** Node versions that expose `node:sqlite` without a command flag. */
 export function supportsNativeNodeSqlite(version: string): boolean {
@@ -155,8 +155,8 @@ export function resolveDatabaseConfig(input: ResolveDatabaseInput): DatabaseReso
     }
   }
 
-  if (type === 'neon') {
-    // `url` falls back to POSTGRES_URL at runtime.
+  if (type === 'neon' || type === 'postgres') {
+    // `url` falls back to POSTGRES_URL or DATABASE_URL at runtime.
     return {
       _tag: 'Resolved',
       logs,

@@ -444,21 +444,23 @@ export async function deleteInfoValue(event: H3Event | undefined, key: string): 
 // Schema Management
 // ============================================================================
 
-const SCHEMA_VERSION = 'v2.3.0-drizzle'
+const SQLITE_SCHEMA_VERSION = 'v2.3.0-drizzle'
+const POSTGRES_SCHEMA_VERSION = 'v2.3.0-drizzle-postgres-bigint'
 
 /**
- * Initialize database schema. Rebuilds on SCHEMA_VERSION change or when the
+ * Initialize database schema. Rebuilds on a schema version change or when the
  * SQLite FTS5 tokenizer differs from the one baked into the existing virtual
  * table (Postgres has no FTS5; tokenizer comparison is SQLite-only).
  */
 export async function initSchema(event?: H3Event): Promise<void> {
   const client = await useDrizzle(event)
   const tokenizer = resolveFtsTokenizer(event)
+  const schemaVersion = client.dialect === 'postgres' ? POSTGRES_SCHEMA_VERSION : SQLITE_SCHEMA_VERSION
 
   const currentVersion = await getSchemaVersion(client)
   const currentTokenizer = client.dialect === 'postgres' ? null : await getStoredTokenizer(client)
 
-  const versionMatches = currentVersion === SCHEMA_VERSION
+  const versionMatches = currentVersion === schemaVersion
   const tokenizerMatches = client.dialect === 'postgres' || !currentTokenizer || currentTokenizer === tokenizer
 
   if (versionMatches && tokenizerMatches)
@@ -485,10 +487,10 @@ export async function initSchema(event?: H3Event): Promise<void> {
   // Update version + tokenizer
   await (client.db as any)
     .insert(info)
-    .values({ id: 'schema', version: SCHEMA_VERSION })
+    .values({ id: 'schema', version: schemaVersion })
     .onConflictDoUpdate({
       target: info.id,
-      set: { version: SCHEMA_VERSION },
+      set: { version: schemaVersion },
     })
 
   if (client.dialect !== 'postgres') {
@@ -654,11 +656,11 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       keywords TEXT NOT NULL DEFAULT '[]',
       content_hash TEXT,
       updated_at TEXT NOT NULL,
-      indexed_at INTEGER NOT NULL,
+      indexed_at BIGINT NOT NULL,
       is_error INTEGER NOT NULL DEFAULT 0,
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
-      last_seen_at INTEGER,
+      last_seen_at BIGINT,
       locale TEXT NOT NULL DEFAULT ''
     )`,
     sql`CREATE TABLE IF NOT EXISTS _ai_ready_info (
@@ -670,8 +672,8 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
     )`,
     sql`CREATE TABLE IF NOT EXISTS ai_ready_cron_runs (
       id SERIAL PRIMARY KEY,
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER,
+      started_at BIGINT NOT NULL,
+      finished_at BIGINT,
       duration_ms INTEGER,
       pages_indexed INTEGER DEFAULT 0,
       pages_remaining INTEGER DEFAULT 0,
@@ -681,7 +683,7 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
     sql`CREATE TABLE IF NOT EXISTS ai_ready_sitemaps (
       name TEXT PRIMARY KEY,
       route TEXT NOT NULL,
-      last_crawled_at INTEGER,
+      last_crawled_at BIGINT,
       url_count INTEGER DEFAULT 0,
       error_count INTEGER DEFAULT 0,
       last_error TEXT,
