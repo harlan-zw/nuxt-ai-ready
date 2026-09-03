@@ -1,6 +1,36 @@
 # Changelog
 
 
+## v2.0.1...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.0.1...main)
+
+### 🚀 Enhancements
+
+- **database:** Add PostgreSQL support ([#91](https://github.com/harlan-zw/nuxt-ai-ready/pull/91))
+
+### 🩹 Fixes
+
+- Keep runtime indexing on HTML representation ([#94](https://github.com/harlan-zw/nuxt-ai-ready/pull/94))
+
+### 📖 Documentation
+
+- Add IndexNow recipe ([ba0e68c](https://github.com/harlan-zw/nuxt-ai-ready/commit/ba0e68c))
+- Humanize IndexNow recipe ([9875fb5](https://github.com/harlan-zw/nuxt-ai-ready/commit/9875fb5))
+
+### 🏡 Chore
+
+- Bump ([15b4ae9](https://github.com/harlan-zw/nuxt-ai-ready/commit/15b4ae9))
+- Bump ([1abc4dc](https://github.com/harlan-zw/nuxt-ai-ready/commit/1abc4dc))
+
+### ✅ Tests
+
+- Configure hooks fixture site URL ([#93](https://github.com/harlan-zw/nuxt-ai-ready/pull/93))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v2.0.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.0.0...main)
