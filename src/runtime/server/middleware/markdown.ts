@@ -1,12 +1,13 @@
 import type { MarkdownSourceContext } from '../../types'
 import type { NegotiationContext } from '../utils/negotiation-response'
 import { createError, defineEventHandler, setHeader, setResponseStatus } from '#nuxtseo/h3'
-import { useNitroApp } from '#nuxtseo/nitro'
+import { useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { logger } from '../logger'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { INTERNAL_HEADER } from '../utils/negotiation-decision'
 import { applyNegotiation, buildNegotiationContext, decideNegotiation, ensureSiteConfig, setMarkdownHeaders } from '../utils/negotiation-response'
+import { appendSitemapSection, isSitemapMdRequest, SITEMAP_MD_ROUTE } from '../utils/sitemap-md'
 
 function notFoundMarkdown(
   ctx: NegotiationContext,
@@ -48,6 +49,10 @@ function notFoundMarkdown(
 }
 
 export default defineEventHandler(async (event) => {
+  const runtimeConfig = useRuntimeConfig(event)
+  if (isSitemapMdRequest(event.path, runtimeConfig.app.baseURL, (runtimeConfig['nuxt-ai-ready'] as any)?.sitemapMd !== false))
+    return
+
   const decision = decideNegotiation(event, 'middleware')
   const negotiationResponse = await applyNegotiation(event, decision)
   if (decision._tag !== 'render')
@@ -57,6 +62,9 @@ export default defineEventHandler(async (event) => {
   const ctx = buildNegotiationContext(event, decision.path)
   const { path, config, resolvePath, resolveUrl, routeContext } = ctx
   const canonicalUrl = resolveUrl(path)
+  const finalizeMarkdown = (markdown: string) => config.sitemapMd === false
+    ? markdown
+    : appendSitemapSection(markdown, resolvePath(SITEMAP_MD_ROUTE))
 
   const [
     { tryGetContentMarkdown },
@@ -82,7 +90,7 @@ export default defineEventHandler(async (event) => {
       last_updated: updatedAt || new Date().toISOString(),
     }, markdown)
     setMarkdownHeaders(event, ctx)
-    return responseMarkdown
+    return finalizeMarkdown(responseMarkdown)
   }
 
   // Prefer @nuxt/content source over HTML→mdream conversion. Content stores
@@ -103,7 +111,7 @@ export default defineEventHandler(async (event) => {
       last_updated: contentPage.updatedAt || new Date().toISOString(),
     })
     setMarkdownHeaders(event, ctx)
-    return `${frontmatter}\n${contentPage.markdown}`
+    return finalizeMarkdown(`${frontmatter}\n${contentPage.markdown}`)
   }
 
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
@@ -199,5 +207,5 @@ export default defineEventHandler(async (event) => {
   )
 
   setMarkdownHeaders(event, ctx)
-  return result.markdown
+  return finalizeMarkdown(result.markdown)
 })
