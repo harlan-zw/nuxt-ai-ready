@@ -1006,17 +1006,30 @@ export async function tryAcquireCronLock(event: H3Event | undefined): Promise<Cr
   const now = Date.now()
   const value = JSON.stringify({ t: token, a: now, e: now + CRON_LOCK_TTL_MS })
 
-  await db.exec(`
-    INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
-    ON CONFLICT(id) DO UPDATE SET value = excluded.value
-    WHERE CAST(coalesce(${cronLockField(db, '_ai_ready_info.value', 'e')}, '0') AS BIGINT) < ?
-  `, [value, now])
+  try {
+    await db.exec(`
+      INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
+      ON CONFLICT(id) DO UPDATE SET value = excluded.value
+      WHERE CAST(coalesce(${cronLockField(db, '_ai_ready_info.value', 'e')}, '0') AS BIGINT) < ?
+    `, [value, now])
 
-  const row = await db.first<{ value: string }>(
-    `SELECT value FROM _ai_ready_info WHERE id = 'cron_lock' AND ${cronLockField(db, 'value', 't')} = ?`,
-    [token],
-  )
-  return row ? { _tag: 'acquired', token } : { _tag: 'held' }
+    const row = await db.first<{ value: string }>(
+      `SELECT value FROM _ai_ready_info WHERE id = 'cron_lock' AND ${cronLockField(db, 'value', 't')} = ?`,
+      [token],
+    )
+    return row ? { _tag: 'acquired', token } : { _tag: 'held' }
+  }
+  catch (error) {
+    // The upsert may have landed before the verify read failed, leaving a
+    // live lock no caller can release: they never see the token. Clear it
+    // best-effort, then surface the original error. Release is a no-op when
+    // the row is absent or owned by another run.
+    await releaseCronLock(event, token).catch(() => {
+      // Ignorable: the lock still expires after CRON_LOCK_TTL_MS, and the
+      // original acquire error is what the caller needs to see.
+    })
+    throw error
+  }
 }
 
 /**
