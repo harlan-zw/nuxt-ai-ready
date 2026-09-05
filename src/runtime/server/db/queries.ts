@@ -3,8 +3,8 @@ import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
 import { randomUUID } from 'uncrypto'
-import { getRequestURL } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
+import { createUniversalContext } from '../utils/context'
 import { resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
@@ -16,6 +16,11 @@ import { normalizeRoute, normalizeRouteKey } from './shared'
  * Falls back to the runtime i18n config (set when @nuxtjs/i18n is detected at
  * build time). Returns '' when no i18n is configured, matching the schema's
  * default for non-i18n sites.
+ *
+ * The host comes from the page's own URL (site URL + route), never from the
+ * triggering request: cron and poll requests can arrive on any domain, which
+ * would otherwise decide the locale of every indexed page on multi-domain
+ * i18n sites.
  */
 function deriveLocale(event: H3Event | undefined, route: string, explicit?: string): string {
   if (explicit !== undefined)
@@ -24,7 +29,15 @@ function deriveLocale(event: H3Event | undefined, route: string, explicit?: stri
   const i18n = cfg['nuxt-ai-ready']?.i18n
   if (!i18n)
     return ''
-  return resolveLocaleFromRoute(route, i18n, event ? { host: getRequestURL(event).host } : undefined).locale
+  const siteUrl = createUniversalContext(event).siteUrl
+  let host: string | undefined
+  try {
+    host = siteUrl ? new URL(siteUrl).host : undefined
+  }
+  catch {
+    host = undefined
+  }
+  return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale
 }
 
 /** Try to get the current H3Event from context or use provided event */
@@ -536,7 +549,7 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
 
   await db.exec(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
@@ -547,11 +560,11 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
       updated_at = excluded.updated_at,
       indexed_at = excluded.indexed_at,
       is_error = excluded.is_error,
-      indexed = 1,
+      indexed = excluded.indexed,
       source = excluded.source,
       last_seen_at = excluded.last_seen_at,
       locale = excluded.locale
-  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt, locale])
+  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, page.isError ? 0 : 1, source, lastSeenAt, locale])
 }
 
 /**
@@ -670,7 +683,11 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
-        ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
+        ON CONFLICT(route) DO UPDATE SET
+          last_seen_at = excluded.last_seen_at,
+          locale = excluded.locale,
+          is_error = 0,
+          indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
       `,
       params,
     })
