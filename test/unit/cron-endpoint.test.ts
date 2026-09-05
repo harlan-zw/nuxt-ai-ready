@@ -57,7 +57,7 @@ describe('gET /__ai-ready/cron', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     releaseCronLock.mockResolvedValue(undefined)
-    tryAcquireCronLock.mockResolvedValue(true)
+    tryAcquireCronLock.mockResolvedValue({ _tag: 'acquired', token: 'run-token' })
     // A settled site with nothing to do, so a healthy run finishes on the
     // fast path without touching the rest of the query surface.
     getCronFastPathStatus.mockResolvedValue({
@@ -96,7 +96,7 @@ describe('gET /__ai-ready/cron', () => {
   })
 
   it('answers a skipped run with 200 when another run holds the lock', async () => {
-    tryAcquireCronLock.mockResolvedValue(false)
+    tryAcquireCronLock.mockResolvedValue({ _tag: 'held' })
 
     const { status, body } = await getCron()
 

@@ -2,6 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
+import { randomUUID } from 'uncrypto'
 import { getRequestURL } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleFromRoute } from '../utils/i18n'
@@ -357,9 +358,10 @@ export async function queryPages(
     return includeMarkdown ? rowToData(row) : rowToEntry(row)
   }
 
-  // Build query
+  // Build query. A deterministic order keeps concurrent runs and offset
+  // pagination stable when SQLite would otherwise return rows in scan order.
   const { sql: whereClause, params } = buildWhereClause(where)
-  let sql = `SELECT ${cols} FROM ai_ready_pages ${whereClause}`
+  let sql = `SELECT ${cols} FROM ai_ready_pages ${whereClause} ORDER BY route`
 
   if (limit) {
     sql += ` LIMIT ?`
@@ -970,39 +972,62 @@ export async function getCronFastPathStatus(
 
 const CRON_LOCK_TTL_MS = 300_000 // 5 minutes - stale lock threshold (matches cron interval)
 
-/**
- * Try to acquire cron lock. Returns true if acquired, false if another run is active.
- * Uses atomic INSERT OR REPLACE with conditional check to prevent race conditions.
- */
-export async function tryAcquireCronLock(event: H3Event | undefined): Promise<boolean> {
-  const db = await getDb(event)
-  if (!db)
-    return true // No DB = no lock needed
+export type CronLockAcquire
+  = | { _tag: 'acquired', token: string }
+    | { _tag: 'held' }
 
-  const now = Date.now()
-  const staleThreshold = now - CRON_LOCK_TTL_MS
+interface CronLockRecord {
+  acquiredAt: number
+  expiresAt: number
+}
 
-  // Atomic: only acquire if no lock exists or existing lock is stale
-  await db.exec(`
-    INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
-    ON CONFLICT(id) DO UPDATE SET value = ?
-    WHERE CAST(_ai_ready_info.value AS BIGINT) < ?
-  `, [String(now), String(now), staleThreshold])
-
-  // Verify we hold the lock (our timestamp was written)
-  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
-  return row?.value === String(now)
+function cronLockField(db: RawExecutor, column: string, key: 't' | 'a' | 'e'): string {
+  return db.dialect === 'postgres'
+    ? `(${column}::jsonb ->> '${key}')`
+    : `json_extract(${column}, '$.${key}')`
 }
 
 /**
- * Release cron lock
+ * Try to acquire cron lock. Returns the ownership token on success, `held`
+ * when a live lock belongs to another run.
+ *
+ * The value carries a random token plus expiry in one row, so the
+ * compare-expired-then-set upsert is atomic and ownership is unique even for
+ * two isolates that start in the same millisecond. A legacy value that
+ * predates tokens parses as no expiry, so it is treated as expired.
  */
-export async function releaseCronLock(event: H3Event | undefined): Promise<void> {
+export async function tryAcquireCronLock(event: H3Event | undefined): Promise<CronLockAcquire> {
+  const token = randomUUID()
+  const db = await getDb(event)
+  if (!db)
+    return { _tag: 'acquired', token }
+
+  const now = Date.now()
+  const value = JSON.stringify({ t: token, a: now, e: now + CRON_LOCK_TTL_MS })
+
+  await db.exec(`
+    INSERT INTO _ai_ready_info (id, value) VALUES ('cron_lock', ?)
+    ON CONFLICT(id) DO UPDATE SET value = excluded.value
+    WHERE CAST(coalesce(${cronLockField(db, '_ai_ready_info.value', 'e')}, '0') AS BIGINT) < ?
+  `, [value, now])
+
+  const row = await db.first<{ value: string }>(
+    `SELECT value FROM _ai_ready_info WHERE id = 'cron_lock' AND ${cronLockField(db, 'value', 't')} = ?`,
+    [token],
+  )
+  return row ? { _tag: 'acquired', token } : { _tag: 'held' }
+}
+
+/**
+ * Release cron lock. Only deletes the row when its token is ours, so a run
+ * that outlived the lock TTL cannot delete the new owner's lock.
+ */
+export async function releaseCronLock(event: H3Event | undefined, token: string): Promise<void> {
   const db = await getDb(event)
   if (!db)
     return
 
-  await db.exec('DELETE FROM _ai_ready_info WHERE id = ?', ['cron_lock'])
+  await db.exec(`DELETE FROM _ai_ready_info WHERE id = 'cron_lock' AND ${cronLockField(db, 'value', 't')} = ?`, [token])
 }
 
 export interface CronLockStatus {
@@ -1010,6 +1035,17 @@ export interface CronLockStatus {
   since: number | null
   elapsedMs: number | null
   stale: boolean
+}
+
+const RE_CRON_LOCK_NUMERIC = /^\d+$/
+
+function parseCronLockValue(value: string): CronLockRecord | null {
+  if (RE_CRON_LOCK_NUMERIC.test(value))
+    return { acquiredAt: Number(value), expiresAt: Number(value) + CRON_LOCK_TTL_MS }
+  const parsed = safeJsonParse<{ a?: unknown, e?: unknown } | null>(value, null)
+  if (parsed && typeof parsed === 'object' && typeof parsed.a === 'number' && typeof parsed.e === 'number')
+    return { acquiredAt: parsed.a, expiresAt: parsed.e }
+  return null
 }
 
 /**
@@ -1028,15 +1064,17 @@ export async function getCronLockStatus(event: H3Event | undefined): Promise<Cro
   if (!row)
     return { held: false, since: null, elapsedMs: null, stale: false }
 
-  const lockTime = Number.parseInt(row.value, 10)
+  const record = parseCronLockValue(row.value)
+  if (!record)
+    return { held: false, since: null, elapsedMs: null, stale: false }
+
   const now = Date.now()
-  const elapsed = now - lockTime
-  const stale = elapsed >= CRON_LOCK_TTL_MS
+  const stale = now >= record.expiresAt
 
   return {
     held: !stale,
-    since: lockTime,
-    elapsedMs: elapsed,
+    since: record.acquiredAt,
+    elapsedMs: now - record.acquiredAt,
     stale,
   }
 }

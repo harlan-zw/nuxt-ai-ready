@@ -94,15 +94,15 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
   // Prevent overlapping cron runs.
   // This is the first database call of the run and it used to sit outside the
   // try below, so a database blip here threw straight out of the task.
-  const acquired = await tryAcquireCronLock(event).catch((error) => {
+  const lock = await tryAcquireCronLock(event).catch((error) => {
     logger.error(`[cron] Could not acquire the lock: ${describeFailure(error)}`)
     return null
   })
 
-  if (acquired === null)
+  if (lock === null)
     return { failed: { stage: 'lock', message: 'Could not acquire the cron lock' } }
 
-  if (!acquired) {
+  if (lock._tag === 'held') {
     if (debug) {
       logger.info(`[cron] Skipping - another cron run is in progress`)
     }
@@ -231,9 +231,11 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
     return results
   }
   finally {
-    // Always release lock; a throw between acquire and release would
+    // Always release the lock; a throw between acquire and release would
     // otherwise strand it for CRON_LOCK_TTL_MS, blocking subsequent runs.
-    await releaseCronLock(event).catch((err) => {
+    // The token check inside release keeps a run that outlived the TTL from
+    // deleting a newer owner's lock.
+    await releaseCronLock(event, lock.token).catch((err) => {
       logger.warn(`[cron] Failed to release lock: ${err?.message || err}`)
     })
   }
