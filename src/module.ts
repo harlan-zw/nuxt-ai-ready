@@ -38,7 +38,7 @@ import {
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
 import { ensureStaticHeader } from './utils/static-headers'
-import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, staticDescribedbyEntry } from './utils/static-markdown-headers'
+import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
@@ -1078,6 +1078,20 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
+      // Crawler-discovered pages queue their `.md` twin while prerendering, so
+      // they never appear in the config-time route list above. Once Nitro
+      // finishes, every twin it actually wrote gets the exact same headers via
+      // route rules. Presets bake those into `_headers` at `compiled`, and
+      // static handlers apply them at runtime.
+      nitro.hooks.hook('prerender:done', () => {
+        for (const { route, headers } of prerenderedMarkdownHeaderRules(
+          nitro._prerenderedRoutes || [],
+          staticBaseURL,
+          config.describedby !== false,
+        )) {
+          nitro.options.routeRules[route] = defu({ headers }, nitro.options.routeRules[route])
+        }
+      })
       nitro.hooks.hook('compiled', async () => {
         const headersPath = join(nitro.options.output.publicDir, '_headers')
         logger.debug(`Checking for _headers file: ${headersPath}`)

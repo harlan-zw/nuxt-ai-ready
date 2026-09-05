@@ -54,4 +54,17 @@ describe('prerender canonical HTML (issue #36)', async () => {
     expect(link).toContain('</about>; rel="canonical"')
     expect(link).toContain('</llms.txt>; rel="describedby"')
   })
+
+  it('emits the same Link headers on a twin discovered only by crawling', async () => {
+    // /crawled is linked from the index page but absent from
+    // nitro.prerender.routes, so only the crawler can have prerendered it.
+    const response = await fetch(url('/crawled.md'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('last-modified')).toBeTruthy()
+    const link = response.headers.get('link') || ''
+    expect(link).toContain('</crawled>; rel="canonical"')
+    expect(link).toContain('</crawled>; rel="alternate"; type="text/html"')
+    expect(link).toContain('</llms.txt>; rel="describedby"')
+  })
 })
