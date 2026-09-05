@@ -735,32 +735,6 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
 }
 
 /**
- * Get sitemap seeded timestamp from _ai_ready_info
- */
-export async function getSitemapSeededAt(event: H3Event | undefined): Promise<number | undefined> {
-  const db = await getDb(event)
-  if (!db)
-    return undefined
-
-  const row = await db.first<{ value: string }>('SELECT value FROM _ai_ready_info WHERE id = ?', ['sitemap_seeded_at'])
-  return row ? Number.parseInt(row.value, 10) : undefined
-}
-
-/**
- * Set sitemap seeded timestamp
- */
-export async function setSitemapSeededAt(event: H3Event | undefined, timestamp: number): Promise<void> {
-  const db = await getDb(event)
-  if (!db)
-    return
-
-  await db.exec(`
-    INSERT INTO _ai_ready_info (id, value) VALUES (?, ?)
-    ON CONFLICT(id) DO UPDATE SET value = excluded.value
-  `, ['sitemap_seeded_at', String(timestamp)])
-}
-
-/**
  * Prune routes not seen in sitemap for longer than threshold
  * Only prunes routes with source='runtime' (never prerendered pages)
  */
@@ -913,33 +887,6 @@ export async function getRecentCronRuns(
     [limit],
   )
   return rows.map(rowToCronRun)
-}
-
-/**
- * Clean up old cron runs (keep last N)
- */
-export async function cleanupOldCronRuns(
-  event: H3Event | undefined,
-  keepCount = 50,
-): Promise<number> {
-  const db = await getDb(event)
-  if (!db)
-    return 0
-
-  const countRow = await db.first<{ count: DatabaseNumber }>('SELECT COUNT(*) as count FROM ai_ready_cron_runs')
-  const total = toNumber(countRow?.count)
-
-  if (total <= keepCount)
-    return 0
-
-  const deleteCount = total - keepCount
-  await db.exec(`
-    DELETE FROM ai_ready_cron_runs WHERE id IN (
-      SELECT id FROM ai_ready_cron_runs ORDER BY started_at ASC LIMIT ?
-    )
-  `, [deleteCount])
-
-  return deleteCount
 }
 
 /**
