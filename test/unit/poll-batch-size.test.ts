@@ -12,6 +12,15 @@ vi.mock('#nuxtseo/nitro', () => ({
 const { requireAuth } = vi.hoisted(() => ({ requireAuth: vi.fn() }))
 vi.mock('../../src/runtime/server/utils/auth', () => ({ requireAuth }))
 
+const { tryAcquireCronLock, releaseCronLock } = vi.hoisted(() => ({
+  tryAcquireCronLock: vi.fn(),
+  releaseCronLock: vi.fn(),
+}))
+vi.mock('../../src/runtime/server/db/queries', () => ({
+  tryAcquireCronLock,
+  releaseCronLock,
+}))
+
 const { batchIndexPages } = vi.hoisted(() => ({ batchIndexPages: vi.fn() }))
 vi.mock('../../src/runtime/server/utils/batchIndex', () => ({ batchIndexPages }))
 
@@ -30,6 +39,8 @@ describe('pOST /__ai-ready/poll limit defaults', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     requireAuth.mockReturnValue(undefined)
+    tryAcquireCronLock.mockResolvedValue({ _tag: 'acquired', token: 'lock-token' })
+    releaseCronLock.mockResolvedValue(undefined)
     batchIndexPages.mockResolvedValue({ indexed: 0, remaining: 0, errors: [], duration: 1, complete: true })
   })
 
@@ -70,6 +81,39 @@ describe('pOST /__ai-ready/poll limit defaults', () => {
     try {
       await poll()
       expect(batchIndexPages).toHaveBeenCalledWith(expect.anything(), { limit: 50, all: false, timeout: undefined })
+    }
+    finally {
+      config.runtimeSync.batchSize = 25
+    }
+  })
+
+  it('clamps a configured batch size of 0 to 1', async () => {
+    config.runtimeSync.batchSize = 0
+    try {
+      await poll()
+      expect(batchIndexPages).toHaveBeenCalledWith(expect.anything(), { limit: 1, all: false, timeout: undefined })
+    }
+    finally {
+      config.runtimeSync.batchSize = 25
+    }
+  })
+
+  it('clamps a negative configured batch size to 1', async () => {
+    config.runtimeSync.batchSize = -5
+    try {
+      await poll()
+      expect(batchIndexPages).toHaveBeenCalledWith(expect.anything(), { limit: 1, all: false, timeout: undefined })
+    }
+    finally {
+      config.runtimeSync.batchSize = 25
+    }
+  })
+
+  it('falls back to 10 for a non-numeric configured batch size', async () => {
+    config.runtimeSync.batchSize = Number.NaN
+    try {
+      await poll()
+      expect(batchIndexPages).toHaveBeenCalledWith(expect.anything(), { limit: 10, all: false, timeout: undefined })
     }
     finally {
       config.runtimeSync.batchSize = 25

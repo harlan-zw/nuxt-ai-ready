@@ -18,7 +18,7 @@ export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
     runtimeSync?: { batchSize?: number }
   }
-  const defaultLimit = Math.min(config.runtimeSync?.batchSize ?? 10, 50)
+  const defaultLimit = Math.max(1, Math.min(config.runtimeSync?.batchSize ?? 10, 50)) || 10
 
   const limit = query.limit ? Math.max(1, Math.min(50, Math.trunc(Number(query.limit)) || defaultLimit)) : defaultLimit
   const timeout = query.timeout ? Math.max(1000, Math.trunc(Number(query.timeout)) || 30000) : undefined
