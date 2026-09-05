@@ -171,6 +171,21 @@ export interface ModuleOptions {
   llmsTxt?: LlmsTxtConfig
 
   /**
+   * Generate a Markdown sitemap at `/sitemap.md` from indexed pages and end
+   * every Markdown page with a `## Sitemap` section linking to it.
+   * @default true
+   */
+  sitemapMd?: boolean
+
+  /**
+   * Advertise llms.txt as `rel="describedby"` from HTML and Markdown
+   * responses, as the llms.txt v2 spec requires. Emits an HTML `<link>` tag
+   * and a Link header entry pointing at the llms.txt route.
+   * @default true
+   */
+  describedby?: boolean
+
+  /**
    * Content Signal Directives
    */
   contentSignal?: false | {
