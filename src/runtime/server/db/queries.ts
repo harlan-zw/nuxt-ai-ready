@@ -3,13 +3,25 @@ import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
 import { randomUUID } from 'uncrypto'
+import { getRequestURL } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { createUniversalContext } from '../utils/context'
-import { resolveLocaleFromRoute } from '../utils/i18n'
+import { hostMatchesLocaleDomain, resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
 import { normalizeRoute, normalizeRouteKey } from './shared'
+
+function hostFromUrl(url: string | undefined): string | undefined {
+  if (!url)
+    return undefined
+  try {
+    return new URL(url).host || undefined
+  }
+  catch {
+    return undefined
+  }
+}
 
 /**
  * Resolve a route's locale, deferring to the explicit value when supplied.
@@ -17,26 +29,40 @@ import { normalizeRoute, normalizeRouteKey } from './shared'
  * build time). Returns '' when no i18n is configured, matching the schema's
  * default for non-i18n sites.
  *
- * The host comes from the page's own URL (site URL + route), never from the
- * triggering request: cron and poll requests can arrive on any domain, which
- * would otherwise decide the locale of every indexed page on multi-domain
- * i18n sites.
+ * The host comes from the page's own URL, in order of trust:
+ * 1. the sitemap entry URL, when the caller has one
+ * 2. the request host, but only when it is itself a configured locale domain:
+ *    cron and poll requests can arrive on any domain (e.g. a workers.dev
+ *    preview host), which would otherwise decide the locale of every indexed
+ *    page on multi-domain i18n sites
+ * 3. the site config host
  */
-function deriveLocale(event: H3Event | undefined, route: string, explicit?: string): string {
+function deriveLocale(event: H3Event | undefined, route: string, explicit?: string, pageUrl?: string): string {
   if (explicit !== undefined)
     return explicit
   const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
   const i18n = cfg['nuxt-ai-ready']?.i18n
   if (!i18n)
     return ''
-  const siteUrl = createUniversalContext(event).siteUrl
-  let host: string | undefined
-  try {
-    host = siteUrl ? new URL(siteUrl).host : undefined
+
+  const entryHost = hostFromUrl(pageUrl)
+  if (entryHost)
+    return resolveLocaleFromRoute(route, i18n, { host: entryHost }).locale
+
+  let requestHost: string | undefined
+  if (event) {
+    try {
+      requestHost = getRequestURL(event).host
+    }
+    catch {
+      // An event without a readable request carries no host signal; fall
+      // through to the site config host.
+      requestHost = undefined
+    }
   }
-  catch {
-    host = undefined
-  }
+  const host = requestHost && hostMatchesLocaleDomain(requestHost, i18n)
+    ? requestHost
+    : hostFromUrl(createUniversalContext(event).siteUrl)
   return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale
 }
 
@@ -645,7 +671,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string }>): Promise<number> {
+export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string, url?: string }>): Promise<number> {
   const db = await getDb(event)
   if (!db || routes.length === 0)
     return 0
@@ -662,10 +688,11 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
     // them distinct here defeats the dedupe and collides on route_key instead.
     const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
     const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
+    const entryUrl = typeof entry === 'string' ? undefined : entry.url
     byRoute.set(route, {
       route,
       routeKey: normalizeRouteKey(route),
-      locale: deriveLocale(event, route, explicitLocale),
+      locale: deriveLocale(event, route, explicitLocale, entryUrl),
     })
   }
 
