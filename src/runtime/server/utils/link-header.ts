@@ -16,8 +16,11 @@ export function encodePathForHeader(path: string): string {
 
 type LinkUrlResolver = (path: string) => string
 
+export const LLMS_TXT_PATH = '/llms.txt'
+
 interface LinkHeaderConfig {
   apiCatalog?: { href: string }
+  describedby?: boolean
   i18n?: RuntimeI18nConfig | null
 }
 
@@ -50,6 +53,12 @@ export function buildLinkHeader(
   else {
     const href = resolveHeaderUrl(path, resolveUrl)
     parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; type="text/html"`)
+    parts.push(`<${encodePathForHeader(href)}>; rel="canonical"`)
+  }
+
+  if (config.describedby !== false) {
+    const href = resolveHeaderUrl(LLMS_TXT_PATH, resolveUrl)
+    parts.push(`<${encodePathForHeader(href)}>; rel="describedby"`)
   }
 
   if (config.i18n) {

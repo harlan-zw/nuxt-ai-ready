@@ -19,6 +19,7 @@ import { contentLookupModule, resolveContentSource } from './content-source'
 import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
@@ -65,6 +66,8 @@ export interface ModulePublicRuntimeConfig {
   debugCron: boolean
   contentNegotiation: ContentNegotiationPolicy
   version: string
+  sitemapMd: boolean
+  describedby: boolean
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   database: ResolvedDatabase
@@ -874,6 +877,8 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
           ? 'enabled'
           : 'disabled',
       mdreamOptions: config.mdreamOptions || {},
+      sitemapMd: config.sitemapMd !== false,
+      describedby: config.describedby !== false,
       markdownCacheHeaders: defu(config.markdownCacheHeaders, {
         maxAge: 3600,
         swr: true,
@@ -925,6 +930,9 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
     // gets replaced with a static file
     addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
     addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
+    if (config.sitemapMd !== false) {
+      addServerHandler({ route: SITEMAP_MD_ROUTE, handler: resolve('./runtime/server/routes/sitemap.md.get'), lazy: true })
+    }
     if (agentSkillsResult._tag === 'Enabled') {
       addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index'), lazy: true })
       for (const route of Object.keys(agentSkillsResult.localArtifacts)) {
@@ -1044,6 +1052,9 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
     // Add route rules for static files with proper charset
     for (const route of ['/llms.txt', '/llms-full.txt']) {
       extendRouteRules(route, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    }
+    if (config.sitemapMd !== false) {
+      extendRouteRules(SITEMAP_MD_ROUTE, { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
     }
 
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs

@@ -10,6 +10,7 @@ import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
 import { getMarkdownRenderInfo } from '../utils/markdown-request'
 import { consumePrerenderedHtml } from '../utils/prerender-html'
+import { isSitemapMdRequest } from '../utils/sitemap-md'
 
 // Pull headings out of source markdown for the page-data record. mdream
 // produces a similar list during HTML conversion; this mirrors that shape so
@@ -37,12 +38,15 @@ export default defineEventHandler(async (event) => {
     return
   }
 
+  const fullRuntimeConfig = useRuntimeConfig(event)
+  if (isSitemapMdRequest(event.path, fullRuntimeConfig.app.baseURL, (fullRuntimeConfig['nuxt-ai-ready'] as any)?.sitemapMd !== false))
+    return
+
   const renderInfo = getMarkdownRenderInfo(event, { _tag: 'prerender' })
   if (!renderInfo || 'notAcceptable' in renderInfo)
     return
 
   const { path } = renderInfo
-  const fullRuntimeConfig = useRuntimeConfig(event)
   const runtimeConfig = fullRuntimeConfig['nuxt-ai-ready'] as any
   const deployedPath = toDeployedRoute(path, fullRuntimeConfig.app.baseURL)
   const canonicalUrl = withSiteUrl(event, deployedPath)

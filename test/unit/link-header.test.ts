@@ -154,4 +154,31 @@ describe('buildLinkHeader', () => {
     )
     expect(buildLinkHeader('/', 'html', baseConfig)).not.toContain('rel="api-catalog"')
   })
+
+  it('points rel=canonical at the HTML page from the markdown variant', () => {
+    const header = buildLinkHeader('/about', 'markdown', baseConfig, resolveExampleUrl)
+
+    expect(header).toContain('<https://example.com/about>; rel="canonical"')
+  })
+
+  it('emits no rel=canonical on the html variant', () => {
+    const header = buildLinkHeader('/about', 'html', baseConfig, resolveExampleUrl)
+
+    expect(header).not.toContain('rel="canonical"')
+  })
+
+  it('emits rel=describedby pointing at llms.txt for both variants', () => {
+    const html = buildLinkHeader('/about', 'html', baseConfig, resolveExampleUrl)
+    const markdown = buildLinkHeader('/about', 'markdown', baseConfig, resolveExampleUrl)
+
+    expect(html).toContain('<https://example.com/llms.txt>; rel="describedby"')
+    expect(markdown).toContain('<https://example.com/llms.txt>; rel="describedby"')
+  })
+
+  it('omits rel=describedby when disabled', () => {
+    const config = { describedby: false } as ModulePublicRuntimeConfig
+
+    expect(buildLinkHeader('/about', 'html', config, resolveExampleUrl)).not.toContain('rel="describedby"')
+    expect(buildLinkHeader('/about', 'markdown', config, resolveExampleUrl)).not.toContain('rel="describedby"')
+  })
 })

@@ -17,6 +17,7 @@ import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
+import { appendSitemapSection, SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { supportsNativeNodeSqlite } from './utils/database'
 
 const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
@@ -526,6 +527,9 @@ export function setupPrerenderHandler(
         return
       }
 
+      if (route.fileName === SITEMAP_MD_ROUTE)
+        return
+
       if (!route.fileName?.endsWith('.md'))
         return
 
@@ -545,7 +549,9 @@ export function setupPrerenderHandler(
 
       // The prerender middleware already wrote frontmatter via mdream's
       // additionalFields, so write the markdown straight to disk.
-      route.contents = parsed.markdown
+      route.contents = options.sitemapMd === false
+        ? parsed.markdown
+        : appendSitemapSection(parsed.markdown, toDeployedRoute(SITEMAP_MD_ROUTE, nitro.options.baseURL))
       route.contentType = 'text/markdown; charset=utf-8'
       state.totalProcessingTime += Date.now() - pageStartTime
     })
@@ -640,6 +646,11 @@ export function setupPrerenderHandler(
       // otherwise presets keep the runtime handler's route, and on Vercel that
       // function output shadows the static file (nuxt/scripts#825).
       nitro._prerenderedRoutes!.push({ route: '/llms-full.txt', fileName: '/llms-full.txt' })
+
+      if (options.sitemapMd !== false) {
+        const sitemapMdStats = await prerenderRoute(nitro, SITEMAP_MD_ROUTE)
+        logger.debug(`Wrote sitemap.md (${(sitemapMdStats.size / 1024).toFixed(1)}kb)`)
+      }
 
       const kb = (b: number) => (b / 1024).toFixed(1)
       const totalKb = kb(llmsStats.size + llmsFullStats.size)
