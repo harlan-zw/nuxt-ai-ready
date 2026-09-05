@@ -10,7 +10,7 @@ import { hostMatchesLocaleDomain, resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
-import { normalizeRoute, normalizeRouteKey } from './shared'
+import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, normalizeRoute, normalizeRouteKey } from './shared'
 
 function hostFromUrl(url: string | undefined): string | undefined {
   if (!url)
@@ -514,15 +514,15 @@ export async function searchPages(
     return []
 
   if (db.dialect === 'postgres') {
-    const searchTerm = `%${sanitized}%`
+    const searchTerm = likeSubstring(sanitized)
     return db.all<SearchResult>(`
       SELECT route, title, description, 0 AS score
       FROM ai_ready_pages
       WHERE is_error = 0
-        AND (title ILIKE ? OR description ILIKE ? OR markdown ILIKE ? OR headings ILIKE ?)
+        AND (title ILIKE ? ESCAPE ? OR description ILIKE ? ESCAPE ? OR markdown ILIKE ? ESCAPE ? OR headings ILIKE ? ESCAPE ?)
       ORDER BY route
       LIMIT ?
-    `, [searchTerm, searchTerm, searchTerm, searchTerm, limit])
+    `, [searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, limit])
   }
 
   // Add prefix matching for partial words
@@ -707,13 +707,14 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
   }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
-  // call on D1), so one INSERT per route times out large sitemaps. 5 bind
-  // params per row keeps each statement within D1's 100-parameter cap. The
-  // statements then go through `db.batch` so all round-trips collapse into one
+  // call on D1), so one INSERT per route times out large sitemaps. The chunk
+  // size is derived from the 5 bind params per row so each statement stays
+  // within D1's 100-parameter cap even if a column is added. The statements
+  // then go through `db.batch` so all round-trips collapse into one
   // driver-level batch request.
-  const ROWS_PER_INSERT = 20
+  const rowsPerInsert = maxRowsPerInsert(5)
   const stmts: { sql: string, params: unknown[] }[] = []
-  for (const batch of chunk([...byRoute.values()], ROWS_PER_INSERT)) {
+  for (const batch of chunk([...byRoute.values()], rowsPerInsert)) {
     const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
     const params = batch.flatMap(r => [r.route, r.routeKey, now, nowMs, r.locale])
     stmts.push({
