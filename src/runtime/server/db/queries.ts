@@ -982,9 +982,10 @@ interface CronLockRecord {
 }
 
 function cronLockField(db: RawExecutor, column: string, key: 't' | 'a' | 'e'): string {
-  return db.dialect === 'postgres'
-    ? `(${column}::jsonb ->> '${key}')`
-    : `json_extract(${column}, '$.${key}')`
+  if (db.dialect !== 'postgres')
+    return `json_extract(${column}, '$.${key}')`
+  const jsonb = `${column}::jsonb`
+  return `CASE WHEN jsonb_typeof(${jsonb}) = 'object' THEN (${jsonb} ->> '${key}') END`
 }
 
 /**
