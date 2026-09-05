@@ -18,7 +18,27 @@ interface SitemapPingResult {
   pruned: number
 }
 
+/**
+ * Why a run could not finish.
+ *
+ * `lock` means the run never started, so nothing was changed. `run` means it
+ * started and stopped part way, so some work may already be committed.
+ */
+export interface CronFailure {
+  stage: 'lock' | 'run'
+  message: string
+}
+
 export interface CronResult {
+  /**
+   * Set when the run failed.
+   *
+   * A scheduled task that throws reaches Cloudflare as `scriptThrewException`,
+   * which carries no stage, no message, and nothing a host can report. The
+   * failure travels back as a value instead, so the caller decides what to do
+   * with it.
+   */
+  failed?: CronFailure
   runId?: number | null
   stale?: StaleCheckResult
   sitemap?: {
@@ -36,14 +56,34 @@ export interface CronResult {
   }
 }
 
+/** The message from an unknown throw, without assuming it is an `Error`. */
+function describeFailure(error: unknown): string {
+  if (error instanceof Error)
+    return error.message
+  return String(error)
+}
+
 /**
  * Run cron job logic - shared between scheduled task and HTTP endpoint
+ *
+ * This is the error boundary for the whole run. Nothing throws past it: the
+ * scheduled task has no request context and no handler above it, so a throw
+ * here becomes an opaque platform exception rather than something the host can
+ * report. Every failure comes back as `CronResult.failed`.
  */
 export async function runCron(event: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
   // Skip in dev - DB and context not available
   if (import.meta.dev)
     return {}
 
+  return executeCron(event, options).catch((error) => {
+    const message = describeFailure(error)
+    logger.error(`[cron] Run failed: ${message}`)
+    return { failed: { stage: 'run' as const, message } }
+  })
+}
+
+async function executeCron(event: H3Event | undefined, options?: { batchSize?: number }): Promise<CronResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const debug = config.debug
   const startTime = Date.now()
@@ -51,8 +91,17 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   const allErrors: string[] = []
   const sitemapIntervalMinutes = resolveSitemapIntervalMinutes(config.runtimeSync.ttl)
 
-  // Prevent overlapping cron runs
-  const acquired = await tryAcquireCronLock(event)
+  // Prevent overlapping cron runs.
+  // This is the first database call of the run and it used to sit outside the
+  // try below, so a database blip here threw straight out of the task.
+  const acquired = await tryAcquireCronLock(event).catch((error) => {
+    logger.error(`[cron] Could not acquire the lock: ${describeFailure(error)}`)
+    return null
+  })
+
+  if (acquired === null)
+    return { failed: { stage: 'lock', message: 'Could not acquire the cron lock' } }
+
   if (!acquired) {
     if (debug) {
       logger.info(`[cron] Skipping - another cron run is in progress`)
