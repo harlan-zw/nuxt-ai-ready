@@ -183,14 +183,11 @@ export function getRawExecutor(client: DrizzleDatabase) {
         case 'neon': {
           const sqlFn = driver as {
             query: (sql: string, params: unknown[]) => Promise<unknown>
-            transaction: (queries: unknown[]) => Promise<unknown>
+            transaction: <T>(run: (tx: { query: (sql: string, params: unknown[]) => Promise<T> }) => unknown[]) => Promise<T[]>
           }
           for (let i = 0; i < queries.length; i += MAX_BATCH_STATEMENTS) {
             const chunk = queries.slice(i, i + MAX_BATCH_STATEMENTS)
-            const pgQueries = chunk.map((q) => {
-              return sqlFn.query(toPostgresQuery(q.sql), q.params || [])
-            })
-            await sqlFn.transaction(pgQueries)
+            await sqlFn.transaction(tx => chunk.map(q => tx.query(toPostgresQuery(q.sql), q.params || [])))
           }
           break
         }
