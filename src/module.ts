@@ -1003,6 +1003,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post'), lazy: true })
       addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post'), lazy: true })
       addServerHandler({ route: '/__ai-ready/restore', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/restore.post'), lazy: true })
+      addServerHandler({ route: '/__ai-ready/reindex', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/reindex.post'), lazy: true })
 
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
       addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
