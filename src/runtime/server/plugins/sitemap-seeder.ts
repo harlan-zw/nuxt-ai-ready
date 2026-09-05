@@ -46,6 +46,12 @@ function recordDiagnostic(event: H3Event, message: string): void {
 // every hit, which timed out large sitemaps on D1.
 const SEED_INTERVAL_MS = 5 * 60 * 1000
 
+// In-process throttle timestamps. The durable value can be unavailable when
+// the DB read times out, so this keeps the throttle engaged against the same
+// process even while reads fail; Math.max with the durable value below makes
+// it a guard, never a bypass.
+const lastSeedAt = new Map<string, number>()
+
 // Hard cap on DB work that runs before the sitemap renders. The DB driver has
 // no cancellation, so a slow/hung D1 read would otherwise stall the response.
 // On timeout we fall back and still render the sitemap (without that round's
@@ -158,8 +164,10 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
       record?.(message)
     }
 
-    if (lastCrawled && Date.now() - lastCrawled < SEED_INTERVAL_MS)
+    const lastSeed = Math.max(lastCrawled ?? 0, lastSeedAt.get(sitemapName) ?? 0)
+    if (Date.now() - lastSeed < SEED_INTERVAL_MS)
       return
+    lastSeedAt.set(sitemapName, Date.now())
 
     const routes = [...routeToUrl.keys()]
     const urlCount = urls.length

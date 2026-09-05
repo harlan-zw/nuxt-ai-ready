@@ -2,11 +2,12 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { SitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import type { FtsTokenizer } from '../schema-sql'
 import type { DrizzleDatabase } from './client'
-import { and, count, desc, eq, gt, isNotNull, isNull, like, lt, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
+import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert } from '../shared'
 import { useDrizzle } from './client'
 import { getRawExecutor, useRawDb } from './raw'
 
@@ -246,7 +247,8 @@ export async function searchPages(
 ): Promise<PageMetaOutput[]> {
   const client = await useDrizzle(event)
   const limitNum = options?.limit || 20
-  const searchTerm = `%${query}%`
+  const searchTerm = likeSubstring(query)
+  const matches = (col: unknown) => sql`${col} LIKE ${searchTerm} ESCAPE ${LIKE_ESCAPE}`
 
   // For SQLite, try FTS5 first via raw SQL
   if (client.dialect === 'sqlite') {
@@ -284,10 +286,10 @@ export async function searchPages(
       and(
         eq(pages.isError, 0),
         or(
-          like(pages.title, searchTerm),
-          like(pages.description, searchTerm),
-          like(pages.markdown, searchTerm),
-          like(pages.headings, searchTerm),
+          matches(pages.title),
+          matches(pages.description),
+          matches(pages.markdown),
+          matches(pages.headings),
         ),
       ),
     )
@@ -1177,17 +1179,18 @@ export async function seedRoutes(
   }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
-  // call on D1), so one INSERT per route times out large sitemaps. 4 bind
-  // params per row keeps each statement within D1's 100-parameter cap. All
-  // statements then go through `db.batch` so round-trips collapse into one.
-  const ROWS_PER_INSERT = 20
+  // call on D1), so one INSERT per route times out large sitemaps. The chunk
+  // size is derived from the 4 bind params per row so each statement stays
+  // within D1's 100-parameter cap even if a column is added. All statements
+  // then go through `db.batch` so round-trips collapse into one.
+  const rowsPerInsert = maxRowsPerInsert(4)
   const db = await useRawDb(event)
   const now = new Date().toISOString()
   const nowMs = Date.now()
   const entries = [...byRoute.entries()]
   const stmts: { sql: string, params: unknown[] }[] = []
-  for (let i = 0; i < entries.length; i += ROWS_PER_INSERT) {
-    const batch = entries.slice(i, i + ROWS_PER_INSERT)
+  for (let i = 0; i < entries.length; i += rowsPerInsert) {
+    const batch = entries.slice(i, i + rowsPerInsert)
     const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?)`).join(', ')
     const params = batch.flatMap(([route, routeKey]) => [route, routeKey, now, nowMs])
     stmts.push({
