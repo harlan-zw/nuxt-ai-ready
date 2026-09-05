@@ -8,9 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Key features:
 - **llms.txt generation**: Auto-generate `llms.txt` and `llms-full.txt` at build time
-- **On-demand markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`)
-- **MCP server**: `list_pages` and `search_pages` tools for AI agents
+- **On-demand markdown**: Any route available as `.md` (e.g., `/about` → `/about.md`), plus `Accept: text/markdown` negotiation
+- **Nuxt Content integration**: Pages backed by a page collection serve source markdown directly (`contentSource`)
+- **MCP server**: `list_pages`, `search_pages`, `get_page_markdown` tools for AI agents, plus an MCP server card and AI catalog
+- **API catalog**: RFC 9727 linkset at `/.well-known/api-catalog`
+- **Agent skills**: v0.2.0 discovery index at `/.well-known/agent-skills/index.json`
 - **WebMCP**: Browser-side tools for in-page AI agents via `document.modelContext`
+- **Runtime indexing**: Seed and index pages on-demand from the sitemap, with SQLite, D1, LibSQL, Neon and Postgres storage
+- **i18n**: Auto-detects `@nuxtjs/i18n` for hreflang Link headers, locale frontmatter and llms.txt sections
 - **Content signals**: Configure AI training/search permissions via Nuxt Robots
 
 ## Development Commands
@@ -48,27 +53,31 @@ During prerender, the module:
 
 ### Runtime
 
-- **Middleware** (`src/runtime/server/middleware/`): HTML→markdown conversion for `.md` requests
-- **Routes**: `/llms.txt`, `/llms-full.txt` handlers (replaced with static files after prerender)
+- **Middleware** (`src/runtime/server/middleware/`): HTML→markdown conversion for `.md` requests (dev/runtime + prerender variants)
+- **Routes**: `/llms.txt`, `/llms-full.txt` (replaced with static files after prerender); discovery routes `/.well-known/api-catalog`, `/.well-known/ai-catalog.json`, `/.well-known/agent-skills/index.json`, MCP server card; `/__ai-ready/*` control endpoints
 - **MCP** (`src/runtime/server/mcp/`): Tools and resources for AI agent integration
-  - `tools/list-pages.ts`: List all pages with metadata
-  - `tools/search-pages.ts`: FTS5 full-text search
+  - `tools/list-pages.ts`, `tools/search-pages.ts`, `tools/get-page-markdown.ts`
   - `resources/pages.ts`: Pages resource
-- **WebMCP** (`src/runtime/webmcp.ts`, `webmcp-site-tools.ts`): `document.modelContext` types plus the built-in `list_pages`, `search_pages` and `get_page_markdown` browser tools (opt-in via `webmcp`). Registered by `app/plugins/webmcp.client.ts`, backed by `GET /__ai-ready/pages`. `useWebMcpTool()` (`app/composables/webmcp.ts`) is always auto-imported.
+- **WebMCP** (`src/runtime/webmcp.ts`, `webmcp-site-tools.ts`): `document.modelContext` types plus the built-in `list_pages`, `search_pages` and `get_page_markdown` browser tools (opt-in via `webmcp`). Registered by `app/plugins/webmcp.client.ts`, backed by `GET /__ai-ready/pages`. `useWebMcpTool()` (`app/composables/webmcp.ts`) is auto-imported when `webmcp` is enabled.
+- **Devtools**: dev-only UI at `/__nuxt-ai-ready`, backed by `GET /__ai-ready__/devtools` (registered in dev or debug mode only)
+- **CLI**: `nuxt-ai-ready status|poll|restore|prune` (`src/cli.ts`)
 
 ### Database Layer (`src/runtime/server/db/`)
 
-SQLite database via db0 for page storage and FTS5 search (tables prefixed `ai_ready_`):
-- **schema.ts**: Table definitions (`ai_ready_pages`, `ai_ready_pages_fts`) with FTS5 triggers
-- **index.ts**: Database singleton (`useDatabase()`)
-- **queries.ts**: Query functions (`getAllPages`, `searchPages`, `upsertPage`, etc.)
-- **dump.ts**: Compressed dump export/import for serverless cold starts
+Page storage and FTS5 search via drizzle-orm, tables prefixed `ai_ready_`:
+- **schema/**: SQLite and Postgres table definitions; **schema-sql.ts**: raw SQL + FTS5 triggers
+- **drizzle/providers/**: sqlite (better-sqlite3), bun, node-sqlite, d1, libsql, neon, postgres clients
+- **queries.ts** (raw SQL adapters) and **drizzle/queries.ts**: two parallel query layers, keep both in sync
+- **shared.ts**: shared row mapping; dump export/import for serverless cold starts lives in `utils/checkStale.ts`
 
 ### Runtime Plugins (`src/runtime/server/plugins/`)
 
-- **db-restore.ts**: Restores prerendered data from compressed dump on cold start
+- **db-lifecycle.ts**: DB lifecycle management
 - **sitemap-seeder.ts**: Seeds routes from sitemap into DB on first request (with TTL)
 - **markdown-negotiation.ts**: Splices the Accept negotiation handler into the h3 stack ahead of Nitro's static asset handler, which otherwise answers prerendered routes before any middleware
+- **link-header.ts**: Status-aware Link headers (alternate markdown, hreflang, api-catalog)
+- **html-capture.prerender.ts**: Captures HTML during prerender
+- **mcp-data.ts**: Feeds page data to the MCP server
 
 ### Runtime Indexing Flow
 
@@ -102,11 +111,11 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 
 ### Scheduled Task (`src/runtime/server/tasks/ai-ready-cron.ts`)
 
-Cron task runs every minute when enabled. `cron: true` auto-enables `runtimeSync`.
+Cron task runs every 5 minutes when enabled (`*/5 * * * *`). `cron: true` auto-enables `runtimeSync`.
 
 ```ts
 aiReady: {
-  cron: true, // every minute, auto-enables runtimeSync
+  cron: true, // every 5 minutes, auto-enables runtimeSync
 }
 ```
 
@@ -118,28 +127,34 @@ aiReady: {
 ### Utils
 - **utils/indexPage.ts**: Manual indexing utilities (`indexPage`, `indexPageByRoute`)
 - **utils/batchIndex.ts**: Shared batch indexing logic for poll endpoint and scheduled task
-- **utils/pageData.ts**: Unified read from database
-- **utils/sitemap.ts**: Fetch and parse sitemap URLs
+- **utils/runCron.ts**, **cron-plan.ts**: Scheduled task execution and planning
+- **utils/checkStale.ts**: Build-id + hash comparison, restores prerendered dump on cold start
+- **utils/sitemap.ts**, **sitemap-routes.ts**, **sitemap-crawl-state.ts**: Sitemap fetch, parse and crawl state
+- **utils/negotiation-decision.ts**, **negotiation-response.ts**, **content-negotiation.ts**: Accept header negotiation
+- **utils/link-header.ts**: Link header building
 
 ### Key Dependencies
 
-- **mdream**: HTML → markdown conversion
-- **db0**: Universal database layer (SQLite, D1, LibSQL)
+- **mdream**, **@mdream/js**: HTML → markdown conversion and negotiation
+- **drizzle-orm**: Database layer (SQLite, D1, LibSQL, Neon, Postgres)
 - **@nuxtjs/mcp-toolkit**: MCP server (optional, enables MCP features)
-- **nuxt-site-config**: Site metadata (peer dependency)
+- **nuxt-site-config**: Site metadata
 - **@nuxtjs/robots**, **@nuxtjs/sitemap**: Required module dependencies
 
 ### Module Hooks
 
 ```ts
 // Nuxt hooks (build-time)
-'ai-ready:llms-txt': (payload) => void    // Extend llms.txt content
-'ai-ready:page:markdown': (context) => void // Process page markdown during prerender
+'ai-ready:llms-txt': (payload) => void         // Extend llms.txt content
+'ai-ready:page:markdown': (context) => void    // Process page markdown during prerender
 
 // Nitro hooks (runtime)
-'ai-ready:page:markdown': (context) => void // Modify markdown output
-'ai-ready:mdreamConfig': (config) => void  // Customize mdream options
-'ai-ready:page:indexed': (context) => void // Called when page indexed at runtime
+'ai-ready:markdown:source': (context) => void  // Short-circuit with a custom markdown source
+'ai-ready:page:markdown': (context) => void    // Modify markdown output
+'ai-ready:page:indexed': (context) => void     // Called when page indexed at runtime
+
+// App hooks
+'ai-ready:webmcp:tools': (tools) => void       // Add browser tools
 ```
 
 ### Type Exports
@@ -168,9 +183,9 @@ Config key: `aiReady` in nuxt.config.ts
   mcp: { tools: true, resources: true },
   webmcp: true, // browser tools via document.modelContext
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
-  cron: true, // every minute, auto-enables runtimeSync
+  cron: true, // every 5 minutes, auto-enables runtimeSync
   runtimeSyncSecret: 'token', // auth for runtime sync endpoints
-  runtimeSync: { ttl: 3600, batchSize: 20, pruneTtl: 0 }, // optional overrides
+  runtimeSync: { ttl: 3600, batchSize: 50, pruneTtl: 0 }, // optional overrides
 }
 ```
 
