@@ -49,7 +49,7 @@ describe('cron failure boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     releaseCronLock.mockResolvedValue(undefined)
-    tryAcquireCronLock.mockResolvedValue(true)
+    tryAcquireCronLock.mockResolvedValue({ _tag: 'acquired', token: 'run-token' })
     // A settled site with nothing to do, so the run takes the fast path and
     // finishes without touching the rest of the query surface.
     getCronFastPathStatus.mockResolvedValue({
@@ -94,7 +94,7 @@ describe('cron failure boundary', () => {
 
     await runCron(undefined)
 
-    expect(releaseCronLock).toHaveBeenCalled()
+    expect(releaseCronLock).toHaveBeenCalledWith(undefined, 'run-token')
   })
 
   it('reports a thrown non-Error without assuming its shape', async () => {
@@ -113,7 +113,7 @@ describe('cron failure boundary', () => {
   })
 
   it('skips without reporting a failure when another run holds the lock', async () => {
-    tryAcquireCronLock.mockResolvedValue(false)
+    tryAcquireCronLock.mockResolvedValue({ _tag: 'held' })
 
     const result = await runCron(undefined)
 

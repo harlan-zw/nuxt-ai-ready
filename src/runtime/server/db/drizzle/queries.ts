@@ -344,6 +344,7 @@ export async function getPendingPages(
     .select({ route: pages.route })
     .from(pages)
     .where(eq(pages.indexed, 0))
+    .orderBy(pages.route)
     .limit(limit)
 }
 
