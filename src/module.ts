@@ -977,8 +977,10 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       }
     }
 
-    // Devtools API endpoint
-    addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get'), lazy: true })
+    // Devtools API endpoint (only accessible in dev or debug mode)
+    if (nuxt.options.dev || config.debug) {
+      addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get'), lazy: true })
+    }
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {
