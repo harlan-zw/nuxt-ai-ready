@@ -12,9 +12,11 @@ const config = {
   runtimeSync: { enabled: true, ttl: 3600, batchSize: 10 },
 }
 
-const tryAcquireCronLock = vi.fn()
-const releaseCronLock = vi.fn(async () => {})
-const getCronFastPathStatus = vi.fn()
+const { tryAcquireCronLock, releaseCronLock, getCronFastPathStatus } = vi.hoisted(() => ({
+  tryAcquireCronLock: vi.fn(),
+  releaseCronLock: vi.fn(),
+  getCronFastPathStatus: vi.fn(),
+}))
 
 vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
@@ -22,9 +24,9 @@ vi.mock('#nuxtseo/nitro', () => ({
 }))
 
 vi.mock('../../src/runtime/server/db/queries', () => ({
-  tryAcquireCronLock: (...args: unknown[]) => tryAcquireCronLock(...args),
-  releaseCronLock: (...args: unknown[]) => releaseCronLock(...args),
-  getCronFastPathStatus: (...args: unknown[]) => getCronFastPathStatus(...args),
+  tryAcquireCronLock,
+  releaseCronLock,
+  getCronFastPathStatus,
   completeCronRun: vi.fn(),
   getNextSitemapToCrawl: vi.fn(),
   markSitemapCrawled: vi.fn(),
@@ -46,6 +48,7 @@ const { runCron } = await import('../../src/runtime/server/utils/runCron')
 describe('cron failure boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    releaseCronLock.mockResolvedValue(undefined)
     tryAcquireCronLock.mockResolvedValue(true)
     // A settled site with nothing to do, so the run takes the fast path and
     // finishes without touching the rest of the query surface.
