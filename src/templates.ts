@@ -10,50 +10,13 @@ interface TemplateContext {
   nitroCompatibility: NitroRuntimeCompatibility
 }
 
-/**
- * Types for the WebMCP declarative API, which turns an annotated form into a
- * tool. Only emitted when WebMCP is enabled so the attributes stay out of
- * autocomplete for everyone else.
- * @see https://developer.chrome.com/docs/ai/webmcp/declarative-api
- */
-const declarativeWebMcpTypes = `
+const webmcpTypes = `
 import type { WebMcpToolsContext } from 'nuxt-ai-ready/webmcp'
 
 declare module '#app' {
   interface RuntimeNuxtHooks {
     /** Mutate built-in browser tools and their registration options before registration. */
     'ai-ready:webmcp:tools': (context: WebMcpToolsContext) => void | Promise<void>
-  }
-}
-
-declare module '@vue/runtime-dom' {
-  interface HTMLAttributes {
-    /** Names the tool this form exposes to agents. */
-    toolname?: string
-    /** Describes what submitting this form does. */
-    tooldescription?: string
-    /** Describes this field as a tool parameter. */
-    toolparamdescription?: string
-    /** Submit the form as soon as an agent fills it in. */
-    toolautosubmit?: boolean | ''
-  }
-}
-
-declare global {
-  interface SubmitEvent {
-    /** Whether an agent triggered this submit through a tool call. */
-    readonly agentInvoked?: boolean
-    /** Return a result to the agent. Call preventDefault() first. */
-    respondWith?: (result: Promise<unknown>) => void
-  }
-
-  interface WebMcpToolEvent extends Event {
-    readonly toolName: string
-  }
-
-  interface WindowEventMap {
-    toolactivated: WebMcpToolEvent
-    toolcancel: WebMcpToolEvent
   }
 }
 `
@@ -75,7 +38,7 @@ import type { MarkdownContext, MarkdownSourceContext, PageIndexedContext } from 
 import type { MdreamOptions } from 'mdream'
 
 ${nitroTypes}
-${ctx.config.webmcp ? declarativeWebMcpTypes : ''}
+${ctx.config.webmcp ? webmcpTypes : ''}
 export {}
 `,
   })
