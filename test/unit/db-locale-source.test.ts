@@ -161,6 +161,36 @@ describe('indexed page locale source', () => {
     expect(localeOf('/a-propos')).toBe('fr')
   })
 
+  it('keeps the seeded locale when a later upsert arrives from another locale domain', async () => {
+    mocks.runtimeConfig = {
+      'nuxt-ai-ready': { i18n: domainI18n },
+      'site': { url: 'https://en.example.com' },
+    }
+    const { seedRoutes, upsertPage } = await importQueries()
+
+    await seedRoutes(eventWithHost('en.example.com'), [
+      { route: '/a-propos', url: 'https://fr.example.com/a-propos' },
+    ])
+    await upsertPage(eventWithHost('en.example.com'), page('/a-propos'))
+
+    expect(localeOf('/a-propos')).toBe('fr')
+  })
+
+  it('applies an explicit locale over the stored one', async () => {
+    mocks.runtimeConfig = {
+      'nuxt-ai-ready': { i18n: domainI18n },
+      'site': { url: 'https://en.example.com' },
+    }
+    const { seedRoutes, upsertPage } = await importQueries()
+
+    await seedRoutes(eventWithHost('en.example.com'), [
+      { route: '/a-propos', url: 'https://fr.example.com/a-propos' },
+    ])
+    await upsertPage(eventWithHost('en.example.com'), { ...page('/a-propos'), locale: 'en' })
+
+    expect(localeOf('/a-propos')).toBe('en')
+  })
+
   it('seeds locale from the site URL host when no entry URL matches a locale domain', async () => {
     mocks.runtimeConfig = {
       'nuxt-ai-ready': { i18n: domainI18n },

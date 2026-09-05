@@ -573,6 +573,14 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
   const lastSeenAt = source === 'runtime' ? indexedAt : null
   const locale = deriveLocale(event, route, page.locale)
 
+  // upsertPage never sees the page's own URL, so a locale without an explicit
+  // value is derived from the triggering request or site host. Cron and poll
+  // requests can arrive on any domain, so a host-derived locale is only a
+  // default for new rows: on conflict the stored locale (seeded from each
+  // sitemap entry's URL) is never rewritten by the triggering host. Callers
+  // that state the locale explicitly remain authoritative.
+  const localeTrusted = page.locale !== undefined
+
   await db.exec(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -588,8 +596,10 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
       is_error = excluded.is_error,
       indexed = excluded.indexed,
       source = excluded.source,
-      last_seen_at = excluded.last_seen_at,
-      locale = excluded.locale
+      last_seen_at = excluded.last_seen_at${localeTrusted
+        ? `,
+      locale = excluded.locale`
+        : ''}
   `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, page.isError ? 0 : 1, source, lastSeenAt, locale])
 }
 
