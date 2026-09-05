@@ -30,13 +30,30 @@ async function requireSecret(cwd: string, hint = ''): Promise<string | null> {
   return secret
 }
 
-async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T | null> {
-  return fetch(url, init)
-    .then(r => r.json())
-    .catch((err) => {
-      consola.error(`${errorLabel}: ${err.message}`)
+function describeHttpError(status: number, body: unknown): string {
+  const error = body as { message?: unknown, statusMessage?: unknown, error?: unknown } | null
+  const message = typeof error?.message === 'string' && error.message
+    ? error.message
+    : typeof error?.statusMessage === 'string' && error.statusMessage
+      ? error.statusMessage
+      : typeof error?.error === 'string' && error.error
+        ? error.error
+        : null
+  return message ? `${status}: ${message}` : `request failed with status ${status}`
+}
+
+async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T> {
+  const r = await fetch(url, init).catch((err) => {
+    throw new Error(`${errorLabel}: ${err instanceof Error ? err.message : String(err)}`)
+  })
+  if (!r.ok) {
+    const body = await r.json().catch(() => {
+      // Non-JSON error bodies (e.g. an HTML proxy page) carry no message to show.
       return null
     })
+    throw new Error(`${errorLabel}: ${describeHttpError(r.status, body)}`)
+  }
+  return r.json()
 }
 
 const main = defineCommand({
@@ -74,8 +91,6 @@ const main = defineCommand({
         consola.info(`Fetching status from ${args.url}...`)
 
         const res = await fetchJson(url, { headers: authHeaders(secret) }, 'Failed to connect')
-        if (!res)
-          return
 
         consola.box('AI Ready Status')
 
@@ -170,8 +185,6 @@ const main = defineCommand({
         consola.info(`Triggering poll at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
 
         consola.success(`Indexed: ${colors.green(res.indexed?.toString() || '0')} pages`)
         consola.info(`Remaining: ${colors.yellow(res.remaining?.toString() || '0')}`)
@@ -223,8 +236,6 @@ const main = defineCommand({
         consola.info(`Restoring database at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
 
         consola.success(`Restored: ${colors.green(res.restored?.toString() || '0')} pages`)
         if (res.cleared) {
@@ -282,9 +293,6 @@ const main = defineCommand({
           method: 'POST',
           headers: secret ? authHeaders(secret) : undefined,
         })
-
-        if (!res)
-          return
 
         if (args.dry) {
           consola.info(`Would prune: ${colors.yellow(res.count?.toString() || '0')} routes`)
@@ -347,8 +355,6 @@ const main = defineCommand({
         consola.info(`Reindexing ${args.route} at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
 
         if (res.indexed) {
           consola.success(`Indexed: ${colors.green(res.route)}`)
@@ -360,7 +366,7 @@ const main = defineCommand({
           consola.info(`Skipped: ${colors.yellow(res.route)} (still fresh)`)
         }
         else {
-          consola.error(`Failed: ${colors.red(res.route)}${res.error ? ` (${res.error})` : ''}`)
+          throw new Error(`Failed to reindex ${res.route ?? args.route}${res.error ? `: ${res.error}` : ''}`)
         }
       },
     }),
