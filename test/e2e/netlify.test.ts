@@ -41,6 +41,19 @@ describe('netlify build output', async () => {
     expect(llmsBlock).toContain('X-Robots-Tag: noindex')
   })
 
+  it('writes exact Link header blocks for crawled markdown twins', async () => {
+    const headersPath = join(fixtureDir, 'dist', '_headers')
+    const headers = await readFile(headersPath, 'utf-8')
+
+    // /crawled is linked from the index page but absent from
+    // nitro.prerender.routes, so only the crawler can have prerendered it.
+    const crawledBlock = getHeaderBlock(headers, '/crawled.md')
+    expect(crawledBlock).toContain('Content-Type: text/markdown; charset=utf-8')
+    expect(crawledBlock).toContain('</crawled>; rel="canonical"')
+    expect(crawledBlock).toContain('</crawled>; rel="alternate"; type="text/html"')
+    expect(crawledBlock).toContain('</llms.txt>; rel="describedby"')
+  })
+
   it('has expected output structure', async () => {
     // Check key files exist (only static output, not .netlify functions which require real deployment)
     const files = [
