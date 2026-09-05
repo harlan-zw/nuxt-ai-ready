@@ -303,6 +303,68 @@ const main = defineCommand({
       },
     }),
 
+    reindex: () => defineCommand({
+      meta: {
+        name: 'reindex',
+        description: 'Reindex a single route',
+      },
+      args: {
+        route: {
+          type: 'positional',
+          description: 'Route to reindex (e.g. /about)',
+          required: true,
+        },
+        url: {
+          type: 'string',
+          alias: 'u',
+          description: 'Site URL (default: http://localhost:3000)',
+          default: 'http://localhost:3000',
+        },
+        force: {
+          type: 'boolean',
+          description: 'Index even when the page is still fresh',
+          default: true,
+          negativeDescription: 'Skip indexing when the page is still fresh',
+        },
+        cwd: {
+          type: 'string',
+          description: 'Working directory',
+          default: '.',
+        },
+      },
+      async run({ args }) {
+        const cwd = resolve(args.cwd || '.')
+        const secret = await requireSecret(cwd)
+        if (!secret)
+          return
+
+        const params = new URLSearchParams()
+        params.set('route', args.route)
+        if (!args.force)
+          params.set('force', 'false')
+
+        const url = `${args.url}/__ai-ready/reindex?${params}`
+        consola.info(`Reindexing ${args.route} at ${args.url}...`)
+
+        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
+        if (!res)
+          return
+
+        if (res.indexed) {
+          consola.success(`Indexed: ${colors.green(res.route)}`)
+          if (res.contentChanged !== undefined) {
+            consola.info(`Content changed: ${res.contentChanged ? colors.green('yes') : colors.yellow('no')}`)
+          }
+        }
+        else if (res.skipped) {
+          consola.info(`Skipped: ${colors.yellow(res.route)} (still fresh)`)
+        }
+        else {
+          consola.error(`Failed: ${colors.red(res.route)}${res.error ? ` (${res.error})` : ''}`)
+        }
+      },
+    }),
+
   },
 })
 
