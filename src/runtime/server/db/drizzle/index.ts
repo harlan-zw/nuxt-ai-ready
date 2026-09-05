@@ -17,7 +17,6 @@ export {
   countPages,
   // Info table queries
   deleteInfoValue,
-  deletePage,
   getAllPages,
   getContentHashes,
   getInfoValue,
