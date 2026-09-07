@@ -286,7 +286,7 @@ export interface ModuleOptions {
     filename?: string
     /**
      * D1 binding name for Cloudflare Workers/Pages
-     * @default 'AI_READY_DB'
+     * @default 'DB'
      */
     bindingName?: string
     /**
@@ -301,7 +301,7 @@ export interface ModuleOptions {
   }
 
   /**
-   * Enable scheduled cron task (runs every minute)
+   * Enable scheduled cron task (runs every 5 minutes)
    * When true, automatically enables runtimeSync for background indexing
    */
   cron?: boolean
@@ -356,7 +356,7 @@ export interface ModuleOptions {
     ttl?: number
     /**
      * Pages to index per batch
-     * @default 20
+     * @default 50
      */
     batchSize?: number
     /**
