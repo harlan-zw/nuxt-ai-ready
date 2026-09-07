@@ -102,11 +102,11 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 
 ### Scheduled Task (`src/runtime/server/tasks/ai-ready-cron.ts`)
 
-Cron task runs every minute when enabled. `cron: true` auto-enables `runtimeSync`.
+Cron task runs every 5 minutes when enabled. `cron: true` auto-enables `runtimeSync`.
 
 ```ts
 aiReady: {
-  cron: true, // every minute, auto-enables runtimeSync
+  cron: true, // every 5 minutes, auto-enables runtimeSync
 }
 ```
 
@@ -168,7 +168,7 @@ Config key: `aiReady` in nuxt.config.ts
   mcp: { tools: true, resources: true },
   webmcp: true, // browser tools via document.modelContext
   database: { type: 'sqlite', filename: '.data/ai-ready/pages.db' },
-  cron: true, // every minute, auto-enables runtimeSync
+  cron: true, // every 5 minutes, auto-enables runtimeSync
   runtimeSyncSecret: 'token', // auth for runtime sync endpoints
   runtimeSync: { ttl: 3600, batchSize: 20, pruneTtl: 0 }, // optional overrides
 }
