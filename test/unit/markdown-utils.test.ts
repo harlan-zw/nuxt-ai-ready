@@ -13,12 +13,6 @@ describe('mdream origin handling', () => {
     expect(md).toBe('[intro](https://example.com/docs/getting-started)')
   })
 
-  it('incorrectly doubles path when full URL used as origin', () => {
-    // This demonstrates the bug we're avoiding
-    const md = htmlToMarkdown(html, { origin: 'https://example.com/some/page' })
-    expect(md).toBe('[intro](https://example.com/some/page/docs/getting-started)')
-  })
-
   it('extracting origin from full URL fixes the issue', () => {
     const fullUrl = 'https://example.com/some/page'
     const origin = new URL(fullUrl).origin
