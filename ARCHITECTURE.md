@@ -100,7 +100,7 @@ src/
         │   └── sitemap-seeder.ts  # Seed routes from sitemap (with TTL)
         │
         ├── tasks/
-        │   └── ai-ready-cron.ts   # Nitro scheduled task (every minute)
+        │   └── ai-ready-cron.ts   # Nitro scheduled task (every 5 minutes)
         │
         ├── utils/
         │   ├── indexPage.ts   # Manual indexing utilities
@@ -271,12 +271,12 @@ GET /__ai-ready/cron
 
 ### Scheduled Task
 
-The cron task runs every minute when `cron: true` is set. It auto-enables `runtimeSync`.
+The cron task runs every 5 minutes when `cron: true` is set. It auto-enables `runtimeSync`.
 
 ```ts
 // nuxt.config.ts
 aiReady: {
-  cron: true, // every minute, auto-enables runtimeSync
+  cron: true, // every 5 minutes, auto-enables runtimeSync
 }
 ```
 
@@ -824,7 +824,7 @@ export default defineNuxtConfig({
 })
 ```
 
-When `cron: true`, the module auto-configures Vercel crons to call `GET /__ai-ready/cron` every minute.
+When `cron: true`, the module auto-configures Vercel crons to call `GET /__ai-ready/cron` every 5 minutes.
 
 **Note**: `/tmp` is ephemeral per function instance. Cold starts restore from dump automatically.
 
