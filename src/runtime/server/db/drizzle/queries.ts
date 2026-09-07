@@ -312,6 +312,9 @@ export async function countPages(
   if (options?.errors !== undefined) {
     conditions.push(eq(pages.isError, options.errors ? 1 : 0))
   }
+  else {
+    conditions.push(eq(pages.isError, 0))
+  }
 
   let query = (client.db as any).select({ count: count() }).from(pages)
   if (conditions.length > 0) {
@@ -343,7 +346,10 @@ export async function getPendingPages(
   return (client.db as any)
     .select({ route: pages.route })
     .from(pages)
-    .where(eq(pages.indexed, 0))
+    .where(and(
+      eq(pages.indexed, 0),
+      eq(pages.isError, 0),
+    ))
     .orderBy(pages.route)
     .limit(limit)
 }
@@ -376,7 +382,7 @@ export async function markRoutesPending(event: H3Event | undefined, routes: stri
     const batch = routes.slice(i, i + D1_MAX_IN_ROUTES)
     const placeholders = batch.map(() => '?').join(',')
     stmts.push({
-      sql: `UPDATE ai_ready_pages SET indexed = 0 WHERE route IN (${placeholders})`,
+      sql: `UPDATE ai_ready_pages SET indexed = 0, is_error = 0 WHERE route IN (${placeholders})`,
       params: batch,
     })
   }
@@ -1188,7 +1194,10 @@ export async function seedRoutes(
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
         VALUES ${valuesSql}
-        ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at
+        ON CONFLICT(route) DO UPDATE SET
+          last_seen_at = excluded.last_seen_at,
+          is_error = 0,
+          indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
       `,
       params,
     })

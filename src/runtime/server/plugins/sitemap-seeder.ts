@@ -161,7 +161,9 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     if (lastCrawled && Date.now() - lastCrawled < SEED_INTERVAL_MS)
       return
 
-    const routes = [...routeToUrl.keys()]
+    // Thread each entry's URL so seeded locales derive from the page's own
+    // host on multi-domain i18n sites, never from the requesting host.
+    const routes = [...routeToUrl.entries()].map(([route, url]) => ({ route, url: url.loc }))
     const urlCount = urls.length
 
     // Defer the writes off the response path. On Cloudflare, waitUntil keeps the

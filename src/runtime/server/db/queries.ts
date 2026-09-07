@@ -5,26 +5,65 @@ import type { RawExecutor } from './drizzle/raw'
 import { randomUUID } from 'uncrypto'
 import { getRequestURL } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
-import { resolveLocaleFromRoute } from '../utils/i18n'
+import { createUniversalContext } from '../utils/context'
+import { hostMatchesLocaleDomain, resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
 import { normalizeRoute, normalizeRouteKey } from './shared'
+
+function hostFromUrl(url: string | undefined): string | undefined {
+  if (!url)
+    return undefined
+  try {
+    return new URL(url).host || undefined
+  }
+  catch {
+    return undefined
+  }
+}
 
 /**
  * Resolve a route's locale, deferring to the explicit value when supplied.
  * Falls back to the runtime i18n config (set when @nuxtjs/i18n is detected at
  * build time). Returns '' when no i18n is configured, matching the schema's
  * default for non-i18n sites.
+ *
+ * The host comes from the page's own URL, in order of trust:
+ * 1. the sitemap entry URL, when the caller has one
+ * 2. the request host, but only when it is itself a configured locale domain:
+ *    cron and poll requests can arrive on any domain (e.g. a workers.dev
+ *    preview host), which would otherwise decide the locale of every indexed
+ *    page on multi-domain i18n sites
+ * 3. the site config host
  */
-function deriveLocale(event: H3Event | undefined, route: string, explicit?: string): string {
+function deriveLocale(event: H3Event | undefined, route: string, explicit?: string, pageUrl?: string): string {
   if (explicit !== undefined)
     return explicit
   const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
   const i18n = cfg['nuxt-ai-ready']?.i18n
   if (!i18n)
     return ''
-  return resolveLocaleFromRoute(route, i18n, event ? { host: getRequestURL(event).host } : undefined).locale
+
+  const entryHost = hostFromUrl(pageUrl)
+  if (entryHost)
+    return resolveLocaleFromRoute(route, i18n, { host: entryHost }).locale
+
+  let requestHost: string | undefined
+  if (event) {
+    try {
+      requestHost = getRequestURL(event).host
+    }
+    catch {
+      // An event without a readable request carries no host signal; fall
+      // through to the site config host.
+      requestHost = undefined
+    }
+  }
+  const host = requestHost && hostMatchesLocaleDomain(requestHost, i18n)
+    ? requestHost
+    : hostFromUrl(createUniversalContext(event).siteUrl)
+  return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale
 }
 
 /** Try to get the current H3Event from context or use provided event */
@@ -534,9 +573,17 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
   const lastSeenAt = source === 'runtime' ? indexedAt : null
   const locale = deriveLocale(event, route, page.locale)
 
+  // upsertPage never sees the page's own URL, so a locale without an explicit
+  // value is derived from the triggering request or site host. Cron and poll
+  // requests can arrive on any domain, so a host-derived locale is only a
+  // default for new rows: on conflict the stored locale (seeded from each
+  // sitemap entry's URL) is never rewritten by the triggering host. Callers
+  // that state the locale explicitly remain authoritative.
+  const localeTrusted = page.locale !== undefined
+
   await db.exec(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, content_hash, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(route) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
@@ -547,11 +594,13 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
       updated_at = excluded.updated_at,
       indexed_at = excluded.indexed_at,
       is_error = excluded.is_error,
-      indexed = 1,
+      indexed = excluded.indexed,
       source = excluded.source,
-      last_seen_at = excluded.last_seen_at,
-      locale = excluded.locale
-  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, source, lastSeenAt, locale])
+      last_seen_at = excluded.last_seen_at${localeTrusted
+        ? `,
+      locale = excluded.locale`
+        : ''}
+  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, page.isError ? 0 : 1, source, lastSeenAt, locale])
 }
 
 /**
@@ -632,7 +681,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string }>): Promise<number> {
+export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string, url?: string }>): Promise<number> {
   const db = await getDb(event)
   if (!db || routes.length === 0)
     return 0
@@ -649,10 +698,11 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
     // them distinct here defeats the dedupe and collides on route_key instead.
     const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
     const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
+    const entryUrl = typeof entry === 'string' ? undefined : entry.url
     byRoute.set(route, {
       route,
       routeKey: normalizeRouteKey(route),
-      locale: deriveLocale(event, route, explicitLocale),
+      locale: deriveLocale(event, route, explicitLocale, entryUrl),
     })
   }
 
@@ -670,7 +720,11 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
-        ON CONFLICT(route) DO UPDATE SET last_seen_at = excluded.last_seen_at, locale = excluded.locale
+        ON CONFLICT(route) DO UPDATE SET
+          last_seen_at = excluded.last_seen_at,
+          locale = excluded.locale,
+          is_error = 0,
+          indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
       `,
       params,
     })
