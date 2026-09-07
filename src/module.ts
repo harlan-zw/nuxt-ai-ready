@@ -19,6 +19,7 @@ import { contentLookupModule, resolveContentSource } from './content-source'
 import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { toMarkdownPath } from './runtime/markdown-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
@@ -37,6 +38,7 @@ import {
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
 import { ensureStaticHeader } from './utils/static-headers'
+import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
@@ -1057,21 +1059,62 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       extendRouteRules(SITEMAP_MD_ROUTE, { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
     }
 
+    // Nitro's static handler answers prerendered `.md` files before any
+    // middleware (#82), so route rules are the only header mechanism server
+    // presets apply to them. Every explicitly prerendered page route gets
+    // relative canonical and describedby entries on its markdown twin.
+    const staticBaseURL = nuxt.options.app.baseURL || '/'
+    for (const route of (nuxt.options.nitro.prerender?.routes || []) as string[]) {
+      if (!isStaticMarkdownSourceRoute(route))
+        continue
+      extendRouteRules(toMarkdownPath(route), {
+        headers: {
+          'Content-Type': 'text/markdown; charset=utf-8',
+          'Link': buildStaticMarkdownLinkHeader(route, staticBaseURL, config.describedby !== false),
+        },
+      })
+    }
+
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
+      // Crawler-discovered pages queue their `.md` twin while prerendering, so
+      // they never appear in the config-time route list above. Once Nitro
+      // finishes, every twin it actually wrote gets the exact same headers via
+      // route rules. Presets bake those into `_headers` at `compiled`, and
+      // static handlers apply them at runtime.
+      nitro.hooks.hook('prerender:done', () => {
+        for (const { route, headers } of prerenderedMarkdownHeaderRules(
+          nitro._prerenderedRoutes || [],
+          staticBaseURL,
+          config.describedby !== false,
+        )) {
+          nitro.options.routeRules[route] = defu({ headers }, nitro.options.routeRules[route])
+        }
+      })
       nitro.hooks.hook('compiled', async () => {
         const headersPath = join(nitro.options.output.publicDir, '_headers')
         logger.debug(`Checking for _headers file: ${headersPath}`)
         const exists = await access(headersPath).then(() => true).catch(() => false)
         if (exists) {
           const headers = await readFile(headersPath, 'utf8')
-          const mergedHeaders = ensureStaticHeader(
+          // The /*.md glob cannot express a per-route canonical, so it carries
+          // the describedby entry for every markdown file the exact rules above
+          // do not cover (crawled pages).
+          let mergedHeaders = ensureStaticHeader(
             headers,
             '/*.md',
             'Content-Type',
             'text/markdown; charset=utf-8',
           )
+          if (config.describedby !== false) {
+            mergedHeaders = ensureStaticHeader(
+              mergedHeaders,
+              '/*.md',
+              'Link',
+              staticDescribedbyEntry(nitro.options.baseURL || '/'),
+            )
+          }
           if (mergedHeaders !== headers) {
             await writeFile(headersPath, mergedHeaders)
             logger.debug('Merged .md charset header into _headers')

@@ -9,7 +9,8 @@
  * The bodies themselves cannot agree byte for byte, and should not. The whole
  * point of reading the collection is that the HTML round trip is lossy, so the
  * body assertions check that the substance survives both ways, and that the
- * adapter reproduces its source file exactly.
+ * adapter reproduces its source file exactly. The served page adds frontmatter
+ * before the body and the sitemap footer after it; both are by design.
  */
 import { readFileSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
@@ -19,6 +20,7 @@ import { execa } from 'execa'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createPrerenderDatabase } from '../../src/prerender'
 import { decompressFromBase64, importDbDump, initSchema } from '../../src/runtime/server/db/shared'
+import { appendSitemapSection, SITEMAP_MD_ROUTE } from '../../src/runtime/server/utils/sitemap-md'
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '../fixtures/comark-content')
 
@@ -146,7 +148,9 @@ describe.skipIf(!comarkSupportsContentSource())('comark content source equivalen
     for (const route of ROUTES) {
       const source = await readFile(join(fixtureDir, `content${route}.md`), 'utf-8')
       const body = normalise(source.slice(source.indexOf('---', 3) + 4))
-      expect(normalise(fromCollection.markdown[route]!).endsWith(body), route).toBe(true)
+      // Every served markdown page ends with the sitemap footer (`sitemapMd`).
+      const expectedTail = normalise(appendSitemapSection(body, SITEMAP_MD_ROUTE))
+      expect(normalise(fromCollection.markdown[route]!).endsWith(expectedTail), route).toBe(true)
     }
   })
 

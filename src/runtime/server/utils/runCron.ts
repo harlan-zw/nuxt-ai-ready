@@ -286,7 +286,9 @@ async function pingSitemap(
     route: nextSitemap.route,
     state: nextSitemap.crawlState,
   })
-  const routes = [...mapSitemapRoutes(result.urls).keys()]
+  // Thread each entry's URL so seeded locales derive from the page's own host
+  // on multi-domain i18n sites, never from the cron request host.
+  const routes = [...mapSitemapRoutes(result.urls).entries()].map(([route, url]) => ({ route, url: url.loc }))
   if (routes.length > 0)
     await seedRoutes(event, routes)
 
