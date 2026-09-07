@@ -18,10 +18,9 @@ describe('robots.txt content signals without explicit robots config', async () =
     const robotsTxt = await $fetch('/robots.txt')
 
     expect(robotsTxt).toBeTruthy()
-    expect(robotsTxt).toContain('ai-train=yes')
-    expect(robotsTxt).toContain('search=yes')
-    expect(robotsTxt).toContain('ai-input=no')
-    expect(robotsTxt).toContain('train-ai=y')
+    expect(robotsTxt).toMatch(/^Content-Signal: ai-train=yes, search=yes, ai-input=no$/m)
+    expect(robotsTxt.match(/^Content-Signal:/gm)).toHaveLength(1)
+    expect(robotsTxt).toMatch(/^Content-Usage: train-ai=y$/m)
     expect(robotsTxt).toMatch(/^Disallow:\s*$/m)
   })
 })
