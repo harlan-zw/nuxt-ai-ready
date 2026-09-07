@@ -26,8 +26,6 @@ const tools = ref<RegisteredTool[]>([])
 const inputs = ref<Record<string, string>>({})
 const outputs = ref<Record<string, string>>({})
 const counter = ref(0)
-const formStatus = ref('Waiting for a submit.')
-const greeting = ref('')
 
 function modelContext(): ModelContext | undefined {
   return (globalThis.document as Document & { modelContext?: ModelContext })?.modelContext
@@ -52,23 +50,6 @@ useWebMcpTool({
     return `Counter set to ${next}.`
   },
 })
-
-function onGreetSubmit(event: SubmitEvent) {
-  event.preventDefault()
-  const form = event.target as HTMLFormElement
-  const name = String(new FormData(form).get('name') || '').trim()
-  const message = name ? `Hello, ${name}!` : 'Please provide a name.'
-  greeting.value = message
-
-  // respondWith is only valid for a submit the agent triggered
-  if (event.agentInvoked) {
-    formStatus.value = 'Submitted by an agent.'
-    event.respondWith?.(Promise.resolve(message))
-  }
-  else {
-    formStatus.value = 'Submitted by a person.'
-  }
-}
 
 async function refresh() {
   const ctx = modelContext()
@@ -103,28 +84,14 @@ function refreshTools() {
   })
 }
 
-function onToolActivated(event: Event) {
-  const { toolName } = event as Event & { toolName: string }
-  formStatus.value = `An agent activated ${toolName}.`
-}
-
-function onToolCancel(event: Event) {
-  const { toolName } = event as Event & { toolName: string }
-  formStatus.value = `The agent cancelled ${toolName}.`
-}
-
 onMounted(() => {
   registeredContext = modelContext()
   refreshTools()
   registeredContext?.addEventListener('toolchange', refreshTools)
-  window.addEventListener('toolactivated', onToolActivated)
-  window.addEventListener('toolcancel', onToolCancel)
 })
 
 onUnmounted(() => {
   registeredContext?.removeEventListener('toolchange', refreshTools)
-  window.removeEventListener('toolactivated', onToolActivated)
-  window.removeEventListener('toolcancel', onToolCancel)
 })
 </script>
 
@@ -153,31 +120,6 @@ onUnmounted(() => {
     <p>
       The <code>set_counter</code> tool is registered by <code>useWebMcpTool()</code> in this page's setup, so it
       unregisters when you navigate away. Counter: <strong>{{ counter }}</strong>
-    </p>
-
-    <h2>Declarative form tool</h2>
-    <p>
-      This form becomes the <code>say_hello</code> tool through <code>toolname</code> and
-      <code>tooldescription</code> alone, with no JavaScript registration.
-    </p>
-    <form
-      toolname="say_hello"
-      tooldescription="Greets a person by name and shows the greeting on the page."
-      @submit="onGreetSubmit"
-    >
-      <label for="greet-name">Name to greet</label>
-      <input
-        id="greet-name"
-        name="name"
-        toolparamdescription="The name of the person to greet."
-        autocomplete="name"
-      >
-      <button type="submit">
-        Greet
-      </button>
-    </form>
-    <p class="status">
-      {{ formStatus }}<template v-if="greeting"> {{ greeting }}</template>
     </p>
 
     <!-- rendered last so filling it after hydration shifts nothing above -->
