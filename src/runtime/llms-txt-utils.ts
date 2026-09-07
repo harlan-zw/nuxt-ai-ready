@@ -8,7 +8,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
-import { toMarkdownPath } from './markdown-path'
+import { isReservedPath, toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
@@ -26,10 +26,7 @@ interface PageItem {
 
 function hasRuntimeMarkdownHandler(pathname: string): boolean {
   const lastSegment = pathname.split('/').pop() || ''
-  return !pathname.startsWith('/api')
-    && !pathname.startsWith('/_')
-    && !pathname.startsWith('/@')
-    && !lastSegment.includes('.')
+  return !isReservedPath(pathname) && !lastSegment.includes('.')
 }
 
 interface MarkdownLinkAvailability {
