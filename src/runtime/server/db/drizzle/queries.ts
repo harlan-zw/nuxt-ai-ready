@@ -328,15 +328,6 @@ export async function countPages(
 }
 
 /**
- * Delete a page by route
- */
-export async function deletePage(event: H3Event | undefined, route: string): Promise<void> {
-  const client = await useDrizzle(event)
-
-  await (client.db as any).delete(pages).where(eq(pages.route, route))
-}
-
-/**
  * Get pending pages (not yet indexed)
  */
 export async function getPendingPages(
