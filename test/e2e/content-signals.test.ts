@@ -24,10 +24,9 @@ describe('robots.txt content signals', async () => {
   it('includes content-signal directives in robots.txt', async () => {
     const robotsTxt = await $fetch('/robots.txt')
 
-    // Should include all three content signal directives
-    expect(robotsTxt).toContain('ai-train=yes')
-    expect(robotsTxt).toContain('search=yes')
-    expect(robotsTxt).toContain('ai-input=no')
+    // contentsignals.org expects one comma-separated line, validators reject one line per signal
+    expect(robotsTxt).toMatch(/^Content-Signal: ai-train=yes, search=yes, ai-input=no$/m)
+    expect(robotsTxt.match(/^Content-Signal:/gm)).toHaveLength(1)
   })
 
   it('applies to user-agent wildcard', async () => {

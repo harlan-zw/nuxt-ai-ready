@@ -363,7 +363,12 @@ export default defineNuxtModule<ModuleOptions>({
         userAgent: '*',
         // Preserve nuxt-robots' default wildcard rule so the injected group remains valid.
         disallow: [''],
-        contentSignal: [`ai-train=${config.contentSignal.aiTrain ? 'yes' : 'no'}`, `search=${config.contentSignal.search ? 'yes' : 'no'}`, `ai-input=${config.contentSignal.aiInput ? 'yes' : 'no'}`],
+        // Object form renders one comma-separated line; an array renders one line per entry, which validators reject.
+        contentSignal: {
+          'ai-train': config.contentSignal.aiTrain ? 'yes' : 'no',
+          'search': config.contentSignal.search ? 'yes' : 'no',
+          'ai-input': config.contentSignal.aiInput ? 'yes' : 'no',
+        },
       }
       if (config.contentSignal.contentUsage !== false)
         group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
