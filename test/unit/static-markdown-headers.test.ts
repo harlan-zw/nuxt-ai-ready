@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, staticDescribedbyEntry } from '../../src/utils/static-markdown-headers'
+import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from '../../src/utils/static-markdown-headers'
 
 describe('buildStaticMarkdownLinkHeader', () => {
   it('emits relative canonical and describedby entries for a page route', () => {
@@ -54,5 +54,22 @@ describe('isStaticMarkdownSourceRoute', () => {
     expect(isStaticMarkdownSourceRoute('/api/data')).toBe(false)
     expect(isStaticMarkdownSourceRoute('/_content')).toBe(false)
     expect(isStaticMarkdownSourceRoute('/@build')).toBe(false)
+  })
+
+  it('keeps pages whose first segment merely starts with a reserved prefix', () => {
+    expect(isStaticMarkdownSourceRoute('/api-reference')).toBe(true)
+    expect(isStaticMarkdownSourceRoute('/apiary/hives')).toBe(true)
+    expect(isStaticMarkdownSourceRoute('/api')).toBe(false)
+  })
+})
+
+describe('prerenderedMarkdownHeaderRules', () => {
+  it('emits a canonical Link for /api-reference but none for /api/foo', () => {
+    const rules = prerenderedMarkdownHeaderRules([
+      { route: '/api-reference', fileName: '/api-reference.md' },
+      { route: '/api/foo', fileName: '/api/foo.md' },
+    ], '/', false)
+    expect(rules.map(r => r.route)).toEqual(['/api-reference.md'])
+    expect(rules[0]!.headers.Link).toContain('</api-reference>; rel="canonical"')
   })
 })

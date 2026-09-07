@@ -3,6 +3,9 @@ import type { H3Event } from '#nuxtseo/h3'
 import { negotiateContent } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeaders } from '#nuxtseo/h3'
+import { isReservedPath } from '../../markdown-path'
+
+const RE_MD_EXT = /\.md$/
 
 /**
  * Lower-cased request headers plus the request path. Every negotiation input is
@@ -65,7 +68,7 @@ export function getRequestRenderInfo(
   const originalPath = queryIndex === -1 ? request.path : request.path.slice(0, queryIndex)
   const isPrerender = mode._tag === 'prerender'
 
-  if (originalPath.startsWith('/api') || originalPath.startsWith('/_') || originalPath.startsWith('/@'))
+  if (isReservedPath(originalPath.replace(RE_MD_EXT, '')))
     return null
 
   const accept = request.headers.accept || ''
