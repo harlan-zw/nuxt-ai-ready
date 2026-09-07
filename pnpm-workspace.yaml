@@ -117,12 +117,12 @@ catalogs:
     eslint: ^10.10.0
   dev-test:
     '@nuxt/test-utils': ^4.2.0
-    '@vitest/coverage-v8': ^4.1.11
+    '@vitest/coverage-v8': ^5.0.0
     '@vue/test-utils': ^2.5.0
     happy-dom: ^20.14.0
     playwright: ^1.63.0
     playwright-core: ^1.63.0
-    vitest: ^4.1.11
+    vitest: ^5.0.0
   nuxt:
     '@nuxt/content': ^3.16.0
     '@nuxt/kit': ^4.5.2
