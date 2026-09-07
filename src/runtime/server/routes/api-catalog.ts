@@ -8,11 +8,12 @@ interface ApiCatalogRuntimeConfig {
 }
 
 export default defineEventHandler((event) => {
+  setHeader(event, 'Access-Control-Allow-Origin', '*')
+
   if (event.method === 'OPTIONS') {
     setHeaders(event, {
       'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
       'Access-Control-Allow-Methods': 'GET, HEAD',
-      'Access-Control-Allow-Origin': '*',
     })
     setResponseStatus(event, 204)
     return null
