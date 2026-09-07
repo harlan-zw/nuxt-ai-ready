@@ -30,13 +30,30 @@ async function requireSecret(cwd: string, hint = ''): Promise<string | null> {
   return secret
 }
 
-async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T | null> {
-  return fetch(url, init)
-    .then(r => r.json())
-    .catch((err) => {
-      consola.error(`${errorLabel}: ${err.message}`)
+function describeHttpError(status: number, body: unknown): string {
+  const error = body as { message?: unknown, statusMessage?: unknown, error?: unknown } | null
+  const message = typeof error?.message === 'string' && error.message
+    ? error.message
+    : typeof error?.statusMessage === 'string' && error.statusMessage
+      ? error.statusMessage
+      : typeof error?.error === 'string' && error.error
+        ? error.error
+        : null
+  return message ? `${status}: ${message}` : `request failed with status ${status}`
+}
+
+async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T> {
+  const r = await fetch(url, init).catch((err) => {
+    throw new Error(`${errorLabel}: ${err instanceof Error ? err.message : String(err)}`)
+  })
+  if (!r.ok) {
+    const body = await r.json().catch(() => {
+      // Non-JSON error bodies (e.g. an HTML proxy page) carry no message to show.
       return null
     })
+    throw new Error(`${errorLabel}: ${describeHttpError(r.status, body)}`)
+  }
+  return r.json()
 }
 
 const main = defineCommand({
@@ -74,8 +91,6 @@ const main = defineCommand({
         consola.info(`Fetching status from ${args.url}...`)
 
         const res = await fetchJson(url, { headers: authHeaders(secret) }, 'Failed to connect')
-        if (!res)
-          return
 
         consola.box('AI Ready Status')
 
@@ -170,8 +185,6 @@ const main = defineCommand({
         consola.info(`Triggering poll at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
 
         consola.success(`Indexed: ${colors.green(res.indexed?.toString() || '0')} pages`)
         consola.info(`Remaining: ${colors.yellow(res.remaining?.toString() || '0')}`)
@@ -223,8 +236,6 @@ const main = defineCommand({
         consola.info(`Restoring database at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
-        if (!res)
-          return
 
         consola.success(`Restored: ${colors.green(res.restored?.toString() || '0')} pages`)
         if (res.cleared) {
@@ -283,9 +294,6 @@ const main = defineCommand({
           headers: secret ? authHeaders(secret) : undefined,
         })
 
-        if (!res)
-          return
-
         if (args.dry) {
           consola.info(`Would prune: ${colors.yellow(res.count?.toString() || '0')} routes`)
           if (res.routes?.length) {
@@ -299,6 +307,66 @@ const main = defineCommand({
         }
         else {
           consola.success(`Pruned: ${colors.green(res.pruned?.toString() || '0')} routes`)
+        }
+      },
+    }),
+
+    reindex: () => defineCommand({
+      meta: {
+        name: 'reindex',
+        description: 'Reindex a single route',
+      },
+      args: {
+        route: {
+          type: 'positional',
+          description: 'Route to reindex (e.g. /about)',
+          required: true,
+        },
+        url: {
+          type: 'string',
+          alias: 'u',
+          description: 'Site URL (default: http://localhost:3000)',
+          default: 'http://localhost:3000',
+        },
+        force: {
+          type: 'boolean',
+          description: 'Index even when the page is still fresh',
+          default: true,
+          negativeDescription: 'Skip indexing when the page is still fresh',
+        },
+        cwd: {
+          type: 'string',
+          description: 'Working directory',
+          default: '.',
+        },
+      },
+      async run({ args }) {
+        const cwd = resolve(args.cwd || '.')
+        const secret = await requireSecret(cwd)
+        if (!secret)
+          return
+
+        const params = new URLSearchParams()
+        params.set('route', args.route)
+        if (!args.force)
+          params.set('force', 'false')
+
+        const url = `${args.url}/__ai-ready/reindex?${params}`
+        consola.info(`Reindexing ${args.route} at ${args.url}...`)
+
+        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
+
+        if (res.indexed) {
+          consola.success(`Indexed: ${colors.green(res.route)}`)
+          if (res.contentChanged !== undefined) {
+            consola.info(`Content changed: ${res.contentChanged ? colors.green('yes') : colors.yellow('no')}`)
+          }
+        }
+        else if (res.skipped) {
+          consola.info(`Skipped: ${colors.yellow(res.route)} (still fresh)`)
+        }
+        else {
+          throw new Error(`Failed to reindex ${res.route ?? args.route}${res.error ? `: ${res.error}` : ''}`)
         }
       },
     }),
