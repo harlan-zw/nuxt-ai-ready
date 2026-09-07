@@ -118,6 +118,36 @@ export function normalizeRoute(route: string): string {
   return route.startsWith('/') ? route : `/${route}`
 }
 
+const RE_LIKE_META = /[\\%_]/g
+
+/**
+ * Escape LIKE/ILIKE wildcard characters in a search term so the term matches
+ * literal text. Pair with an `ESCAPE` clause (see `LIKE_ESCAPE`): SQLite has no
+ * default escape character, so without the clause the escaping is inert.
+ */
+export function escapeLikeTerm(term: string): string {
+  return term.replace(RE_LIKE_META, ch => `\\${ch}`)
+}
+
+/** Substring LIKE/ILIKE pattern for a term, with wildcards escaped. */
+export function likeSubstring(term: string): string {
+  return `%${escapeLikeTerm(term)}%`
+}
+
+/** Escape character to bind next to `likeSubstring` patterns. */
+export const LIKE_ESCAPE = '\\'
+
+const MAX_BIND_PARAMS_PER_STATEMENT = 100
+
+/**
+ * Multi-row INSERT chunk size that keeps one statement within the 100-bind
+ * cap shared by SQLite and D1, derived from the row's bind count so an added
+ * column resizes the chunk instead of breaking the insert.
+ */
+export function maxRowsPerInsert(paramsPerRow: number): number {
+  return Math.max(1, Math.floor(MAX_BIND_PARAMS_PER_STATEMENT / paramsPerRow))
+}
+
 /**
  * Normalize route to storage key format
  * e.g., '/about/team' -> 'about:team', '/' -> 'index'
