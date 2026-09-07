@@ -1,4 +1,4 @@
-import { normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
+import { isReservedPath, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
 
@@ -14,7 +14,7 @@ export function isStaticMarkdownSourceRoute(route: string): boolean {
   if (route.includes('*') || route.includes(':'))
     return false
   const path = route.split('?')[0] || route
-  if (path.startsWith('/api') || path.startsWith('/_') || path.startsWith('/@'))
+  if (isReservedPath(path))
     return false
   const lastSegment = path.split('/').pop() || ''
   return !lastSegment.includes('.')
