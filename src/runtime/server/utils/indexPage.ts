@@ -175,5 +175,12 @@ export async function indexPageByRoute(
     return { success: false, error: `Failed to fetch HTML for ${route}` }
   }
 
-  return indexPage(route, html, options, event)
+  try {
+    return await indexPage(route, html, options, event)
+  }
+  catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logger.warn(`[indexPageByRoute] Failed to index ${route}:`, message)
+    return { success: false, error: message || `Failed to index ${route}` }
+  }
 }
