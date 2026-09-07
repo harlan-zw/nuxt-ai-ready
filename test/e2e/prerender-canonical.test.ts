@@ -1,5 +1,6 @@
 import { createResolver } from '@nuxt/kit'
 import { $fetch, setup } from '@nuxt/test-utils'
+import { fetch, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -40,5 +41,30 @@ describe('prerender canonical HTML (issue #36)', async () => {
     expect(md).not.toContain('<!DOCTYPE')
     expect(md).not.toContain('http-equiv="refresh"')
     expect(md).toContain('Welcome to Test Site')
+  })
+
+  it('emits canonical and describedby Link headers on the prerendered markdown twin', async () => {
+    const response = await fetch(url('/about.md'))
+
+    expect(response.status).toBe(200)
+    // last-modified proves Nitro's static handler answers, which is the path
+    // that never runs the negotiation middleware (#82).
+    expect(response.headers.get('last-modified')).toBeTruthy()
+    const link = response.headers.get('link') || ''
+    expect(link).toContain('</about>; rel="canonical"')
+    expect(link).toContain('</llms.txt>; rel="describedby"')
+  })
+
+  it('emits the same Link headers on a twin discovered only by crawling', async () => {
+    // /crawled is linked from the index page but absent from
+    // nitro.prerender.routes, so only the crawler can have prerendered it.
+    const response = await fetch(url('/crawled.md'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('last-modified')).toBeTruthy()
+    const link = response.headers.get('link') || ''
+    expect(link).toContain('</crawled>; rel="canonical"')
+    expect(link).toContain('</crawled>; rel="alternate"; type="text/html"')
+    expect(link).toContain('</llms.txt>; rel="describedby"')
   })
 })

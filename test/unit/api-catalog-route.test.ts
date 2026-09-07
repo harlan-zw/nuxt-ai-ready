@@ -59,6 +59,13 @@ describe('gET /.well-known/api-catalog route', () => {
     expect(headers.get('link')).toBe(`<${catalogConfig().href}>; rel="api-catalog"`)
   })
 
+  it('grants the same cross-origin access on GET that OPTIONS advertises', async () => {
+    const { status, headers } = await call('GET')
+
+    expect(status).toBe(200)
+    expect(headers.get('access-control-allow-origin')).toBe('*')
+  })
+
   it('answers 404 when the runtime config is missing', async () => {
     config.apiCatalog = undefined
 
