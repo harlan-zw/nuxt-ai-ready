@@ -11,7 +11,13 @@ const config = {
   database: { filename: '' },
 }
 
-const { fetchWithEvent } = vi.hoisted(() => ({ fetchWithEvent: vi.fn() }))
+const { fetchWithEvent, convertHtmlToMarkdown } = vi.hoisted(() => ({ fetchWithEvent: vi.fn(), convertHtmlToMarkdown: vi.fn() }))
+
+vi.mock('../../src/runtime/server/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/runtime/server/utils')>()
+  convertHtmlToMarkdown.mockImplementation(actual.convertHtmlToMarkdown)
+  return { ...actual, convertHtmlToMarkdown }
+})
 
 vi.mock('#nuxtseo/nitro', () => ({
   fetchWithEvent,
@@ -109,6 +115,17 @@ describe('pOST /__ai-ready/reindex', () => {
     const recovery = await reindex('?route=/missing')
     expect(recovery.status).toBe(200)
     expect(recovery.body.indexed).toBe(true)
+  })
+
+  it('answers 502 when conversion throws', async () => {
+    fetchWithEvent.mockResolvedValue(html('About'))
+    convertHtmlToMarkdown.mockRejectedValueOnce(new Error('mdream conversion failed'))
+
+    const { status, body } = await reindex('?route=/about')
+
+    expect(status).toBe(502)
+    expect(body).toMatchObject({ route: '/about', indexed: false })
+    expect(body.error).toContain('mdream conversion failed')
   })
 
   it('skips a fresh page when force is false', async () => {
