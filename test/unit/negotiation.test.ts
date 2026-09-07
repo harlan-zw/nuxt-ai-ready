@@ -41,6 +41,13 @@ describe('getMarkdownRenderInfo', () => {
       negotiation: 'markdown',
     })
   })
+
+  it('renders /api-reference.md but skips the /api route namespace', () => {
+    const mode = { _tag: 'runtime', contentNegotiation: false } as const
+    expect(getMarkdownRenderInfo(mockEvent({}, '/api-reference.md'), mode)).toMatchObject({ path: '/api-reference' })
+    expect(getMarkdownRenderInfo(mockEvent({}, '/api/foo.md'), mode)).toBeNull()
+    expect(getMarkdownRenderInfo(mockEvent({}, '/api.md'), mode)).toBeNull()
+  })
 })
 
 describe('negotiateRepresentation', () => {
