@@ -109,6 +109,17 @@ describe('pOST /__ai-ready/poll limit defaults', () => {
     }
   })
 
+  it('truncates a fractional configured batch size to an integer', async () => {
+    config.runtimeSync.batchSize = 2.5
+    try {
+      await poll()
+      expect(batchIndexPages).toHaveBeenCalledWith(expect.anything(), { limit: 2, all: false, timeout: undefined })
+    }
+    finally {
+      config.runtimeSync.batchSize = 25
+    }
+  })
+
   it('falls back to 10 for a non-numeric configured batch size', async () => {
     config.runtimeSync.batchSize = Number.NaN
     try {
