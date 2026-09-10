@@ -1,3 +1,4 @@
+import { defu } from 'defu'
 import { isReservedPath, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
@@ -95,4 +96,73 @@ export function prerenderedMarkdownHeaderRules(
     }
   }
   return [...rules.values()]
+}
+
+const RE_EXACT_MARKDOWN_ROUTE = /^\/[^*:\s]*\.md$/
+
+/** A route rule Nitro's Cloudflare presets write into `_headers`: any rule carrying headers. */
+function isStaticHeaderRouteRule([, rule]: [string, object | undefined]): boolean {
+  return Boolean(rule && 'headers' in rule && rule.headers)
+}
+
+export type StaticMarkdownHeaderPlan
+  = | { _tag: 'apply', rules: StaticMarkdownHeaderRule[] }
+    | {
+      _tag: 'skip'
+      /** Exact `.md` route rules already registered that the caller must remove. */
+      drop: string[]
+      /** Rules `_headers` would have held with every twin included. */
+      total: number
+      /** Twins that lose their per-page rule. */
+      dropped: number
+    }
+
+/**
+ * Whether the per-page `.md` rules fit the host's `_headers` budget.
+ *
+ * Nitro writes one `_headers` rule per route rule that carries headers, and
+ * Cloudflare rejects the file past its limit, which fails the deploy. The
+ * decision happens here, on the route rules, so the file is never over budget
+ * at any point in the build; a module auditing `_headers` earlier in the
+ * `compiled` hook order sees it already trimmed. Over budget, every exact
+ * `.md` rule goes, including the ones registered at config time, and the
+ * `/*.md` glob keeps the charset and describedby entries.
+ */
+export function planStaticMarkdownHeaderRules(
+  routeRules: Record<string, object | undefined>,
+  rules: StaticMarkdownHeaderRule[],
+  limit: number | null,
+): StaticMarkdownHeaderPlan {
+  if (limit === null)
+    return { _tag: 'apply', rules }
+  const entries = Object.entries(routeRules).filter(isStaticHeaderRouteRule)
+  const registeredMarkdown = entries.map(([route]) => route).filter(route => RE_EXACT_MARKDOWN_ROUTE.test(route))
+  const other = entries.length - registeredMarkdown.length
+  const markdown = new Set([...registeredMarkdown, ...rules.map(rule => rule.route)])
+  const total = other + markdown.size
+  if (total <= limit)
+    return { _tag: 'apply', rules }
+  return { _tag: 'skip', drop: registeredMarkdown, total, dropped: markdown.size }
+}
+
+/**
+ * Apply the plan to the route rules: merge in the twin rules on `apply`.
+ * Over budget, only the headers entry goes: Nitro's Cloudflare presets skip
+ * rules with falsy headers, and the rest of the rule (redirect, etc.) keeps
+ * working.
+ */
+export function applyStaticMarkdownHeaderPlan(
+  routeRules: Record<string, object | undefined>,
+  plan: StaticMarkdownHeaderPlan,
+): void {
+  if (plan._tag === 'skip') {
+    for (const route of plan.drop) {
+      const rule = routeRules[route] as { headers?: unknown } | undefined
+      if (rule)
+        rule.headers = undefined
+    }
+    return
+  }
+  for (const { route, headers } of plan.rules)
+    routeRules[route] = defu({ headers }, routeRules[route])
 }
