@@ -37,7 +37,7 @@ import {
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
-import { ensureStaticHeader } from './utils/static-headers'
+import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, enforceStaticHeaderBudget, ensureStaticHeader } from './utils/static-headers'
 import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -1120,6 +1120,18 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
               'Link',
               staticDescribedbyEntry(nitro.options.baseURL || '/'),
             )
+          }
+          // Cloudflare refuses the upload past its rule limit, which fails
+          // the whole deploy, and every prerendered page added one exact rule
+          // above. Under budget nothing changes.
+          if (String(nitro.options.preset || '').startsWith('cloudflare')) {
+            const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
+            if (budget.dropped > 0) {
+              mergedHeaders = budget.contents
+              logger.warn(`_headers had ${budget.total + budget.dropped} rules and Cloudflare allows ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}. Dropped the ${budget.dropped} per-page .md rules; the /*.md glob still sets the charset and describedby entries, but static markdown no longer sends a per-page canonical Link.`)
+            }
+            if (budget.total > CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
+              logger.warn(`_headers still has ${budget.total} rules after dropping the .md rules. Cloudflare will reject the deploy until the other rules fit under ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}.`)
           }
           if (mergedHeaders !== headers) {
             await writeFile(headersPath, mergedHeaders)
