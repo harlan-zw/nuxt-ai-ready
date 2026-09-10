@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v2.2.1...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.2.1...main)
+
+### 🚀 Enhancements
+
+- **agent-skills:** Serve a local skill at a root alias ([#111](https://github.com/harlan-zw/nuxt-ai-ready/pull/111))
+- **agent-skills:** Discover skills/<name>/SKILL.md and publish by convention ([#113](https://github.com/harlan-zw/nuxt-ai-ready/pull/113))
+
+### 🩹 Fixes
+
+- **module:** Decide the _headers budget on the route rules ([#112](https://github.com/harlan-zw/nuxt-ai-ready/pull/112))
+
+### 📖 Documentation
+
+- **changelog:** Record recent releases ([#115](https://github.com/harlan-zw/nuxt-ai-ready/pull/115))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v2.2.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.2.0...main)
