@@ -1,6 +1,54 @@
 # Changelog
 
 
+## v2.2.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.2.0...main)
+
+### 🩹 Fixes
+
+- **module:** Keep _headers under the Cloudflare rule limit ([#110](https://github.com/harlan-zw/nuxt-ai-ready/pull/110))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
+## v2.1.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.1.0...main)
+
+### 🚀 Enhancements
+
+- Add sitemap.md, canonical and describedby links ([#101](https://github.com/harlan-zw/nuxt-ai-ready/pull/101))
+- **server:** Add single-route reindex endpoint and cli ([#104](https://github.com/harlan-zw/nuxt-ai-ready/pull/104))
+
+### 🩹 Fixes
+
+- **cron:** Report a failed run instead of throwing out of the task ([#95](https://github.com/harlan-zw/nuxt-ai-ready/pull/95))
+- **server:** Gate devtools debug endpoint to dev or debug mode ([#97](https://github.com/harlan-zw/nuxt-ai-ready/pull/97))
+- **db:** Add lock ownership tokens and guard poll endpoint ([#98](https://github.com/harlan-zw/nuxt-ai-ready/pull/98))
+- **module:** Align config defaults and wire poll batch size ([#99](https://github.com/harlan-zw/nuxt-ai-ready/pull/99))
+- **db:** Retry errored pages and derive locale from page url ([#100](https://github.com/harlan-zw/nuxt-ai-ready/pull/100))
+- **db:** Repair neon transactions, LIKE escaping and seed chunking ([#102](https://github.com/harlan-zw/nuxt-ai-ready/pull/102))
+- **module:** Emit one Content-Signal line in robots.txt ([#108](https://github.com/harlan-zw/nuxt-ai-ready/pull/108))
+
+### 💅 Refactors
+
+- **webmcp:** Remove unimplemented declarative API types ([#96](https://github.com/harlan-zw/nuxt-ai-ready/pull/96))
+
+### 📖 Documentation
+
+- Refresh CLAUDE.md to match current architecture ([d381c3a](https://github.com/harlan-zw/nuxt-ai-ready/commit/d381c3a))
+
+### 🏡 Chore
+
+- Bump ([ad644cd](https://github.com/harlan-zw/nuxt-ai-ready/commit/ad644cd))
+- **db:** Remove dead query exports ([#103](https://github.com/harlan-zw/nuxt-ai-ready/pull/103))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v2.0.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.0.1...main)
