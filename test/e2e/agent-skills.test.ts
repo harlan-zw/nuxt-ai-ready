@@ -65,6 +65,24 @@ describe('agent skills discovery', async () => {
     )
   })
 
+  it('serves the alias verbatim, even to a client that asks for HTML', async () => {
+    // Content negotiation owns explicit `.md` requests and would otherwise
+    // render this route and add generated frontmatter. The alias must skip it.
+    const response = await fetch('/docs/SKILL.md', { headers: { accept: 'text/html,application/xhtml+xml' }, redirect: 'manual' })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    await expect(response.text()).resolves.toBe(localSkill)
+  })
+
+  it('keeps the discovery index on the well-known artifact URL when an alias exists', async () => {
+    const response = await fetch('/.well-known/agent-skills/index.json')
+    const index = await response.json() as { skills: Array<{ name: string, url: string }> }
+
+    expect(index.skills.find(skill => skill.name === 'seo-audit')?.url).toBe('seo-audit/SKILL.md')
+  })
+
   it('resolves an advertised local artifact after the app-base redirect', async () => {
     const indexResponse = await fetch('/.well-known/agent-skills/index.json')
     const index = await indexResponse.json()

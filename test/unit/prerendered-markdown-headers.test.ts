@@ -11,6 +11,7 @@ describe('prerenderedMarkdownHeaderRules', () => {
       ],
       '/',
       true,
+      [],
     )
 
     expect(rules).toHaveLength(1)
@@ -26,6 +27,7 @@ describe('prerenderedMarkdownHeaderRules', () => {
       [{ route: '/base/index.md', fileName: '/index.md' }],
       '/base',
       true,
+      [],
     )
 
     expect(rules[0]!.route).toBe('/index.md')
@@ -45,6 +47,7 @@ describe('prerenderedMarkdownHeaderRules', () => {
       ],
       '/',
       true,
+      [],
     )
 
     expect(rules.map(rule => rule.route)).toEqual(['/a.md'])
@@ -55,12 +58,49 @@ describe('prerenderedMarkdownHeaderRules', () => {
       [{ route: '/a.md', fileName: '/a.md' }],
       '/',
       false,
+      [],
     )
 
     expect(rules[0]!.headers.Link).not.toContain('describedby')
   })
 
   it('returns no rules when nothing markdown-backed was prerendered', () => {
-    expect(prerenderedMarkdownHeaderRules([], '/', true)).toEqual([])
+    expect(prerenderedMarkdownHeaderRules([], '/', true, [])).toEqual([])
+  })
+
+  it('excludes an alias artifact route from twin rules', () => {
+    const rules = prerenderedMarkdownHeaderRules(
+      [{ route: '/SKILL.md', fileName: '/SKILL.md' }],
+      '/',
+      true,
+      ['/SKILL.md'],
+    )
+
+    expect(rules).toEqual([])
+  })
+
+  it('excludes a well-known agent-skill artifact route from twin rules', () => {
+    const rules = prerenderedMarkdownHeaderRules(
+      [{
+        route: '/.well-known/agent-skills/seo-audit/SKILL.md',
+        fileName: '/.well-known/agent-skills/seo-audit/SKILL.md',
+      }],
+      '/',
+      true,
+      ['/.well-known/agent-skills/seo-audit/SKILL.md'],
+    )
+
+    expect(rules).toEqual([])
+  })
+
+  it('keeps twin rules for routes outside the artifact list', () => {
+    const rules = prerenderedMarkdownHeaderRules(
+      [{ route: '/a.md', fileName: '/a.md' }],
+      '/',
+      true,
+      ['/SKILL.md'],
+    )
+
+    expect(rules.map(rule => rule.route)).toEqual(['/a.md'])
   })
 })

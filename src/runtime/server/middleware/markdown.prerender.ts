@@ -9,6 +9,7 @@ import { fetchRawWithEvent } from '../utils/fetch'
 import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
 import { getMarkdownRenderInfo } from '../utils/markdown-request'
+import { agentSkillArtifactPaths } from '../utils/negotiation-response'
 import { consumePrerenderedHtml } from '../utils/prerender-html'
 import { isSitemapMdRequest } from '../utils/sitemap-md'
 
@@ -30,7 +31,7 @@ function extractHeadingsFromMarkdown(markdown: string): Array<Record<string, str
 }
 
 export default defineEventHandler(async (event) => {
-  if (event.path.startsWith('/.well-known/'))
+  if (event.path.startsWith('/.well-known/') || agentSkillArtifactPaths().has(event.path))
     return
 
   // Only run during prerender

@@ -18,10 +18,15 @@ export interface NegotiationInput {
   request: MarkdownRequest
   routeRule: NegotiationRouteRule
   policy: ContentNegotiationPolicy
+  /**
+   * Routes that already serve a Markdown file verbatim, such as an agent skill
+   * alias. They are answered by their own handler, never rendered.
+   */
+  artifactPaths?: ReadonlySet<string>
 }
 
 export type NegotiationDecision
-  = | { _tag: 'skip', reason: 'well-known' | 'internal' | 'not-a-page' | 'deferred' }
+  = | { _tag: 'skip', reason: 'well-known' | 'internal' | 'artifact' | 'not-a-page' | 'deferred' }
     | { _tag: 'not-acceptable' }
     | { _tag: 'html', path: string, negotiation: ContentNegotiationResolution }
     | { _tag: 'redirect', path: string }
@@ -39,6 +44,9 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
 
   if (path.startsWith('/.well-known/'))
     return { _tag: 'skip', reason: 'well-known' }
+
+  if (input.artifactPaths?.has(path))
+    return { _tag: 'skip', reason: 'artifact' }
 
   // Internal module requests need the HTML representation.
   if (request.headers[INTERNAL_HEADER])
