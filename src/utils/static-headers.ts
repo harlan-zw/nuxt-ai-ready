@@ -49,3 +49,60 @@ export function ensureStaticHeader(
   const prefix = blockStart === routeLineEnd ? eol : ''
   return `${contents.slice(0, blockStart)}${prefix}  ${name}: ${value}${eol}${contents.slice(blockStart)}`
 }
+
+/** Cloudflare rejects a `_headers` file with more rules than this (code 100324). */
+export const CLOUDFLARE_STATIC_HEADER_RULE_LIMIT = 100
+
+export interface StaticHeaderBudgetResult {
+  contents: string
+  /** Rules left in the file. */
+  total: number
+  /** Exact `.md` rules removed to get under the limit. */
+  dropped: number
+}
+
+const RE_EXACT_MARKDOWN_ROUTE = /^\/[^*\s]*\.md[\t ]*\r?$/
+
+interface HeaderBlock {
+  route: string | null
+  text: string
+}
+
+/** Splits a `_headers` file into its rule blocks. Leading comments and blank lines form a routeless block. */
+function splitHeaderBlocks(contents: string): HeaderBlock[] {
+  const blocks: HeaderBlock[] = []
+  let current: HeaderBlock = { route: null, text: '' }
+  for (const line of contents.split(/(?<=\n)/)) {
+    const isRoute = /^[^\s#]/.test(line)
+    if (isRoute) {
+      blocks.push(current)
+      current = { route: line.trimEnd(), text: '' }
+    }
+    current.text += line
+  }
+  blocks.push(current)
+  return blocks
+}
+
+/**
+ * Keeps a `_headers` file under a host's rule limit.
+ *
+ * Exact `.md` rules are the ones this module multiplies, one per prerendered
+ * page, so a site with more pages than the limit fails its whole deploy on the
+ * upload. When the file is over budget those rules go first. The `/*.md` glob
+ * still sets the charset and describedby entries for every markdown twin;
+ * only the per-page canonical and alternate entries are lost.
+ */
+export function enforceStaticHeaderBudget(contents: string, limit: number): StaticHeaderBudgetResult {
+  const blocks = splitHeaderBlocks(contents)
+  const ruleCount = blocks.filter(block => block.route !== null).length
+  if (ruleCount <= limit)
+    return { contents, total: ruleCount, dropped: 0 }
+
+  const kept = blocks.filter(block => block.route === null || !RE_EXACT_MARKDOWN_ROUTE.test(block.route))
+  return {
+    contents: kept.map(block => block.text).join(''),
+    total: kept.filter(block => block.route !== null).length,
+    dropped: ruleCount - kept.filter(block => block.route !== null).length,
+  }
+}
