@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AGENT_SKILLS_SCHEMA, applyRootAlias, discoverAgentSkills, mergeAgentSkills, prepareAgentSkills, resolveAgentSkillsConfig, ROOT_SKILL_ALIAS } from '../../src/utils/agent-skills'
+import { resolveExternalSkillUrl } from '../../src/utils/agent-skills-config'
 
 const localSkill = `---
 name: seo-audit
@@ -67,8 +68,8 @@ describe('resolveAgentSkillsConfig', () => {
         '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill,
       },
       links: [
-        { name: 'seo-audit', description: 'Audit a site for critical SEO issues.', href: '/.well-known/agent-skills/seo-audit/SKILL.md' },
-        { name: 'seo-toolkit', description: 'Use the complete SEO toolkit and its supporting resources.', href: 'https://cdn.example.com/seo-toolkit.tar.gz' },
+        { source: 'local', name: 'seo-audit', description: 'Audit a site for critical SEO issues.', href: '/.well-known/agent-skills/seo-audit/SKILL.md' },
+        { source: 'external', name: 'seo-toolkit', description: 'Use the complete SEO toolkit and its supporting resources.', href: 'https://cdn.example.com/seo-toolkit.tar.gz' },
       ],
     })
   })
@@ -428,6 +429,40 @@ describe('discoverAgentSkills', () => {
   it('finds nothing when the directory is absent', async () => {
     const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
     await expect(discoverAgentSkills({ rootDir, scanDirs: [rootDir], dir: 'skills' })).resolves.toEqual({ skills: [], issues: [] })
+  })
+})
+
+describe('resolveExternalSkillUrl', () => {
+  const indexUrl = 'https://site.example.com/.well-known/agent-skills/index.json'
+
+  it('strips ASCII tab, LF, and CR from an absolute href', () => {
+    expect(resolveExternalSkillUrl('https://cdn.example.com/a\tb\nc', indexUrl))
+      .toBe('https://cdn.example.com/abc')
+  })
+
+  it('strips ASCII tab, LF, and CR from a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//cdn.example.com/a\tb\nc', indexUrl))
+      .toBe('//cdn.example.com/abc')
+  })
+
+  it('percent-encodes interior control characters in an absolute href', () => {
+    expect(resolveExternalSkillUrl('https://cdn.example.com/a\u0001b', indexUrl))
+      .toBe('https://cdn.example.com/a%01b')
+  })
+
+  it('percent-encodes interior control characters in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//cdn.example.com/a\u0001b', indexUrl))
+      .toBe('//cdn.example.com/a%01b')
+  })
+
+  it('preserves userinfo in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//user:pass@cdn.example.com/x', indexUrl))
+      .toBe('//user:pass@cdn.example.com/x')
+  })
+
+  it('preserves a username without a password in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//user@cdn.example.com/x', indexUrl))
+      .toBe('//user@cdn.example.com/x')
   })
 })
 

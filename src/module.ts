@@ -22,7 +22,7 @@ import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { toMarkdownPath } from './runtime/markdown-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
-import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE } from './utils/agent-skills-config'
+import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { resolveDatabaseConfig, supportsNativeNodeSqlite } from './utils/database'
@@ -433,7 +433,9 @@ export default defineNuxtModule<ModuleOptions>({
         description: `Skills an agent can install from this site. The index at ${indexUrl} carries a sha256 digest for each one.`,
         links: agentSkillsResult.links.map(link => ({
           title: link.name,
-          href: link.href.startsWith('/') ? withSiteUrl(link.href.slice(1), { withBase: true }) : new URL(link.href, indexUrl).href,
+          href: link.source === 'local'
+            ? withSiteUrl(link.href.slice(1), { withBase: true })
+            : resolveExternalSkillUrl(link.href, indexUrl),
           description: link.description,
         })),
       })

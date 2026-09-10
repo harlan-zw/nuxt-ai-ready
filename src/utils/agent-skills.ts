@@ -312,7 +312,7 @@ export async function resolveAgentSkillsConfig(
 
   const entries: AgentSkillsIndexEntry[] = []
   const localArtifacts: Record<string, string> = {}
-  const links: Array<{ name: string, description: string, href: string }> = []
+  const links: Extract<ResolvedAgentSkillsConfig, { _tag: 'Enabled' }>['links'] = []
   for (const result of resolved) {
     if (result._tag !== 'Resolved')
       continue
@@ -322,10 +322,10 @@ export async function resolveAgentSkillsConfig(
         localArtifacts[route] = result.content
       // Prefer the shortest alias: `/SKILL.md` beats `/skills/name/SKILL.md`.
       const [alias] = result.routes.slice(1).sort((a, b) => a.length - b.length)
-      links.push({ name: result.entry.name, description: result.entry.description, href: alias ?? result.routes[0]! })
+      links.push({ source: 'local', name: result.entry.name, description: result.entry.description, href: alias ?? result.routes[0]! })
     }
     else {
-      links.push({ name: result.entry.name, description: result.entry.description, href: result.entry.url })
+      links.push({ source: 'external', name: result.entry.name, description: result.entry.description, href: result.entry.url })
     }
   }
 
