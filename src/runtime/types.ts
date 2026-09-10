@@ -53,12 +53,12 @@ export interface LocalAgentSkillConfig {
   /** SKILL.md path, resolved relative to the Nuxt root directory. */
   file: string
   /**
-   * Also serve the same bytes at this path-absolute `.md` route, such as
-   * `/SKILL.md`. Content negotiation leaves the route alone, so the response
+   * Also serve the same bytes at these path-absolute `.md` routes, such as
+   * `/SKILL.md`. Content negotiation leaves the routes alone, so the response
    * is the file itself with no generated frontmatter. The discovery index
    * keeps advertising the `.well-known` artifact URL.
    */
-  alias?: string
+  alias?: string | string[]
 }
 
 export interface ExternalAgentSkillConfig {
@@ -79,7 +79,29 @@ export interface ExternalAgentSkillConfig {
 export type AgentSkillConfig = LocalAgentSkillConfig | ExternalAgentSkillConfig
 
 export interface AgentSkillsConfig {
-  skills: AgentSkillConfig[]
+  /**
+   * Explicit entries. Discovered skills are merged in first; an explicit entry
+   * with the same name replaces the discovered one.
+   */
+  skills?: AgentSkillConfig[]
+  /**
+   * Directory scanned for `<name>/SKILL.md` in the project root and in every
+   * layer inside it. Each match is published as a local skill and also served
+   * at `/<dir>/<name>/SKILL.md`, mirroring the repository path. `false` turns
+   * discovery off.
+   * @default 'skills'
+   */
+  dir?: string | false
+  /**
+   * Name of the local skill also served at `/SKILL.md`. Defaults to the only
+   * local skill when exactly one exists. `false` publishes no root alias.
+   */
+  root?: string | false
+  /**
+   * Add an "Agent Skills" section to llms.txt listing every published skill.
+   * @default true
+   */
+  llmsTxt?: boolean
 }
 
 export interface AgentSkillsIndexEntry {
@@ -266,9 +288,11 @@ export interface ModuleOptions {
   }
 
   /**
-   * Publish an Agent Skills Discovery v0.2.0 index and optionally host local
-   * SKILL.md artifacts under `/.well-known/agent-skills/`.
-   * @default false
+   * Publish an Agent Skills Discovery v0.2.0 index and host local SKILL.md
+   * artifacts under `/.well-known/agent-skills/`. Skills in `skills/<name>/SKILL.md`
+   * are discovered and published without configuration; nothing is published
+   * when none exist. Set `false` to turn the feature off.
+   * @default {}
    */
   agentSkills?: false | AgentSkillsConfig
 

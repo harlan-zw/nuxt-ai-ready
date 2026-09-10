@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AGENT_SKILLS_SCHEMA, resolveAgentSkillsConfig } from '../../src/utils/agent-skills'
+import { AGENT_SKILLS_SCHEMA, applyRootAlias, discoverAgentSkills, mergeAgentSkills, prepareAgentSkills, resolveAgentSkillsConfig, ROOT_SKILL_ALIAS } from '../../src/utils/agent-skills'
 
 const localSkill = `---
 name: seo-audit
@@ -66,6 +66,10 @@ describe('resolveAgentSkillsConfig', () => {
       localArtifacts: {
         '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill,
       },
+      links: [
+        { name: 'seo-audit', description: 'Audit a site for critical SEO issues.', href: '/.well-known/agent-skills/seo-audit/SKILL.md' },
+        { name: 'seo-toolkit', description: 'Use the complete SEO toolkit and its supporting resources.', href: 'https://cdn.example.com/seo-toolkit.tar.gz' },
+      ],
     })
   })
 
@@ -351,5 +355,163 @@ describe('resolveAgentSkillsConfig', () => {
     }, rootDir)
 
     expect(result).toMatchObject({ _tag: 'Invalid', issues: [{ index: 0, field }] })
+  })
+})
+
+const reviewSkill = `---
+name: site-review
+description: Review a site's pages for content quality issues.
+---
+
+# Site review
+`
+
+async function skillsRoot(files: Record<string, string>): Promise<string> {
+  const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(join(rootDir, path, '..'), { recursive: true })
+    await writeFile(join(rootDir, path), content)
+  }
+  return rootDir
+}
+
+describe('discoverAgentSkills', () => {
+  it('publishes every skills/<name>/SKILL.md with a repository-mirroring alias', async () => {
+    const rootDir = await skillsRoot({
+      'skills/seo-audit/SKILL.md': localSkill,
+      'skills/site-review/SKILL.md': reviewSkill,
+      'skills/notes.md': '# not a skill',
+    })
+
+    const result = await discoverAgentSkills({ rootDir, scanDirs: [rootDir], dir: 'skills' })
+
+    expect(result.issues).toEqual([])
+    expect(result.skills).toEqual([
+      { source: 'local', name: 'seo-audit', description: 'Audit a site for critical SEO issues.', file: 'skills/seo-audit/SKILL.md', alias: '/skills/seo-audit/SKILL.md' },
+      { source: 'local', name: 'site-review', description: 'Review a site\'s pages for content quality issues.', file: 'skills/site-review/SKILL.md', alias: '/skills/site-review/SKILL.md' },
+    ])
+  })
+
+  it('lets the project shadow a layer skill of the same name', async () => {
+    const rootDir = await skillsRoot({
+      'skills/seo-audit/SKILL.md': localSkill,
+      'layers/base/skills/seo-audit/SKILL.md': localSkill.replace('critical', 'layer'),
+      'layers/base/skills/site-review/SKILL.md': reviewSkill,
+    })
+
+    const result = await discoverAgentSkills({ rootDir, scanDirs: [rootDir, join(rootDir, 'layers/base')], dir: 'skills' })
+
+    expect(result.skills.map(skill => [skill.name, skill.file])).toEqual([
+      ['seo-audit', 'skills/seo-audit/SKILL.md'],
+      ['site-review', 'layers/base/skills/site-review/SKILL.md'],
+    ])
+  })
+
+  it('skips a layer outside the Nuxt root', async () => {
+    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    const outside = await skillsRoot({ 'skills/site-review/SKILL.md': reviewSkill })
+
+    const result = await discoverAgentSkills({ rootDir, scanDirs: [rootDir, outside], dir: 'skills' })
+
+    expect(result.skills.map(skill => skill.name)).toEqual(['seo-audit'])
+  })
+
+  it('reports a frontmatter name that does not match its directory, by file path', async () => {
+    const rootDir = await skillsRoot({ 'skills/audit/SKILL.md': localSkill })
+
+    const result = await discoverAgentSkills({ rootDir, scanDirs: [rootDir], dir: 'skills' })
+
+    expect(result.skills).toEqual([])
+    expect(result.issues).toEqual([{ field: 'name', message: 'skills/audit/SKILL.md frontmatter name "seo-audit" must equal its directory name "audit"' }])
+  })
+
+  it('finds nothing when the directory is absent', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
+    await expect(discoverAgentSkills({ rootDir, scanDirs: [rootDir], dir: 'skills' })).resolves.toEqual({ skills: [], issues: [] })
+  })
+})
+
+describe('mergeAgentSkills and applyRootAlias', () => {
+  const discovered = [
+    { source: 'local' as const, name: 'seo-audit', description: 'd', file: 'skills/seo-audit/SKILL.md', alias: '/skills/seo-audit/SKILL.md' },
+    { source: 'local' as const, name: 'site-review', description: 'd', file: 'skills/site-review/SKILL.md', alias: '/skills/site-review/SKILL.md' },
+  ]
+
+  it('lets an explicit entry replace a discovered one by name and keeps the rest', () => {
+    const explicit = { source: 'local' as const, name: 'seo-audit', description: 'd', file: './other/SKILL.md' }
+    expect(mergeAgentSkills(discovered, [explicit])).toEqual([discovered[1], explicit])
+  })
+
+  it('adds /SKILL.md to the only local skill by default', () => {
+    const result = applyRootAlias([discovered[0]!], undefined)
+    expect(result).toEqual({ _tag: 'Ok', skills: [{ ...discovered[0], alias: ['/skills/seo-audit/SKILL.md', ROOT_SKILL_ALIAS] }] })
+  })
+
+  it('adds no root alias when several local skills exist and none is named', () => {
+    expect(applyRootAlias(discovered, undefined)).toEqual({ _tag: 'Ok', skills: discovered })
+  })
+
+  it('names the root skill explicitly and rejects an unknown name', () => {
+    const named = applyRootAlias(discovered, 'site-review')
+    expect(named._tag).toBe('Ok')
+    if (named._tag === 'Ok')
+      expect(named.skills[1]).toMatchObject({ alias: ['/skills/site-review/SKILL.md', '/SKILL.md'] })
+    expect(applyRootAlias(discovered, 'missing')).toEqual({ _tag: 'Invalid', issues: [{ field: 'root', message: 'names no local skill: "missing"' }] })
+    expect(applyRootAlias(discovered, false)).toEqual({ _tag: 'Ok', skills: discovered })
+  })
+})
+
+describe('prepareAgentSkills and resolve with aliases', () => {
+  it.each([true, 0, 42, null, [], ['skills'], {}].map(dir => ({ dir })))('rejects invalid dir: $dir', async ({ dir }) => {
+    // @ts-expect-error Config from JavaScript can contain invalid values.
+    await expect(prepareAgentSkills({ dir }, { rootDir: '/app', scanDirs: [] })).resolves.toEqual({
+      _tag: 'Invalid',
+      issues: [{ field: 'dir', message: 'must be a string or false when set' }],
+    })
+  })
+
+  it('discovers skills in a custom directory', async () => {
+    const rootDir = await skillsRoot({ 'custom/seo-audit/SKILL.md': localSkill })
+
+    await expect(prepareAgentSkills({ dir: 'custom' }, { rootDir, scanDirs: [rootDir] })).resolves.toMatchObject({
+      _tag: 'Ok',
+      skills: [{ name: 'seo-audit', file: 'custom/seo-audit/SKILL.md', alias: '/custom/seo-audit/SKILL.md' }],
+    })
+  })
+
+  it('serves a discovered skill at its mirrored path, at /SKILL.md, and in the index', async () => {
+    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+
+    const prepared = await prepareAgentSkills({}, { rootDir, scanDirs: [rootDir] })
+    expect(prepared._tag).toBe('Ok')
+    if (prepared._tag !== 'Ok')
+      return
+    const rooted = applyRootAlias(prepared.skills, undefined)
+    if (rooted._tag !== 'Ok')
+      return
+    const result = await resolveAgentSkillsConfig({ skills: rooted.skills }, rootDir)
+
+    expect(result).toMatchObject({
+      _tag: 'Enabled',
+      index: { skills: [{ name: 'seo-audit', url: 'seo-audit/SKILL.md' }] },
+      localArtifacts: {
+        '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill,
+        '/skills/seo-audit/SKILL.md': localSkill,
+        '/SKILL.md': localSkill,
+      },
+      links: [{ name: 'seo-audit', href: '/SKILL.md' }],
+    })
+  })
+
+  it('is disabled when nothing is discovered and nothing is configured', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
+    const prepared = await prepareAgentSkills({}, { rootDir, scanDirs: [rootDir] })
+    expect(prepared).toEqual({ _tag: 'Ok', skills: [] })
+    await expect(resolveAgentSkillsConfig({ skills: [] }, rootDir)).resolves.toEqual({ _tag: 'Disabled' })
+  })
+
+  it('turns discovery off with dir: false', async () => {
+    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    await expect(prepareAgentSkills({ dir: false }, { rootDir, scanDirs: [rootDir] })).resolves.toEqual({ _tag: 'Ok', skills: [] })
   })
 })

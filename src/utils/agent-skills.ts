@@ -2,14 +2,15 @@ import type {
   AgentSkillConfig,
   AgentSkillsConfig,
   AgentSkillsIndexEntry,
+  LocalAgentSkillConfig,
 } from '../runtime/types'
 import type {
   AgentSkillsConfigIssue,
   ResolvedAgentSkillsConfig,
 } from './agent-skills-config'
 import { createHash } from 'node:crypto'
-import { readFile, realpath } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { readdir, readFile, realpath } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parseDocument } from 'yaml'
 import { AGENT_SKILLS_SCHEMA } from './agent-skills-config'
 
@@ -22,6 +23,12 @@ const urlBase = 'https://example.com/.well-known/agent-skills/index.json'
 
 function skillRoute(name: string) {
   return `/.well-known/agent-skills/${name}/SKILL.md`
+}
+
+export const ROOT_SKILL_ALIAS = '/SKILL.md'
+
+function aliasesOf(skill: { alias?: string | string[] }): string[] {
+  return skill.alias === undefined ? [] : Array.isArray(skill.alias) ? skill.alias : [skill.alias]
 }
 
 function skillUrl(name: string) {
@@ -37,6 +44,8 @@ function skillUrl(name: string) {
 function validateAlias(alias: unknown, index: number, sitemapMd: boolean): AgentSkillsConfigIssue[] {
   if (alias === undefined)
     return []
+  if (Array.isArray(alias))
+    return alias.flatMap(entry => validateAlias(entry, index, sitemapMd))
   if (typeof alias !== 'string' || !/^\/(?:[^/?#\s]+\/)*[^/?#\s]+\.md$/.test(alias) || alias.split('/').includes('..'))
     return [{ index, field: 'alias', message: 'must be a path-absolute route ending in .md, such as "/SKILL.md"' }]
   if (alias.startsWith('/.well-known/'))
@@ -118,40 +127,36 @@ function resolveExternalEntry(skill: Extract<AgentSkillConfig, { source: 'extern
   }
 }
 
+type SkillFrontmatter
+  = | { _tag: 'Ok', metadata: Record<string, unknown>, hasBody: boolean }
+    | { _tag: 'Err', message: string }
+
+/** The frontmatter block of a SKILL.md, parsed but not yet validated. */
+export function readSkillFrontmatter(content: string): SkillFrontmatter {
+  const match = content.match(/^\uFEFF?---[\t ]*\r?\n([\s\S]*?)\r?\n---[\t ]*(?:\r?\n|$)/)
+  if (!match?.[1])
+    return { _tag: 'Err', message: 'must contain YAML frontmatter with name and description fields' }
+  const document = parseDocument(match[1], { prettyErrors: false })
+  if (document.errors.length > 0)
+    return { _tag: 'Err', message: `contains invalid YAML frontmatter: ${document.errors[0]?.message || 'unknown YAML error'}` }
+  const metadata = document.toJS() as unknown
+  if (!isRecord(metadata))
+    return { _tag: 'Err', message: 'frontmatter must be a YAML mapping with name and description fields' }
+  return { _tag: 'Ok', metadata, hasBody: content.slice(match[0].length).trim().length > 0 }
+}
+
 function parseLocalSkillMetadata(
   content: string,
   skill: Extract<AgentSkillConfig, { source: 'local' }>,
   index: number,
 ): AgentSkillsConfigIssue[] {
-  const match = content.match(/^\uFEFF?---[\t ]*\r?\n([\s\S]*?)\r?\n---[\t ]*(?:\r?\n|$)/)
-  if (!match?.[1]) {
-    return [{
-      index,
-      field: 'file',
-      message: 'must contain YAML frontmatter with name and description fields',
-    }]
-  }
-
-  const document = parseDocument(match[1], { prettyErrors: false })
-  if (document.errors.length > 0) {
-    return [{
-      index,
-      field: 'file',
-      message: `contains invalid YAML frontmatter: ${document.errors[0]?.message || 'unknown YAML error'}`,
-    }]
-  }
-
-  const metadata = document.toJS() as unknown
-  if (!isRecord(metadata)) {
-    return [{
-      index,
-      field: 'file',
-      message: 'frontmatter must be a YAML mapping with name and description fields',
-    }]
-  }
+  const frontmatter = readSkillFrontmatter(content)
+  if (frontmatter._tag === 'Err')
+    return [{ index, field: 'file', message: frontmatter.message }]
+  const { metadata } = frontmatter
 
   const issues: AgentSkillsConfigIssue[] = []
-  if (!content.slice(match[0].length).trim()) {
+  if (!frontmatter.hasBody) {
     issues.push({
       index,
       field: 'file',
@@ -225,7 +230,7 @@ async function resolveLocalEntry(
             issues: metadataIssues,
           }
         }
-        const routes = skill.alias ? [skillRoute(skill.name), skill.alias] : [skillRoute(skill.name)]
+        const routes = [skillRoute(skill.name), ...aliasesOf(skill)]
         const digest = `sha256:${createHash('sha256').update(content).digest('hex')}` as const
         return {
           _tag: 'Resolved' as const,
@@ -267,34 +272,37 @@ export async function resolveAgentSkillsConfig(
   if (config === false || config === undefined)
     return { _tag: 'Disabled' }
 
-  if (!isRecord(config) || !Array.isArray(config.skills)) {
+  if (!isRecord(config) || (config.skills !== undefined && !Array.isArray(config.skills))) {
     return {
       _tag: 'Invalid',
-      issues: [{ field: 'agentSkills', message: 'must contain a skills array' }],
+      issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }],
     }
   }
+  const configuredSkills: unknown[] = config.skills ?? []
+  if (configuredSkills.length === 0)
+    return { _tag: 'Disabled' }
 
   const sitemapMd = options.sitemapMd !== false
-  const issues = config.skills.flatMap((skill, index) => validateSkill(skill, index, sitemapMd))
+  const issues = configuredSkills.flatMap((skill, index) => validateSkill(skill, index, sitemapMd))
   const seenNames = new Set<string>()
   const seenAliases = new Set<string>()
-  for (const [index, skill] of config.skills.entries()) {
+  for (const [index, skill] of configuredSkills.entries()) {
     if (!isRecord(skill) || typeof skill.name !== 'string' || seenNames.has(skill.name)) {
       if (isRecord(skill) && typeof skill.name === 'string' && seenNames.has(skill.name))
         issues.push({ index, field: 'name', message: `duplicates the skill name "${skill.name}"` })
       continue
     }
     seenNames.add(skill.name)
-    if (typeof skill.alias === 'string') {
-      if (seenAliases.has(skill.alias))
-        issues.push({ index, field: 'alias', message: `duplicates the alias "${skill.alias}"` })
-      seenAliases.add(skill.alias)
+    for (const alias of aliasesOf(skill as { alias?: string | string[] })) {
+      if (seenAliases.has(alias))
+        issues.push({ index, field: 'alias', message: `duplicates the alias "${alias}"` })
+      seenAliases.add(alias)
     }
   }
   if (issues.length > 0)
     return { _tag: 'Invalid', issues }
 
-  const skills = config.skills as AgentSkillConfig[]
+  const skills = configuredSkills as AgentSkillConfig[]
   const resolved = await Promise.all(skills.map((skill, index) => skill.source === 'local'
     ? resolveLocalEntry(skill, index, rootDir)
     : Promise.resolve({ _tag: 'Resolved' as const, entry: resolveExternalEntry(skill) })))
@@ -304,6 +312,7 @@ export async function resolveAgentSkillsConfig(
 
   const entries: AgentSkillsIndexEntry[] = []
   const localArtifacts: Record<string, string> = {}
+  const links: Array<{ name: string, description: string, href: string }> = []
   for (const result of resolved) {
     if (result._tag !== 'Resolved')
       continue
@@ -311,6 +320,12 @@ export async function resolveAgentSkillsConfig(
     if ('routes' in result) {
       for (const route of result.routes)
         localArtifacts[route] = result.content
+      // Prefer the shortest alias: `/SKILL.md` beats `/skills/name/SKILL.md`.
+      const [alias] = result.routes.slice(1).sort((a, b) => a.length - b.length)
+      links.push({ name: result.entry.name, description: result.entry.description, href: alias ?? result.routes[0]! })
+    }
+    else {
+      links.push({ name: result.entry.name, description: result.entry.description, href: result.entry.url })
     }
   }
 
@@ -321,5 +336,138 @@ export async function resolveAgentSkillsConfig(
       skills: entries,
     },
     localArtifacts,
+    links,
   }
+}
+
+export interface DiscoverAgentSkillsOptions {
+  /** The Nuxt root. Every published file must resolve inside it. */
+  rootDir: string
+  /** Directories to scan: the project root and its layers. Entries outside `rootDir` are skipped. */
+  scanDirs: readonly string[]
+  /** Directory name under each scan directory, such as `skills`. */
+  dir: string
+}
+
+export interface DiscoveredAgentSkills {
+  skills: LocalAgentSkillConfig[]
+  issues: AgentSkillsConfigIssue[]
+}
+
+function toPosix(path: string): string {
+  return path.split(sep).join('/')
+}
+
+/**
+ * The convention: `<dir>/<name>/SKILL.md`. Frontmatter supplies `name` and
+ * `description`, so a skill needs no config entry, and `name` must equal the
+ * directory name as the Agent Skills specification requires. Each skill is
+ * also served at `/<dir>/<name>/SKILL.md`, so the URL mirrors the repository.
+ * The first scan directory wins a name clash, which puts the project ahead of
+ * its layers.
+ */
+export async function discoverAgentSkills(options: DiscoverAgentSkillsOptions): Promise<DiscoveredAgentSkills> {
+  const dir = options.dir.replace(/^\.?\/+/, '').replace(/\/+$/, '')
+  const skills: LocalAgentSkillConfig[] = []
+  const issues: AgentSkillsConfigIssue[] = []
+  const seen = new Set<string>()
+  for (const scanDir of options.scanDirs) {
+    const base = resolve(scanDir, dir)
+    if (!isWithinDirectory(options.rootDir, base) && base !== options.rootDir)
+      continue
+    const entries = await readdir(base, { withFileTypes: true }).catch(() => {
+      // A scan directory with no `<dir>` folder is the common case, not a fault.
+      return []
+    })
+    for (const entry of entries.filter(entry => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (seen.has(entry.name))
+        continue
+      const file = join(base, entry.name, 'SKILL.md')
+      const content = await readFile(file, 'utf8').catch(() => {
+        // A directory without a SKILL.md is not a skill; skip it.
+        return null
+      })
+      if (content === null)
+        continue
+      const relativeFile = toPosix(relative(options.rootDir, file))
+      const frontmatter = readSkillFrontmatter(content)
+      if (frontmatter._tag === 'Err') {
+        issues.push({ field: 'file', message: `${relativeFile} ${frontmatter.message}` })
+        continue
+      }
+      const { name, description } = frontmatter.metadata
+      if (name !== entry.name) {
+        issues.push({ field: 'name', message: `${relativeFile} frontmatter name "${String(name)}" must equal its directory name "${entry.name}"` })
+        continue
+      }
+      if (typeof description !== 'string' || description.length === 0) {
+        issues.push({ field: 'description', message: `${relativeFile} frontmatter must contain a description` })
+        continue
+      }
+      seen.add(entry.name)
+      skills.push({
+        source: 'local',
+        name: entry.name,
+        description,
+        file: relativeFile,
+        alias: `/${dir}/${entry.name}/SKILL.md`,
+      })
+    }
+  }
+  return { skills, issues }
+}
+
+/** Explicit entries replace discovered ones with the same name; order is discovered first, then explicit. */
+export function mergeAgentSkills(discovered: readonly AgentSkillConfig[], configured: readonly AgentSkillConfig[]): AgentSkillConfig[] {
+  const overridden = new Set(configured.map(skill => skill.name))
+  return [...discovered.filter(skill => !overridden.has(skill.name)), ...configured]
+}
+
+/**
+ * `/SKILL.md` is where installers and people look first. Serve it for the
+ * named local skill, or for the only local skill when nothing is named.
+ */
+export function applyRootAlias(
+  skills: readonly AgentSkillConfig[],
+  root: string | false | undefined,
+): { _tag: 'Ok', skills: AgentSkillConfig[] } | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] } {
+  if (root === false)
+    return { _tag: 'Ok', skills: [...skills] }
+  const locals = skills.filter((skill): skill is LocalAgentSkillConfig => skill.source === 'local')
+  const target = root === undefined
+    ? (locals.length === 1 ? locals[0] : undefined)
+    : locals.find(skill => skill.name === root)
+  if (root !== undefined && !target)
+    return { _tag: 'Invalid', issues: [{ field: 'root', message: `names no local skill: "${root}"` }] }
+  if (!target || aliasesOf(target).includes(ROOT_SKILL_ALIAS))
+    return { _tag: 'Ok', skills: [...skills] }
+  return {
+    _tag: 'Ok',
+    skills: skills.map(skill => skill === target ? { ...skill, alias: [...aliasesOf(skill), ROOT_SKILL_ALIAS] } : skill),
+  }
+}
+
+export interface PrepareAgentSkillsOptions {
+  rootDir: string
+  scanDirs: readonly string[]
+}
+
+/**
+ * Discovery plus explicit config, before the `ai-ready:agent-skills` hook runs.
+ * The root alias is applied after the hook, so a skill the hook adds counts.
+ */
+export async function prepareAgentSkills(
+  config: AgentSkillsConfig,
+  options: PrepareAgentSkillsOptions,
+): Promise<{ _tag: 'Ok', skills: AgentSkillConfig[] } | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }> {
+  if (config.dir !== undefined && config.dir !== false && typeof config.dir !== 'string')
+    return { _tag: 'Invalid', issues: [{ field: 'dir', message: 'must be a string or false when set' }] }
+  if (config.skills !== undefined && !Array.isArray(config.skills))
+    return { _tag: 'Invalid', issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }] }
+  const discovered = config.dir === false
+    ? { skills: [], issues: [] }
+    : await discoverAgentSkills({ rootDir: options.rootDir, scanDirs: options.scanDirs, dir: config.dir ?? 'skills' })
+  if (discovered.issues.length > 0)
+    return { _tag: 'Invalid', issues: discovered.issues }
+  return { _tag: 'Ok', skills: mergeAgentSkills(discovered.skills, (config.skills ?? []) as AgentSkillConfig[]) }
 }

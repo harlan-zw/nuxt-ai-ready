@@ -1,6 +1,6 @@
 import type { ParsedMarkdownResult } from './prerender'
-import type { ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
-import type { ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
+import type { AgentSkillConfig, AgentSkillsConfig, ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { AgentSkillsConfigIssue, ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedDatabase } from './utils/database'
 import type { RuntimeI18nConfig } from './utils/i18n'
@@ -54,12 +54,22 @@ export interface ModuleHooks {
     sections: LlmsTxtConfig['sections']
     notes: string[]
   }) => void | Promise<void>
+  /**
+   * Hook called with every agent skill about to be published: the ones
+   * discovered under `agentSkills.dir` merged with `agentSkills.skills`.
+   * Mutate the array to add external entries, drop a skill, or change its
+   * aliases. The root alias is applied after this hook.
+   */
+  'ai-ready:agent-skills': (payload: {
+    skills: AgentSkillConfig[]
+  }) => void | Promise<void>
 }
 
 declare module '@nuxt/schema' {
   interface NuxtHooks {
     'ai-ready:page:markdown': ModuleHooks['ai-ready:page:markdown']
     'ai-ready:llms-txt': ModuleHooks['ai-ready:llms-txt']
+    'ai-ready:agent-skills': ModuleHooks['ai-ready:agent-skills']
   }
 }
 
@@ -152,16 +162,39 @@ export default defineNuxtModule<ModuleOptions>({
       return
     }
 
-    const agentSkillsResult: ResolvedAgentSkillsConfig = config.agentSkills === false || config.agentSkills === undefined
-      ? { _tag: 'Disabled' }
-      : await import('./utils/agent-skills')
-          .then(({ resolveAgentSkillsConfig }) =>
-            resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir, { sitemapMd: config.sitemapMd !== false }))
-    if (agentSkillsResult._tag === 'Invalid') {
-      const details = agentSkillsResult.issues
+    // Agent skills: `skills/<name>/SKILL.md` in the project and its layers is
+    // discovered, merged with explicit config, offered to the
+    // `ai-ready:agent-skills` hook, then given its root alias and resolved.
+    const agentSkillsConfig: false | AgentSkillsConfig = config.agentSkills === false ? false : (config.agentSkills ?? {})
+    const agentSkillsError = (issues: AgentSkillsConfigIssue[]): Error => {
+      const details = issues
         .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
         .join('\n')
-      throw new Error(`[nuxt-ai-ready] Invalid Agent Skills configuration:\n${details}`)
+      return new Error(`[nuxt-ai-ready] Invalid Agent Skills configuration:\n${details}`)
+    }
+    let agentSkillsResult: ResolvedAgentSkillsConfig = { _tag: 'Disabled' }
+    if (agentSkillsConfig !== false) {
+      const { applyRootAlias, prepareAgentSkills, resolveAgentSkillsConfig } = await import('./utils/agent-skills')
+      const prepared = await prepareAgentSkills(agentSkillsConfig, {
+        rootDir: nuxt.options.rootDir,
+        scanDirs: nuxt.options._layers.map(layer => layer.config.rootDir ?? layer.cwd),
+      })
+      if (prepared._tag === 'Invalid')
+        throw agentSkillsError(prepared.issues)
+      const payload: { skills: AgentSkillConfig[] } = { skills: prepared.skills }
+      await nuxt.callHook('ai-ready:agent-skills' as any, payload)
+      const rooted = applyRootAlias(payload.skills, agentSkillsConfig.root)
+      if (rooted._tag === 'Invalid')
+        throw agentSkillsError(rooted.issues)
+      agentSkillsResult = await resolveAgentSkillsConfig(
+        { ...agentSkillsConfig, skills: rooted.skills },
+        nuxt.options.rootDir,
+        { sitemapMd: config.sitemapMd !== false },
+      )
+      if (agentSkillsResult._tag === 'Invalid')
+        throw agentSkillsError(agentSkillsResult.issues)
+      if (agentSkillsResult._tag === 'Enabled')
+        logger.debug(`Publishing ${agentSkillsResult.index.skills.length} agent skill(s): ${agentSkillsResult.index.skills.map(skill => skill.name).join(', ')}`)
     }
 
     const mcpServerCardResult = parseMcpServerCardConfig(config.mcpServerCard)
@@ -392,6 +425,19 @@ export default defineNuxtModule<ModuleOptions>({
         },
       ],
     })
+
+    if (agentSkillsResult._tag === 'Enabled' && agentSkillsConfig !== false && agentSkillsConfig.llmsTxt !== false) {
+      const indexUrl = withSiteUrl(AGENT_SKILLS_INDEX_ROUTE.slice(1), { withBase: true })
+      defaultLlmsTxtSections.push({
+        title: 'Agent Skills',
+        description: `Skills an agent can install from this site. The index at ${indexUrl} carries a sha256 digest for each one.`,
+        links: agentSkillsResult.links.map(link => ({
+          title: link.name,
+          href: link.href.startsWith('/') ? withSiteUrl(link.href.slice(1), { withBase: true }) : new URL(link.href, indexUrl).href,
+          description: link.description,
+        })),
+      })
+    }
 
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
