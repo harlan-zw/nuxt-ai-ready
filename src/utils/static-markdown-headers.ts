@@ -1,3 +1,4 @@
+import { defu } from 'defu'
 import { isReservedPath, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
@@ -92,8 +93,8 @@ export function prerenderedMarkdownHeaderRules(
 const RE_EXACT_MARKDOWN_ROUTE = /^\/[^*:\s]*\.md$/
 
 /** A route rule Nitro's Cloudflare presets write into `_headers`: any rule carrying headers. */
-function isStaticHeaderRouteRule([route, rule]: [string, object | undefined]): boolean {
-  return Boolean(rule && 'headers' in rule && rule.headers) && !route.includes(':')
+function isStaticHeaderRouteRule([, rule]: [string, object | undefined]): boolean {
+  return Boolean(rule && 'headers' in rule && rule.headers)
 }
 
 export type StaticMarkdownHeaderPlan
@@ -134,4 +135,26 @@ export function planStaticMarkdownHeaderRules(
   if (total <= limit)
     return { _tag: 'apply', rules }
   return { _tag: 'skip', drop: registeredMarkdown, total, dropped: markdown.size }
+}
+
+/**
+ * Apply the plan to the route rules: merge in the twin rules on `apply`.
+ * Over budget, only the headers entry goes: Nitro's Cloudflare presets skip
+ * rules with falsy headers, and the rest of the rule (redirect, etc.) keeps
+ * working.
+ */
+export function applyStaticMarkdownHeaderPlan(
+  routeRules: Record<string, object | undefined>,
+  plan: StaticMarkdownHeaderPlan,
+): void {
+  if (plan._tag === 'skip') {
+    for (const route of plan.drop) {
+      const rule = routeRules[route] as { headers?: unknown } | undefined
+      if (rule)
+        rule.headers = undefined
+    }
+    return
+  }
+  for (const { route, headers } of plan.rules)
+    routeRules[route] = defu({ headers }, routeRules[route])
 }

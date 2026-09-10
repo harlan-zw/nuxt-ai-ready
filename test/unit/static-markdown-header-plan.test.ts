@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planStaticMarkdownHeaderRules } from '../../src/utils/static-markdown-headers'
+import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules } from '../../src/utils/static-markdown-headers'
 
 const headers = { 'Content-Type': 'text/markdown; charset=utf-8' }
 const twin = (i: number) => ({ route: `/page-${i}.md`, headers })
@@ -24,7 +24,7 @@ describe('planStaticMarkdownHeaderRules', () => {
     expect(planStaticMarkdownHeaderRules(routeRules, rules, 3)).toEqual({
       _tag: 'skip',
       drop: ['/guide/a.md', '/guide/b.md'],
-      total: 4,
+      total: 5,
       dropped: 3,
     })
   })
@@ -45,5 +45,36 @@ describe('planStaticMarkdownHeaderRules', () => {
       total: 3,
       dropped: 2,
     })
+  })
+
+  it('counts :param route rules that carry headers, because Nitro writes them into _headers', () => {
+    const routeRules = { '/a/:id': { headers }, '/x.md': { headers } }
+
+    expect(planStaticMarkdownHeaderRules(routeRules, [], 1)).toEqual({
+      _tag: 'skip',
+      drop: ['/x.md'],
+      total: 2,
+      dropped: 1,
+    })
+  })
+
+  it('keeps non-header options on the registered rules the skip strips', () => {
+    const routeRules = { '/old.md': { redirect: '/new.md', headers } } satisfies Record<string, object | undefined>
+    const plan = planStaticMarkdownHeaderRules(routeRules, [twin(1)], 1)
+
+    expect(plan).toEqual({ _tag: 'skip', drop: ['/old.md'], total: 2, dropped: 2 })
+    applyStaticMarkdownHeaderPlan(routeRules, plan)
+
+    const rule = routeRules['/old.md'] as { redirect?: string, headers?: unknown }
+    expect(rule.redirect).toBe('/new.md')
+    expect(rule.headers).toBeUndefined()
+  })
+
+  it('applies twin rules onto existing entries without clobbering them', () => {
+    const routeRules = { '/page-1.md': { prerender: true } } satisfies Record<string, object | undefined>
+
+    applyStaticMarkdownHeaderPlan(routeRules, { _tag: 'apply', rules: [twin(1)] })
+
+    expect(routeRules['/page-1.md']).toEqual({ prerender: true, headers })
   })
 })
