@@ -462,6 +462,23 @@ describe('mergeAgentSkills and applyRootAlias', () => {
 })
 
 describe('prepareAgentSkills and resolve with aliases', () => {
+  it.each([true, 0, 42, null, [], ['skills'], {}].map(dir => ({ dir })))('rejects invalid dir: $dir', async ({ dir }) => {
+    // @ts-expect-error Config from JavaScript can contain invalid values.
+    await expect(prepareAgentSkills({ dir }, { rootDir: '/app', scanDirs: [] })).resolves.toEqual({
+      _tag: 'Invalid',
+      issues: [{ field: 'dir', message: 'must be a string or false when set' }],
+    })
+  })
+
+  it('discovers skills in a custom directory', async () => {
+    const rootDir = await skillsRoot({ 'custom/seo-audit/SKILL.md': localSkill })
+
+    await expect(prepareAgentSkills({ dir: 'custom' }, { rootDir, scanDirs: [rootDir] })).resolves.toMatchObject({
+      _tag: 'Ok',
+      skills: [{ name: 'seo-audit', file: 'custom/seo-audit/SKILL.md', alias: '/custom/seo-audit/SKILL.md' }],
+    })
+  })
+
   it('serves a discovered skill at its mirrored path, at /SKILL.md, and in the index', async () => {
     const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
 

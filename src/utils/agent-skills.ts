@@ -460,6 +460,8 @@ export async function prepareAgentSkills(
   config: AgentSkillsConfig,
   options: PrepareAgentSkillsOptions,
 ): Promise<{ _tag: 'Ok', skills: AgentSkillConfig[] } | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }> {
+  if (config.dir !== undefined && config.dir !== false && typeof config.dir !== 'string')
+    return { _tag: 'Invalid', issues: [{ field: 'dir', message: 'must be a string or false when set' }] }
   if (config.skills !== undefined && !Array.isArray(config.skills))
     return { _tag: 'Invalid', issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }] }
   const discovered = config.dir === false

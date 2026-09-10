@@ -8,7 +8,7 @@ export const AGENT_SKILLS_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600, 
 
 export interface AgentSkillsConfigIssue {
   index?: number
-  field: 'agentSkills' | 'source' | 'name' | 'type' | 'description' | 'file' | 'alias' | 'root' | 'url' | 'digest'
+  field: 'agentSkills' | 'source' | 'name' | 'type' | 'description' | 'file' | 'alias' | 'root' | 'dir' | 'url' | 'digest'
   message: string
 }
 
