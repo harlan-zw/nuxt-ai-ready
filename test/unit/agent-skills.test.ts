@@ -67,8 +67,8 @@ describe('resolveAgentSkillsConfig', () => {
         '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill,
       },
       links: [
-        { name: 'seo-audit', description: 'Audit a site for critical SEO issues.', href: '/.well-known/agent-skills/seo-audit/SKILL.md' },
-        { name: 'seo-toolkit', description: 'Use the complete SEO toolkit and its supporting resources.', href: 'https://cdn.example.com/seo-toolkit.tar.gz' },
+        { source: 'local', name: 'seo-audit', description: 'Audit a site for critical SEO issues.', href: '/.well-known/agent-skills/seo-audit/SKILL.md' },
+        { source: 'external', name: 'seo-toolkit', description: 'Use the complete SEO toolkit and its supporting resources.', href: 'https://cdn.example.com/seo-toolkit.tar.gz' },
       ],
     })
   })
