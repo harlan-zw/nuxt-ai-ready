@@ -19,6 +19,7 @@ export default defineNuxtConfig({
           name: 'seo-audit',
           description: 'Audit a site for critical SEO issues.',
           file: './skills/seo-audit/SKILL.md',
+          alias: '/SKILL.md',
         },
         {
           source: 'external',

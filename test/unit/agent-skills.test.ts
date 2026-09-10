@@ -82,6 +82,64 @@ describe('resolveAgentSkillsConfig', () => {
       expect(result.issues[0]).toMatchObject({ index: 0 })
   })
 
+  it('serves an alias route with the same bytes and keeps the index URL under .well-known', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
+    await writeFile(join(rootDir, 'SKILL.md'), localSkill)
+
+    const result = await resolveAgentSkillsConfig({
+      skills: [{
+        source: 'local',
+        name: 'seo-audit',
+        description: 'Audit a site for critical SEO issues.',
+        file: './SKILL.md',
+        alias: '/SKILL.md',
+      }],
+    }, rootDir)
+
+    expect(result).toMatchObject({
+      _tag: 'Enabled',
+      index: { skills: [{ name: 'seo-audit', url: 'seo-audit/SKILL.md' }] },
+      localArtifacts: {
+        '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill,
+        '/SKILL.md': localSkill,
+      },
+    })
+  })
+
+  it.each([
+    ['SKILL.md', 'relative'],
+    ['/skills/', 'directory'],
+    ['/skill', 'no .md suffix'],
+    ['/a/../SKILL.md', 'parent segment'],
+    ['/.well-known/agent-skills/other/SKILL.md', 'well-known prefix'],
+  ])('rejects the alias %s (%s)', async (alias) => {
+    const result = await resolveAgentSkillsConfig({
+      skills: [{
+        source: 'local',
+        name: 'seo-audit',
+        description: 'Audit a site for critical SEO issues.',
+        file: './SKILL.md',
+        alias,
+      }],
+    }, '/app')
+
+    expect(result).toMatchObject({ _tag: 'Invalid', issues: [{ index: 0, field: 'alias' }] })
+  })
+
+  it('rejects two skills that claim the same alias', async () => {
+    const skill = {
+      source: 'local' as const,
+      description: 'Audit a site for critical SEO issues.',
+      file: './SKILL.md',
+      alias: '/SKILL.md',
+    }
+    const result = await resolveAgentSkillsConfig({
+      skills: [{ ...skill, name: 'seo-audit' }, { ...skill, name: 'seo-review' }],
+    }, '/app')
+
+    expect(result).toMatchObject({ _tag: 'Invalid', issues: [{ index: 1, field: 'alias' }] })
+  })
+
   it('rejects duplicate names', async () => {
     const skill = {
       source: 'external' as const,

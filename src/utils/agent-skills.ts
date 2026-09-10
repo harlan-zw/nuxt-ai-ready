@@ -28,6 +28,21 @@ function skillUrl(name: string) {
   return `${name}/SKILL.md`
 }
 
+/**
+ * An alias is a second address for the same artifact bytes. It must be a
+ * path-absolute `.md` route outside `/.well-known/`, so the discovery routes
+ * and the content-negotiation skip list stay unambiguous.
+ */
+function validateAlias(alias: unknown, index: number): AgentSkillsConfigIssue[] {
+  if (alias === undefined)
+    return []
+  if (typeof alias !== 'string' || !/^\/(?:[^/?#\s]+\/)*[^/?#\s]+\.md$/.test(alias) || alias.split('/').includes('..'))
+    return [{ index, field: 'alias', message: 'must be a path-absolute route ending in .md, such as "/SKILL.md"' }]
+  if (alias.startsWith('/.well-known/'))
+    return [{ index, field: 'alias', message: 'must not use the /.well-known/ prefix reserved for discovery routes' }]
+  return []
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -65,6 +80,7 @@ function validateSkill(skill: unknown, index: number): AgentSkillsConfigIssue[] 
   if (skill.source === 'local') {
     if (typeof skill.file !== 'string' || skill.file.trim().length === 0)
       issues.push({ index, field: 'file', message: 'must be a non-empty path relative to the Nuxt root directory' })
+    issues.push(...validateAlias(skill.alias, index))
     return issues
   }
 
@@ -159,7 +175,7 @@ async function resolveLocalEntry(
   index: number,
   rootDir: string,
 ): Promise<
-  | { _tag: 'Resolved', entry: AgentSkillsIndexEntry, route: string, content: string }
+  | { _tag: 'Resolved', entry: AgentSkillsIndexEntry, routes: string[], content: string }
   | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }
 > {
   const file = resolve(rootDir, skill.file)
@@ -204,7 +220,7 @@ async function resolveLocalEntry(
             issues: metadataIssues,
           }
         }
-        const route = skillRoute(skill.name)
+        const routes = skill.alias ? [skillRoute(skill.name), skill.alias] : [skillRoute(skill.name)]
         const digest = `sha256:${createHash('sha256').update(content).digest('hex')}` as const
         return {
           _tag: 'Resolved' as const,
@@ -215,7 +231,7 @@ async function resolveLocalEntry(
             url: skillUrl(skill.name),
             digest,
           },
-          route,
+          routes,
           content: text,
         }
       })
@@ -246,6 +262,7 @@ export async function resolveAgentSkillsConfig(
 
   const issues = config.skills.flatMap((skill, index) => validateSkill(skill, index))
   const seenNames = new Set<string>()
+  const seenAliases = new Set<string>()
   for (const [index, skill] of config.skills.entries()) {
     if (!isRecord(skill) || typeof skill.name !== 'string' || seenNames.has(skill.name)) {
       if (isRecord(skill) && typeof skill.name === 'string' && seenNames.has(skill.name))
@@ -253,6 +270,11 @@ export async function resolveAgentSkillsConfig(
       continue
     }
     seenNames.add(skill.name)
+    if (typeof skill.alias === 'string') {
+      if (seenAliases.has(skill.alias))
+        issues.push({ index, field: 'alias', message: `duplicates the alias "${skill.alias}"` })
+      seenAliases.add(skill.alias)
+    }
   }
   if (issues.length > 0)
     return { _tag: 'Invalid', issues }
@@ -271,8 +293,10 @@ export async function resolveAgentSkillsConfig(
     if (result._tag !== 'Resolved')
       continue
     entries.push(result.entry)
-    if ('route' in result)
-      localArtifacts[result.route] = result.content
+    if ('routes' in result) {
+      for (const route of result.routes)
+        localArtifacts[route] = result.content
+    }
   }
 
   return {

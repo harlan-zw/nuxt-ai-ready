@@ -8,6 +8,7 @@ function input(overrides: {
   stage?: NegotiationInput['stage']
   policy?: NegotiationInput['policy']
   routeRule?: NegotiationInput['routeRule']
+  artifactPaths?: NegotiationInput['artifactPaths']
   isPrerender?: boolean
 }): NegotiationInput {
   return {
@@ -19,6 +20,7 @@ function input(overrides: {
     },
     routeRule: overrides.routeRule ?? {},
     policy: overrides.policy ?? 'auto',
+    artifactPaths: overrides.artifactPaths,
   }
 }
 
@@ -84,6 +86,15 @@ describe('resolveNegotiationDecision', () => {
       path: '/about',
       headers: { 'accept': 'text/markdown', 'x-ai-ready-internal': '1' },
     }))).toEqual({ _tag: 'skip', reason: 'internal' })
+  })
+
+  it('skips an agent skill alias so its handler answers with the file itself', () => {
+    expect(resolveNegotiationDecision(input({
+      stage: 'middleware',
+      path: '/SKILL.md',
+      headers: { accept: 'text/html' },
+      artifactPaths: new Set(['/SKILL.md']),
+    }))).toEqual({ _tag: 'skip', reason: 'artifact' })
   })
 
   it('skips well-known paths', () => {

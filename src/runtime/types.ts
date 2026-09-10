@@ -52,6 +52,13 @@ export interface LocalAgentSkillConfig {
   description: string
   /** SKILL.md path, resolved relative to the Nuxt root directory. */
   file: string
+  /**
+   * Also serve the same bytes at this path-absolute `.md` route, such as
+   * `/SKILL.md`. Content negotiation leaves the route alone, so the response
+   * is the file itself with no generated frontmatter. The discovery index
+   * keeps advertising the `.well-known` artifact URL.
+   */
+  alias?: string
 }
 
 export interface ExternalAgentSkillConfig {

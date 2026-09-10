@@ -4,6 +4,7 @@ import type { NegotiationRouteRule } from './content-negotiation'
 import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
+import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
 import { appendHeader, createError, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
@@ -18,6 +19,14 @@ import { resolveNegotiationDecision } from './negotiation-decision'
 
 /** Set once the negotiation headers are on the response, so nothing repeats them. */
 const APPLIED_KEY = 'nuxt-ai-ready:negotiation-applied'
+
+let artifactPaths: ReadonlySet<string> | undefined
+
+/** Routes an agent skill answers verbatim; negotiation must not render them. */
+export function agentSkillArtifactPaths(): ReadonlySet<string> {
+  artifactPaths ??= new Set(Object.keys(localAgentSkillArtifacts))
+  return artifactPaths
+}
 
 export type LinkUrlResolver = (path: string) => string
 
@@ -116,6 +125,7 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
     request: toMarkdownRequest(event),
     routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
     policy: config.contentNegotiation,
+    artifactPaths: agentSkillArtifactPaths(),
   })
 }
 
