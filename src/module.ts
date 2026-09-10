@@ -1089,7 +1089,11 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
         description: siteConfig.description,
-      }, mergedLlmsTxt, { ftsTokenizer, i18n: i18nConfig })
+      }, mergedLlmsTxt, {
+        ftsTokenizer,
+        i18n: i18nConfig,
+        artifactRoutes: agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+      })
     }
 
     // Add lifecycle plugin to handle database connection cleanup

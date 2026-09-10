@@ -35,4 +35,11 @@ export default defineNuxtConfig({
   robots: {
     robotsTxt: false,
   },
+  nitro: {
+    prerender: {
+      // A site may prerender an artifact so static hosts and link checkers
+      // see the file. The bytes must survive the markdown twin pipeline.
+      routes: ['/SKILL.md', '/skills/site-review/SKILL.md'],
+    },
+  },
 })

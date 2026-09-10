@@ -487,6 +487,12 @@ async function prerenderRoute(nitro: Nitro, route: string) {
 export interface PrerenderHandlerOptions {
   ftsTokenizer?: string
   i18n?: PrerenderI18nConfig | null
+  /**
+   * Agent skill artifact routes such as `/SKILL.md`. They are files served
+   * verbatim, not markdown twins of a page, so the generate hook must leave
+   * their bytes alone.
+   */
+  artifactRoutes?: readonly string[]
 }
 
 export function setupPrerenderHandler(
@@ -511,6 +517,7 @@ export function setupPrerenderHandler(
       extras.i18n,
     )
     let initPromise: Promise<void> | null = null
+    const artifactRoutes = new Set(extras.artifactRoutes ?? [])
 
     nitro.hooks.hook('prerender:generate', async (route) => {
       // Track error routes for filtering in llms.txt
@@ -529,6 +536,13 @@ export function setupPrerenderHandler(
 
       if (route.fileName === SITEMAP_MD_ROUTE)
         return
+
+      // An agent skill artifact carries its own frontmatter and no JSON
+      // envelope. Parsing it as a page twin threw and dropped the file.
+      if (artifactRoutes.has(route.route) || (route.fileName && artifactRoutes.has(withLeadingSlash(route.fileName)))) {
+        route.contentType = 'text/markdown; charset=utf-8'
+        return
+      }
 
       if (!route.fileName?.endsWith('.md'))
         return
