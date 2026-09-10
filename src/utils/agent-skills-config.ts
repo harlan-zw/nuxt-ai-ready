@@ -27,8 +27,14 @@ export type ResolvedAgentSkillsConfig
 export function resolveExternalSkillUrl(href: string, indexUrl: string): string {
   // URL parsing strips these control characters, so the passthrough branches must too.
   const normalized = href.replaceAll(/[\t\n\r]/g, '')
-  if (URL.canParse(normalized) || normalized.startsWith('//'))
-    return normalized
+  // Return the URL-parsed form so remaining control characters are percent-encoded.
+  if (URL.canParse(normalized))
+    return new URL(normalized).href
+  if (normalized.startsWith('//')) {
+    // URL needs an origin to parse a protocol-relative href; rebuild it without the temporary origin.
+    const resolved = new URL(normalized, 'https://nuxt-ai-ready.invalid')
+    return `//${resolved.host}${resolved.pathname}${resolved.search}${resolved.hash}`
+  }
   if (URL.canParse(indexUrl))
     return new URL(normalized, indexUrl).href
 

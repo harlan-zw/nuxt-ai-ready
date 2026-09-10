@@ -444,6 +444,16 @@ describe('resolveExternalSkillUrl', () => {
     expect(resolveExternalSkillUrl('//cdn.example.com/a\tb\nc', indexUrl))
       .toBe('//cdn.example.com/abc')
   })
+
+  it('percent-encodes interior control characters in an absolute href', () => {
+    expect(resolveExternalSkillUrl('https://cdn.example.com/a\u0001b', indexUrl))
+      .toBe('https://cdn.example.com/a%01b')
+  })
+
+  it('percent-encodes interior control characters in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//cdn.example.com/a\u0001b', indexUrl))
+      .toBe('//cdn.example.com/a%01b')
+  })
 })
 
 describe('mergeAgentSkills and applyRootAlias', () => {
