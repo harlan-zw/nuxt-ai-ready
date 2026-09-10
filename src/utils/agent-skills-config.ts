@@ -33,7 +33,10 @@ export function resolveExternalSkillUrl(href: string, indexUrl: string): string 
   if (normalized.startsWith('//')) {
     // URL needs an origin to parse a protocol-relative href; rebuild it without the temporary origin.
     const resolved = new URL(normalized, 'https://nuxt-ai-ready.invalid')
-    return `//${resolved.host}${resolved.pathname}${resolved.search}${resolved.hash}`
+    const auth = resolved.username || resolved.password
+      ? `${resolved.username}${resolved.password ? `:${resolved.password}` : ''}@`
+      : ''
+    return `//${auth}${resolved.host}${resolved.pathname}${resolved.search}${resolved.hash}`
   }
   if (URL.canParse(indexUrl))
     return new URL(normalized, indexUrl).href

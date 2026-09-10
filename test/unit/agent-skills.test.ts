@@ -454,6 +454,16 @@ describe('resolveExternalSkillUrl', () => {
     expect(resolveExternalSkillUrl('//cdn.example.com/a\u0001b', indexUrl))
       .toBe('//cdn.example.com/a%01b')
   })
+
+  it('preserves userinfo in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//user:pass@cdn.example.com/x', indexUrl))
+      .toBe('//user:pass@cdn.example.com/x')
+  })
+
+  it('preserves a username without a password in a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//user@cdn.example.com/x', indexUrl))
+      .toBe('//user@cdn.example.com/x')
+  })
 })
 
 describe('mergeAgentSkills and applyRootAlias', () => {
