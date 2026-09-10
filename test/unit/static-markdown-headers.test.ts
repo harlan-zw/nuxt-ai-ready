@@ -68,7 +68,7 @@ describe('prerenderedMarkdownHeaderRules', () => {
     const rules = prerenderedMarkdownHeaderRules([
       { route: '/api-reference', fileName: '/api-reference.md' },
       { route: '/api/foo', fileName: '/api/foo.md' },
-    ], '/', false)
+    ], '/', false, [])
     expect(rules.map(r => r.route)).toEqual(['/api-reference.md'])
     expect(rules[0]!.headers.Link).toContain('</api-reference>; rel="canonical"')
   })

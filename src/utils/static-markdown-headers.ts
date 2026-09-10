@@ -63,15 +63,23 @@ export interface StaticMarkdownHeaderRule {
 /**
  * Exact rules for every markdown twin Nitro actually wrote during prerender.
  * Crawler-discovered twins never appear in the config-time prerender route
- * list, so `_prerenderedRoutes` is the only complete source.
+ * list, so `_prerenderedRoutes` is the only complete source. Agent-skill
+ * artifact routes are real files served verbatim, not page twins, so they
+ * are excluded.
  */
 export function prerenderedMarkdownHeaderRules(
   prerenderedRoutes: ReadonlyArray<{ route?: string, fileName?: string }>,
   baseURL: string,
   describedby: boolean,
+  artifactRoutes: ReadonlyArray<string>,
 ): StaticMarkdownHeaderRule[] {
+  const artifacts = new Set(artifactRoutes)
   const rules = new Map<string, StaticMarkdownHeaderRule>()
   for (const entry of prerenderedRoutes) {
+    if ((entry.route !== undefined && artifacts.has(entry.route))
+      || (entry.fileName !== undefined && artifacts.has(entry.fileName))) {
+      continue
+    }
     const pageRoute = pageRouteFromMarkdownTwin(entry.fileName)
     if (pageRoute === null)
       continue

@@ -1095,6 +1095,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
           nitro._prerenderedRoutes || [],
           staticBaseURL,
           config.describedby !== false,
+          agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
         )) {
           nitro.options.routeRules[route] = defu({ headers }, nitro.options.routeRules[route])
         }
