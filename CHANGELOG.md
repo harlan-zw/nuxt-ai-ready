@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v2.3.0...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.0...main)
+
+### 🩹 Fixes
+
+- **agent-skills:** Resolve external links against the index ([#116](https://github.com/harlan-zw/nuxt-ai-ready/pull/116))
+
+### 🏡 Chore
+
+- Bump ([27f4807](https://github.com/harlan-zw/nuxt-ai-ready/commit/27f4807))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v2.2.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.2.1...main)
