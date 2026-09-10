@@ -38,7 +38,7 @@ import {
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
 import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, enforceStaticHeaderBudget, ensureStaticHeader } from './utils/static-headers'
-import { buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
+import { applyStaticMarkdownHeaderPlan, buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 export interface ModuleHooks {
@@ -1089,14 +1089,26 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // finishes, every twin it actually wrote gets the exact same headers via
       // route rules. Presets bake those into `_headers` at `compiled`, and
       // static handlers apply them at runtime.
+      const isCloudflarePreset = String(nitro.options.preset || '').startsWith('cloudflare')
       nitro.hooks.hook('prerender:done', () => {
-        for (const { route, headers } of prerenderedMarkdownHeaderRules(
-          nitro._prerenderedRoutes || [],
-          staticBaseURL,
-          config.describedby !== false,
-        )) {
-          nitro.options.routeRules[route] = defu({ headers }, nitro.options.routeRules[route])
+        const plan = planStaticMarkdownHeaderRules(
+          nitro.options.routeRules,
+          prerenderedMarkdownHeaderRules(
+            nitro._prerenderedRoutes || [],
+            staticBaseURL,
+            config.describedby !== false,
+          ),
+          isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
+        )
+        if (plan._tag === 'skip') {
+          // Decided here, before Nitro writes `_headers`, so a module that
+          // audits the file earlier in the `compiled` order never sees it
+          // over budget.
+          applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
+          logger.warn(`_headers would hold ${plan.total} rules and Cloudflare allows ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}. Skipped the ${plan.dropped} per-page .md rules; the /*.md glob still sets the charset and describedby entries, but static markdown does not send a per-page canonical Link.`)
+          return
         }
+        applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
       })
       nitro.hooks.hook('compiled', async () => {
         const headersPath = join(nitro.options.output.publicDir, '_headers')
@@ -1124,7 +1136,10 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
           // Cloudflare refuses the upload past its rule limit, which fails
           // the whole deploy, and every prerendered page added one exact rule
           // above. Under budget nothing changes.
-          if (String(nitro.options.preset || '').startsWith('cloudflare')) {
+          // Belt and braces for rules that arrive from a `public/_headers`
+          // file or another module; the route rule plan above is the
+          // primary control.
+          if (isCloudflarePreset) {
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
