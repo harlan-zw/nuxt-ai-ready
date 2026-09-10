@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
-import { fetch, setup } from '@nuxt/test-utils/e2e'
+import { fetch, setup, useTestContext } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -101,6 +102,16 @@ describe('agent skills discovery', async () => {
     expect(llms).toContain('/docs/SKILL.md')
     expect(llms).toContain('/docs/skills/site-review/SKILL.md')
     expect(llms).toContain('https://cdn.example.com/seo-toolkit.tar.gz')
+  })
+
+  it('prerenders an artifact route as the exact file, not a markdown twin', async () => {
+    const buildDir = useTestContext().nuxt?.options.buildDir
+    if (!buildDir)
+      throw new Error('nuxt.options.buildDir not available in test context')
+    const publicDir = join(buildDir, 'output/public')
+    const reviewSkill = await readFile(resolve('../fixtures/agent-skills/skills/site-review/SKILL.md'), 'utf8')
+    await expect(readFile(join(publicDir, 'SKILL.md'), 'utf8')).resolves.toBe(localSkill)
+    await expect(readFile(join(publicDir, 'skills/site-review/SKILL.md'), 'utf8')).resolves.toBe(reviewSkill)
   })
 
   it('keeps the discovery index on the well-known artifact URL when an alias exists', async () => {
