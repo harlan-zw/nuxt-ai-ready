@@ -25,13 +25,15 @@ export type ResolvedAgentSkillsConfig
 
 /** Resolve an external artifact against its discovery index, including when no site URL exists. */
 export function resolveExternalSkillUrl(href: string, indexUrl: string): string {
-  if (URL.canParse(href) || href.startsWith('//'))
-    return href
+  // URL parsing strips these control characters, so the passthrough branches must too.
+  const normalized = href.replaceAll(/[\t\n\r]/g, '')
+  if (URL.canParse(normalized) || normalized.startsWith('//'))
+    return normalized
   if (URL.canParse(indexUrl))
-    return new URL(href, indexUrl).href
+    return new URL(normalized, indexUrl).href
 
   // URL needs an origin to resolve dot segments, queries, and fragments.
   // Strip this temporary origin so the link uses the site's actual origin.
-  const resolved = new URL(href, new URL(indexUrl, 'https://nuxt-ai-ready.invalid'))
+  const resolved = new URL(normalized, new URL(indexUrl, 'https://nuxt-ai-ready.invalid'))
   return `${resolved.pathname}${resolved.search}${resolved.hash}`
 }

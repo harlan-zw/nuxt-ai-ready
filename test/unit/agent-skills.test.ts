@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AGENT_SKILLS_SCHEMA, applyRootAlias, discoverAgentSkills, mergeAgentSkills, prepareAgentSkills, resolveAgentSkillsConfig, ROOT_SKILL_ALIAS } from '../../src/utils/agent-skills'
+import { resolveExternalSkillUrl } from '../../src/utils/agent-skills-config'
 
 const localSkill = `---
 name: seo-audit
@@ -428,6 +429,20 @@ describe('discoverAgentSkills', () => {
   it('finds nothing when the directory is absent', async () => {
     const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
     await expect(discoverAgentSkills({ rootDir, scanDirs: [rootDir], dir: 'skills' })).resolves.toEqual({ skills: [], issues: [] })
+  })
+})
+
+describe('resolveExternalSkillUrl', () => {
+  const indexUrl = 'https://site.example.com/.well-known/agent-skills/index.json'
+
+  it('strips ASCII tab, LF, and CR from an absolute href', () => {
+    expect(resolveExternalSkillUrl('https://cdn.example.com/a\tb\nc', indexUrl))
+      .toBe('https://cdn.example.com/abc')
+  })
+
+  it('strips ASCII tab, LF, and CR from a protocol-relative href', () => {
+    expect(resolveExternalSkillUrl('//cdn.example.com/a\tb\nc', indexUrl))
+      .toBe('//cdn.example.com/abc')
   })
 })
 
