@@ -8,7 +8,7 @@ export const AGENT_SKILLS_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600, 
 
 export interface AgentSkillsConfigIssue {
   index?: number
-  field: 'agentSkills' | 'source' | 'name' | 'type' | 'description' | 'file' | 'alias' | 'url' | 'digest'
+  field: 'agentSkills' | 'source' | 'name' | 'type' | 'description' | 'file' | 'alias' | 'root' | 'url' | 'digest'
   message: string
 }
 
@@ -19,4 +19,6 @@ export type ResolvedAgentSkillsConfig
       _tag: 'Enabled'
       index: AgentSkillsIndex
       localArtifacts: Record<string, string>
+      /** One llms.txt link per published skill: the alias when one exists, else the artifact URL. */
+      links: Array<{ name: string, description: string, href: string }>
     }

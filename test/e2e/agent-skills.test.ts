@@ -30,9 +30,17 @@ describe('agent skills discovery', async () => {
     expect(response.headers.get('content-type')).toContain('application/json')
     expect(response.headers.get('cache-control')).toContain('public')
     expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    const reviewSkillBytes = await readFile(resolve('../fixtures/agent-skills/skills/site-review/SKILL.md'))
     await expect(response.json()).resolves.toEqual({
       $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json',
       skills: [
+        {
+          name: 'site-review',
+          type: 'skill-md',
+          description: 'Review a site\'s pages for content quality issues before publishing.',
+          url: 'site-review/SKILL.md',
+          digest: `sha256:${createHash('sha256').update(reviewSkillBytes).digest('hex')}`,
+        },
         {
           name: 'seo-audit',
           type: 'skill-md',
@@ -76,6 +84,25 @@ describe('agent skills discovery', async () => {
     await expect(response.text()).resolves.toBe(localSkill)
   })
 
+  it('discovers skills/<name>/SKILL.md without config and mirrors the repository path', async () => {
+    const reviewSkill = await readFile(resolve('../fixtures/agent-skills/skills/site-review/SKILL.md'), 'utf8')
+    const index = await fetch('/.well-known/agent-skills/index.json').then(response => response.json()) as { skills: Array<{ name: string, url: string }> }
+    expect(index.skills.map(skill => skill.name)).toEqual(['site-review', 'seo-audit', 'seo-toolkit'])
+
+    const mirrored = await fetch('/docs/skills/site-review/SKILL.md', { headers: { accept: 'text/html' } })
+    expect(mirrored.status).toBe(200)
+    expect(mirrored.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
+    await expect(mirrored.text()).resolves.toBe(reviewSkill)
+  })
+
+  it('lists every published skill in llms.txt', async () => {
+    const llms = await fetch('/docs/llms.txt').then(response => response.text())
+    expect(llms).toContain('## Agent Skills')
+    expect(llms).toContain('/docs/SKILL.md')
+    expect(llms).toContain('/docs/skills/site-review/SKILL.md')
+    expect(llms).toContain('https://cdn.example.com/seo-toolkit.tar.gz')
+  })
+
   it('keeps the discovery index on the well-known artifact URL when an alias exists', async () => {
     const response = await fetch('/.well-known/agent-skills/index.json')
     const index = await response.json() as { skills: Array<{ name: string, url: string }> }
@@ -86,7 +113,8 @@ describe('agent skills discovery', async () => {
   it('resolves an advertised local artifact after the app-base redirect', async () => {
     const indexResponse = await fetch('/.well-known/agent-skills/index.json')
     const index = await indexResponse.json()
-    const artifactUrl = new URL(index.skills[0].url, indexResponse.url)
+    const seoAudit = index.skills.find((skill: { name: string }) => skill.name === 'seo-audit')
+    const artifactUrl = new URL(seoAudit.url, indexResponse.url)
     const artifactResponse = await globalThis.fetch(artifactUrl)
 
     expect(artifactUrl.pathname).toBe('/docs/.well-known/agent-skills/seo-audit/SKILL.md')
