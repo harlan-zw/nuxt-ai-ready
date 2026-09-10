@@ -30,16 +30,21 @@ function skillUrl(name: string) {
 
 /**
  * An alias is a second address for the same artifact bytes. It must be a
- * path-absolute `.md` route outside `/.well-known/`, so the discovery routes
- * and the content-negotiation skip list stay unambiguous.
+ * path-absolute `.md` route outside `/.well-known/` and outside the
+ * module-owned markdown routes, so the discovery routes, the sitemap
+ * markdown endpoint and the home page markdown twin stay unambiguous.
  */
-function validateAlias(alias: unknown, index: number): AgentSkillsConfigIssue[] {
+function validateAlias(alias: unknown, index: number, sitemapMd: boolean): AgentSkillsConfigIssue[] {
   if (alias === undefined)
     return []
   if (typeof alias !== 'string' || !/^\/(?:[^/?#\s]+\/)*[^/?#\s]+\.md$/.test(alias) || alias.split('/').includes('..'))
     return [{ index, field: 'alias', message: 'must be a path-absolute route ending in .md, such as "/SKILL.md"' }]
   if (alias.startsWith('/.well-known/'))
     return [{ index, field: 'alias', message: 'must not use the /.well-known/ prefix reserved for discovery routes' }]
+  if (alias === '/index.md')
+    return [{ index, field: 'alias', message: 'must not use the module-owned markdown route "/index.md"' }]
+  if (sitemapMd && alias === '/sitemap.md')
+    return [{ index, field: 'alias', message: 'must not use the module-owned markdown route "/sitemap.md"' }]
   return []
 }
 
@@ -71,7 +76,7 @@ function validateCommonFields(skill: Record<string, unknown>, index: number): Ag
   return issues
 }
 
-function validateSkill(skill: unknown, index: number): AgentSkillsConfigIssue[] {
+function validateSkill(skill: unknown, index: number, sitemapMd: boolean): AgentSkillsConfigIssue[] {
   if (!isRecord(skill)) {
     return [{ index, field: 'source', message: 'must be a local or external skill entry' }]
   }
@@ -80,7 +85,7 @@ function validateSkill(skill: unknown, index: number): AgentSkillsConfigIssue[] 
   if (skill.source === 'local') {
     if (typeof skill.file !== 'string' || skill.file.trim().length === 0)
       issues.push({ index, field: 'file', message: 'must be a non-empty path relative to the Nuxt root directory' })
-    issues.push(...validateAlias(skill.alias, index))
+    issues.push(...validateAlias(skill.alias, index, sitemapMd))
     return issues
   }
 
@@ -246,9 +251,18 @@ async function resolveLocalEntry(
     }))
 }
 
+export interface ResolveAgentSkillsOptions {
+  /**
+   * Whether the module owns the `/sitemap.md` route. Mirrors the `sitemapMd`
+   * module option, which is enabled unless set to false.
+   */
+  sitemapMd?: boolean
+}
+
 export async function resolveAgentSkillsConfig(
   config: false | AgentSkillsConfig | undefined,
   rootDir: string,
+  options: ResolveAgentSkillsOptions = {},
 ): Promise<ResolvedAgentSkillsConfig> {
   if (config === false || config === undefined)
     return { _tag: 'Disabled' }
@@ -260,7 +274,8 @@ export async function resolveAgentSkillsConfig(
     }
   }
 
-  const issues = config.skills.flatMap((skill, index) => validateSkill(skill, index))
+  const sitemapMd = options.sitemapMd !== false
+  const issues = config.skills.flatMap((skill, index) => validateSkill(skill, index, sitemapMd))
   const seenNames = new Set<string>()
   const seenAliases = new Set<string>()
   for (const [index, skill] of config.skills.entries()) {

@@ -106,6 +106,40 @@ describe('resolveAgentSkillsConfig', () => {
     })
   })
 
+  it('rejects an alias that shadows a module-owned markdown route', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-skills-'))
+    await writeFile(join(rootDir, 'SKILL.md'), localSkill)
+
+    const result = await resolveAgentSkillsConfig({
+      skills: [{
+        source: 'local',
+        name: 'seo-audit',
+        description: 'Audit a site for critical SEO issues.',
+        file: './SKILL.md',
+        alias: '/sitemap.md',
+      }],
+    }, rootDir)
+
+    expect(result).toMatchObject({ _tag: 'Invalid', issues: [{ index: 0, field: 'alias' }] })
+  })
+
+  it.each([
+    ['/sitemap.md', 'sitemap markdown route'],
+    ['/index.md', 'home markdown route'],
+  ])('rejects the module-owned alias %s (%s)', async (alias) => {
+    const result = await resolveAgentSkillsConfig({
+      skills: [{
+        source: 'local',
+        name: 'seo-audit',
+        description: 'Audit a site for critical SEO issues.',
+        file: './SKILL.md',
+        alias,
+      }],
+    }, '/app')
+
+    expect(result).toMatchObject({ _tag: 'Invalid', issues: [{ index: 0, field: 'alias' }] })
+  })
+
   it.each([
     ['SKILL.md', 'relative'],
     ['/skills/', 'directory'],

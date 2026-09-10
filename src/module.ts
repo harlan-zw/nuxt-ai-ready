@@ -155,7 +155,8 @@ export default defineNuxtModule<ModuleOptions>({
     const agentSkillsResult: ResolvedAgentSkillsConfig = config.agentSkills === false || config.agentSkills === undefined
       ? { _tag: 'Disabled' }
       : await import('./utils/agent-skills')
-          .then(({ resolveAgentSkillsConfig }) => resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir))
+          .then(({ resolveAgentSkillsConfig }) =>
+            resolveAgentSkillsConfig(config.agentSkills, nuxt.options.rootDir, { sitemapMd: config.sitemapMd !== false }))
     if (agentSkillsResult._tag === 'Invalid') {
       const details = agentSkillsResult.issues
         .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
