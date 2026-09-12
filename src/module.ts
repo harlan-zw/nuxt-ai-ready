@@ -857,12 +857,12 @@ export default defineNuxtModule<ModuleOptions>({
       nitroConfig.virtual['#ai-ready-virtual/i18n-runtime.mjs'] = () => {
         const runtimeConfig = nitroConfig.runtimeConfig?.['nuxt-ai-ready'] as ModulePublicRuntimeConfig | undefined
         return runtimeConfig?.i18n
-          ? `export { computeLocaleAlternates, localePath, resolveLocaleAlternates, resolveLocaleFromRoute } from ${JSON.stringify(nuxtSeoSharedI18nRuntimePath)}`
+          ? `export { computeLocaleAlternates, localePath, resolveI18nDomain, resolveLocaleAlternates, resolveLocaleFromRoute } from ${JSON.stringify(nuxtSeoSharedI18nRuntimePath)}`
           : `
 const unavailable = () => {
   throw new Error('[nuxt-ai-ready] i18n runtime called without i18n configuration.')
 }
-export { unavailable as computeLocaleAlternates, unavailable as localePath, unavailable as resolveLocaleAlternates, unavailable as resolveLocaleFromRoute }
+export { unavailable as computeLocaleAlternates, unavailable as localePath, unavailable as resolveI18nDomain, unavailable as resolveLocaleAlternates, unavailable as resolveLocaleFromRoute }
 `
       }
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
