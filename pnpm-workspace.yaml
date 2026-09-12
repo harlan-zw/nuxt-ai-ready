@@ -48,7 +48,7 @@ packages:
 
 overrides:
   h3: ^1.15.11
-  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@d3e6504
+  nuxtseo-shared: ^5.3.15
   rollup-plugin-visualizer>open: ^10.0.0
   schema-utils>ajv: 8.14.0
   vue: ^3.5.42
@@ -91,7 +91,7 @@ catalog:
   mdream: ^1.7.1
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.14
-  nuxtseo-shared: https://pkg.pr.new/nuxtseo-shared@d3e6504
+  nuxtseo-shared: ^5.3.15
   pathe: ^2.0.3
   pkg-types: ^2.3.2
   postgres: ^3.4.9
