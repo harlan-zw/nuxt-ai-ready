@@ -3,10 +3,10 @@ import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
 import { randomUUID } from 'uncrypto'
-import { getRequestURL } from '#nuxtseo/h3'
+import { getRequestHost } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { createUniversalContext } from '../utils/context'
-import { hostMatchesLocaleDomain, resolveLocaleFromRoute } from '../utils/i18n'
+import { resolveI18nDomain, resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
@@ -52,7 +52,7 @@ function deriveLocale(event: H3Event | undefined, route: string, explicit?: stri
   let requestHost: string | undefined
   if (event) {
     try {
-      requestHost = getRequestURL(event).host
+      requestHost = getRequestHost(event, { xForwardedHost: true })
     }
     catch {
       // An event without a readable request carries no host signal; fall
@@ -60,7 +60,7 @@ function deriveLocale(event: H3Event | undefined, route: string, explicit?: stri
       requestHost = undefined
     }
   }
-  const host = requestHost && hostMatchesLocaleDomain(requestHost, i18n)
+  const host = requestHost && resolveI18nDomain(requestHost, i18n)._tag === 'known'
     ? requestHost
     : hostFromUrl(createUniversalContext(event).siteUrl)
   return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale

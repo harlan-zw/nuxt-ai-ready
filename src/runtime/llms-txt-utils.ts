@@ -3,7 +3,7 @@ import type { PageEntry } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { decodePath } from 'ufo'
-import { getRequestURL } from '#nuxtseo/h3'
+import { getRequestHost } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
@@ -198,7 +198,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const i18nRuntime = i18n
     ? { _tag: 'enabled' as const, config: i18n, ...await import('./llms-txt-i18n') }
     : { _tag: 'disabled' as const }
-  const i18nContext = { host: getRequestURL(event).host }
+  const i18nContext = { host: getRequestHost(event, { xForwardedHost: true }) }
   const baseURL = runtimeConfig.app.baseURL
   const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
   const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL))

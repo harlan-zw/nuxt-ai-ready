@@ -123,6 +123,20 @@ describe('indexed page locale source', () => {
     expect(localeOf('/a-propos')).toBe('fr')
   })
 
+  it('uses the forwarded locale domain behind a proxy', async () => {
+    mocks.runtimeConfig = {
+      'nuxt-ai-ready': { i18n: domainI18n },
+      'site': { url: 'https://en.example.com' },
+    }
+    const { upsertPage } = await importQueries()
+    const event = eventWithHost('internal.proxy')
+    event.node.req.headers['x-forwarded-host'] = 'fr.example.com'
+
+    await upsertPage(event, page('/a-propos'))
+
+    expect(localeOf('/a-propos')).toBe('fr')
+  })
+
   it('ignores request hosts that match no configured locale domain', async () => {
     mocks.runtimeConfig = {
       'nuxt-ai-ready': { i18n: domainI18n },
@@ -131,6 +145,20 @@ describe('indexed page locale source', () => {
     const { upsertPage } = await importQueries()
 
     await upsertPage(eventWithHost('my-worker.workers.dev'), page('/about'))
+
+    expect(localeOf('/about')).toBe('en')
+  })
+
+  it('uses the site locale when the forwarded host is unknown', async () => {
+    mocks.runtimeConfig = {
+      'nuxt-ai-ready': { i18n: domainI18n },
+      'site': { url: 'https://en.example.com' },
+    }
+    const { upsertPage } = await importQueries()
+    const event = eventWithHost('fr.example.com')
+    event.node.req.headers['x-forwarded-host'] = 'preview.example.com'
+
+    await upsertPage(event, page('/about'))
 
     expect(localeOf('/about')).toBe('en')
   })

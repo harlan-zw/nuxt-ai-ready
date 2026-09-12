@@ -5,7 +5,7 @@ import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
-import { appendHeader, createError, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { appendHeader, createError, getRequestHost, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import initSiteConfig from '#site-config/server/middleware/init'
@@ -101,7 +101,7 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
     path,
     resolvePath,
     resolveUrl: (target: string) => withSiteUrl(event, resolvePath(target)),
-    routeContext: { host: getRequestURL(event).host },
+    routeContext: { host: getRequestHost(event, { xForwardedHost: true }) },
   }
 }
 

@@ -142,6 +142,24 @@ describe('buildLinkHeader', () => {
     expect(header).toContain('<https://fr.example.com/a-propos>; rel="alternate"; hreflang="fr"')
   })
 
+  it('keeps canonical hreflang domains when a locale is available on both hosts', () => {
+    const i18n: RuntimeI18nConfig = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      multiDomainLocales: true,
+      locales: [
+        { code: 'en', hreflang: 'en', domains: ['en.example.com', 'fr.example.com'], defaultForDomains: ['en.example.com'] },
+        { code: 'fr', hreflang: 'fr', domains: ['en.example.com', 'fr.example.com'], defaultForDomains: ['fr.example.com'] },
+      ],
+      pages: { about: { en: '/about', fr: '/a-propos' } },
+    }
+
+    const header = buildLinkHeader('/a-propos', 'html', { ...baseConfig, i18n }, resolveExampleUrl, { host: 'fr.example.com' })
+
+    expect(header).toContain('<https://en.example.com/about>; rel="alternate"; hreflang="en"')
+    expect(header).toContain('<https://fr.example.com/a-propos>; rel="alternate"; hreflang="fr"')
+  })
+
   it('advertises the API catalog only when enabled', () => {
     const enabledConfig = {
       apiCatalog: {

@@ -46,6 +46,7 @@ declare module '#ai-ready-virtual/i18n-runtime.mjs' {
   export {
     computeLocaleAlternates,
     localePath,
+    resolveI18nDomain,
     resolveLocaleAlternates,
     resolveLocaleFromRoute,
   } from 'nuxtseo-shared/i18n-runtime'
