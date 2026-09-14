@@ -1,7 +1,7 @@
 import type { ModulePublicRuntimeConfig } from '../../../../module'
 import { eventHandler, getQuery } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { getStaleRoutes, pruneStaleRoutes } from '../../db/queries'
+import { getStaleRoutes, pruneStaleRoutes, resolveSeedRefreshWindowMs } from '../../db/queries'
 
 export default eventHandler(async (event) => {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
@@ -17,13 +17,17 @@ export default eventHandler(async (event) => {
 
   const ttl = query.ttl ? Math.max(0, Math.trunc(Number(query.ttl)) || config.runtimeSync.pruneTtl) : config.runtimeSync.pruneTtl
 
+  // The seeder resolves its window from the configured pruneTtl, never the
+  // ttl override, so pruning uses that same window.
+  const refreshWindowMs = resolveSeedRefreshWindowMs(config.runtimeSync.pruneTtl)
+
   // Dry run: preview stale routes without deleting
   if (dry) {
-    const routes = await getStaleRoutes(event, ttl)
+    const routes = await getStaleRoutes(event, ttl, refreshWindowMs)
     return { routes, count: routes.length, ttl, dry: true }
   }
 
   // Execute prune
-  const pruned = await pruneStaleRoutes(event, ttl)
+  const pruned = await pruneStaleRoutes(event, ttl, undefined, refreshWindowMs)
   return { pruned, ttl, dry: false }
 })

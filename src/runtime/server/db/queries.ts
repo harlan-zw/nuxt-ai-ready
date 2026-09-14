@@ -1,70 +1,17 @@
 import type { H3Event } from '#nuxtseo/h3'
-import type { RuntimeI18nConfig } from '../utils/i18n'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { RawExecutor } from './drizzle/raw'
+import type { SeedRoutesOptions } from './seed'
 import { randomUUID } from 'uncrypto'
-import { getRequestHost } from '#nuxtseo/h3'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
-import { createUniversalContext } from '../utils/context'
-import { resolveI18nDomain, resolveLocaleFromRoute } from '../utils/i18n'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
+import { deriveLocale, SEED_REFRESH_WINDOW_MS } from './seed'
 import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, normalizeRoute, normalizeRouteKey } from './shared'
 
-function hostFromUrl(url: string | undefined): string | undefined {
-  if (!url)
-    return undefined
-  try {
-    return new URL(url).host || undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-/**
- * Resolve a route's locale, deferring to the explicit value when supplied.
- * Falls back to the runtime i18n config (set when @nuxtjs/i18n is detected at
- * build time). Returns '' when no i18n is configured, matching the schema's
- * default for non-i18n sites.
- *
- * The host comes from the page's own URL, in order of trust:
- * 1. the sitemap entry URL, when the caller has one
- * 2. the request host, but only when it is itself a configured locale domain:
- *    cron and poll requests can arrive on any domain (e.g. a workers.dev
- *    preview host), which would otherwise decide the locale of every indexed
- *    page on multi-domain i18n sites
- * 3. the site config host
- */
-function deriveLocale(event: H3Event | undefined, route: string, explicit?: string, pageUrl?: string): string {
-  if (explicit !== undefined)
-    return explicit
-  const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
-  const i18n = cfg['nuxt-ai-ready']?.i18n
-  if (!i18n)
-    return ''
-
-  const entryHost = hostFromUrl(pageUrl)
-  if (entryHost)
-    return resolveLocaleFromRoute(route, i18n, { host: entryHost }).locale
-
-  let requestHost: string | undefined
-  if (event) {
-    try {
-      requestHost = getRequestHost(event, { xForwardedHost: true })
-    }
-    catch {
-      // An event without a readable request carries no host signal; fall
-      // through to the site config host.
-      requestHost = undefined
-    }
-  }
-  const host = requestHost && resolveI18nDomain(requestHost, i18n)._tag === 'known'
-    ? requestHost
-    : hostFromUrl(createUniversalContext(event).siteUrl)
-  return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale
-}
+export type { SeedRoutesOptions }
+export { resolveSeedRefreshWindowMs, SEED_REFRESH_WINDOW_MS } from './seed'
 
 /** Try to get the current H3Event from context or use provided event */
 function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
@@ -681,11 +628,18 @@ function chunk<T>(items: T[], size: number): T[][] {
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string, url?: string }>): Promise<number> {
+export async function seedRoutes(
+  event: H3Event | undefined,
+  routes: Array<string | { route: string, locale?: string, url?: string }>,
+  options: SeedRoutesOptions = {},
+): Promise<number> {
   const db = await getDb(event)
   if (!db || routes.length === 0)
     return 0
 
+  // Inlined as a literal: a bind param would push a full chunk past D1's
+  // 100-parameter cap. Truncating a finite number keeps it injection-safe.
+  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
   const now = new Date().toISOString()
   const nowMs = Date.now()
 
@@ -712,6 +666,10 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
   // within D1's 100-parameter cap even if a column is added. The statements
   // then go through `db.batch` so all round-trips collapse into one
   // driver-level batch request.
+  //
+  // The DO UPDATE is guarded so an unchanged row is not rewritten on every
+  // crawl. Without the guard each run bumped last_seen_at on every row and
+  // its index entries, which cost millions of D1 row writes a month.
   const rowsPerInsert = maxRowsPerInsert(5)
   const stmts: { sql: string, params: unknown[] }[] = []
   for (const batch of chunk([...byRoute.values()], rowsPerInsert)) {
@@ -726,6 +684,10 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
           locale = excluded.locale,
           is_error = 0,
           indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
+        WHERE ai_ready_pages.last_seen_at IS NULL
+          OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
+          OR ai_ready_pages.is_error = 1
+          OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
       `,
       params,
     })
@@ -737,20 +699,25 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
 /**
  * Prune routes not seen in sitemap for longer than threshold
  * Only prunes routes with source='runtime' (never prerendered pages)
+ *
+ * `seedRoutes` lets `last_seen_at` lag a sighting by up to `refreshWindowMs`,
+ * so the threshold moves back by that window. A live route is then never
+ * pruned. Pass the window the seeder used; the default is the largest one.
  */
 export async function pruneStaleRoutes(
   event: H3Event | undefined,
   staleThresholdSeconds: number,
   protectedSince?: number,
+  refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
 ): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
 
   const staleThreshold = Date.now() - (staleThresholdSeconds * 1000)
-  const threshold = protectedSince === undefined
+  const threshold = (protectedSince === undefined
     ? staleThreshold
-    : Math.min(staleThreshold, protectedSince)
+    : Math.min(staleThreshold, protectedSince)) - refreshWindowMs
 
   const countRow = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
@@ -767,12 +734,16 @@ export async function pruneStaleRoutes(
 /**
  * Get stale routes that would be pruned (for preview)
  */
-export async function getStaleRoutes(event: H3Event | undefined, staleThresholdSeconds: number): Promise<string[]> {
+export async function getStaleRoutes(
+  event: H3Event | undefined,
+  staleThresholdSeconds: number,
+  refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
+): Promise<string[]> {
   const db = await getDb(event)
   if (!db)
     return []
 
-  const threshold = Date.now() - (staleThresholdSeconds * 1000)
+  const threshold = Date.now() - (staleThresholdSeconds * 1000) - refreshWindowMs
   const rows = await db.all<{ route: string }>(
     'SELECT route FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
     ['runtime', threshold],

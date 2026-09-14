@@ -2,7 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { StaleCheckResult } from './checkStale'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapCrawlPartial, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, seedRoutes, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
+import { completeCronRun, getCronFastPathStatus, getNextSitemapToCrawl, markSitemapCrawled, markSitemapCrawlPartial, markSitemapError, pruneCronRunsByAge, pruneStaleRoutes, releaseCronLock, resolveSeedRefreshWindowMs, seedRoutes, startCronRun, syncSitemaps, tryAcquireCronLock } from '../db/queries'
 import { logger } from '../logger'
 import { batchIndexPages } from './batchIndex'
 import { checkAndHandleStale, STALE_CHECK_INTERVAL_MS } from './checkStale'
@@ -252,6 +252,8 @@ async function pingSitemap(
   debug?: boolean,
 ): Promise<SitemapPingResult> {
   const { pruneTtl } = config.runtimeSync
+  // Seeding and pruning must agree on how far last_seen_at may lag.
+  const refreshWindowMs = resolveSeedRefreshWindowMs(pruneTtl)
 
   // Sync sitemap list from runtime config to DB
   const sitemaps = getSitemapsFromConfig(event)
@@ -270,7 +272,7 @@ async function pingSitemap(
     // Still do pruning even if no sitemap to ping
     let pruned = 0
     if (pruneTtl > 0) {
-      pruned = await pruneStaleRoutes(event, pruneTtl)
+      pruned = await pruneStaleRoutes(event, pruneTtl, undefined, refreshWindowMs)
     }
     return { pinged: false, pruned }
   }
@@ -290,7 +292,7 @@ async function pingSitemap(
   // on multi-domain i18n sites, never from the cron request host.
   const routes = [...mapSitemapRoutes(result.urls).entries()].map(([route, url]) => ({ route, url: url.loc }))
   if (routes.length > 0)
-    await seedRoutes(event, routes)
+    await seedRoutes(event, routes, { refreshWindowMs })
 
   if (result._tag === 'failed') {
     await markSitemapError(event, nextSitemap.name, result.error)
@@ -327,7 +329,7 @@ async function pingSitemap(
   // routes whose sitemap simply failed to load this run.
   let pruned = 0
   if (pruneTtl > 0) {
-    pruned = await pruneStaleRoutes(event, pruneTtl, result.startedAt)
+    pruned = await pruneStaleRoutes(event, pruneTtl, result.startedAt, refreshWindowMs)
   }
 
   return {

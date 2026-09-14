@@ -1,12 +1,14 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { SitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import type { FtsTokenizer } from '../schema-sql'
+import type { SeedRoutesOptions } from '../seed'
 import type { DrizzleDatabase } from './client'
 import { and, count, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
+import { deriveLocale, SEED_REFRESH_WINDOW_MS } from '../seed'
 import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert } from '../shared'
 import { useDrizzle } from './client'
 import { getRawExecutor, useRawDb } from './raw'
@@ -1151,47 +1153,69 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
 
 /**
  * Seed routes from sitemap
+ *
+ * Mirrors `seedRoutes` in `../queries` (the raw layer), including the guarded
+ * DO UPDATE: an unchanged row is not rewritten on every crawl. Without the
+ * guard each run bumped `last_seen_at` on every row, which cost millions of
+ * D1 row writes a month. Keep the two layers in sync.
  */
 export async function seedRoutes(
   event: H3Event | undefined,
-  routes: string[],
+  routes: Array<string | { route: string, locale?: string, url?: string }>,
+  options: SeedRoutesOptions = {},
 ): Promise<number> {
   if (routes.length === 0)
     return 0
 
-  // Dedupe by route to avoid SQLite's "ON CONFLICT cannot affect row a second
-  // time" error when a multi-row INSERT contains the same route twice.
-  const byRoute = new Map<string, string>()
-  for (const raw of routes) {
-    // Canonicalise before keying: '' and '/' are one page, so leaving them
-    // distinct defeats the dedupe and collides on route_key instead.
-    const route = normalizeRoute(raw)
-    byRoute.set(route, normalizeRouteKey(route))
+  // Inlined as a literal: a bind param would push a full chunk past D1's
+  // 100-parameter cap. Truncating a finite number keeps it injection-safe.
+  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
+  const now = new Date().toISOString()
+  const nowMs = Date.now()
+
+  // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
+  // SQLite's "ON CONFLICT cannot affect row a second time" error when a
+  // multi-row INSERT contains the same route twice.
+  const byRoute = new Map<string, { route: string, routeKey: string, locale: string }>()
+  for (const entry of routes) {
+    // Canonicalise before keying the map: '' and '/' are one page, so leaving
+    // them distinct here defeats the dedupe and collides on route_key instead.
+    const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
+    const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
+    const entryUrl = typeof entry === 'string' ? undefined : entry.url
+    byRoute.set(route, {
+      route,
+      routeKey: normalizeRouteKey(route),
+      locale: deriveLocale(event, route, explicitLocale, entryUrl),
+    })
   }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. The chunk
-  // size is derived from the 4 bind params per row so each statement stays
+  // size is derived from the 5 bind params per row so each statement stays
   // within D1's 100-parameter cap even if a column is added. All statements
   // then go through `db.batch` so round-trips collapse into one.
-  const rowsPerInsert = maxRowsPerInsert(4)
+  const rowsPerInsert = maxRowsPerInsert(5)
   const db = await useRawDb(event)
-  const now = new Date().toISOString()
-  const nowMs = Date.now()
-  const entries = [...byRoute.entries()]
+  const entries = [...byRoute.values()]
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < entries.length; i += rowsPerInsert) {
     const batch = entries.slice(i, i + rowsPerInsert)
-    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?)`).join(', ')
-    const params = batch.flatMap(([route, routeKey]) => [route, routeKey, now, nowMs])
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
+    const params = batch.flatMap(r => [r.route, r.routeKey, now, nowMs, r.locale])
     stmts.push({
       sql: `
-        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at)
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
         ON CONFLICT(route) DO UPDATE SET
           last_seen_at = excluded.last_seen_at,
+          locale = excluded.locale,
           is_error = 0,
           indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
+        WHERE ai_ready_pages.last_seen_at IS NULL
+          OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
+          OR ai_ready_pages.is_error = 1
+          OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
       `,
       params,
     })

@@ -3,7 +3,7 @@ import type { useNitroApp } from '#nuxtseo/nitro'
 import type { SitemapRouteSource } from '../utils/sitemap-routes'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { trackDrizzleWork } from '../db/drizzle/client'
-import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, seedRoutes } from '../db/queries'
+import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, resolveSeedRefreshWindowMs, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
 import { mapSitemapRoutes } from '../utils/sitemap-routes'
 
@@ -178,7 +178,8 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     // worker alive until they finish without blocking the sitemap response.
     const seed = async () => {
       const seedStart = Date.now()
-      const seeded = await seedRoutes(event, routes).catch((e) => {
+      const pruneTtl = (useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { runtimeSync?: { pruneTtl?: number } } })['nuxt-ai-ready']?.runtimeSync?.pruneTtl ?? 0
+      const seeded = await seedRoutes(event, routes, { refreshWindowMs: resolveSeedRefreshWindowMs(pruneTtl) }).catch((e) => {
         logger.warn(`[sitemap-seeder] Failed to seed routes: ${e.message}`)
         return 0
       })
