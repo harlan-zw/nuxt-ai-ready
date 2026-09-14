@@ -288,11 +288,11 @@ describe('runtime indexing', async () => {
       },
     })
 
-    // Set its last_seen_at to 8 days ago
-    const eightDaysAgo = Date.now() - (8 * 24 * 60 * 60 * 1000)
+    // Set its last_seen_at to 9 days ago: past the 7 day TTL plus the 24h seed refresh window
+    const nineDaysAgo = Date.now() - (9 * 24 * 60 * 60 * 1000)
     await fetch('/api/__db-test?action=set-last-seen', {
       method: 'POST',
-      body: { route: '/stale-test', timestamp: eightDaysAgo },
+      body: { route: '/stale-test', timestamp: nineDaysAgo },
     })
 
     // With 7 day TTL, this route should be stale
@@ -366,7 +366,7 @@ describe('runtime indexing', async () => {
         updatedAt: new Date().toISOString(),
       },
     })
-    const oldTime = Date.now() - (8 * 24 * 60 * 60 * 1000)
+    const oldTime = Date.now() - (9 * 24 * 60 * 60 * 1000)
     await fetch('/api/__db-test?action=set-last-seen', {
       method: 'POST',
       body: { route: '/stale-endpoint-test', timestamp: oldTime },

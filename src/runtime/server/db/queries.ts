@@ -678,14 +678,44 @@ function chunk<T>(items: T[], size: number): T[][] {
   return result
 }
 
+/** Longest time `seedRoutes` lets `last_seen_at` lag behind a sighting. */
+export const SEED_REFRESH_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Resolve how long an unchanged seeded row may skip its `last_seen_at` write.
+ * With pruning on, the window stays at half of pruneTtl so the lag stays small
+ * against the TTL. Pass the same value to `pruneStaleRoutes`.
+ */
+export function resolveSeedRefreshWindowMs(pruneTtlSeconds: number): number {
+  if (!(pruneTtlSeconds > 0))
+    return SEED_REFRESH_WINDOW_MS
+  return Math.min(SEED_REFRESH_WINDOW_MS, Math.floor(pruneTtlSeconds * 1000 / 2))
+}
+
+export interface SeedRoutesOptions {
+  /**
+   * An existing row is rewritten only when its `last_seen_at` is older than
+   * this, when it is an error row, or when its locale changed.
+   * @default SEED_REFRESH_WINDOW_MS
+   */
+  refreshWindowMs?: number
+}
+
 /**
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
-export async function seedRoutes(event: H3Event | undefined, routes: Array<string | { route: string, locale?: string, url?: string }>): Promise<number> {
+export async function seedRoutes(
+  event: H3Event | undefined,
+  routes: Array<string | { route: string, locale?: string, url?: string }>,
+  options: SeedRoutesOptions = {},
+): Promise<number> {
   const db = await getDb(event)
   if (!db || routes.length === 0)
     return 0
 
+  // Inlined as a literal: a bind param would push a full chunk past D1's
+  // 100-parameter cap. Truncating a finite number keeps it injection-safe.
+  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
   const now = new Date().toISOString()
   const nowMs = Date.now()
 
@@ -712,6 +742,10 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
   // within D1's 100-parameter cap even if a column is added. The statements
   // then go through `db.batch` so all round-trips collapse into one
   // driver-level batch request.
+  //
+  // The DO UPDATE is guarded so an unchanged row is not rewritten on every
+  // crawl. Without the guard each run bumped last_seen_at on every row and
+  // its index entries, which cost millions of D1 row writes a month.
   const rowsPerInsert = maxRowsPerInsert(5)
   const stmts: { sql: string, params: unknown[] }[] = []
   for (const batch of chunk([...byRoute.values()], rowsPerInsert)) {
@@ -726,6 +760,10 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
           locale = excluded.locale,
           is_error = 0,
           indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
+        WHERE ai_ready_pages.last_seen_at IS NULL
+          OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
+          OR ai_ready_pages.is_error = 1
+          OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
       `,
       params,
     })
@@ -737,20 +775,25 @@ export async function seedRoutes(event: H3Event | undefined, routes: Array<strin
 /**
  * Prune routes not seen in sitemap for longer than threshold
  * Only prunes routes with source='runtime' (never prerendered pages)
+ *
+ * `seedRoutes` lets `last_seen_at` lag a sighting by up to `refreshWindowMs`,
+ * so the threshold moves back by that window. A live route is then never
+ * pruned. Pass the window the seeder used; the default is the largest one.
  */
 export async function pruneStaleRoutes(
   event: H3Event | undefined,
   staleThresholdSeconds: number,
   protectedSince?: number,
+  refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
 ): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
 
   const staleThreshold = Date.now() - (staleThresholdSeconds * 1000)
-  const threshold = protectedSince === undefined
+  const threshold = (protectedSince === undefined
     ? staleThreshold
-    : Math.min(staleThreshold, protectedSince)
+    : Math.min(staleThreshold, protectedSince)) - refreshWindowMs
 
   const countRow = await db.first<{ count: DatabaseNumber }>(
     'SELECT COUNT(*) as count FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
@@ -767,12 +810,16 @@ export async function pruneStaleRoutes(
 /**
  * Get stale routes that would be pruned (for preview)
  */
-export async function getStaleRoutes(event: H3Event | undefined, staleThresholdSeconds: number): Promise<string[]> {
+export async function getStaleRoutes(
+  event: H3Event | undefined,
+  staleThresholdSeconds: number,
+  refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
+): Promise<string[]> {
   const db = await getDb(event)
   if (!db)
     return []
 
-  const threshold = Date.now() - (staleThresholdSeconds * 1000)
+  const threshold = Date.now() - (staleThresholdSeconds * 1000) - refreshWindowMs
   const rows = await db.all<{ route: string }>(
     'SELECT route FROM ai_ready_pages WHERE source = ? AND last_seen_at < ?',
     ['runtime', threshold],

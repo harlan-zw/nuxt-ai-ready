@@ -13,6 +13,7 @@ vi.mock('../../src/runtime/server/db/queries', () => ({
   getPageLastmods: mocks.getPageLastmods,
   getSitemapLastCrawledAt: mocks.getSitemapLastCrawledAt,
   markSitemapSeeded: mocks.markSitemapSeeded,
+  resolveSeedRefreshWindowMs: () => 24 * 60 * 60 * 1000,
   seedRoutes: mocks.seedRoutes,
 }))
 
