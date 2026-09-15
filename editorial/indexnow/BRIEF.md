@@ -69,3 +69,11 @@ The old guide returned 301 and the browser reached the rendered destination.
 No article figures or downloads were added. No live IndexNow request was sent.
 Temporary captures: ~/scratch/indexnow-refresh/. Browser page indexnow-refresh was closed.
 The deployed source still uses the old route. Publish content and route rules together.
+
+## Collection follow-up
+
+The independent collection reviewer traced pending-page selection and sitemap seeding.
+Added an explicit reindex prerequisite for existing-page edits. TTL expiry alone does not mark healthy indexed pages pending.
+Evidence: `src/runtime/server/utils/batchIndex.ts:71`, `src/runtime/server/db/queries.ts:686`, and `reindex.post.ts`.
+The reindex endpoint authenticates and defaults force to true. No new automatic change detection is promised.
+This follow-up belongs to the collection PR, after pilot revision 6a76f6d.
