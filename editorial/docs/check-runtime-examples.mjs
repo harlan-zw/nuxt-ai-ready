@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
+import { htmlToMarkdown } from 'mdream'
 import ts from 'typescript'
 import { joinURL } from 'ufo'
 
@@ -98,3 +99,20 @@ process.stdout.write(`${count} JavaScript/TypeScript fences compile; JSON fences
 process.stdout.write('Base duplicate declaration fails; revised snippets compile.\n')
 process.stdout.write('Base missing-source parser invents /undefined; revised parser rejects it.\n')
 process.stdout.write('Current formatter replay and changed-content hook checks pass. No external API calls.\n')
+
+const conversionExample = hooks.find(([, , code]) => code.includes('hook(\'ai-ready:mdreamConfig\''))[2]
+const conversionHooks = new Map()
+const conversionPlugin = runInNewContext(compile(conversionExample).runnable, { defineNitroPlugin: value => value })
+conversionPlugin({ hooks: { hook: (name, callback) => conversionHooks.set(name, callback) } })
+const configureConversion = conversionHooks.get('ai-ready:mdreamConfig')
+const html = '<main><h1>Article</h1><p>Keep this paragraph.</p><div class="author-bio">Biography</div><div class="existing-exclude">Existing exclusion</div></main>'
+for (const initialOptions of [{}, { filter: { exclude: ['.existing-exclude'] } }]) {
+  const options = structuredClone(initialOptions)
+  configureConversion(options)
+  const markdown = htmlToMarkdown(html, options)
+  assert.match(markdown, /Keep this paragraph/)
+  assert.doesNotMatch(markdown, /Biography/)
+  if (initialOptions.filter)
+    assert.doesNotMatch(markdown, /Existing exclusion/)
+}
+process.stdout.write('Extracted mdream hook filters real HTML and preserves existing exclusions.\n')

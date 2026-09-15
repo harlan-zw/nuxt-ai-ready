@@ -203,3 +203,22 @@ Independent final article review remains pending.
 
 Scoped [ESLint](https://eslint.org) passed for all ten articles and the replay helper with zero warnings.
 Heading inventory comparison found no removed headings in any owned page. URLs and existing anchors remain unchanged.
+
+
+## Independent review repairs
+
+Reviewer found that the mdreamConfig example retained unsupported `ignoreElements`.
+Added a behavioral replay before changing the example. The old example left Biography text in converted Markdown and failed.
+The corrected `filter.exclude` example removes that text with mdream 1.7.1 and preserves an existing exclusion.
+The replay also checks that ordinary article content remains.
+
+The same revision scopes locale frontmatter to runtime HTML conversion and removes the obsolete page-data.jsonl output claim.
+Nuxt hook timing now covers all prerendering, including ordinary builds with configured prerender routes.
+Historical v1 authentication now names protected endpoints; prune dry runs remain exempt, matching the v1 source.
+
+Surface humanize pass: retained simple sentences and exact option names; removed “All” from the historical authentication claim.
+Structural humanize pass: kept filtering immediately beside conversion scope and preserved existing hook headings.
+Meaning recheck: filter mutation preserves the existing filter object and excludes; the hook still has no route field.
+
+Validation: `node editorial/docs/check-runtime-examples.mjs` passes all previous checks plus real mdream filtering.
+The first run failed against a63c643 before the example changed. No external service calls ran.
