@@ -21,7 +21,7 @@ No paid research is authorized or needed for this technical refresh. Search dema
 | MCP | https://modelcontextprotocol.io/specification/ | Protocol details | Version and client support are separate |
 | IETF | https://www.rfc-editor.org/rfc/rfc9727.html | API catalog | Protocol, not client adoption |
 | llms.txt | https://llmstxt.org/ | File proposal | Proposal does not prove crawler adoption |
-| Cloudflare | https://developers.cloudflare.com/ | Deployment and bindings | Check preset/version; no account-specific assumption |
+| [Cloudflare](https://cloudflare.com) | https://developers.cloudflare.com/ | Deployment and bindings | Check preset/version; no account-specific assumption |
 | IndexNow | [Pilot sources](../indexnow/SOURCES.md) | Changed URL recipe | No live submission |
 
 Additional primary sources may enter through a reviewed page brief. Record exact URLs, not search result URLs.

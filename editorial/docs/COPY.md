@@ -12,7 +12,7 @@ Never invent personal experience, benchmarks, demand, or support by a named clie
 
 ## Vocabulary
 
-No root glossary or informal glossary was found during the bounded repository search.
+The bounded repository search found no root glossary or informal glossary.
 Preserve established public identifiers and existing product names. Do not rename a product concept during this refresh.
 The existing customer surface and `CLAUDE.md` feature names supply the current vocabulary.
 The user explicitly chose IndexNow as its navigation label and Advanced as its section.

@@ -19,20 +19,20 @@ External documents were opened on 2026-09-15. Their relevant scopes follow.
 | --- | --- | --- | --- | --- |
 | F-01 | Observed | Implementation | Markdown, llms.txt, stored-page export, optional MCP, signals, skills, and catalogs have distinct prerequisites. | `src/module.ts:118`, `src/module.ts:390`, `src/module.ts:539`; handlers under `src/runtime/server/routes/` |
 | F-02 | Observed | Implementation | Runtime indexing uses polling, scheduled tasks, or manual utilities. Page visits do not index content. Polling selects pending rows; TTL expiry does not reindex healthy stored rows. Static output cannot host the server MCP endpoint. | `src/runtime/server/plugins/sitemap-seeder.ts`; `src/runtime/server/tasks/ai-ready-cron.ts`; `src/runtime/server/utils/indexPage.ts`; `src/module.ts:539` |
-| F-03 | Observed | Implementation | Native Node SQLite starts at Node 22.13, Node 23.4, and later major versions. Vercel chooses Neon when POSTGRES_URL exists. | `src/utils/database.ts:6`, `src/utils/database.ts:90` |
-| F-04 | Observed | Implementation | Content Signals are off by default. Enabled omitted booleans emit no. Content-Usage can be disabled inside contentSignal. Required Robots version is >=6.0.0. | `src/module.ts:118`, `src/module.ts:390` |
+| F-03 | Observed | Implementation | Native Node [SQLite](https://sqlite.org) starts at Node 22.13, Node 23.4, and later major versions. [Vercel](https://vercel.com) chooses Neon when POSTGRES_URL exists. | `src/utils/database.ts:6`, `src/utils/database.ts:90` |
+| F-04 | Observed | Implementation | Content Signals are off by default. Enabled omitted booleans emit no. Set contentSignal.contentUsage to false to disable Content-Usage. Required Robots version is >=6.0.0. | `src/module.ts:118`, `src/module.ts:390` |
 | F-05 | Documented | Primary draft | Content-Usage expresses preferences through HTTP or robots.txt. train-ai=y/n is a documented example. A draft does not establish crawler compliance. | https://ietf-wg-aipref.github.io/drafts/draft-ietf-aipref-attach.html |
 | F-06 | Observed | Implementation | Accept negotiation follows mdream negotiation and AI bot classification, with route cache policy. It is not the existing simple Accept exclusion rule. Negotiated Markdown uses a 307 redirect. | `src/runtime/server/utils/markdown-request.ts`; `negotiation-decision.ts`; `negotiation-response.ts`; `content-negotiation.ts` |
 | F-07 | Observed | Implementation | mdream uses filter.exclude. ignoreElements, ignoreSelectors, and preserveCodeBlocks are not supported options. options.origin contains the origin, not a route path. | `node_modules/mdream/dist/index.d.mts:62`; `src/runtime/server/utils.ts:77` |
 | F-08 | Observed | Implementation | Runtime llms.txt combines stored pages and sitemap URLs. Sitemap exclusion does not remove a stored page. Runtime llms-full streams stored content. | `src/runtime/llms-txt-utils.ts:250`; `src/runtime/server/routes/llms-full.txt.get.ts` |
 | F-09 | Observed | Implementation | Prerender hooks write SQLite page records; empty Markdown omits full-export content but does not remove the record. Sitemap-only crawl entries skip the static full export. | `src/prerender.ts:264`, `src/prerender.ts:364`, `src/prerender.ts:682` |
 | F-10 | Documented | Primary proposal | llms.txt is a proposal. Its format specifies an H1, optional summary/preamble, and H2 link lists. llms-full is not defined by it. | https://llmstxt.org/ ; current v2 updated 2026-08-10 |
-| F-11 | Documented | Primary standard | RFC 9727 defines API discovery and application/linkset+json. It recommends the RFC profile. | https://www.rfc-editor.org/rfc/rfc9727.html ; June 2025 |
+| F-11 | Documented | Primary standard | RFC 9727 defines API discovery and `application/linkset+json`. It recommends the RFC profile. | https://www.rfc-editor.org/rfc/rfc9727.html ; June 2025 |
 | F-12 | Observed | Implementation | Config maps camelCase catalog fields to relation tokens, resolves URLs, and generates MCP entries only with server Toolkit and a site URL. apiCatalog:false disables catalog output. | `src/utils/api-catalog.ts`; `src/module.ts:584`; `src/runtime/server/routes/api-catalog.ts` |
 | F-13 | Documented | Primary draft | Agent Skills Discovery draft 0.2.0 requires schema URI, artifact type, URL, digest, and identity fields. SHA-256 covers artifact bytes. | https://github.com/cloudflare/agent-skills-discovery-rfc ; updated 2026-03-12 |
 | F-14 | Documented | Primary specification | Skill name matches its parent directory; SKILL.md has name and description frontmatter. | https://agentskills.io/specification |
-| F-15 | Observed | Implementation | Local discovery is project-root constrained; entries preserve file bytes and calculate digests. External artifacts are validated but not fetched. Hook digest must be 64 hexadecimal characters. | `src/utils/agent-skills.ts:186`, `:269`, `:364`, `:432`; `src/module.ts:168` |
-| F-16 | Observed | Implementation | i18n auto-detection can be disabled. Page fallback uses discovered Nuxt paths when the default locale is omitted. Error response headers suppress locale alternates. | `src/utils/i18n.ts:49`; `src/runtime/server/plugins/link-header.ts`; `src/runtime/server/utils/negotiation-response.ts:47` |
+| F-15 | Observed | Implementation | Local discovery is project-root constrained; entries preserve file bytes and calculate digests. External artifacts pass validation but not fetched. Hook digest must be 64 hexadecimal characters. | `src/utils/agent-skills.ts:186`, `:269`, `:364`, `:432`; `src/module.ts:168` |
+| F-16 | Observed | Implementation | i18n auto-detection supports disabling. Page fallback uses discovered Nuxt paths when the default locale is omitted. Error response headers suppress locale alternates. | `src/utils/i18n.ts:49`; `src/runtime/server/plugins/link-header.ts`; `src/runtime/server/utils/negotiation-response.ts:47` |
 | F-17 | Observed | Implementation | SQLite tokenizer defaults to trigram when a configured locale is CJK, unless configured otherwise. Postgres does not use FTS5. | `src/utils/i18n.ts:17`; `src/module.ts`; `src/runtime/server/db/drizzle/queries.ts:455` |
 | F-18 | Documented | Primary documentation | Custom i18n routes can come from config. WebMCP is experimental; Chrome documents an origin trial and local flag. | https://i18n.nuxtjs.org/docs/guide/custom-paths ; https://developer.chrome.com/docs/ai/webmcp |
 | F-19 | Observed | Implementation | WebMCP composables register while mounted/active/enabled; unsupported clients skip. Built-ins use public indexed data; this is not an access-control check against sitemap visibility. | `src/runtime/app/composables/webmcp.ts`; `src/runtime/app/plugins/webmcp.client.ts`; `src/runtime/server/routes/__ai-ready/pages.get.ts` |
@@ -136,7 +136,7 @@ Limitations: contentsignals.org yielded no extractable body, so protocol labels 
 - Question: how do I publish a valid skill and advertise its artifact?
 - Outcome: minimal SKILL.md and discoverable index, with later external/archive options.
 - Evidence: F-13 through F-15.
-- Corrections: hook's sha256 ellipsis fails validation; use a clearly synthetic valid-length digest and instruction to replace it.
+- Corrections: hook's sha256 ellipsis fails validation; use a synthetic valid-length digest and instruction to replace it.
 - Move complete valid SKILL.md example beside first discovery directory example. Name discovery version as a draft.
 - Clarify local discovery publishes SKILL.md only; package supporting resources in an external archive when needed.
 - Outline: convention and valid skill; config/hook; explicit local entries; aliases; external archives.
@@ -246,14 +246,14 @@ The base-fence replay fails because the old Markdown filter leaves “Remove thi
 This comparison ran after drafting. It demonstrates the old defect; it is not claimed as a test-first source-code repair.
 The current replay passes: 36 TypeScript examples parse; both conversion filters remove selected content and retain the article.
 It also verifies catalog URL resolution, skill bytes and digest, skill filtering, a WebMCP handler result, i18n links, and llms.txt formatting.
-The skill digest uses real fixture bytes, not a fabricated hash. The temporary fixture is removed afterward.
+The skill digest uses real fixture bytes, not a fabricated hash. The replay removes its temporary fixture afterward.
 
 The i18n replay maps the virtual module to the installed shared runtime, matching the configured module branch.
 It does not build Nitro or exercise browser registration. Vue registration is a captured boundary in the component example.
 The header check verifies the actual Link builder. Request lifecycle and status handling remain implementation evidence.
 All JSON/TypeScript checks are syntax or isolated behavior checks, not full application typechecking.
 
-Focused ESLint passed for all nine article paths and the replay helper. `git diff --check` passed.
+Focused [ESLint](https://eslint.org) passed for all nine article paths and the replay helper. `git diff --check` passed.
 No repository-wide tests, server build, browser session, or external submission ran in this writer task.
 
 ## Per-page validation
@@ -286,4 +286,4 @@ Updated the WebMCP tool table and added the server-versus-static distinction bes
 Surface pass: removed the universal “Markdown bodies include” and “Full-text search across page content” claims.
 Structural pass: put each qualification beside the table and example it changes.
 Factual recheck traced the early content-source returns and the metadata-only search weights.
-Focused ESLint passed on both articles. Independent re-review remains pending.
+Focused [ESLint](https://eslint.org) passed on both articles. Independent re-review remains pending.

@@ -2,7 +2,7 @@
 
 Root coordinates the only browser operator. Use dev-browser; close task-named pages afterward.
 Never stop shared browsers. If DISPLAY is empty, use --headless for a launched browser.
-No instructional figure is required unless it teaches a specific task better than code or text.
+Add an instructional figure only when it teaches the task better than code or text.
 Do not fabricate account UI or indexing results.
 
 Render through the real nuxtseo.com site with a temporary local source override to the task docs worktree.

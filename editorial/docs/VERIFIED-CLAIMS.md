@@ -10,7 +10,7 @@ Mark missing external evidence Unresolved. Preserve withdrawn claims with their 
 | Group | Evidence record | Scope |
 | --- | --- | --- |
 | IndexNow pilot | [Pilot claims](../indexnow/VERIFIED-CLAIMS.md) | IN-01 through IN-08; live acceptance untested |
-| Getting started and content | fundamentals.md, pending research | Introduction, installation, signals, Markdown, llms.txt, catalogs, skills, i18n, WebMCP |
-| Runtime and reference | runtime-reference.md, pending research | MCP, runtime indexing, Cloudflare, CLI, RAG, hooks, config, composables, v1 |
+| Getting started and content | [Fundamentals claims](fundamentals.md) | Introduction, installation, signals, Markdown, llms.txt, catalogs, skills, i18n, WebMCP |
+| Runtime and reference | [Runtime claims](runtime-reference.md) | MCP, runtime indexing, [Cloudflare](https://cloudflare.com), CLI, RAG, hooks, config, composables, v1 |
 
 No new technical assertion is approved by this index alone.
