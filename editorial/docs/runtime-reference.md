@@ -222,3 +222,8 @@ Meaning recheck: filter mutation preserves the existing filter object and exclud
 
 Validation: `node editorial/docs/check-runtime-examples.mjs` passes all previous checks plus real mdream filtering.
 The first run failed against a63c643 before the example changed. No external service calls ran.
+
+## Collection handoff
+
+Independent article review accepted the corrected revision. The coordinator verified all routes, metadata, and rendered fragments.
+See [the collection ledger](LEDGER.md) for final checks and publication limits.

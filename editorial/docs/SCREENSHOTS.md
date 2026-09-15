@@ -19,3 +19,10 @@ Pilot dimensions: 2880x2000 for 1440x1000 CSS; 780x1688 for 390x844 CSS.
 Keep raw captures in ~/scratch/. Put selected report PNGs beside ~/notes/nuxt-ai-ready-doc-refresh.md.
 Use relative image links, descriptive alt text, and a display width no greater than half the source width.
 Screenshots prove the local renderer only. Confirm deployed revision separately if deployment is authorized.
+
+## Captured evidence
+
+The coordinator captured the actual site on 2026-09-15. Desktop PNGs measure 2880 by 2000 for 1440 by 1000 CSS pixels.
+The mobile PNG measures 780 by 1688 for 390 by 844 CSS pixels. No scaling or sharpening modified these captures.
+The local task report stores the inspected installation, runtime, Nitro hook, and IndexNow screenshots outside Git.
+The preview requires a restart after external source edits. Initial stale captures were discarded and current text verified.

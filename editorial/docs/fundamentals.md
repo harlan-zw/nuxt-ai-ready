@@ -287,3 +287,8 @@ Surface pass: removed the universal “Markdown bodies include” and “Full-te
 Structural pass: put each qualification beside the table and example it changes.
 Factual recheck traced the early content-source returns and the metadata-only search weights.
 Focused [ESLint](https://eslint.org) passed on both articles. Independent re-review remains pending.
+
+## Collection handoff
+
+Independent article review accepted the corrected revision. The coordinator verified all routes, metadata, and rendered fragments.
+See [the collection ledger](LEDGER.md) for final checks and publication limits.
