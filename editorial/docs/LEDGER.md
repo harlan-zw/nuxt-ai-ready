@@ -12,10 +12,17 @@ An independent reviewer checks final revisions; writers cannot approve their own
 | Group | Files | State | Owner |
 | --- | --- | --- | --- |
 | IndexNow | Advanced IndexNow recipe | article reviewed | Pilot PR121 |
-| Fundamentals | 9 files | sources needed | Pending assignment |
-| Runtime and reference | 10 files | sources needed | Pending assignment |
+| Fundamentals | 9 files | brief reviewed; drafting | Assigned writer |
+| Runtime and reference | 10 files | brief reviewed; drafting | Assigned writer |
 
 ## Delivery
 
 Refresh branch builds on the IndexNow pilot. The site redirect must deploy with the moved article.
 Keep the historical v1 page historical. Do not interpret removed v1 features as current defects.
+
+## Independent brief review
+
+Root approved both group briefs on 2026-09-15. A separate reviewer traced cross-page behavior.
+Required corrections: TTL does not queue existing indexed pages; HTTP conversion hooks do not run during indexPage conversion.
+The config reference also needs active prerender.concurrency and debugCron options. Writers accepted these additions.
+Root added the reindex prerequisite to IndexNow so all20 pages share the same runtime model.
