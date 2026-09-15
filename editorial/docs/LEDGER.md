@@ -43,7 +43,7 @@ The final PR review covers the final commit and those fragment corrections.
 Replay checks pass: fundamentals examples, runtime/reference examples, and the changed-only IndexNow helper.
 The runtime hook replay converts real HTML and preserves existing filter exclusions.
 External service acceptance, authenticated deployments, and paid vector operations remain untested.
-No downloadable example artifacts were added. Fenced examples are the checked copyable instructions.
+The refresh adds no downloadable example artifacts. Fenced examples are the checked copyable instructions.
 
 Publication remains pending. Merge and deploy the content with the companion site redirect.
 Editorial files remain outside docs/content. The site's collection glob excludes them from navigation, search, and sitemap ingestion.
