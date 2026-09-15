@@ -269,3 +269,21 @@ No repository-wide tests, server build, browser session, or external submission 
 | Agent Skills | Local bytes/digest and hook filter replay; real sha256 command documented | External upload and discovery client not run |
 | i18n | Actual Link builder produces canonical and locale URLs; fallback implementation inspected | Full localized app rendering not run |
 | WebMCP | SFC script parses; captured handler returns expected result; lifecycle implementation traced | Browser registration and agent selection not run |
+
+
+## Independent article review corrections, 2026-09-15
+
+The independent reviewer identified two P2 scope errors after writer commit `5eac4f0`.
+Both were corrected in prose without changing runtime source.
+
+| ID | Status | Kind | Corrected claim | Evidence |
+| --- | --- | --- | --- | --- |
+| F-22 | Observed | Implementation | Only runtime HTML conversion injects locale frontmatter. Content-source and prerendered responses need their own locale metadata. | `src/runtime/server/middleware/markdown.ts:85`, `:104`, `:196`; prerender middleware additionalFrontmatter |
+| F-23 | Observed | Implementation | Server WebMCP search uses database full-text search. Static fallback matches metadata, not Markdown bodies; fallback also runs after empty server results. | `src/runtime/webmcp-site-tools.ts:63`, `:132`, `:349` |
+
+Updated the i18n surface table, frontmatter example, introduction, and behavior note together.
+Updated the WebMCP tool table and added the server-versus-static distinction beside it.
+Surface pass: removed the universal “Markdown bodies include” and “Full-text search across page content” claims.
+Structural pass: put each qualification beside the table and example it changes.
+Factual recheck traced the early content-source returns and the metadata-only search weights.
+Focused ESLint passed on both articles. Independent re-review remains pending.
