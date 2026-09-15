@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v2.3.2...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.2...main)
+
+### 🩹 Fixes
+
+- **i18n:** Use shared domain rules and public request hosts ([#119](https://github.com/harlan-zw/nuxt-ai-ready/pull/119))
+- **db:** Skip seedRoutes writes for unchanged rows ([#120](https://github.com/harlan-zw/nuxt-ai-ready/pull/120))
+
+### 🏡 Chore
+
+- Bump ([c8aee0b](https://github.com/harlan-zw/nuxt-ai-ready/commit/c8aee0b))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## v2.3.1...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.1...main)
