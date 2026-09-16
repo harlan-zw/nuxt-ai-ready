@@ -53,7 +53,14 @@ describe('isStaticMarkdownSourceRoute', () => {
     expect(isStaticMarkdownSourceRoute('/index.md')).toBe(false)
     expect(isStaticMarkdownSourceRoute('/api/data')).toBe(false)
     expect(isStaticMarkdownSourceRoute('/_content')).toBe(false)
-    expect(isStaticMarkdownSourceRoute('/@build')).toBe(false)
+    expect(isStaticMarkdownSourceRoute('/@vite/client')).toBe(false)
+    expect(isStaticMarkdownSourceRoute('/@fs/home/user/app.js')).toBe(false)
+  })
+
+  it('accepts an @handle page route', () => {
+    // /@login is a profile namespace. Only Vite's own prefixes are internal.
+    expect(isStaticMarkdownSourceRoute('/@emilkowalski')).toBe(true)
+    expect(isStaticMarkdownSourceRoute('/@harlan-zw/nuxt')).toBe(true)
   })
 
   it('keeps pages whose first segment merely starts with a reserved prefix', () => {
