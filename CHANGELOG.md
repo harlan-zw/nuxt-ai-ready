@@ -1,3 +1,12 @@
+## 2.3.4
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.3...v2.3.4)
+
+- chore: bump ([ced7476](https://github.com/harlan-zw/nuxt-ai-ready/commit/ced7476a20c059c3514949e4967fe8ed4b1e7212))
+- docs: move and refresh changed-only IndexNow recipe (#121) ([6e632ee](https://github.com/harlan-zw/nuxt-ai-ready/commit/6e632ee9b0dd2056c237b13c4b0a6131c34b7b54))
+- docs: refresh all Nuxt AI Ready guides and references (#122) ([afb03e9](https://github.com/harlan-zw/nuxt-ai-ready/commit/afb03e9d601d49e768c2b3b761395f42ec501d54))
+- fix(markdown): serve markdown for an @handle page route (#124) ([c8f26a6](https://github.com/harlan-zw/nuxt-ai-ready/commit/c8f26a6ed4ff99d93b738c68b64231252c70e4b8))
+
 # Changelog
 
 
