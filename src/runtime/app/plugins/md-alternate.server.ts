@@ -1,15 +1,16 @@
 import { defineNuxtPlugin, useHead, useRequestURL, useRuntimeConfig } from 'nuxt/app'
 import { joinURL } from 'ufo'
-import { toMarkdownPath } from '../../markdown-path'
+import { markdownAlternatePath } from '../../markdown-path'
 
 export default defineNuxtPlugin({
   setup() {
     const url = useRequestURL()
     const path = url.pathname
 
-    // Skip file-like routes (already have an extension)
-    const lastSegment = path.split('/').pop() || ''
-    if (lastSegment.includes('.'))
+    // Skip anything the markdown handler declines: a reserved namespace, or a
+    // route that already carries an extension.
+    const markdownPath = markdownAlternatePath(path)
+    if (!markdownPath)
       return
 
     const runtimeConfig = useRuntimeConfig()
@@ -17,7 +18,7 @@ export default defineNuxtPlugin({
 
     useHead({
       link: [
-        { rel: 'alternate', type: 'text/markdown', href: toMarkdownPath(path) },
+        { rel: 'alternate', type: 'text/markdown', href: markdownPath },
         ...(describedby
           ? [{ rel: 'describedby', href: joinURL(runtimeConfig.app.baseURL, 'llms.txt') } as unknown as { rel: 'alternate', href: string }]
           : []),

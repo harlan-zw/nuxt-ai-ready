@@ -16,6 +16,20 @@ describe('nuxt-ai-ready e2e', async () => {
     expect(markdown).toContain('#') // Should contain markdown headers
   })
 
+  it('converts an @handle page to markdown', async () => {
+    // /@login is a profile namespace, not a Vite internal. Reserving all of
+    // /@ left these pages advertising a .md the handler refused to serve.
+    const markdown = await $fetch('/@emilkowalski.md')
+    expect(typeof markdown).toBe('string')
+    expect(markdown).toContain('@emilkowalski')
+    expect(markdown).not.toContain('<!DOCTYPE html>')
+  })
+
+  it('advertises the markdown sibling on an @handle page', async () => {
+    const html = await $fetch('/@emilkowalski')
+    expect(html).toContain('rel="alternate" type="text/markdown" href="/@emilkowalski.md"')
+  })
+
   it('handles valid routes and converts to markdown', async () => {
     // Test with /about.md which should work
     const aboutMarkdown = await $fetch('/about.md')
