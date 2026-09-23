@@ -17,6 +17,7 @@ import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
+import { resolvePageUpdatedAt } from './runtime/server/utils/page-updated-at'
 import { appendSitemapSection, SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { supportsNativeNodeSqlite } from './utils/database'
 
@@ -266,12 +267,7 @@ async function processMarkdownRoute(
   route = normalizePagePath(route)
   const { title, description, headings, keywords, updatedAt: metaUpdatedAt } = parsed
 
-  let updatedAt = (lastmod instanceof Date ? lastmod.toISOString() : lastmod) || new Date().toISOString()
-  if (metaUpdatedAt) {
-    const parsedDate = new Date(metaUpdatedAt)
-    if (!Number.isNaN(parsedDate.getTime()))
-      updatedAt = parsedDate.toISOString()
-  }
+  const updatedAt = resolvePageUpdatedAt(lastmod, metaUpdatedAt)
 
   const hookContext = { ...parsed, route }
   await nuxt.hooks.callHook('ai-ready:page:markdown' as any, hookContext)
@@ -581,7 +577,7 @@ export function setupPrerenderHandler(
             markdown: '',
             headings: '',
             keywords: [],
-            updatedAt: new Date().toISOString(),
+            updatedAt: '',
             isError: true,
             locale: resolveRouteLocale(route, state.i18n),
           })
