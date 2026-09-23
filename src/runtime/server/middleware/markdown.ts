@@ -41,7 +41,6 @@ function notFoundMarkdown(
     title: 'Page not found',
     description: `No content is available at ${path}.`,
     canonical_url: canonicalUrl,
-    last_updated: new Date().toISOString(),
     locale,
     alternates,
   })
@@ -87,7 +86,7 @@ export default defineEventHandler(async (event) => {
       title: title ?? path,
       description,
       canonical_url: canonicalUrl,
-      last_updated: updatedAt || new Date().toISOString(),
+      last_updated: updatedAt,
     }, markdown)
     setMarkdownHeaders(event, ctx)
     return finalizeMarkdown(responseMarkdown)
@@ -108,7 +107,7 @@ export default defineEventHandler(async (event) => {
       title: contentPage.title,
       description: contentPage.description,
       canonical_url: canonicalUrl,
-      last_updated: contentPage.updatedAt || new Date().toISOString(),
+      last_updated: contentPage.updatedAt,
     })
     setMarkdownHeaders(event, ctx)
     return finalizeMarkdown(`${frontmatter}\n${contentPage.markdown}`)
@@ -174,13 +173,13 @@ export default defineEventHandler(async (event) => {
     import('../utils'),
   ])
 
-  // Resolve last_updated: DB (authoritative, set at index time) → page meta tags
-  // → request time. The DB lookup keeps the timestamp stable across requests.
+  // Resolve last_updated: DB (authoritative, set at index time) → page meta tags.
+  // No source means no field: the request time would claim the page just changed.
   const dbPage = await queryPages(event, { route: path }).catch((err) => {
     logger.debug(`[markdown] DB lookup failed for ${path}:`, err)
     return undefined
   }) as { updatedAt?: string } | undefined
-  const lastUpdated = dbPage?.updatedAt || extractLastUpdated(html) || new Date().toISOString()
+  const lastUpdated = dbPage?.updatedAt || extractLastUpdated(html)
 
   // Convert via mdream; pass canonical_url + last_updated through additionalFields
   // so they land at the root of mdream's emitted YAML frontmatter, where
@@ -189,8 +188,9 @@ export default defineEventHandler(async (event) => {
   // (RFC 8288) since mdream's frontmatter only accepts string scalars.
   const additionalFrontmatter: Record<string, string> = {
     canonical_url: canonicalUrl,
-    last_updated: lastUpdated,
   }
+  if (lastUpdated)
+    additionalFrontmatter.last_updated = lastUpdated
 
   if (config.i18n) {
     additionalFrontmatter.locale = resolveLocaleFromRoute(path, config.i18n, routeContext).locale

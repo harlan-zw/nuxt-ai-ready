@@ -246,7 +246,11 @@ describe('accept header content negotiation', async () => {
       expect(content.startsWith('---\n')).toBe(true)
       expect(content).toMatch(/title:\s+"/)
       expect(content).toMatch(/canonical_url:\s+"/)
-      expect(content).toMatch(/last_updated:\s+"/)
+    })
+
+    it('omits last_updated when the page gives no content date', async () => {
+      const content = await (await fetch(url('/about.md'))).text()
+      expect(content).not.toContain('last_updated')
     })
   })
 

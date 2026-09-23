@@ -61,12 +61,11 @@ export default defineEventHandler(async (event) => {
   })
   if (contentPage) {
     logger.debug(`[markdown.prerender] Using content source for ${path} (${contentPage.markdown.length} bytes)`)
-    const lastUpdated = contentPage.updatedAt || new Date().toISOString()
     const frontmatter = buildFrontmatter({
       title: contentPage.title,
       description: contentPage.description,
       canonical_url: canonicalUrl,
-      last_updated: lastUpdated,
+      last_updated: contentPage.updatedAt,
     })
     const markdown = `${frontmatter}\n${contentPage.markdown}`
     const headings = extractHeadingsFromMarkdown(contentPage.markdown)
@@ -126,7 +125,9 @@ export default defineEventHandler(async (event) => {
       message: `Page rendered as error: ${path}`,
     })
   }
-  const lastUpdated = extractLastUpdated(html) || new Date().toISOString()
+  // A page with no date meta gets no `last_updated`. The build time would
+  // claim every page changed on every deploy.
+  const lastUpdated = extractLastUpdated(html)
   const result = await convertHtmlToMarkdown(
     html,
     canonicalUrl,
@@ -135,7 +136,7 @@ export default defineEventHandler(async (event) => {
       extractUpdatedAt: true,
       additionalFrontmatter: {
         canonical_url: canonicalUrl,
-        last_updated: lastUpdated,
+        ...(lastUpdated && { last_updated: lastUpdated }),
       },
     },
   )
