@@ -2,12 +2,17 @@
 import { subtle } from 'uncrypto'
 import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql'
 
+const LEADING_FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/
+
 /**
- * Compute content hash for change detection (first 16 chars of SHA-256)
+ * Compute content hash for change detection (first 16 chars of SHA-256).
+ * Hash the page body only. Frontmatter holds per-conversion fields
+ * (`canonical_url`, `last_updated`) that differ between the build and runtime
+ * paths, so hashing it marks unchanged pages as changed.
  */
 export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()
-  const data = encoder.encode(markdown)
+  const data = encoder.encode(markdown.replace(LEADING_FRONTMATTER_RE, '').trim())
   const hashBuffer = await subtle.digest('SHA-256', data)
   const hashArray = [...new Uint8Array(hashBuffer)]
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
