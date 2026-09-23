@@ -494,7 +494,7 @@ export interface MarkdownSource {
   title?: string
   /** Page description. */
   description?: string
-  /** ISO timestamp for `last_updated`. Defaults to now. */
+  /** ISO timestamp for `last_updated`. Omitted when not set. */
   updatedAt?: string
 }
 

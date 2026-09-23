@@ -15,9 +15,9 @@ describe('@nuxt/content integration', async () => {
     // Frontmatter pulled from the content file's frontmatter, not page meta
     expect(md).toContain('title: "Source-Authored Title"')
     expect(md).toContain('description: "Comes straight from frontmatter')
-    // canonical_url + last_updated are still merged in by our middleware
+    // canonical_url is merged in by our middleware; the file has no date, so no last_updated
     expect(md).toContain('canonical_url: "https://test.example.com/blog/hello-world"')
-    expect(md).toContain('last_updated:')
+    expect(md).not.toContain('last_updated:')
     // Body is the source markdown, not HTML→markdown round-trip
     expect(md).toContain('# Hello from Nuxt Content')
     expect(md).toContain('load-bearing for the test')
