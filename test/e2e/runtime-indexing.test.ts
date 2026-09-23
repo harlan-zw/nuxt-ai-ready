@@ -473,6 +473,30 @@ describe('runtime indexing', async () => {
     expect(aboutEntry).not.toContain('<lastmod>')
   }, 30000)
 
+  it('sitemap: dates a page from detected content drift', async () => {
+    const reindex = () => fetch('/__ai-ready/reindex?route=/drift-page', { method: 'POST', headers: authHeaders })
+    const lastmod = async () => ((await fetch('/api/__db-test?action=lastmods')) as { lastmods: Record<string, string> }).lastmods['/drift-page']
+
+    await fetch('/api/__drift?version=1')
+    await reindex()
+    // First index: no earlier content to compare, so no date.
+    expect(await lastmod()).toBeUndefined()
+
+    await reindex()
+    expect(await lastmod()).toBeUndefined()
+
+    const before = Date.now()
+    await fetch('/api/__drift?version=2')
+    await reindex()
+    const detected = await lastmod()
+    expect(detected).toBeDefined()
+    expect(Date.parse(detected!)).toBeGreaterThanOrEqual(before - 1000)
+
+    // Unchanged content keeps the detected date.
+    await reindex()
+    expect(await lastmod()).toBe(detected)
+  }, 30000)
+
   it('sitemap: getPageLastmods returns indexed pages', async () => {
     // Test the getPageLastmods query directly via db-test endpoint
     const { lastmods } = (await fetch('/api/__db-test?action=lastmods')) as { lastmods: Record<string, string> }

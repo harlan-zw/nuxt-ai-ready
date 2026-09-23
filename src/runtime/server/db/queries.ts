@@ -571,11 +571,15 @@ export async function isPageFresh(event: H3Event | undefined, route: string, ttl
 export interface PageIndexState {
   indexedAt: number
   contentHash: string | null
+  updatedAt: string
+  source: 'prerender' | 'runtime'
 }
 
 interface PageIndexStateRow {
   indexed_at: DatabaseNumber
   content_hash: string | null
+  updated_at: string
+  source: string
 }
 
 /**
@@ -593,11 +597,16 @@ export async function getPageIndexState(
     return undefined
 
   const row = await db.first<PageIndexStateRow>(
-    'SELECT indexed_at, content_hash FROM ai_ready_pages WHERE route = ?',
+    'SELECT indexed_at, content_hash, updated_at, source FROM ai_ready_pages WHERE route = ?',
     [route],
   )
   return row
-    ? { indexedAt: toNumber(row.indexed_at), contentHash: row.content_hash }
+    ? {
+        indexedAt: toNumber(row.indexed_at),
+        contentHash: row.content_hash,
+        updatedAt: row.updated_at || '',
+        source: row.source === 'runtime' ? 'runtime' : 'prerender',
+      }
     : undefined
 }
 
