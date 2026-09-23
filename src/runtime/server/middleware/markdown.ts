@@ -1,10 +1,11 @@
 import type { MarkdownSourceContext } from '../../types'
 import type { NegotiationContext } from '../utils/negotiation-response'
-import { createError, defineEventHandler, setHeader, setResponseStatus } from '#nuxtseo/h3'
+import { createError, defineEventHandler, getRequestURL, setHeader, setResponseStatus } from '#nuxtseo/h3'
 import { useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { logger } from '../logger'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
+import { resolveMarkdownRedirect } from '../utils/markdown-redirect'
 import { INTERNAL_HEADER } from '../utils/negotiation-decision'
 import { applyNegotiation, buildNegotiationContext, decideNegotiation, ensureSiteConfig, setMarkdownHeaders } from '../utils/negotiation-response'
 import { appendSitemapSection, isSitemapMdRequest, SITEMAP_MD_ROUTE } from '../utils/sitemap-md'
@@ -114,34 +115,51 @@ export default defineEventHandler(async (event) => {
   }
 
   // Explicit .md: fetch HTML with internal marker to prevent recursion, convert
-  // via mdream. Manual redirect so we can forward redirects with .md suffix.
-  logger.debug(`[markdown] Fetching HTML for ${path}`)
-  const response = await fetchRawWithEvent(event, resolvePath(path), {
-    headers: { [INTERNAL_HEADER]: '1' },
-    redirect: 'manual',
-  }).catch((e) => {
-    logger.error(`Failed to fetch HTML for ${path}`, e)
-    return null
-  })
+  // via mdream. Manual redirect so an upstream redirect can point the client
+  // at the markdown sibling of its target.
+  const origin = getRequestURL(event).origin
+  const siteUrl = resolveUrl('/')
+  const redirectOptions = {
+    pageUrl: `${origin}${resolvePath(path)}`,
+    origins: URL.canParse(siteUrl) ? [new URL(siteUrl).origin] : [],
+  }
+  let htmlPath = resolvePath(path)
+  let response: Response | null = null
+  // Two fetches at most: a redirect back onto this same markdown document, such
+  // as a trailing-slash redirect, is followed once instead of looping.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    logger.debug(`[markdown] Fetching HTML for ${htmlPath}`)
+    response = await fetchRawWithEvent(event, htmlPath, {
+      headers: { [INTERNAL_HEADER]: '1' },
+      redirect: 'manual',
+    }).catch((e) => {
+      logger.error(`Failed to fetch HTML for ${htmlPath}`, e)
+      return null
+    })
+
+    const location = response && response.status >= 300 && response.status < 400
+      ? response.headers.get('location')
+      : null
+    if (!response || !location)
+      break
+
+    const redirect = resolveMarkdownRedirect(location, redirectOptions)
+    if (redirect._tag === 'follow' && attempt === 0) {
+      htmlPath = redirect.path
+      continue
+    }
+    setHeader(event, 'location', redirect._tag === 'redirect' ? redirect.location : location)
+    return createError({
+      statusCode: response.status,
+      statusMessage: response.statusText,
+    })
+  }
 
   if (!response) {
     throw createError({
       statusCode: 502,
       statusMessage: 'Bad Gateway',
     })
-  }
-
-  // Forward upstream redirects, adding .md suffix to the target
-  if (response.status >= 300 && response.status < 400) {
-    const location = response.headers.get('location')
-    if (location) {
-      const redirectTarget = location.endsWith('/') ? `${location.slice(0, -1)}.md` : `${location}.md`
-      setHeader(event, 'location', redirectTarget)
-      return createError({
-        statusCode: response.status,
-        statusMessage: response.statusText,
-      })
-    }
   }
 
   // Keep application errors intact, including their body and headers. Only a
