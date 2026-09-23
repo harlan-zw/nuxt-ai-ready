@@ -12,4 +12,14 @@ describe('computeContentHash', () => {
   it('changes when the body changes', async () => {
     expect(await computeContentHash('# A')).not.toBe(await computeContentHash('# B'))
   })
+  it('hashes a body that opens with horizontal rules', async () => {
+    const withRules = '---\nIntro between rules.\n---\n\n# Title'
+    const without = '# Title'
+    expect(await computeContentHash(withRules)).not.toBe(await computeContentHash(without))
+  })
+
+  it('hashes a leading block that holds none of the frontmatter keys we write', async () => {
+    const block = '---\nnote: authored in the body\n---\n\n# Title'
+    expect(await computeContentHash(block)).not.toBe(await computeContentHash('# Title'))
+  })
 })
