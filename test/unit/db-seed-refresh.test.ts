@@ -78,6 +78,12 @@ describe('seedRoutes refresh window', () => {
     expect(lastSeen('/a')).toBe(T0)
   })
 
+  it('gives a seeded, unindexed route no content date', async () => {
+    await seed(['/a'])
+    const row = sqlite.prepare('SELECT updated_at FROM ai_ready_pages WHERE route = ?').get('/a') as { updated_at: string }
+    expect(row.updated_at).toBe('')
+  })
+
   it('refreshes last_seen_at once the row is older than the window', async () => {
     await seed(['/a'])
 

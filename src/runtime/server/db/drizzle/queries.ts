@@ -1170,7 +1170,6 @@ export async function seedRoutes(
   // Inlined as a literal: a bind param would push a full chunk past D1's
   // 100-parameter cap. Truncating a finite number keeps it injection-safe.
   const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
-  const now = new Date().toISOString()
   const nowMs = Date.now()
 
   // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
@@ -1192,17 +1191,17 @@ export async function seedRoutes(
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. The chunk
-  // size is derived from the 5 bind params per row so each statement stays
+  // size is derived from the 4 bind params per row so each statement stays
   // within D1's 100-parameter cap even if a column is added. All statements
   // then go through `db.batch` so round-trips collapse into one.
-  const rowsPerInsert = maxRowsPerInsert(5)
+  const rowsPerInsert = maxRowsPerInsert(4)
   const db = await useRawDb(event)
   const entries = [...byRoute.values()]
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < entries.length; i += rowsPerInsert) {
     const batch = entries.slice(i, i + rowsPerInsert)
-    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
-    const params = batch.flatMap(r => [r.route, r.routeKey, now, nowMs, r.locale])
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', 0, 0, 0, 'runtime', ?, ?)`).join(', ')
+    const params = batch.flatMap(r => [r.route, r.routeKey, nowMs, r.locale])
     stmts.push({
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)

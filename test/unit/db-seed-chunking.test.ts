@@ -90,7 +90,7 @@ describe('seedRoutes chunking (raw layer)', () => {
     const seeded = await seedRoutes({} as H3Event, routes)
 
     expect(seeded).toBe(42)
-    expect(paramCounts).toEqual([100, 100, 10])
+    expect(paramCounts).toEqual([100, 68])
     expect(countPages(sqlite)).toBe(42)
   })
 })
@@ -119,14 +119,14 @@ describe('seedRoutes chunking (drizzle layer)', () => {
     mocks.useRawDb.mockReset().mockImplementation(async () => getRawExecutor(client as unknown as Parameters<typeof getRawExecutor>[0]))
   })
 
-  it('derives chunk size from the bind count (5 binds -> 20 rows)', async () => {
+  it('derives chunk size from the bind count (4 binds -> 25 rows)', async () => {
     const routes = Array.from({ length: 30 }, (_, i) => `/page-${i}`)
     const { seedRoutes } = await import('../../src/runtime/server/db/drizzle/queries')
 
     const seeded = await seedRoutes({} as H3Event, routes)
 
     expect(seeded).toBe(30)
-    expect(paramCounts).toEqual([100, 50])
+    expect(paramCounts).toEqual([100, 20])
     expect(countPages(sqlite)).toBe(30)
   })
 })
