@@ -9,6 +9,7 @@ import { convertHtmlToMarkdown } from '../utils'
 import { createUniversalContext } from './context'
 import { extractKeywords } from './keywords'
 import { INTERNAL_HEADER } from './negotiation-decision'
+import { resolvePageUpdatedAt } from './page-updated-at'
 
 export interface IndexPageOptions {
   /** Skip if page was indexed within TTL (uses config ttl if not specified) */
@@ -75,7 +76,7 @@ export async function indexPage(
   const { siteUrl } = createUniversalContext(event)
   const fullUrl = siteUrl ? `${siteUrl}${route}` : route
   const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, { extractUpdatedAt: true })
-  const updatedAt = result.updatedAt || new Date().toISOString()
+  const updatedAt = resolvePageUpdatedAt(undefined, result.updatedAt)
   const headings = JSON.stringify(result.headings)
   const keywords = extractKeywords(result.textContent, result.metaKeywords)
 
@@ -168,7 +169,7 @@ export async function indexPageByRoute(
         markdown: '',
         headings: '[]',
         keywords: [],
-        updatedAt: new Date().toISOString(),
+        updatedAt: '',
         isError: true,
       })
     }

@@ -583,7 +583,7 @@ export interface PageIndexedContext {
   keywords: string[]
   /** Full markdown content */
   markdown: string
-  /** ISO timestamp */
+  /** ISO timestamp of the last content change from page meta. Empty string when the page gives none. */
   updatedAt: string
   /** Whether this is a new page or an update */
   isUpdate: boolean

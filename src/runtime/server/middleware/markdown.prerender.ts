@@ -77,7 +77,8 @@ export default defineEventHandler(async (event) => {
       description: contentPage.description || '',
       headings,
       keywords,
-      updatedAt: lastUpdated,
+      // Only a real content date feeds the page index and sitemap lastmod.
+      ...(contentPage.updatedAt && { updatedAt: contentPage.updatedAt }),
     })
   }
 

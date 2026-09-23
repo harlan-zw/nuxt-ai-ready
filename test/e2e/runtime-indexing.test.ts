@@ -462,6 +462,17 @@ describe('runtime indexing', async () => {
     expect(sitemap).toContain('urlset')
   })
 
+  it('sitemap: omits lastmod for pages indexed without a content date', async () => {
+    await fetch('/__ai-ready/poll?all=true', { method: 'POST', headers: authHeaders })
+    const { lastmods } = (await fetch('/api/__db-test?action=lastmods')) as { lastmods: Record<string, string> }
+    expect(lastmods['/about']).toBeUndefined()
+
+    const sitemap = await fetch('/sitemap.xml') as string
+    const aboutEntry = sitemap.match(/<url>(?:(?!<\/url>)[\s\S])*<loc>[^<]*\/about<\/loc>[\s\S]*?<\/url>/)?.[0]
+    expect(aboutEntry).toBeDefined()
+    expect(aboutEntry).not.toContain('<lastmod>')
+  }, 30000)
+
   it('sitemap: getPageLastmods returns indexed pages', async () => {
     // Test the getPageLastmods query directly via db-test endpoint
     const { lastmods } = (await fetch('/api/__db-test?action=lastmods')) as { lastmods: Record<string, string> }
