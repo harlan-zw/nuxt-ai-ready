@@ -1,13 +1,37 @@
 // Shared database utilities for build-time and runtime
 import { subtle } from 'uncrypto'
+import { isMap, isScalar, parseDocument } from 'yaml'
 import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql'
 
+const LEADING_BLOCK_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
+// Keys that mdream and the markdown middleware write into page frontmatter.
+const PAGE_FRONTMATTER_KEYS = new Set(['title', 'description', 'meta', 'canonical_url', 'last_updated', 'locale', 'alternates'])
+
 /**
- * Compute content hash for change detection (first 16 chars of SHA-256)
+ * Strip the frontmatter this module writes. A leading `---` block is only
+ * frontmatter when it parses as a YAML map holding one of our keys; otherwise
+ * it is body content, such as text between two horizontal rules.
+ */
+function stripPageFrontmatter(markdown: string): string {
+  const match = markdown.match(LEADING_BLOCK_RE)
+  if (!match)
+    return markdown
+  const document = parseDocument(match[1]!)
+  if (document.errors.length || !isMap(document.contents))
+    return markdown
+  const isPageFrontmatter = document.contents.items.some(item => isScalar(item.key) && PAGE_FRONTMATTER_KEYS.has(String(item.key.value)))
+  return isPageFrontmatter ? markdown.slice(match[0].length) : markdown
+}
+
+/**
+ * Compute content hash for change detection (first 16 chars of SHA-256).
+ * Hash the page body only. Frontmatter holds per-conversion fields
+ * (`canonical_url`, `last_updated`) that differ between the build and runtime
+ * paths, so hashing it marks unchanged pages as changed.
  */
 export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()
-  const data = encoder.encode(markdown)
+  const data = encoder.encode(stripPageFrontmatter(markdown).trim())
   const hashBuffer = await subtle.digest('SHA-256', data)
   const hashArray = [...new Uint8Array(hashBuffer)]
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)

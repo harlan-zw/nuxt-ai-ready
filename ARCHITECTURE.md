@@ -319,7 +319,7 @@ CREATE TABLE _ai_ready_info (
 
 ### Content Hash for Change Detection
 
-Pages store a `content_hash` (first 16 chars of SHA-256 of markdown) to detect actual content changes:
+Pages store a `content_hash` (first 16 chars of SHA-256 of the markdown body, frontmatter excluded) to detect actual content changes:
 
 ```typescript
 // Check if content changed
