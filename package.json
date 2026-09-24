@@ -69,8 +69,8 @@
     "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm install --dir test/fixtures/nuxt5 --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
-    "@libsql/client": "^0.14.0",
-    "@neondatabase/serverless": "^1.0.0",
+    "@libsql/client": "^0.18.0",
+    "@neondatabase/serverless": "^1.1.0",
     "@nuxtjs/sitemap": ">=8.3.1",
     "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0",
     "postgres": "^3.4.9"

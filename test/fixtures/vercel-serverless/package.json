@@ -10,8 +10,8 @@
     "deploy": "vercel"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.0",
-    "nuxt": "^4.0.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "nuxt": "^4.5.2",
     "nuxt-ai-ready": "latest"
   }
 }

@@ -2,19 +2,19 @@
   "name": "nuxt-ai-ready-nuxt5-fixture",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.19.0",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "test": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.server.json && nuxt build && node test.mjs"
   },
   "dependencies": {
-    "nitro": "3.0.260610-beta",
-    "nuxt": "npm:nuxt-nightly@5.0.0-29762711.192612c7",
+    "nitro": "3.0.260903-beta",
+    "nuxt": "npm:nuxt-nightly@5.0.0-29836693.3006e5ac",
     "nuxt-ai-ready-packed": "file:module.tgz",
-    "vue": "^3.5.40",
-    "vue-router": "^5.2.0"
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
     "typescript": "6.0.3",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.11"
   }
 }

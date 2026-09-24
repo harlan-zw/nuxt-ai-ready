@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { $fetch, fetch, setup } from '@nuxt/test-utils/e2e'
+import { fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 describe('markdown redirects', async () => {
@@ -22,7 +22,7 @@ describe('markdown redirects', async () => {
   it('serves markdown when the page redirects to its trailing-slash URL', async () => {
     const response = await fetch('/@slash.md', { redirect: 'manual' })
     expect(response.status).toBe(200)
-    const markdown = await $fetch<string>('/@slash.md')
+    const markdown = await response.text()
     expect(markdown).toContain('@slash')
     expect(markdown).not.toContain('<!DOCTYPE html>')
   })
