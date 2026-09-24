@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "2.3.4",
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@12.6.0",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",
@@ -69,7 +69,7 @@
     "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm install --dir test/fixtures/nuxt5 --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
-    "@libsql/client": "^0.14.0",
+    "@libsql/client": "^0.18.0",
     "@neondatabase/serverless": "^1.0.0",
     "@nuxtjs/sitemap": ">=8.3.1",
     "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0",
