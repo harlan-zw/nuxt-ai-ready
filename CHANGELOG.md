@@ -1,3 +1,22 @@
+## v2.3.4...main
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.4...main)
+
+### 🚀 Enhancements
+
+- Date sitemap lastmod from detected content drift ([#131](https://github.com/harlan-zw/nuxt-ai-ready/pull/131))
+
+### 🩹 Fixes
+
+- Stop inventing page dates for sitemap lastmod ([#126](https://github.com/harlan-zw/nuxt-ai-ready/pull/126))
+- **markdown:** Omit last_updated when the page has no date ([#128](https://github.com/harlan-zw/nuxt-ai-ready/pull/128))
+- **markdown:** Map redirect targets onto markdown siblings ([#130](https://github.com/harlan-zw/nuxt-ai-ready/pull/130))
+- **db:** Hash page body only so build and runtime agree ([#127](https://github.com/harlan-zw/nuxt-ai-ready/pull/127))
+
+### ❤️ Contributors
+
+- Harlan Wilton ([@harlan-zw](https://github.com/harlan-zw))
+
 ## 2.3.4
 
 [Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.3.3...v2.3.4)
