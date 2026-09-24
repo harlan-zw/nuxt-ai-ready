@@ -36,14 +36,18 @@ describe('getPageIndexState', () => {
     mocks.first.mockResolvedValue({
       indexed_at: 123,
       content_hash: 'hash-123',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      source: 'runtime',
     })
 
     await expect(getPageIndexState(undefined, '/page')).resolves.toEqual({
       indexedAt: 123,
       contentHash: 'hash-123',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      source: 'runtime',
     })
     expect(mocks.first).toHaveBeenCalledWith(
-      'SELECT indexed_at, content_hash FROM ai_ready_pages WHERE route = ?',
+      'SELECT indexed_at, content_hash, updated_at, source FROM ai_ready_pages WHERE route = ?',
       ['/page'],
     )
   })

@@ -9,7 +9,7 @@ import { convertHtmlToMarkdown } from '../utils'
 import { createUniversalContext } from './context'
 import { extractKeywords } from './keywords'
 import { INTERNAL_HEADER } from './negotiation-decision'
-import { resolvePageUpdatedAt } from './page-updated-at'
+import { resolveIndexedUpdatedAt, resolvePageUpdatedAt } from './page-updated-at'
 
 export interface IndexPageOptions {
   /** Skip if page was indexed within TTL (uses config ttl if not specified) */
@@ -76,13 +76,21 @@ export async function indexPage(
   const { siteUrl } = createUniversalContext(event)
   const fullUrl = siteUrl ? `${siteUrl}${route}` : route
   const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, { extractUpdatedAt: true })
-  const updatedAt = resolvePageUpdatedAt(undefined, result.updatedAt)
   const headings = JSON.stringify(result.headings)
   const keywords = extractKeywords(result.textContent, result.metaKeywords)
 
   // Compute content hash and check for changes
   const contentHash = await computeContentHash(result.markdown)
   const contentChanged = state?.contentHash !== contentHash
+  const updatedAt = isError
+    ? ''
+    : resolveIndexedUpdatedAt({
+        declared: resolvePageUpdatedAt(undefined, result.updatedAt),
+        previous: state,
+        contentHash,
+        now: new Date(),
+        detectDrift: config.runtimeSync.enabled,
+      })
 
   await upsertPage(event, {
     route,
