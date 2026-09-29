@@ -1,6 +1,5 @@
-import { isPathFile } from 'nuxt-site-config/urls'
 import { defineNuxtPlugin, prerenderRoutes } from 'nuxt/app'
-import { toMarkdownPath } from '../../markdown-path'
+import { markdownAlternatePath } from '../../markdown-path'
 
 export default defineNuxtPlugin({
   setup(nuxtApp) {
@@ -9,10 +8,11 @@ export default defineNuxtPlugin({
     }
     nuxtApp.hooks.hook('app:rendered', (ctx) => {
       const url = ctx.ssrContext?.url || ''
-      if (isPathFile(url) || ctx.ssrContext?.error || ctx.ssrContext?.noSSR) {
+      const markdownPath = markdownAlternatePath(url)
+      if (!markdownPath || ctx.ssrContext?.error || ctx.ssrContext?.noSSR) {
         return
       }
-      prerenderRoutes(toMarkdownPath(url))
+      prerenderRoutes(markdownPath)
     })
   },
 })

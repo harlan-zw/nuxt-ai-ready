@@ -75,4 +75,11 @@ describe('markdownAlternatePath', () => {
     expect(markdownAlternatePath('/@vite/client')).toBeNull()
     expect(markdownAlternatePath('/sitemap.xml')).toBeNull()
   })
+
+  it('advertises a page whose last segment holds a dot but no file extension', () => {
+    // The handler serves /v1.2.md, so the page must link it.
+    expect(markdownAlternatePath('/v1.2')).toBe('/v1.2.md')
+    expect(markdownAlternatePath('/docs/v1.2/')).toBe('/docs/v1.2.md')
+    expect(markdownAlternatePath('/files/report.pdf')).toBeNull()
+  })
 })
