@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { dirname, extname, relative, resolve, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const importPatterns = [
   /\bfrom\s*['"]([^'"]+)['"]/g,
@@ -101,15 +102,32 @@ async function findIncompatibleRuntimeImports(packageRoot) {
   }))).flat()
 }
 
+// Nuxt resolves a module dependency from the consumer's project. A required one
+// must therefore install with the package: a devDependency is absent there, and
+// a package manager may skip a peer.
+async function findUninstalledModuleDependencies(packageRoot) {
+  const packageJson = JSON.parse(await readFile(resolve(packageRoot, 'package.json'), 'utf8'))
+  if (typeof packageJson.main !== 'string')
+    return []
+  const { default: nuxtModule } = await import(pathToFileURL(resolve(packageRoot, packageJson.main)).href)
+  const moduleDependencies = await nuxtModule?.getModuleDependencies?.({}) || {}
+  const installed = new Set(Object.keys(packageJson.dependencies || {}))
+  return Object.entries(moduleDependencies)
+    .filter(([name, meta]) => meta?.optional !== true && !installed.has(name))
+    .map(([name]) => name)
+}
+
 const packageRoot = resolve(process.argv[2] || import.meta.dirname, process.argv[2] ? '.' : '..')
-const [missing, incompatible] = await Promise.all([
+const [missing, incompatible, uninstalled] = await Promise.all([
   findMissingRelativeImports(packageRoot),
   findIncompatibleRuntimeImports(packageRoot),
+  findUninstalledModuleDependencies(packageRoot),
 ])
 
 const failures = [
   ...(missing.length ? [`Published package has unresolved relative imports:\n${missing.map(item => `- ${item}`).join('\n')}`] : []),
   ...(incompatible.length ? [`Published server runtime bypasses Nitro compatibility aliases:\n${incompatible.map(item => `- ${item}`).join('\n')}`] : []),
+  ...(uninstalled.length ? [`Required module dependencies are missing from dependencies:\n${uninstalled.map(item => `- ${item}`).join('\n')}`] : []),
 ]
 if (failures.length)
   throw new Error(failures.join('\n'))

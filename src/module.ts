@@ -740,7 +740,7 @@ export default defineNuxtModule<ModuleOptions>({
     if (!runtimeSyncSecret && runtimeSyncEnabled) {
       runtimeSyncSecret = randomBytes(32).toString('hex')
       if (!nuxt.options.dev && !nuxt.options._prepare)
-        logger.info(`Generated runtimeSyncSecret (use NUXT_AI_READY_RUNTIME_SYNC_SECRET env to set explicitly)`)
+        logger.info('Generated a new runtimeSyncSecret for this build. If an external scheduler calls /__ai-ready/*, set NUXT_AI_READY_RUNTIME_SYNC_SECRET; the generated secret changes on every build.')
     }
 
     // Write secret to cache for CLI access
