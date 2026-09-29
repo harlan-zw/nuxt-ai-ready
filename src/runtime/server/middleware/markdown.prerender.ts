@@ -134,6 +134,7 @@ export default defineEventHandler(async (event) => {
     runtimeConfig.mdreamOptions,
     {
       extractUpdatedAt: true,
+      hooks: { route: path, event, isPrerender: true },
       additionalFrontmatter: {
         canonical_url: canonicalUrl,
         ...(lastUpdated && { last_updated: lastUpdated }),

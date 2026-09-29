@@ -3,6 +3,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { MarkdownContext, ModuleOptions } from '../types'
 import { htmlToMarkdown } from 'mdream'
 import { useNitroApp } from '#nuxtseo/nitro'
+import { hoistMetaDescription } from './utils/frontmatter'
 
 const RE_NBSP = /\u00A0/g
 
@@ -107,8 +108,8 @@ export function extractLastUpdated(html: string): string | undefined {
 interface ConvertHtmlOptions {
   /** Extract updatedAt from meta tags */
   extractUpdatedAt?: boolean
-  /** Call runtime hooks (ai-ready:mdreamConfig, ai-ready:page:markdown) */
-  hooks?: { route: string, event: H3Event }
+  /** Call the Nitro hooks (ai-ready:mdreamConfig, ai-ready:page:markdown) */
+  hooks?: { route: string, event: H3Event, isPrerender: boolean }
   /** Extra fields to inject at the root of mdream's emitted YAML frontmatter */
   additionalFrontmatter?: Record<string, string>
 }
@@ -130,18 +131,18 @@ export async function convertHtmlToMarkdown(
 
     const context: MarkdownContext = {
       html,
-      markdown: htmlToMarkdown(html, options),
+      markdown: hoistMetaDescription(htmlToMarkdown(html, options)),
       route: opts.hooks.route,
       title: meta.title,
       description: meta.description,
-      isPrerender: false,
+      isPrerender: opts.hooks.isPrerender,
       event: opts.hooks.event,
     }
     await nitroApp.hooks.callHook('ai-ready:page:markdown', context)
     markdown = context.markdown
   }
   else {
-    markdown = htmlToMarkdown(html, options)
+    markdown = hoistMetaDescription(htmlToMarkdown(html, options))
   }
 
   return {

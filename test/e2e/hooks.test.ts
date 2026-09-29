@@ -37,6 +37,29 @@ describe('ai-ready hooks e2e', async () => {
     })
   })
 
+  describe('nitro conversion hooks', () => {
+    it('apply to prerendered Markdown', async () => {
+      const aboutMarkdown = await $fetch('/about.md') as string
+      expect(aboutMarkdown).toContain('Nitro Markdown hook ran (isPrerender: true).')
+      expect(aboutMarkdown).not.toContain('Transformers.js')
+    })
+
+    it('apply to llms-full.txt', async () => {
+      const llmsFullTxt = await $fetch('/llms-full.txt') as string
+      expect(llmsFullTxt).toContain('Nitro Markdown hook ran (isPrerender: true).')
+      expect(llmsFullTxt).not.toContain('Transformers.js')
+    })
+  })
+
+  describe('converted page frontmatter', () => {
+    it('puts the description at the root, as Content source pages do', async () => {
+      const aboutMarkdown = await $fetch('/about.md') as string
+      const frontmatter = aboutMarkdown.split('---')[1]
+      expect(frontmatter).toMatch(/^description: "Learn about this test site/m)
+      expect(frontmatter).not.toMatch(/^\s+description:/m)
+    })
+  })
+
   describe('ai-ready:llms-txt hook', () => {
     it('should generate llms.txt with hook modifications', async () => {
       const llmsTxt = await $fetch('/llms.txt')
