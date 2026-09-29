@@ -71,7 +71,6 @@
   "peerDependencies": {
     "@libsql/client": "^0.18.0",
     "@neondatabase/serverless": "^1.0.0",
-    "@nuxtjs/sitemap": ">=8.3.1",
     "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0",
     "postgres": "^3.4.9"
   },
@@ -92,6 +91,8 @@
   "dependencies": {
     "@mdream/js": "catalog:",
     "@nuxt/kit": "catalog:nuxt",
+    "@nuxtjs/robots": "catalog:nuxt",
+    "@nuxtjs/sitemap": "catalog:nuxt",
     "citty": "catalog:",
     "consola": "catalog:",
     "defu": "catalog:",
@@ -117,8 +118,6 @@
     "@nuxt/test-utils": "catalog:dev-test",
     "@nuxtjs/eslint-config-typescript": "catalog:dev-lint",
     "@nuxtjs/mcp-toolkit": "catalog:nuxt",
-    "@nuxtjs/robots": "catalog:nuxt",
-    "@nuxtjs/sitemap": "catalog:nuxt",
     "@types/better-sqlite3": "catalog:",
     "@vitest/coverage-v8": "catalog:dev-test",
     "@vue/test-utils": "catalog:dev-test",
