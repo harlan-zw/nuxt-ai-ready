@@ -63,4 +63,35 @@ describe('published import closure', () => {
     expect(result.stderr).toContain('dist/runtime/server/index.mjs -> nitropack/runtime')
     expect(result.stderr).toContain('dist/runtime/server/index.mjs -> nuxtseo-shared/i18n')
   })
+  it('rejects required module dependencies that a consumer install does not provide', async () => {
+    const packageRoot = await mkdtemp(resolve(tmpdir(), 'nuxt-ai-ready-dist-check-'))
+    temporaryDirectories.push(packageRoot)
+    await mkdir(resolve(packageRoot, 'dist'), { recursive: true })
+    await Promise.all([
+      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({
+        files: ['dist'],
+        main: './dist/module.mjs',
+        dependencies: { 'nuxt-site-config': '^4.0.0' },
+        peerDependencies: { '@nuxtjs/sitemap': '>=8.3.1' },
+        devDependencies: { '@nuxtjs/robots': '^6.0.0' },
+      })),
+      writeFile(resolve(packageRoot, 'dist/module.mjs'), [
+        'const moduleDependencies = {',
+        `  'nuxt-site-config': { version: '>=3.2' },`,
+        `  '@nuxtjs/sitemap': { version: '>=8.3.0' },`,
+        `  '@nuxtjs/robots': { version: '>=6.0.0' },`,
+        `  '@nuxtjs/mcp-toolkit': { version: '>=0.18.0', optional: true },`,
+        '}',
+        'export default Object.assign(() => {}, { getModuleDependencies: () => moduleDependencies })',
+      ].join('\n')),
+    ])
+
+    const result = await execa(process.execPath, [scriptPath, packageRoot], { reject: false })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('- @nuxtjs/robots')
+    expect(result.stderr).toContain('- @nuxtjs/sitemap')
+    expect(result.stderr).not.toContain('- nuxt-site-config')
+    expect(result.stderr).not.toContain('- @nuxtjs/mcp-toolkit')
+  })
 })

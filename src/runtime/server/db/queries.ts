@@ -4,6 +4,7 @@ import type { RawExecutor } from './drizzle/raw'
 import type { SeedRoutesOptions } from './seed'
 import { randomUUID } from 'uncrypto'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
+import { checkAndHandleStale } from '../utils/checkStale'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
 import { useRawDb } from './drizzle/raw'
@@ -33,6 +34,34 @@ type SchemaInitializationState
 
 let schemaInitializationState: SchemaInitializationState = { _tag: 'Uninitialized' }
 
+// The prerendered dump loads before the first read or write of this process,
+// whichever feature makes it. A fresh server otherwise answers every query
+// empty until something happens to call restore.
+type DumpSyncState
+  = | { _tag: 'Pending' }
+    | { _tag: 'Syncing', promise: Promise<void> }
+    | { _tag: 'Synced' }
+
+let dumpSyncState: DumpSyncState = { _tag: 'Pending' }
+
+function syncBuildDump(event: H3Event | undefined): Promise<void> {
+  if (dumpSyncState._tag === 'Synced')
+    return Promise.resolve()
+  if (dumpSyncState._tag === 'Syncing')
+    return dumpSyncState.promise
+  const promise = checkAndHandleStale(event).then(
+    () => {
+      dumpSyncState = { _tag: 'Synced' }
+    },
+    (error) => {
+      dumpSyncState = { _tag: 'Pending' }
+      throw error
+    },
+  )
+  dumpSyncState = { _tag: 'Syncing', promise }
+  return promise
+}
+
 const RE_FTS_CHARS = /[*:^"()]/g
 const RE_WHITESPACE = /\s+/
 
@@ -56,8 +85,9 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
 
   // `aiReady.database: false` ships no driver. Callers treat a null database
   // as "no page data", the same as dev, so llms.txt degrades to the sitemap.
-  const cfg = useRuntimeConfig(resolvedEvent) as { 'nuxt-ai-ready'?: { database?: { _tag?: string } } }
-  if (cfg['nuxt-ai-ready']?.database?._tag === 'Disabled')
+  const cfg = useRuntimeConfig(resolvedEvent) as { 'nuxt-ai-ready'?: { database?: { _tag?: 'Enabled' | 'Disabled' } } }
+  const database = cfg['nuxt-ai-ready']?.database?._tag
+  if (database === 'Disabled')
     return null
 
   const db = await useRawDb(resolvedEvent)
@@ -75,6 +105,9 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
   }
   if (schemaInitializationState._tag === 'Initializing')
     await schemaInitializationState.promise
+
+  if (database === 'Enabled')
+    await syncBuildDump(resolvedEvent)
 
   return db
 }
