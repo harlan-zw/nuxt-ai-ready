@@ -59,21 +59,10 @@ export default defineNuxtConfig({
 })
 ```
 
-Change the Markdown text. Use both hooks if both paths must match:
+Change the Markdown text. The Nitro hook covers runtime `.md` responses, prerendered `.md` files, `llms-full.txt`, and indexed pages. `ctx.isPrerender` is `true` only during prerendering:
 
 ```ts
-// nuxt.config.ts: prerendered .md files and llms-full.txt
-export default defineNuxtConfig({
-  hooks: {
-    'ai-ready:page:markdown': (ctx) => {
-      ctx.markdown += '\n\nSee /support.'
-    },
-  },
-})
-```
-
-```ts
-// server/plugins/markdown.ts: runtime .md responses only
+// server/plugins/markdown.ts
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('ai-ready:page:markdown', (ctx) => {
     ctx.markdown += '\n\nSee /support.'
@@ -96,13 +85,13 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 ## Traps
 
-- **Nitro hooks do not run during prerender.** `ai-ready:mdreamConfig` and the Nitro `ai-ready:page:markdown` hook change only runtime `.md` responses. Prerendered `.md` files and `llms-full.txt` ignore them. Use `aiReady.mdreamOptions` and the Nuxt hook for build output.
+- **The same edit in both hooks applies twice.** During prerendering the Nitro `ai-ready:page:markdown` hook runs, then the Nuxt hook of the same name. Put an edit in one of them, not both.
 - **Content source pages skip conversion hooks.** A Nuxt Content page ignores `mdreamOptions` and both Nitro hooks.
 - **Dev has no page data.** Query helpers, MCP tools, and search return empty results in `nuxi dev`. Test with `nuxi build` and `node .output/server/index.mjs`.
 - **Response caching turns negotiation off.** An ISR, `swr`, or `cache` route rule without `varies: ['accept', 'sec-fetch-dest', 'user-agent']` serves HTML to Markdown clients. The `.md` URL still works. For a CDN that caches by URL only, set `contentNegotiation: false`.
 - **Emptying `ctx.markdown` does not hide a page.** It drops the body from `llms-full.txt`. The URL stays in `llms.txt` and in the index. Use `sitemap.exclude` for discovery, and access control for private pages.
 - **A project `skills/` folder is public.** Agent skills discovery publishes it with no opt in. Rename the folder with `agentSkills.dir`, or set `agentSkills: false`.
-- **The same hook name exists twice.** `ai-ready:page:markdown` is a Nuxt hook (`nuxt.config` `hooks`) and a Nitro hook (`nitroApp.hooks`). They receive different context.
+- **The same hook name exists twice.** `ai-ready:page:markdown` is a Nuxt hook (`nuxt.config` `hooks`, prerender only) and a Nitro hook (`nitroApp.hooks`, every HTML conversion). They receive different context. The Nitro `ctx.event` is undefined when indexing runs outside a request.
 - **`database: false` conflicts with `runtimeSync` and `cron`.** The build fails and names the option.
 
 ## Version limits
