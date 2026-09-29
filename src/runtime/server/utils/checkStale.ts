@@ -34,12 +34,23 @@ export interface StaleCheckResult {
   sitemapsReset?: number
 }
 
+// A host can answer the metadata path with something else, such as a base URL
+// redirect page. Only a real build ID counts as a dump.
+function parseBuildMeta(value: unknown): BuildMeta | null {
+  if (!value || typeof value !== 'object')
+    return null
+  const { buildId, pageCount, createdAt } = value as Record<string, unknown>
+  if (typeof buildId !== 'string' || !buildId || typeof pageCount !== 'number')
+    return null
+  return { buildId, pageCount, createdAt: typeof createdAt === 'string' ? createdAt : '' }
+}
+
 /**
  * Fetch build metadata from static assets
  */
 async function fetchBuildMeta(event?: H3Event): Promise<BuildMeta | null> {
   logger.debug('[stale-check] Fetching meta...')
-  return fetchPublicAsset<BuildMeta>(event, '/__ai-ready/pages.meta.json')
+  return parseBuildMeta(await fetchPublicAsset<unknown>(event, '/__ai-ready/pages.meta.json'))
 }
 
 /**
@@ -55,7 +66,10 @@ async function fetchDump(event?: H3Event): Promise<DumpRow[] | null> {
   }
 
   logger.debug(`[stale-check] Decompressing dump (${(dumpData.length / 1024).toFixed(1)}kb)...`)
-  return decompressFromBase64<DumpRow[]>(dumpData)
+  return decompressFromBase64<DumpRow[]>(dumpData).catch((error) => {
+    logger.warn('[stale-check] Build dump is unreadable, skipping restore:', error)
+    return null
+  })
 }
 
 /**

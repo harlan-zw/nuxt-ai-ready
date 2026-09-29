@@ -77,7 +77,6 @@ Page storage and FTS5 search via drizzle-orm, tables prefixed `ai_ready_`:
 - **markdown-negotiation.ts**: Splices the Accept negotiation handler into the h3 stack ahead of Nitro's static asset handler, which otherwise answers prerendered routes before any middleware
 - **link-header.ts**: Status-aware Link headers (alternate markdown, hreflang, api-catalog)
 - **html-capture.prerender.ts**: Captures HTML during prerender
-- **mcp-data.ts**: Feeds page data to the MCP server
 
 ### Runtime Indexing Flow
 

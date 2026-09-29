@@ -1,5 +1,5 @@
 import { defu } from 'defu'
-import { isReservedPath, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
+import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
 
@@ -7,18 +7,12 @@ const RE_MD_EXT = /\.md$/
 
 /**
  * A route Nitro prerenders as a page, so the module generates a `.md` twin for
- * it. Pattern and dynamic routes cannot carry an exact Link header, and paths
- * whose last segment holds an extension are treated as non-page files by
- * `getRequestRenderInfo`, so they never get a twin.
+ * it. Pattern and dynamic routes cannot carry an exact Link header.
  */
 export function isStaticMarkdownSourceRoute(route: string): boolean {
   if (route.includes('*') || route.includes(':'))
     return false
-  const path = route.split('?')[0] || route
-  if (isReservedPath(path))
-    return false
-  const lastSegment = path.split('/').pop() || ''
-  return !lastSegment.includes('.')
+  return hasMarkdownTwin(route.split('?')[0] || route)
 }
 
 /** Relative `rel="describedby"` entry pointing at llms.txt. */
