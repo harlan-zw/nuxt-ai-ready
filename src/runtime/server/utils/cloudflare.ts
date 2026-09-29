@@ -1,4 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
+import { withBase } from 'ufo'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 const FETCH_TIMEOUT = 5000
 
@@ -63,7 +65,8 @@ export async function fetchPublicAsset<T = unknown>(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-  return globalThis.$fetch(path, {
+  // A self-fetch outside the app base URL gets a redirect page, not the asset.
+  return globalThis.$fetch(withBase(path, useRuntimeConfig(event).app.baseURL), {
     baseURL: '/',
     signal: controller.signal,
     responseType,
