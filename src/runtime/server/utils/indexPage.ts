@@ -75,7 +75,10 @@ export async function indexPage(
 
   const { siteUrl } = createUniversalContext(event)
   const fullUrl = siteUrl ? `${siteUrl}${route}` : route
-  const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, { extractUpdatedAt: true })
+  const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, {
+    extractUpdatedAt: true,
+    hooks: { route, event, isPrerender: false },
+  })
   const headings = JSON.stringify(result.headings)
   const keywords = extractKeywords(result.textContent, result.metaKeywords)
 

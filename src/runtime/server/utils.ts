@@ -3,6 +3,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { MarkdownContext, ModuleOptions } from '../types'
 import { htmlToMarkdown } from 'mdream'
 import { useNitroApp } from '#nuxtseo/nitro'
+import { hoistMetaDescription } from './utils/frontmatter'
 
 const RE_NBSP = /\u00A0/g
 
@@ -107,42 +108,39 @@ export function extractLastUpdated(html: string): string | undefined {
 interface ConvertHtmlOptions {
   /** Extract updatedAt from meta tags */
   extractUpdatedAt?: boolean
-  /** Call runtime hooks (ai-ready:mdreamConfig, ai-ready:page:markdown) */
-  hooks?: { route: string, event: H3Event }
+  /**
+   * Context for the Nitro hooks (ai-ready:mdreamConfig, ai-ready:page:markdown).
+   * Every conversion runs them, so prerender, runtime and indexing agree.
+   */
+  hooks: { route: string, event?: H3Event, isPrerender: boolean }
   /** Extra fields to inject at the root of mdream's emitted YAML frontmatter */
   additionalFrontmatter?: Record<string, string>
 }
 
-// Convert HTML to Markdown with optional hooks and updatedAt extraction
+// Convert HTML to Markdown through the Nitro conversion hooks
 export async function convertHtmlToMarkdown(
   html: string,
   url: string,
   mdreamOptions: ModuleOptions['mdreamOptions'],
-  opts: ConvertHtmlOptions = {},
+  opts: ConvertHtmlOptions,
 ) {
   const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [] }
   const options = buildMdreamOptions(url, mdreamOptions, meta, opts.extractUpdatedAt ?? false, opts.additionalFrontmatter ?? {})
 
-  let markdown: string
-  if (opts.hooks) {
-    const nitroApp = useNitroApp()
-    await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
+  const nitroApp = useNitroApp()
+  await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
 
-    const context: MarkdownContext = {
-      html,
-      markdown: htmlToMarkdown(html, options),
-      route: opts.hooks.route,
-      title: meta.title,
-      description: meta.description,
-      isPrerender: false,
-      event: opts.hooks.event,
-    }
-    await nitroApp.hooks.callHook('ai-ready:page:markdown', context)
-    markdown = context.markdown
+  const context: MarkdownContext = {
+    html,
+    markdown: hoistMetaDescription(htmlToMarkdown(html, options)),
+    route: opts.hooks.route,
+    title: meta.title,
+    description: meta.description,
+    isPrerender: opts.hooks.isPrerender,
+    event: opts.hooks.event,
   }
-  else {
-    markdown = htmlToMarkdown(html, options)
-  }
+  await nitroApp.hooks.callHook('ai-ready:page:markdown', context)
+  const markdown = context.markdown
 
   return {
     markdown: normalizeWhitespace(markdown),

@@ -2,7 +2,7 @@
 // through mdream (e.g. the friendly 404 markdown response). For HTML-derived
 // pages, prefer mdream's `additionalFields` so the engine owns emission.
 
-import { isMap, parseDocument } from 'yaml'
+import { isMap, isScalar, parseDocument } from 'yaml'
 
 interface FrontmatterAlternate {
   hreflang: string
@@ -61,4 +61,32 @@ export function layerFrontmatter(fields: FrontmatterFields, markdown: string): s
 
   const body = markdown.slice(match[0].length).replace(/^\r?\n/, '')
   return `---\n${document.toString({ lineWidth: 0 }).trimEnd()}\n---\n\n${body}`
+}
+
+/**
+ * Move mdream's `meta.description` to a root `description` field, the shape
+ * Content source pages and hand-built frontmatter already use. Other `meta`
+ * fields stay where mdream put them.
+ */
+export function hoistMetaDescription(markdown: string): string {
+  const match = markdown.match(FRONTMATTER_RE)
+  if (!match)
+    return markdown
+
+  const document = parseDocument(match[1]!)
+  const root = document.contents
+  const meta = document.get('meta')
+  if (document.errors.length || !isMap(root) || !isMap(meta) || !meta.has('description'))
+    return markdown
+
+  const description = meta.get('description', true)
+  meta.delete('description')
+  if (!meta.items.length)
+    document.delete('meta')
+  if (!document.has('description')) {
+    const titleIndex = root.items.findIndex(pair => isScalar(pair.key) && pair.key.value === 'title')
+    root.items.splice(titleIndex + 1, 0, document.createPair('description', description))
+  }
+
+  return `---\n${document.toString({ lineWidth: 0 }).trimEnd()}\n---\n${markdown.slice(match[0].length)}`
 }
