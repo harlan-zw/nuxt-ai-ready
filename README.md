@@ -3,6 +3,13 @@
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![Nuxt][nuxt-src]][nuxt-href]
+<a href="https://skilld.dev/gh/harlan-zw/nuxt-ai-ready/nuxt-ai-ready">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://skilld.dev/b/harlan-zw/nuxt-ai-ready/nuxt-ai-ready?theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://skilld.dev/b/harlan-zw/nuxt-ai-ready/nuxt-ai-ready?theme=light">
+    <img alt="Skill repository on skilld.dev" src="https://skilld.dev/b/harlan-zw/nuxt-ai-ready/nuxt-ai-ready?theme=light">
+  </picture>
+</a>
 
 > Best practice AI & LLM discoverability for Nuxt sites. Score 100 on [`npx @vercel/agent-readability audit <URL>`](https://github.com/vercel-labs/agent-readability).
 
@@ -38,10 +45,7 @@ npx nuxi@latest module add nuxt-ai-ready
 ```
 
 > [!TIP]
-> Generate an Agent Skill for this package using [skilld](https://github.com/harlan-zw/skilld):
-> ```bash
-> npx skilld add nuxt-ai-ready
-> ```
+> Using an AI agent? Get the nuxt-ai-ready Skill on [skilld.dev/gh/harlan-zw/nuxt-ai-ready/nuxt-ai-ready](https://skilld.dev/gh/harlan-zw/nuxt-ai-ready/nuxt-ai-ready).
 
 💡 Made your site AI-ready? Preview how a page converts to LLM-readable markdown with the free [HTML→Markdown tool](https://nuxtseo.com/tools/html-to-markdown), or track how AI engines index, rank and cite your site with [Nuxt SEO Pro](https://nuxtseo.com/pro).
 

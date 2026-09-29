@@ -43,6 +43,7 @@
   "files": [
     "dist",
     "mcp.d.ts",
+    "skills",
     "webmcp.d.ts"
   ],
   "scripts": {
