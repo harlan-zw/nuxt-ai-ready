@@ -219,7 +219,7 @@ export default defineEventHandler(async (event) => {
     canonicalUrl,
     config.mdreamOptions,
     {
-      hooks: { route: path, event },
+      hooks: { route: path, event, isPrerender: false },
       additionalFrontmatter,
     },
   )

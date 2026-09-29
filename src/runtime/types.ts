@@ -447,8 +447,9 @@ export interface PageDocument {
 /**
  * Hook context for markdown processing (Nitro runtime hook)
  *
- * This hook is called during HTML→Markdown conversion in the runtime middleware.
- * You can modify the markdown content before it's returned to the client.
+ * This hook is called for every HTML→Markdown conversion: runtime `.md`
+ * requests, prerendering, and page indexing. Modify the markdown content
+ * before the module serves, writes, or stores it.
  *
  * @example Modify markdown content
  * nitroApp.hooks.hook('ai-ready:page:markdown', async (context) => {
@@ -479,8 +480,11 @@ export interface MarkdownContext {
   description: string
   /** Whether this is during prerendering (true) or runtime (false) */
   isPrerender: boolean
-  /** The H3 event object for accessing request/response */
-  event: H3Event
+  /**
+   * The H3 event object for accessing request/response. Undefined when
+   * indexing runs outside a request, such as a scheduled task.
+   */
+  event?: H3Event
 }
 
 /**
