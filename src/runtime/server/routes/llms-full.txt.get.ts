@@ -2,6 +2,7 @@ import { eventHandler, sendIterable, setHeader, setResponseHeader } from '#nuxts
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { publicCacheControl } from '../../cache-control'
 import { toDeployedRoute } from '../../route-path'
 import { countPages, streamPages } from '../db/queries'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../utils/llms-full'
@@ -49,7 +50,7 @@ export default eventHandler(async (event) => {
   }
 
   setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
-  setResponseHeader(event, 'Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400')
+  setResponseHeader(event, 'Cache-Control', publicCacheControl(3600, 86400))
 
   // Stream pages from database using async generator
   const siteUrl = siteConfig.url

@@ -55,6 +55,7 @@ describe('gET /llms.txt internal cache', () => {
     expect(defineCachedFunction).toHaveBeenCalledOnce()
     expect(cachedOptions()[0]).toMatchObject({ name: 'llms-txt', group: 'ai-ready', maxAge: 1200, swr: true })
     expect(cacheControl).toContain('max-age=1200')
+    expect(cacheControl).not.toContain('s-maxage')
   })
 
   it('builds one cached function per configured value', async () => {

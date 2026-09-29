@@ -1,5 +1,6 @@
 import { eventHandler, setHeader } from '#nuxtseo/h3'
 import { defineCachedFunction, useRuntimeConfig } from '#nuxtseo/nitro'
+import { publicCacheControl } from '../../cache-control'
 import { buildLlmsTxt } from '../../llms-txt-utils'
 
 const cachedBuilders = new Map<number, (event: Parameters<typeof buildLlmsTxt>[0]) => ReturnType<typeof buildLlmsTxt>>()
@@ -29,7 +30,7 @@ export default eventHandler(async (event) => {
 
   setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
   if (cacheEnabled) {
-    setHeader(event, 'Cache-Control', `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=3600`)
+    setHeader(event, 'Cache-Control', publicCacheControl(cacheSeconds, 3600))
   }
 
   return content
