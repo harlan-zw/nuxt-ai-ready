@@ -110,6 +110,7 @@ describe('gET /sitemap.md internal cache', () => {
     expect(body).toContain('# Example Site Sitemap')
     expect(cachedOptions()[0]).toMatchObject({ name: 'sitemap-md', group: 'ai-ready', maxAge: 1200, swr: true })
     expect(cacheControl).toContain('max-age=1200')
+    expect(cacheControl).not.toContain('s-maxage')
   })
 
   it('bypasses the cached function when caching is disabled', async () => {

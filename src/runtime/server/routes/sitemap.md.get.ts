@@ -3,6 +3,7 @@ import type { PageEntry } from '../db/queries'
 import { eventHandler, setHeader } from '#nuxtseo/h3'
 import { defineCachedFunction, useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
+import { publicCacheControl } from '../../cache-control'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'
@@ -57,7 +58,7 @@ export default eventHandler(async (event) => {
 
   setHeader(event, 'Content-Type', 'text/markdown; charset=utf-8')
   if (cacheEnabled) {
-    setHeader(event, 'Cache-Control', `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=3600`)
+    setHeader(event, 'Cache-Control', publicCacheControl(cacheSeconds, 3600))
   }
 
   return cacheEnabled

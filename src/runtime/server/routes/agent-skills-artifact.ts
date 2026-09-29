@@ -1,6 +1,7 @@
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
 import { assertMethod, createError, eventHandler, getRequestURL, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { publicCacheControl } from '../../cache-control'
 import { toLogicalRoute } from '../../route-path'
 
 export default eventHandler((event) => {
@@ -15,7 +16,7 @@ export default eventHandler((event) => {
   }
 
   setHeader(event, 'Content-Type', 'text/markdown; charset=utf-8')
-  setHeader(event, 'Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400')
+  setHeader(event, 'Cache-Control', publicCacheControl(3600, 86400))
   setHeader(event, 'Access-Control-Allow-Origin', '*')
   return content
 })

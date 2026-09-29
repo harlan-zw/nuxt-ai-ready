@@ -1,10 +1,11 @@
 import type {
   AgentSkillsIndex,
 } from '../runtime/types'
+import { publicCacheControl } from '../runtime/cache-control'
 
 export const AGENT_SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
 export const AGENT_SKILLS_INDEX_ROUTE = '/.well-known/agent-skills/index.json'
-export const AGENT_SKILLS_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400'
+export const AGENT_SKILLS_CACHE_CONTROL = publicCacheControl(3600, 86400)
 
 export interface AgentSkillsConfigIssue {
   index?: number
