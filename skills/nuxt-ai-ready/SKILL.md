@@ -5,17 +5,16 @@ description: Add, configure, or debug AI and LLM discoverability in a Nuxt site 
 
 # nuxt-ai-ready
 
-Tested against `nuxt-ai-ready` 2.4.1 on Nuxt 4.5 and Node 24 (requires Nuxt `>=4.0.0`).
+Tested against `nuxt-ai-ready` 2.4.1 plus its unreleased fixes on `main`, on Nuxt 4.5 and Node 24 (requires Nuxt `>=4.0.0`).
 The module converts rendered pages to Markdown with mdream and publishes `llms.txt`, `llms-full.txt`, and `.md` twins.
 Optional parts add MCP tools, WebMCP tools, and a runtime page index. Config key: `aiReady`. Docs: https://nuxtseo.com/ai-ready
 
 ## Setup
 
-The module loads `@nuxtjs/robots` and `@nuxtjs/sitemap` as module dependencies, but the package does not install them.
-If the build fails with `Could not resolve @nuxtjs/robots`, install both:
+The package installs `@nuxtjs/robots` and `@nuxtjs/sitemap` and loads them as module dependencies. Configure them with the `robots` and `sitemap` keys.
 
 ```bash
-pnpm add nuxt-ai-ready @nuxtjs/robots @nuxtjs/sitemap
+pnpm add nuxt-ai-ready
 ```
 
 Set `site.url`. Canonical URLs, `Link` headers, and `/.well-known/ai-catalog.json` use it.
@@ -99,7 +98,6 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 - **Nitro hooks do not run during prerender.** `ai-ready:mdreamConfig` and the Nitro `ai-ready:page:markdown` hook change only runtime `.md` responses. Prerendered `.md` files and `llms-full.txt` ignore them. Use `aiReady.mdreamOptions` and the Nuxt hook for build output.
 - **Content source pages skip conversion hooks.** A Nuxt Content page ignores `mdreamOptions` and both Nitro hooks.
-- **The runtime database starts empty on a fresh server.** Only the first MCP request, a cron run, or `POST /__ai-ready/restore` loads the prerendered dump. Until then `queryPages()`, `searchPages()`, `/__ai-ready/status`, and the WebMCP tools return nothing.
 - **Dev has no page data.** Query helpers, MCP tools, and search return empty results in `nuxi dev`. Test with `nuxi build` and `node .output/server/index.mjs`.
 - **Response caching turns negotiation off.** An ISR, `swr`, or `cache` route rule without `varies: ['accept', 'sec-fetch-dest', 'user-agent']` serves HTML to Markdown clients. The `.md` URL still works. For a CDN that caches by URL only, set `contentNegotiation: false`.
 - **Emptying `ctx.markdown` does not hide a page.** It drops the body from `llms-full.txt`. The URL stays in `llms.txt` and in the index. Use `sitemap.exclude` for discovery, and access control for private pages.

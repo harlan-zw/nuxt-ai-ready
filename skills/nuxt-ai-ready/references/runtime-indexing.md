@@ -49,7 +49,7 @@ Every control endpoint needs `Authorization: Bearer <secret>`, including `GET /_
 Traps:
 
 - **TTL expiry does not reindex a page.** Poll and cron process only pending rows. After a CMS edit, call `reindex` for that route.
-- **A fresh database stays empty until a restore.** The first MCP request, a cron run, or `POST /__ai-ready/restore` loads the dump. Call `restore` after a deployment if the site has no MCP and no cron.
+- **Only prerendered pages are in the dump.** Each server process loads the dump before its first database query. A page that was not prerendered stays out of the index until poll, cron, or `reindex` adds it.
 - **Cloudflare Pages has no cron triggers.** Keep `cron: true` and call `GET /__ai-ready/cron` from an external scheduler. On Workers the module adds the trigger.
 
 ## Server query helpers
