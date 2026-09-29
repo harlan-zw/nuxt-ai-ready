@@ -1,3 +1,5 @@
+import { hasMarkdownTwin } from '../../markdown-path'
+
 export interface SitemapRouteSource {
   loc: string
   _path?: { pathname: string } | null
@@ -9,7 +11,7 @@ export function mapSitemapRoutes<T extends SitemapRouteSource>(urls: readonly T[
   for (const url of urls) {
     const route = url._path?.pathname
       ?? (url.loc.startsWith('/') ? (url.loc.split('?')[0] ?? url.loc) : new URL(url.loc).pathname)
-    if (!route.includes('.'))
+    if (hasMarkdownTwin(route))
       routeToUrl.set(route, url)
   }
   return routeToUrl

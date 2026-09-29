@@ -8,7 +8,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
-import { isReservedPath, toMarkdownPath } from './markdown-path'
+import { hasMarkdownTwin, toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
 import { logger } from './server/logger'
@@ -22,11 +22,6 @@ interface PageItem {
   title?: string
   description?: string
   locale?: string
-}
-
-function hasRuntimeMarkdownHandler(pathname: string): boolean {
-  const lastSegment = pathname.split('/').pop() || ''
-  return !isReservedPath(pathname) && !lastSegment.includes('.')
 }
 
 interface MarkdownLinkAvailability {
@@ -307,7 +302,7 @@ export async function buildLlmsTxt(event: H3Event) {
       const deployedPathname = resolvePath(pathname)
       const markdownPath = resolvePath(toMarkdownPath(pathname))
       if (markdownLinkAvailability.paths.has(decodePath(markdownPath))
-        || (markdownLinkAvailability.runtimeMarkdownAvailable && hasRuntimeMarkdownHandler(pathname))) {
+        || (markdownLinkAvailability.runtimeMarkdownAvailable && hasMarkdownTwin(pathname))) {
         return markdownPath
       }
       return deployedPathname

@@ -57,6 +57,11 @@ describe('isStaticMarkdownSourceRoute', () => {
     expect(isStaticMarkdownSourceRoute('/@fs/home/user/app.js')).toBe(false)
   })
 
+  it('accepts a page route whose last segment holds a version number', () => {
+    expect(isStaticMarkdownSourceRoute('/v1.2')).toBe(true)
+    expect(isStaticMarkdownSourceRoute('/docs/v1.2/intro')).toBe(true)
+  })
+
   it('accepts an @handle page route', () => {
     // /@login is a profile namespace. Only Vite's own prefixes are internal.
     expect(isStaticMarkdownSourceRoute('/@emilkowalski')).toBe(true)

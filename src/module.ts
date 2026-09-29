@@ -560,10 +560,6 @@ export default defineNuxtModule<ModuleOptions>({
         return
       }
 
-      // Hydrate the database before Toolkit resolves its first request.
-      if (databaseEnabled)
-        addServerPlugin(resolve('./runtime/server/plugins/mcp-data'))
-
       const mcpLink = {
         title: 'MCP',
         href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
