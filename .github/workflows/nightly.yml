@@ -25,5 +25,7 @@ jobs:
       - run: pnpm dev:prepare
       - name: Pack portable beta preview
         run: node scripts/pack-preview.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
+      - name: Check packed manifest
+        run: node scripts/check-pack-manifest.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
       - name: Publish immutable preview
         run: pnpm dlx pkg-pr-new publish "$RUNNER_TEMP/nuxt-ai-ready.tgz"
