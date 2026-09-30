@@ -13,8 +13,17 @@ permissions:
 
 jobs:
   build:
-    uses: harlan-zw/nuxt-seo/.github/workflows/reusable-nightly.yml@main
-    with:
-      # pkg-pr-new otherwise defaults to npm pack, which cannot resolve pnpm
-      # catalog dependency specifiers in preview tarballs.
-      publish-packages: --pnpm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@lts
+          cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile --trust-lockfile
+      - run: pnpm dev:prepare
+      - name: Pack portable beta preview
+        run: node scripts/pack-preview.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
+      - name: Publish immutable preview
+        run: pnpm dlx pkg-pr-new publish --prepacked "$RUNNER_TEMP/nuxt-ai-ready.tgz"

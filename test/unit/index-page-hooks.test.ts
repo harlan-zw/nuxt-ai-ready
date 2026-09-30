@@ -14,7 +14,7 @@ const config = {
 const contexts: MarkdownContext[] = []
 const handlers: Record<string, (payload: any) => void> = {
   'ai-ready:mdreamConfig': (options: MdreamOptions) => {
-    options.filter ??= {}
+    options.filter ||= {}
     options.filter.exclude = [...(options.filter.exclude || []), 'ul']
   },
   'ai-ready:page:markdown': (ctx: MarkdownContext) => {
