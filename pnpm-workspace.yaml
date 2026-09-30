@@ -54,7 +54,7 @@ onlyBuiltDependencies:
 catalog:
   '@harlan-zw/comark-content': ^0.1.5
   '@libsql/client': ^0.18.0
-  '@mdream/js': ^1.7.2
+  '@mdream/js': https://pkg.pr.new/harlan-zw/mdream/@mdream/js@dd56f56887610767e9d1b79b6e8d2a280763170d
   '@types/better-sqlite3': ^9.6.0
   better-sqlite3: ^13.0.3
   bumpp: ^12.3.0
@@ -65,7 +65,7 @@ catalog:
   eslint-plugin-harlanzw: ^0.23.0
   execa: ^10.0.1
   h3: ^1.15.11
-  mdream: ^1.7.2
+  mdream: https://pkg.pr.new/harlan-zw/mdream@dd56f56887610767e9d1b79b6e8d2a280763170d
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.16
   nuxtseo-shared: ^5.3.16

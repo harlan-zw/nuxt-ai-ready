@@ -4,6 +4,7 @@ import type { RawExecutor } from './drizzle/raw'
 import type { SeedRoutesOptions } from './seed'
 import { randomUUID } from 'uncrypto'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
+import { logger } from '../logger'
 import { checkAndHandleStale } from '../utils/checkStale'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { initSchema } from './drizzle/queries'
@@ -26,7 +27,7 @@ function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
   }
 }
 
-let devWarningShown = false
+let devNoticeShown = false
 type SchemaInitializationState
   = | { _tag: 'Uninitialized' }
     | { _tag: 'Initializing', promise: Promise<void> }
@@ -65,12 +66,12 @@ function syncBuildDump(event: H3Event | undefined): Promise<void> {
 const RE_FTS_CHARS = /[*:^"()]/g
 const RE_WHITESPACE = /\s+/
 
-/** Get database, with dev mode warning and prerender handling */
+/** Get database, with dev mode notice and prerender handling */
 async function getDb(event?: H3Event): Promise<RawExecutor | null> {
   if (import.meta.dev) {
-    if (!devWarningShown) {
-      console.warn('[nuxt-ai-ready] Page data unavailable in dev. Run `nuxi generate` for full metadata.')
-      devWarningShown = true
+    if (!devNoticeShown) {
+      logger.info('Page data unavailable in dev. Run `nuxi generate` for full metadata.')
+      devNoticeShown = true
     }
     return null
   }

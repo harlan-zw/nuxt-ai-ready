@@ -760,6 +760,8 @@ export default defineNuxtModule<ModuleOptions>({
       // For edge presets (Cloudflare, Vercel Edge, Deno), export conditions auto-resolve to WASM.
       const preset = String(nitroConfig.preset || '')
       const isEdgePreset = ['cloudflare', 'vercel-edge', 'netlify-edge', 'deno'].some(p => preset.startsWith(p))
+      if (isEdgePreset)
+        nitroConfig.experimental.wasm = true
       if (nitroCompatibility._tag === 'nitro-v3') {
         const nitro3Config = nitroConfig as unknown as {
           noExternals?: boolean | Array<string | RegExp>
