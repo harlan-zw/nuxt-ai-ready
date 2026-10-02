@@ -13,20 +13,6 @@ const WASI_LOADER = /require\('\.\/rust\.wasi\.cjs'\)/
 const WASI_PACKAGE = '@mdream/rust-wasm32-wasi'
 const WASI_FILES = ['rust.wasi.cjs', 'rust.wasm32-wasi.wasm', 'rust.wasm32-wasi.debug.wasm']
 
-// The mdream beta snapshot only ships linux glibc binaries inline. Its loader
-// also tries rust.<platform>.node files next to napi/index.mjs, so this pulls
-// every published platform binary and the WASI fallback into the staged copy.
-function registryVersion(name) {
-  try {
-    return execFileSync('npm', ['view', name, 'version'], { encoding: 'utf8' }).trim()
-  }
-  catch {
-    // Unpublished napi target (e.g. win32-x64-gnu). Nothing to bundle; the
-    // WASI fallback covers the platform at runtime.
-    return null
-  }
-}
-
 async function downloadPackage(name, version, destination) {
   const stdout = execFileSync('npm', ['pack', `${name}@${version}`, '--pack-destination', destination, '--json'], { encoding: 'utf8' })
   const parsed = JSON.parse(stdout)
@@ -37,12 +23,12 @@ async function downloadPackage(name, version, destination) {
   return join(extract, 'package')
 }
 
-async function vendorInlineBinary(napiDirectory, platform, downloads) {
+async function vendorInlineBinary(napiDirectory, platform, downloads, bindings) {
   const binary = `rust.${platform}.node`
   if (existsSync(join(napiDirectory, binary)))
     return
   const name = `@mdream/rust-${platform}`
-  const version = registryVersion(name)
+  const version = bindings[name]
   if (!version) {
     console.info(`No npm package for ${name}; the WASI fallback covers this platform`)
     return
@@ -53,20 +39,26 @@ async function vendorInlineBinary(napiDirectory, platform, downloads) {
   console.info(`Bundled ${name}@${version} as napi/${binary}`)
 }
 
-async function vendorWasiFallback(napiDirectory, downloads) {
-  if (existsSync(join(napiDirectory, 'rust.wasi.cjs')))
-    return
-  const version = registryVersion(WASI_PACKAGE)
+async function vendorWasiFallback(napiDirectory, downloads, bindings) {
+  const version = bindings[WASI_PACKAGE]
   if (!version)
-    throw new Error(`Cannot bundle the universal WASI fallback: ${WASI_PACKAGE} not found on npm`)
+    throw new Error(`Cannot bundle the universal WASI fallback: ${WASI_PACKAGE} has no declared version`)
   const source = await downloadPackage(WASI_PACKAGE, version, downloads)
+  const { dependencies } = JSON.parse(await readFile(join(source, 'package.json'), 'utf8'))
+  const runtimeDirectory = join(downloads, 'wasi-runtime')
+  await mkdir(runtimeDirectory, { recursive: true })
+  await writeFile(join(runtimeDirectory, 'package.json'), JSON.stringify({ private: true, dependencies }))
+  execFileSync('npm', ['install', '--ignore-scripts', '--omit=dev', '--no-package-lock'], {
+    cwd: runtimeDirectory,
+    stdio: 'inherit',
+  })
   for (const file of WASI_FILES) {
     if (existsSync(join(source, file)))
       await cp(join(source, file), join(napiDirectory, file))
   }
-  if (existsSync(join(source, 'node_modules')))
-    await cp(join(source, 'node_modules'), join(napiDirectory, 'node_modules'), { recursive: true })
+  await cp(join(runtimeDirectory, 'node_modules'), join(napiDirectory, '..', 'node_modules'), { recursive: true })
   console.info(`Bundled ${WASI_PACKAGE}@${version} as the universal WASI fallback`)
+  return dependencies
 }
 
 try {
@@ -98,19 +90,25 @@ try {
       await mkdir(dirname(join(stage, 'node_modules', child)), { recursive: true })
       await cp(childSource, join(stage, 'node_modules', child), { recursive: true })
     }
-    if (Object.keys(dependency.optionalDependencies || {}).length)
-      throw new Error(`${name} preview must include native files without optional dependencies`)
   }
 
   const napiDirectory = join(stage, 'node_modules', 'mdream', 'napi')
+  const mdreamManifestPath = join(stage, 'node_modules', 'mdream', 'package.json')
+  const mdreamManifest = JSON.parse(await readFile(mdreamManifestPath, 'utf8'))
+  const bindings = mdreamManifest.optionalDependencies || {}
   const glue = await readFile(join(napiDirectory, 'index.mjs'), 'utf8')
   const downloads = join(temporary, 'downloads')
   await mkdir(downloads, { recursive: true })
   const referencedPlatforms = [...new Set([...glue.matchAll(LOCAL_BINARY)].map(match => match[1]))]
   for (const platform of referencedPlatforms)
-    await vendorInlineBinary(napiDirectory, platform, downloads)
-  if (WASI_LOADER.test(glue))
-    await vendorWasiFallback(napiDirectory, downloads)
+    await vendorInlineBinary(napiDirectory, platform, downloads, bindings)
+  if (WASI_LOADER.test(glue)) {
+    const wasiDependencies = await vendorWasiFallback(napiDirectory, downloads, bindings)
+    mdreamManifest.dependencies = { ...mdreamManifest.dependencies, ...wasiDependencies }
+    mdreamManifest.bundledDependencies = Object.keys(wasiDependencies)
+  }
+  delete mdreamManifest.optionalDependencies
+  await writeFile(mdreamManifestPath, `${JSON.stringify(mdreamManifest, null, 2)}\n`)
 
   delete manifest.scripts
   delete manifest.devDependencies
