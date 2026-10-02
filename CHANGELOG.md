@@ -1,3 +1,12 @@
+## v2.5.1
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.0...v2.5.1)
+
+### 🩹 Fixes
+
+- Adopt mdream v2 beta on edge runtimes ([#141](https://github.com/harlan-zw/nuxt-ai-ready/pull/141))
+- Use the published mdream beta in portable archives ([#142](https://github.com/harlan-zw/nuxt-ai-ready/pull/142))
+
 ## v2.4.0...main
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.4.0...main)
