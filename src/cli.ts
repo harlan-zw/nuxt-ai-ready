@@ -365,6 +365,9 @@ const main = defineCommand({
         else if (res.skipped) {
           consola.info(`Skipped: ${colors.yellow(res.route)} (still fresh)`)
         }
+        else if (res.gone) {
+          consola.success(`Removed: ${colors.green(res.route)} (HTTP 410)`)
+        }
         else {
           throw new Error(`Failed to reindex ${res.route ?? args.route}${res.error ? `: ${res.error}` : ''}`)
         }

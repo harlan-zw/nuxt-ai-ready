@@ -16,6 +16,9 @@ export default eventHandler(async (event) => {
 
   const result = await indexPageByRoute(route, event, { force })
 
+  if (result.gone)
+    return { route, indexed: false, gone: true }
+
   if (!result.success) {
     setResponseStatus(event, 502)
     return { route, indexed: false, error: result.error ?? `Failed to index ${route}` }

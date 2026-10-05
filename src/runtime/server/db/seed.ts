@@ -75,8 +75,8 @@ export function resolveSeedRefreshWindowMs(pruneTtlSeconds: number): number {
 
 export interface SeedRoutesOptions {
   /**
-   * An existing row is rewritten only when its `last_seen_at` is older than
-   * this, when it is an error row, or when its locale changed.
+   * An existing row is rewritten when its `last_seen_at` is older than this
+   * or its locale changed. Error rows retry after this interval.
    * @default SEED_REFRESH_WINDOW_MS
    */
   refreshWindowMs?: number
