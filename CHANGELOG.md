@@ -1,3 +1,13 @@
+## v2.5.2
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.1...v2.5.2)
+
+### 🩹 Fixes
+
+- Preserve failed-route retry timing when sitemap routes are seeded ([#144](https://github.com/harlan-zw/nuxt-ai-ready/pull/144))
+- Prune pages when routes return HTTP 410 and preserve removal during stale checks within the same build ([#144](https://github.com/harlan-zw/nuxt-ai-ready/pull/144))
+- Return a gone result for manual reindexing and exclude removed routes from batch failures ([#144](https://github.com/harlan-zw/nuxt-ai-ready/pull/144))
+
 ## v2.5.1
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.0...v2.5.1)
