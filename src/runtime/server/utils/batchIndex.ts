@@ -81,14 +81,17 @@ export async function batchIndexPages(
           markFailedAsError: true,
           force: true,
         })
-        return { route: page.route, success: result.success }
+        return { route: page.route, result }
       }),
     )
 
     // Tally results
     for (const result of results) {
       processed++
-      if (result.success) {
+      if (result.result.gone) {
+        logger.debug(`[batchIndex] Pruned gone route: ${result.route}`)
+      }
+      else if (result.result.success) {
         indexed++
         logger.debug(`[batchIndex] Indexed: ${result.route}`)
       }

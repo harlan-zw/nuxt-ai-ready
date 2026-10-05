@@ -2,7 +2,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { PageIndexedContext } from '../../types'
 import { fetchWithEvent, useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
-import { getPageIndexState, upsertPage } from '../db/queries'
+import { getPageIndexState, prunePage, upsertPage } from '../db/queries'
 import { computeContentHash } from '../db/shared'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown } from '../utils'
@@ -22,7 +22,7 @@ export interface IndexPageOptions {
   markFailedAsError?: boolean
 }
 
-export interface IndexPageResult {
+interface IndexedPageResult {
   success: boolean
   /** True if page was already fresh and skipped */
   skipped?: boolean
@@ -44,6 +44,8 @@ export interface IndexPageResult {
   /** Error message if failed */
   error?: string
 }
+
+export type IndexPageResult = IndexedPageResult & ({ success: false, gone: true } | { gone?: never })
 
 /**
  * Manually index a page's HTML content into database
@@ -153,7 +155,7 @@ export async function indexPageByRoute(
   options: IndexPageOptions = {},
 ): Promise<IndexPageResult> {
   logger.debug(`[indexPageByRoute] Fetching HTML for ${route} (timeout: 10000ms)`)
-  const html = await (event
+  const fetched = await (event
     ? fetchWithEvent(event, route, {
         headers: { accept: 'text/html', [INTERNAL_HEADER]: '1' },
         timeout: 10000,
@@ -161,12 +163,22 @@ export async function indexPageByRoute(
     : globalThis.$fetch(route, {
         headers: { accept: 'text/html', [INTERNAL_HEADER]: '1' },
         timeout: 10000, // 10s timeout per page (must fit within CF worker limit)
-      })).catch((err: Error) => {
+      })).then(html => ({ _tag: 'Html' as const, html })).catch((err: Error & { status?: number, statusCode?: number, response?: { status?: number } }) => {
+    const status = err.status ?? err.statusCode ?? err.response?.status
+    if (status === 410)
+      return { _tag: 'Gone' as const }
     logger.warn(`[indexPageByRoute] Failed to fetch ${route}:`, err.message)
-    return null
-  }) as string | null
+    return { _tag: 'Failed' as const }
+  })
 
-  if (html) {
+  if (fetched._tag === 'Gone') {
+    await prunePage(event, route)
+    return { success: false, gone: true }
+  }
+
+  const html = fetched._tag === 'Html' ? fetched.html : null
+
+  if (typeof html === 'string' && html) {
     logger.debug(`[indexPageByRoute] Fetched ${route} (${html.length} bytes)`)
   }
 
