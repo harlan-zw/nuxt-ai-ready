@@ -93,7 +93,6 @@ function row(route: string): StateRow | undefined {
 }
 
 describe('errored page retry (raw layer)', () => {
-  afterEach(() => vi.restoreAllMocks())
   beforeEach(() => {
     vi.resetModules()
     sqlite?.db.close()
@@ -102,6 +101,8 @@ describe('errored page retry (raw layer)', () => {
     mocks.initSchema.mockReset().mockResolvedValue(undefined)
     mocks.useRawDb.mockReset().mockResolvedValue(sqlite.adapter)
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   it('marks an errored upsert as not indexed', async () => {
     const { upsertPage } = await importQueries()
