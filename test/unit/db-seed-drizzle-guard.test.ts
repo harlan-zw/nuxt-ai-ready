@@ -90,11 +90,15 @@ describe('seedRoutes refresh window (drizzle layer)', () => {
     expect(lastSeen('/a')).toBe(T0 + 25 * HOUR)
   })
 
-  it('clears an error row inside the window', async () => {
+  it('retries an error row only after the refresh window', async () => {
     await seed(['/a'])
     sqlite.prepare('UPDATE ai_ready_pages SET is_error = 1, indexed = 1 WHERE route = ?').run('/a')
 
     vi.setSystemTime(T0 + HOUR)
+    expect(await seed(['/a'])).toEqual({ seen: 1, rowsWritten: 0 })
+    expect(row('/a')).toEqual({ is_error: 1, indexed: 1, locale: '' })
+
+    vi.setSystemTime(T0 + 25 * HOUR)
     expect(await seed(['/a'])).toEqual({ seen: 1, rowsWritten: 1 })
     expect(row('/a')).toEqual({ is_error: 0, indexed: 0, locale: '' })
   })

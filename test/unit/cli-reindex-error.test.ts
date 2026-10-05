@@ -41,6 +41,15 @@ function runReindex(url: string, cwd: string, route = '/about', env: Record<stri
 }
 
 describe('cli reindex error handling', () => {
+  it('prints the removed route and exits 0 after HTTP 410 cleanup', async () => {
+    const url = await startReindexStub(200, { route: '/removed', indexed: false, gone: true })
+    const cwd = await writeSecret()
+
+    const result = await runReindex(url, cwd, '/removed', { CONSOLA_LEVEL: '3', NO_COLOR: '1' })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('Removed: /removed (HTTP 410)')
+  })
   it('reports the h3 error body message and exits non-zero on 400', async () => {
     const url = await startReindexStub(400, {
       url: '/__ai-ready/reindex?route=about',

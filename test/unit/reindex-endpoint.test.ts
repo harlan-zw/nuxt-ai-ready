@@ -128,6 +128,18 @@ describe('pOST /__ai-ready/reindex', () => {
     expect(body.error).toContain('mdream conversion failed')
   })
 
+  it('reports successful cleanup when the indexed route returns HTTP 410', async () => {
+    fetchWithEvent.mockResolvedValue(html('Removed'))
+    await reindex('?route=/removed')
+    fetchWithEvent.mockRejectedValue(Object.assign(new Error('Gone'), { status: 410 }))
+
+    const { status, body } = await reindex('?route=/removed')
+
+    expect(status).toBe(200)
+    expect(body).toEqual({ route: '/removed', indexed: false, gone: true })
+    expect(await queryPages(readerEvent(), { route: '/removed' })).toBeUndefined()
+  })
+
   it('skips a fresh page when force is false', async () => {
     fetchWithEvent.mockResolvedValue(html('About'))
 

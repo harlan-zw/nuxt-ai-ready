@@ -117,7 +117,7 @@ export const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 /**
  * Check if data is stale and handle restore/mark-pending
  * Called at start of cron - handles:
- * 1. Empty DB → restore from dump
+ * 1. Empty DB with a different build ID → restore from dump
  * 2. Build ID changed → compare hashes, only mark changed pages pending, add new pages from dump
  * Skips HTTP fetch if checked within 5 minutes and DB is populated
  */
@@ -151,8 +151,8 @@ export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckRe
     return { action: 'none', dbCount, reason: 'no_dump_metadata' }
   }
 
-  // Case 1: DB is empty - restore from dump
-  if (dbCount === 0) {
+  // An empty database can reflect HTTP 410 cleanup within the current build.
+  if (dbCount === 0 && storedBuildId !== meta.buildId) {
     if (debug)
       logger.info('[stale-check] DB empty, restoring from dump...')
 

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   initSchema: vi.fn(),
@@ -102,6 +102,8 @@ describe('errored page retry (raw layer)', () => {
     mocks.useRawDb.mockReset().mockResolvedValue(sqlite.adapter)
   })
 
+  afterEach(() => vi.restoreAllMocks())
+
   it('marks an errored upsert as not indexed', async () => {
     const { upsertPage } = await importQueries()
 
@@ -130,13 +132,18 @@ describe('errored page retry (raw layer)', () => {
     expect(await countPages(undefined, { where: { pending: true } })).toBe(1)
   })
 
-  it('retries an errored page after it reappears in a sitemap round', async () => {
+  it('retries an errored page after the refresh window expires', async () => {
     const { queryPages, seedRoutes, upsertPage } = await importQueries()
+    const start = Date.now()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(start)
 
     await seedRoutes(undefined, ['/flaky'])
     await upsertPage(undefined, errorPage('/flaky'))
     expect(await queryPages(undefined, { where: { pending: true } })).toEqual([])
 
+    await seedRoutes(undefined, ['/flaky'])
+    expect(await queryPages(undefined, { where: { pending: true } })).toEqual([])
+    now.mockReturnValue(start + 25 * 60 * 60 * 1000)
     await seedRoutes(undefined, ['/flaky'])
 
     const pending = await queryPages(undefined, { where: { pending: true } }) as { route: string }[]

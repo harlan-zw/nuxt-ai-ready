@@ -1213,7 +1213,6 @@ export async function seedRoutes(
           indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
         WHERE ai_ready_pages.last_seen_at IS NULL
           OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
-          OR ai_ready_pages.is_error = 1
           OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
       `,
       params,
