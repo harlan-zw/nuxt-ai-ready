@@ -18,7 +18,12 @@ permissions:
 
 jobs:
   ci:
+    strategy:
+      matrix:
+        node-version: [22.22.3, 24.18.0]
     uses: harlan-zw/nuxt-seo/.github/workflows/reusable-ci.yml@main
+    with:
+      node-version: ${{ matrix.node-version }}
 
   test-postgres:
     runs-on: ubuntu-24.04-arm

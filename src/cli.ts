@@ -5,7 +5,7 @@ import { defineCommand, runMain } from 'citty'
 import { consola } from 'consola'
 import { colors } from 'consola/utils'
 import { join, resolve } from 'pathe'
-import { readPackageJSON } from 'pkg-types'
+import { readPackageMetadata } from './package-metadata'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const secretPath = join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret')
@@ -60,7 +60,7 @@ const main = defineCommand({
   meta: {
     name: 'nuxt-ai-ready',
     description: 'Nuxt AI Ready CLI',
-    version: await readPackageJSON(import.meta.url).then(p => p.version || '0.0.0'),
+    version: await readPackageMetadata(import.meta.url).then(p => p.version || '0.0.0'),
   },
   subCommands: {
     status: () => defineCommand({

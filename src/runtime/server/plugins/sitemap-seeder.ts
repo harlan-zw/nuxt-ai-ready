@@ -1,5 +1,5 @@
-import type { H3Event } from '#nuxtseo/h3'
 import type { useNitroApp } from '#nuxtseo/nitro'
+import type { AiReadyDatabaseEvent } from '../db/context'
 import type { SitemapRouteSource } from '../utils/sitemap-routes'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { trackDrizzleWork } from '../db/drizzle/client'
@@ -16,13 +16,13 @@ interface ResolvedSitemapUrl extends SitemapRouteSource {
 interface SitemapResolvedCtx {
   urls: ResolvedSitemapUrl[]
   sitemapName: string
-  event: H3Event
+  event: AiReadyDatabaseEvent
 }
 
 interface SitemapOutputCtx {
   sitemap: string
   sitemapName: string
-  event: H3Event
+  event: AiReadyDatabaseEvent
 }
 
 // Per-request diagnostics, stashed on event.context (the only attach point
@@ -31,11 +31,11 @@ interface SitemapOutputCtx {
 // XML ourselves via the output hook.
 const DIAGNOSTICS_KEY = '_aiReadySitemapDiagnostics'
 
-function isDebug(event: H3Event): boolean {
-  return !!(useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { debug?: boolean } })['nuxt-ai-ready']?.debug
+function isDebug(_event: AiReadyDatabaseEvent): boolean {
+  return !!(useRuntimeConfig() as { 'nuxt-ai-ready'?: { debug?: boolean } })['nuxt-ai-ready']?.debug
 }
 
-function recordDiagnostic(event: H3Event, message: string): void {
+function recordDiagnostic(event: AiReadyDatabaseEvent, message: string): void {
   const ctx = event.context as Record<string, unknown>
   const list = (ctx[DIAGNOSTICS_KEY] ??= []) as string[]
   list.push(message)
@@ -178,7 +178,7 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     // worker alive until they finish without blocking the sitemap response.
     const seed = async () => {
       const seedStart = Date.now()
-      const pruneTtl = (useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { runtimeSync?: { pruneTtl?: number } } })['nuxt-ai-ready']?.runtimeSync?.pruneTtl ?? 0
+      const pruneTtl = (useRuntimeConfig() as { 'nuxt-ai-ready'?: { runtimeSync?: { pruneTtl?: number } } })['nuxt-ai-ready']?.runtimeSync?.pruneTtl ?? 0
       const seeded = await seedRoutes(event, routes, { refreshWindowMs: resolveSeedRefreshWindowMs(pruneTtl) }).catch((e) => {
         logger.warn(`[sitemap-seeder] Failed to seed routes: ${e.message}`)
         return 0

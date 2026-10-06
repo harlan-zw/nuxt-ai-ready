@@ -1,6 +1,5 @@
-import type { H3Event } from '#nuxtseo/h3'
 import type { RuntimeI18nConfig } from '../utils/i18n'
-import { getRequestHost } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from './context'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { createUniversalContext } from '../utils/context'
 import { resolveI18nDomain, resolveLocaleFromRoute } from '../utils/i18n'
@@ -30,10 +29,10 @@ function hostFromUrl(url: string | undefined): string | undefined {
  *    page on multi-domain i18n sites
  * 3. the site config host
  */
-export function deriveLocale(event: H3Event | undefined, route: string, explicit?: string, pageUrl?: string): string {
+export function deriveLocale(event: AiReadyDatabaseEvent | undefined, route: string, explicit?: string, pageUrl?: string): string {
   if (explicit !== undefined)
     return explicit
-  const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
+  const cfg = useRuntimeConfig() as { 'nuxt-ai-ready'?: { i18n?: RuntimeI18nConfig | null } }
   const i18n = cfg['nuxt-ai-ready']?.i18n
   if (!i18n)
     return ''
@@ -45,7 +44,11 @@ export function deriveLocale(event: H3Event | undefined, route: string, explicit
   let requestHost: string | undefined
   if (event) {
     try {
-      requestHost = getRequestHost(event, { xForwardedHost: true })
+      const headers = event.req?.headers || event.node?.req.headers
+      const host = headers instanceof Headers
+        ? headers.get('x-forwarded-host') || headers.get('host')
+        : headers?.['x-forwarded-host'] || headers?.host
+      requestHost = (Array.isArray(host) ? host[0] : host)?.split(',')[0]?.trim()
     }
     catch {
       // An event without a readable request carries no host signal; fall

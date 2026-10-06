@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createPrerenderDatabase } from '../../src/prerender'
 
-vi.mock('better-sqlite3', () => {
-  throw new Error('better-sqlite3 must not load when Node has native SQLite')
-})
+vi.mock('nuxtseo-shared/prerender', () => ({
+  createPrerenderFetch: () => { throw new Error('The database test does not initialize a prerender app.') },
+}))
 
 describe('prerender database', () => {
   it('uses native node:sqlite when Node supports it', async () => {

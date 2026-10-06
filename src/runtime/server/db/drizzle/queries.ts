@@ -1,5 +1,5 @@
-import type { H3Event } from '#nuxtseo/h3'
 import type { SitemapCrawlState } from '../../utils/sitemap-crawl-state'
+import type { AiReadyDatabaseEvent } from '../context'
 import type { FtsTokenizer } from '../schema-sql'
 import type { SeedRoutesOptions } from '../seed'
 import type { DrizzleDatabase } from './client'
@@ -13,8 +13,8 @@ import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert } from '../shared'
 import { useDrizzle } from './client'
 import { getRawExecutor, useRawDb } from './raw'
 
-function resolveFtsTokenizer(event?: H3Event): FtsTokenizer {
-  const cfg = useRuntimeConfig(event) as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
+function resolveFtsTokenizer(_event?: AiReadyDatabaseEvent): FtsTokenizer {
+  const cfg = useRuntimeConfig() as { 'nuxt-ai-ready'?: { ftsTokenizer?: string } }
   return validateFtsTokenizer(cfg['nuxt-ai-ready']?.ftsTokenizer)
 }
 
@@ -108,7 +108,7 @@ function rowToMeta(row: any): PageMetaOutput {
 /**
  * Insert or update a page
  */
-export async function upsertPage(event: H3Event | undefined, page: PageInput): Promise<void> {
+export async function upsertPage(event: AiReadyDatabaseEvent | undefined, page: PageInput): Promise<void> {
   const client = await useDrizzle(event)
   const now = Date.now()
 
@@ -156,7 +156,7 @@ export async function upsertPage(event: H3Event | undefined, page: PageInput): P
  * Get all pages
  */
 export async function getAllPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   options?: { includeErrors?: boolean, excludeMarkdown?: boolean },
 ): Promise<PageOutput[] | PageMetaOutput[]> {
   const client = await useDrizzle(event)
@@ -193,7 +193,7 @@ export async function getAllPages(
  * Get a single page by route
  */
 export async function getPageByRoute(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   route: string,
 ): Promise<PageOutput | undefined> {
   const client = await useDrizzle(event)
@@ -215,7 +215,7 @@ export async function getPageByRoute(
  * Returns a Map for O(1) lookup when enriching sitemaps
  */
 export async function getPageLastmods(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
 ): Promise<Map<string, string>> {
   const client = await useDrizzle(event)
 
@@ -243,7 +243,7 @@ export async function getPageLastmods(
  * Search pages (uses LIKE for both dialects, FTS5 fallback for SQLite)
  */
 export async function searchPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   query: string,
   options?: { limit?: number },
 ): Promise<PageMetaOutput[]> {
@@ -304,7 +304,7 @@ export async function searchPages(
  * Count pages
  */
 export async function countPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   options?: { indexed?: boolean, errors?: boolean },
 ): Promise<number> {
   const client = await useDrizzle(event)
@@ -333,7 +333,7 @@ export async function countPages(
  * Get pending pages (not yet indexed)
  */
 export async function getPendingPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   limit: number = 10,
 ): Promise<{ route: string }[]> {
   const client = await useDrizzle(event)
@@ -352,7 +352,7 @@ export async function getPendingPages(
 /**
  * Mark page as indexed
  */
-export async function markPageIndexed(event: H3Event | undefined, route: string): Promise<void> {
+export async function markPageIndexed(event: AiReadyDatabaseEvent | undefined, route: string): Promise<void> {
   const client = await useDrizzle(event)
 
   await (client.db as any)
@@ -364,7 +364,7 @@ export async function markPageIndexed(event: H3Event | undefined, route: string)
 /**
  * Mark multiple routes as pending (needing re-index)
  */
-export async function markRoutesPending(event: H3Event | undefined, routes: string[]): Promise<void> {
+export async function markRoutesPending(event: AiReadyDatabaseEvent | undefined, routes: string[]): Promise<void> {
   if (routes.length === 0)
     return
 
@@ -387,7 +387,7 @@ export async function markRoutesPending(event: H3Event | undefined, routes: stri
 /**
  * Get content hashes for all pages
  */
-export async function getContentHashes(event?: H3Event): Promise<Map<string, string | null>> {
+export async function getContentHashes(event?: AiReadyDatabaseEvent): Promise<Map<string, string | null>> {
   const client = await useDrizzle(event)
 
   const rows = await (client.db as any)
@@ -404,7 +404,7 @@ export async function getContentHashes(event?: H3Event): Promise<Map<string, str
 /**
  * Get a value from the info table
  */
-export async function getInfoValue(event: H3Event | undefined, key: string): Promise<string | null> {
+export async function getInfoValue(event: AiReadyDatabaseEvent | undefined, key: string): Promise<string | null> {
   const client = await useDrizzle(event)
 
   const row = await (client.db as any)
@@ -419,7 +419,7 @@ export async function getInfoValue(event: H3Event | undefined, key: string): Pro
 /**
  * Set a value in the info table
  */
-export async function setInfoValue(event: H3Event | undefined, key: string, value: string): Promise<void> {
+export async function setInfoValue(event: AiReadyDatabaseEvent | undefined, key: string, value: string): Promise<void> {
   const client = await useDrizzle(event)
 
   await (client.db as any)
@@ -434,7 +434,7 @@ export async function setInfoValue(event: H3Event | undefined, key: string, valu
 /**
  * Delete a value from the info table
  */
-export async function deleteInfoValue(event: H3Event | undefined, key: string): Promise<void> {
+export async function deleteInfoValue(event: AiReadyDatabaseEvent | undefined, key: string): Promise<void> {
   const client = await useDrizzle(event)
 
   await (client.db as any)
@@ -455,7 +455,7 @@ const POSTGRES_SCHEMA_VERSION = 'v2.3.0-drizzle-postgres-bigint'
  * SQLite FTS5 tokenizer differs from the one baked into the existing virtual
  * table (Postgres has no FTS5; tokenizer comparison is SQLite-only).
  */
-export async function initSchema(event?: H3Event): Promise<void> {
+export async function initSchema(event?: AiReadyDatabaseEvent): Promise<void> {
   const client = await useDrizzle(event)
   const tokenizer = resolveFtsTokenizer(event)
   const schemaVersion = client.dialect === 'postgres' ? POSTGRES_SCHEMA_VERSION : SQLITE_SCHEMA_VERSION
@@ -784,7 +784,7 @@ function rowToCronRun(row: any): CronRunOutput {
 /**
  * Start a cron run
  */
-export async function startCronRun(event: H3Event | undefined): Promise<number | null> {
+export async function startCronRun(event: AiReadyDatabaseEvent | undefined): Promise<number | null> {
   const client = await useDrizzle(event)
   const now = Date.now()
 
@@ -800,7 +800,7 @@ export async function startCronRun(event: H3Event | undefined): Promise<number |
  * Complete a cron run
  */
 export async function completeCronRun(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   runId: number,
   result: {
     pagesIndexed: number
@@ -840,7 +840,7 @@ export async function completeCronRun(
  * Get recent cron runs
  */
 export async function getRecentCronRuns(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   limit = 10,
 ): Promise<CronRunOutput[]> {
   const client = await useDrizzle(event)
@@ -892,7 +892,7 @@ function rowToSitemap(row: any): SitemapEntry {
  * Sync sitemaps from config
  */
 export async function syncSitemaps(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   sitemapList: Array<{ name: string, route: string }>,
 ): Promise<{ added: number, removed: number }> {
   const client = await useDrizzle(event)
@@ -948,7 +948,7 @@ export async function syncSitemaps(
  * Get next sitemap to crawl
  */
 export async function getNextSitemapToCrawl(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   minIntervalMinutes = 5,
 ): Promise<SitemapEntry | null> {
   const client = await useDrizzle(event)
@@ -1011,7 +1011,7 @@ export async function getNextSitemapToCrawl(
  * Mark sitemap as crawled
  */
 export async function markSitemapCrawled(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   urlCount: number,
 ): Promise<void> {
@@ -1031,7 +1031,7 @@ export async function markSitemapCrawled(
 
 /** Record a deferred sitemap hook seed only when no crawl is in progress. */
 export async function markSitemapSeeded(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   urlCount: number,
   expectedLastCrawledAt: number | null,
@@ -1058,7 +1058,7 @@ export async function markSitemapSeeded(
 
 /** Persist a resumable sitemap crawl without incrementing its error budget. */
 export async function markSitemapCrawlPartial(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   state: SitemapCrawlState,
 ): Promise<void> {
@@ -1080,7 +1080,7 @@ export async function markSitemapCrawlPartial(
  * Mark sitemap error
  */
 export async function markSitemapError(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   error: string,
 ): Promise<void> {
@@ -1101,7 +1101,7 @@ export async function markSitemapError(
  * Get all sitemaps status
  */
 export async function getSitemapStatus(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
 ): Promise<SitemapOutput[]> {
   const client = await useDrizzle(event)
 
@@ -1119,7 +1119,7 @@ export async function getSitemapStatus(
 /**
  * Reset all sitemap errors (called on build_id change)
  */
-export async function resetSitemapErrors(event: H3Event | undefined): Promise<number> {
+export async function resetSitemapErrors(event: AiReadyDatabaseEvent | undefined): Promise<number> {
   const client = await useDrizzle(event)
 
   // Count sitemaps with errors or abandoned continuation state.
@@ -1160,7 +1160,7 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
  * D1 row writes a month. Keep the two layers in sync.
  */
 export async function seedRoutes(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   routes: Array<string | { route: string, locale?: string, url?: string }>,
   options: SeedRoutesOptions = {},
 ): Promise<number> {

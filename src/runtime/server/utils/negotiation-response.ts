@@ -1,3 +1,4 @@
+import type { AppRouteRules } from 'nuxt/server'
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { NegotiationRouteRule } from './content-negotiation'
@@ -5,10 +6,10 @@ import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
-import { appendHeader, createError, getHeader, getRequestHost, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { appendHeader, createError, getHeader, getRequestHost, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
-import initSiteConfig from '#site-config/server/middleware/init'
+import { initRequestSiteConfig } from '#site-config/server/init'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { setStatusAwareLinkHeader } from '../plugins/link-header'
@@ -106,7 +107,7 @@ export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sour
  */
 export async function ensureSiteConfig(event: H3Event): Promise<void> {
   if (!(event.context as { _initedSiteConfig?: boolean })._initedSiteConfig)
-    await initSiteConfig(event)
+    await initRequestSiteConfig(event, getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin, createNitroRouteRuleMatcher<AppRouteRules>(useRuntimeConfig(event))(event.path))
 }
 
 export function buildNegotiationContext(event: H3Event, path: string): NegotiationContext {

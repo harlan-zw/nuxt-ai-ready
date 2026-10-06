@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, it } from 'vitest'
 
-const cliPath = resolve(import.meta.dirname, '../../src/cli.ts')
+const cliPath = resolve(import.meta.dirname, '../../dist/cli.mjs')
 
 const temporaryDirectories: string[] = []
 const servers: Server[] = []

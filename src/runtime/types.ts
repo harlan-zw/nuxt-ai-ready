@@ -316,7 +316,7 @@ export interface ModuleOptions {
     /**
      * Database type - auto-detected if not specified
      * - 'none': No database. Build time generation only.
-     * - 'sqlite': Local SQLite via node:sqlite or better-sqlite3 (default for Node.js)
+     * - 'sqlite': Local SQLite via node:sqlite (default for Node.js)
      * - 'd1': Cloudflare D1 (auto-detected on Cloudflare)
      * - 'bun': Bun SQLite via bun:sqlite (auto-detected on Bun) [experimental]
      * - 'libsql': Turso/LibSQL [experimental]

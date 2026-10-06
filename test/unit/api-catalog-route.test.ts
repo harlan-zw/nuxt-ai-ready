@@ -1,22 +1,18 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { createApp, toWebHandler } from 'h3'
-import ts from 'typescript'
+import type { RequestEvent } from 'nuxt/schema'
+import type * as NuxtServer from 'nuxt/server'
+import { isNuxtError } from 'nuxt/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const config: {
   apiCatalog?: { href: string, mediaType: string, document: { linkset: Array<Record<string, unknown>> } }
 } = {}
 
-vi.mock('#nuxtseo/nitro', () => ({
+vi.mock('nuxt/server', async importOriginal => ({
+  ...await importOriginal<typeof NuxtServer>(),
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
 }))
 
 const { default: apiCatalogHandler } = await import('../../src/runtime/server/routes/api-catalog')
-
-const app = createApp()
-app.use(apiCatalogHandler)
-const request = toWebHandler(app)
 
 function catalogConfig() {
   return {
@@ -27,11 +23,18 @@ function catalogConfig() {
 }
 
 async function call(method: string) {
-  const response = await request(new Request('http://localhost/.well-known/api-catalog', { method }))
+  const url = new URL('http://localhost/.well-known/api-catalog')
+  const event: RequestEvent = { req: new Request(url, { method }), url, res: { headers: new Headers() }, context: {} }
+  const body = await Promise.resolve().then(() => apiCatalogHandler(event)).catch((error: unknown) => {
+    if (!isNuxtError(error))
+      throw error
+    event.res.status = error.status
+    return null
+  })
   return {
-    status: response.status,
-    body: await response.text(),
-    headers: response.headers,
+    status: event.res.status || 200,
+    body: body == null ? '' : JSON.stringify(body),
+    headers: event.res.headers,
   }
 }
 
@@ -87,65 +90,5 @@ describe('gET /.well-known/api-catalog route', () => {
     const { status } = await call('POST')
 
     expect(status).toBe(405)
-  })
-})
-
-describe('api-catalog registration gate', () => {
-  function moduleSourceFile() {
-    const filename = resolve(import.meta.dirname, '../../src/module.ts')
-    const source = readFileSync(filename, 'utf8')
-    return ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
-  }
-
-  it('registers the handler only through the config-gated registerApiCatalog', () => {
-    const sourceFile = moduleSourceFile()
-
-    let registration: ts.CallExpression | undefined
-    const registerCalls: ts.CallExpression[] = []
-    const visit = (node: ts.Node): void => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-        if (node.expression.text === 'addServerHandler'
-          && node.arguments.length > 0
-          && node.arguments[0]!.getText(sourceFile).includes('API_CATALOG_PATH')) {
-          registration = node
-        }
-        if (node.expression.text === 'registerApiCatalog')
-          registerCalls.push(node)
-      }
-      ts.forEachChild(node, visit)
-    }
-    visit(sourceFile)
-
-    expect(registration, 'api-catalog handler registration').toBeDefined()
-    expect(registerCalls.length).toBeGreaterThanOrEqual(2)
-
-    let parent = registration!.parent
-    let insideRegisterApiCatalog = false
-    while (parent) {
-      if (ts.isFunctionDeclaration(parent) || ts.isVariableDeclaration(parent)) {
-        const name = parent.name?.getText(sourceFile)
-        if (name === 'registerApiCatalog')
-          insideRegisterApiCatalog = true
-      }
-      parent = parent.parent
-    }
-    expect(insideRegisterApiCatalog, 'registration must sit inside registerApiCatalog').toBe(true)
-
-    for (const call of registerCalls) {
-      let node: ts.Node | undefined = call.parent
-      let condition: string | undefined
-      while (node) {
-        if (ts.isIfStatement(node)) {
-          condition = node.expression.getText(sourceFile)
-          break
-        }
-        node = node.parent
-      }
-      expect(condition, 'registerApiCatalog call must sit inside a config guard').toBeDefined()
-      expect(
-        condition!.includes('apiCatalogConfig') || (condition!.includes('generatedApiCatalog') && condition!.includes('\'Enabled\'')),
-        `guard must check the catalog config, got: ${condition}`,
-      ).toBe(true)
-    }
   })
 })

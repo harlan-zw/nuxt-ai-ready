@@ -10,7 +10,7 @@ vi.mock('#nuxtseo/nitro', () => ({
 vi.mock('#site-config/server/composables/utils', () => ({
   withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
 }))
-vi.mock('#site-config/server/middleware/init', () => ({ default: vi.fn() }))
+vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
 
 describe('negotiation locale context', () => {
   it.each([

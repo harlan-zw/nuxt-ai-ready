@@ -6,9 +6,10 @@ import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
-import { hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
+import { getNitroVersion, hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
 import { colorize } from 'consola/utils'
 import { resolveLocaleFromRoute } from 'nuxtseo-shared/i18n-runtime'
+import { createPrerenderFetch } from 'nuxtseo-shared/prerender'
 import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
@@ -19,9 +20,9 @@ import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 import { resolvePageUpdatedAt } from './runtime/server/utils/page-updated-at'
 import { appendSitemapSection, SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
-import { supportsNativeNodeSqlite } from './utils/database'
 
 const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
+type PrerenderFetch = ReturnType<typeof createPrerenderFetch>['fetch']
 
 const RE_HTML_MD_EXT = /\.(html|md)$/
 const RE_INDEX_SUFFIX = /\/index$/
@@ -97,6 +98,7 @@ async function findOutputMarkdownPaths(
 export type PrerenderI18nConfig = RuntimeI18nConfig
 
 export interface CrawlerState {
+  fetch?: PrerenderFetch
   prerenderedRoutes: Set<string>
   errorRoutes: Set<string>
   totalProcessingTime: number
@@ -109,6 +111,12 @@ export interface CrawlerState {
   concurrency: number
   ftsTokenizer?: string
   i18n?: PrerenderI18nConfig | null
+}
+
+function crawlerFetch(state: CrawlerState): PrerenderFetch {
+  if (!state.fetch)
+    throw new Error('The Nitro prerender app is not initialized.')
+  return state.fetch
 }
 
 function createCrawlerState(
@@ -231,16 +239,8 @@ function createSqliteAdapter(sqlite: SqliteDriver): DatabaseAdapter {
 }
 
 export async function createPrerenderDatabase(dbPath: string): Promise<DatabaseAdapter> {
-  if (supportsNativeNodeSqlite(process.versions.node || '')) {
-    const { DatabaseSync } = await import('node:sqlite')
-    const sqlite = new DatabaseSync(dbPath)
-    for (const pragma of PRERENDER_PRAGMAS)
-      sqlite.exec(pragma)
-    return createSqliteAdapter(sqlite as unknown as SqliteDriver)
-  }
-
-  const { default: Database } = await import('better-sqlite3')
-  const sqlite = new Database(dbPath)
+  const { DatabaseSync } = await import('node:sqlite')
+  const sqlite = new DatabaseSync(dbPath)
   for (const pragma of PRERENDER_PRAGMAS)
     sqlite.exec(pragma)
   return createSqliteAdapter(sqlite as unknown as SqliteDriver)
@@ -331,7 +331,7 @@ async function processSitemapEntry(
   // fails to render at build time fails the same way on the second attempt. The
   // caller skips the route either way, so the retry only pays for a second full
   // SSR render of every broken page.
-  const res = await globalThis.$fetch(mdUrl, {
+  const res = await crawlerFetch(state)(mdUrl, {
     headers: { 'x-nitro-prerender': mdRoute },
     retry: 0,
     signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
@@ -445,12 +445,12 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
   }
 }
 
-async function prerenderRoute(nitro: Nitro, route: string) {
+async function prerenderRoute(nitro: Nitro, route: string, fetch: PrerenderFetch) {
   const start = Date.now()
   const encodedRoute = encodeURI(route)
   const fetchUrl = withBase(encodedRoute, nitro.options.baseURL)
 
-  const res = await globalThis.$fetch.raw(fetchUrl, {
+  const res = await fetch.raw(fetchUrl, {
     headers: { 'x-nitro-prerender': encodedRoute },
     retry: nitro.options.prerender.retry,
     retryDelay: nitro.options.prerender.retryDelay,
@@ -512,6 +512,14 @@ export function setupPrerenderHandler(
       extras.ftsTokenizer,
       extras.i18n,
     )
+    let prerenderClient: ReturnType<typeof createPrerenderFetch> | undefined
+    nitro.hooks.hook('prerender:init', (renderer) => {
+      const major = getNitroVersion(nuxt)
+      if (major !== 2 && major !== 3)
+        throw new Error(`Unsupported Nitro prerender builder: ${major}`)
+      prerenderClient = createPrerenderFetch(renderer, major)
+      state.fetch = prerenderClient.fetch
+    })
     let initPromise: Promise<void> | null = null
     const artifactRoutes = new Set(extras.artifactRoutes ?? [])
 
@@ -650,7 +658,7 @@ export function setupPrerenderHandler(
       }
 
       // Only prerender llms.txt - llms-full.txt is already streamed
-      const llmsStats = await prerenderRoute(nitro, '/llms.txt')
+      const llmsStats = await prerenderRoute(nitro, '/llms.txt', crawlerFetch(state))
       const llmsFullStats = await stat(state.llmsFullTxtPath!)
       // The streamed file must still be registered as a prerendered route:
       // otherwise presets keep the runtime handler's route, and on Vercel that
@@ -658,7 +666,7 @@ export function setupPrerenderHandler(
       nitro._prerenderedRoutes!.push({ route: '/llms-full.txt', fileName: '/llms-full.txt' })
 
       if (options.sitemapMd !== false) {
-        const sitemapMdStats = await prerenderRoute(nitro, SITEMAP_MD_ROUTE)
+        const sitemapMdStats = await prerenderRoute(nitro, SITEMAP_MD_ROUTE, crawlerFetch(state))
         logger.debug(`Wrote sitemap.md (${(sitemapMdStats.size / 1024).toFixed(1)}kb)`)
       }
 
@@ -676,7 +684,7 @@ export function setupPrerenderHandler(
 
     if (useSitemapHook) {
       // sitemap:prerender:done fires after sitemap.xml is written
-      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ content: string }> }) => {
+      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ content: string }> }) => (async () => {
         if (!state.initialized)
           return
 
@@ -687,14 +695,14 @@ export function setupPrerenderHandler(
         state.prerenderedRoutes.clear()
         if (state.db)
           await state.db.close?.()
-      })
+      })().finally(() => prerenderClient?.close()))
     }
     else if (usePrerenderHook) {
-      nitro.hooks.hook('prerender:done', async () => {
+      nitro.hooks.hook('prerender:done', async () => (async () => {
         if (!state.initialized)
           return
 
-        const sitemapContent = await globalThis.$fetch('/sitemap.xml', {
+        const sitemapContent = await crawlerFetch(state)('/sitemap.xml', {
           headers: { 'x-nitro-prerender': '/sitemap.xml' },
           signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
         }).catch(() => {
@@ -709,7 +717,7 @@ export function setupPrerenderHandler(
         state.prerenderedRoutes.clear()
         if (state.db)
           await state.db.close?.()
-      })
+      })().finally(() => prerenderClient?.close()))
     }
   })
 }

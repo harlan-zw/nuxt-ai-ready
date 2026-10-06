@@ -1,12 +1,12 @@
-import type { H3Event } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from '../../context'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 
-export async function createClient(event?: H3Event) {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
+export async function createClient(_event?: AiReadyDatabaseEvent) {
+  const config = useRuntimeConfig()['nuxt-ai-ready'] as {
     database: { url?: string }
   }
 
