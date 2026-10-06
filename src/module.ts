@@ -116,16 +116,16 @@ export default defineNuxtModule<ModuleOptions>({
   },
   moduleDependencies: {
     '@nuxtjs/robots': {
-      version: '^7.0.0',
+      version: '>=7.0.0',
     },
     '@nuxtjs/sitemap': {
-      version: '^9.0.0',
+      version: '>=9.0.0',
     },
     'nuxt-site-config': {
-      version: '^5.0.0',
+      version: '>=5.0.0',
     },
     'nuxtseo-shared': {
-      version: '^6.0.0',
+      version: '>=6.0.0',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.18.0',

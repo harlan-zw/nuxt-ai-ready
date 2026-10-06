@@ -64,15 +64,14 @@
     "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",
-    "test": "vitest run && pnpm test:nuxt-lanes",
-    "test:run": "pnpm run prepare:fixtures && vitest run && pnpm test:nuxt-lanes",
+    "test": "vitest run && pnpm test:nuxt5",
+    "test:run": "pnpm run prepare:fixtures && vitest run && pnpm test:nuxt5",
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
     "test:dist": "node scripts/check-dist-imports.mjs",
     "typecheck": "nuxt typecheck && tsc -p test/types/tsconfig.json",
     "test:attw": "attw --pack",
-    "test:nuxt5": "node scripts/test-nuxt-lanes.ts nuxt5",
-    "test:nuxt-lanes": "node scripts/test-nuxt-lanes.ts"
+    "test:nuxt5": "pnpm build && pnpm --dir test/fixtures/nuxt5 install --frozen-lockfile && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
     "@libsql/client": "^0.18.0",

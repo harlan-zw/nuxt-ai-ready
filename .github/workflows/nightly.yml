@@ -2,7 +2,11 @@ name: Nightly
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
   push:
+    paths-ignore:
+      - '**/*.md'
     branches:
       - main
     tags:
@@ -13,25 +17,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/setup@v2
-        with:
-          runtime: node@lts
-          cache: true
-          install: false
-      - name: Prepare pinned migration sources
-        id: migration
-        uses: harlan-zw/nuxt-seo/.github/actions/migration-ci@226c091a0744b7286ef721ac035eed53856bfaa5
-      - run: pnpm dev:prepare
-        working-directory: ${{ steps.migration.outputs.workspace }}
-      - name: Pack portable beta preview
-        run: node scripts/pack-preview.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
-        working-directory: ${{ steps.migration.outputs.workspace }}
-      - name: Check packed manifest
-        run: node scripts/check-pack-manifest.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
-        working-directory: ${{ steps.migration.outputs.workspace }}
-      - name: Publish immutable preview
-        run: pnpm dlx pkg-pr-new publish "$RUNNER_TEMP/nuxt-ai-ready.tgz"
-        working-directory: ${{ steps.migration.outputs.workspace }}
+    uses: harlan-zw/nuxt-seo/.github/workflows/reusable-nightly.yml@09760efb0ffeac9f477673725c1c2f1fc8b1b049
+    with:
+      publish-packages: --pnpm
+      node-version: 22.22.3

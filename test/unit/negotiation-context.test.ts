@@ -17,7 +17,7 @@ describe('negotiation locale context', () => {
     [{ host: 'fr.example.com' }, 'fr.example.com'],
     [{ 'host': 'internal.proxy', 'x-forwarded-host': 'fr.example.com' }, 'fr.example.com'],
   ])('uses the public request host: %j', (headers, expectedHost) => {
-    const event = { path: '/a-propos', node: { req: { headers } } } as unknown as H3Event
+    const event = { req: new Request('https://example.com/a-propos', { headers }), path: '/a-propos' } as unknown as H3Event
 
     const context = buildNegotiationContext(event, '/a-propos')
 
