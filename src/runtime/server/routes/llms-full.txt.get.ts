@@ -22,7 +22,7 @@ export default eventHandler(async (event) => {
   }
   const siteConfig = getSiteConfig(event)
   const baseURL = runtimeConfig.app.baseURL
-  const canonicalSiteUrl = siteConfig.url ? withSiteUrl(event, toDeployedRoute('/', baseURL)) : undefined
+  const canonicalSiteUrl = siteConfig.url ? withSiteUrl(event, toDeployedRoute('/', baseURL), { withBase: true }) : undefined
 
   // Build header
   const header = buildLlmsFullTxtHeader(

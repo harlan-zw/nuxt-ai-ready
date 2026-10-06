@@ -67,4 +67,41 @@ describe('drizzle client lifecycle', () => {
 
     expect(mocks.closeDriver).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps inherited request resources open until their owner finishes', async () => {
+    mocks.createClient.mockResolvedValue({ dialect: 'postgres', db: {} })
+    const { closeDrizzle, finishDrizzleResponse, useDrizzle } = await import('../../src/runtime/server/db/drizzle/client')
+    const request = { headers: {} }
+    const portable = { context: {}, node: { req: request } }
+    const client = await useDrizzle(portable)
+    const nested = { context: { ...portable.context }, node: { req: { headers: {} } } }
+
+    expect(await useDrizzle(nested)).toBe(client)
+    await finishDrizzleResponse(nested)
+    await closeDrizzle(nested)
+    expect(mocks.closeDriver).not.toHaveBeenCalled()
+
+    // Nitro 2 provides another event view for the same underlying request.
+    await finishDrizzleResponse({ context: portable.context, node: { req: request } })
+    expect(mocks.closeDriver).toHaveBeenCalledExactlyOnceWith(client.db)
+  })
+
+  it('closes the owner after a borrowed child finishes the final deferred task', async () => {
+    mocks.createClient.mockResolvedValue({ dialect: 'postgres', db: {} })
+    const { finishDrizzleResponse, trackDrizzleWork, useDrizzle } = await import('../../src/runtime/server/db/drizzle/client')
+    const owner = { context: {}, node: { req: { headers: {} } } }
+    const client = await useDrizzle(owner)
+    const child = { context: { ...owner.context }, node: { req: { headers: {} } } }
+    let release: (() => void) | undefined
+    const deferred = trackDrizzleWork(child, new Promise<void>((resolve) => {
+      release = resolve
+    }))
+
+    await finishDrizzleResponse(child)
+    await finishDrizzleResponse(owner)
+    expect(mocks.closeDriver).not.toHaveBeenCalled()
+    release?.()
+    await deferred
+    expect(mocks.closeDriver).toHaveBeenCalledExactlyOnceWith(client.db)
+  })
 })

@@ -6,7 +6,7 @@ export default defineNuxtConfig({
     preset: 'cloudflare-module',
     prerender: {
       crawlLinks: true,
-      routes: ['/', '/about'],
+      routes: ['/', '/about', '/sitemap.xml'],
       failOnError: false,
     },
     rollupConfig: {

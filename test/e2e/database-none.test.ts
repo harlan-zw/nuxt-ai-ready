@@ -37,7 +37,7 @@ describe('database disabled', async () => {
   })
 
   it('reports the database as disabled', async () => {
-    const debug = await $fetch('/__ai-ready__/debug.json') as { config: { database: { type: string } } }
+    const debug = await $fetch<{ config: { database: { type: string } } }>('/__ai-ready__/debug.json')
 
     expect(debug.config.database.type).toBe('none')
   })

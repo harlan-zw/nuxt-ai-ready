@@ -1,8 +1,7 @@
-import type { H3Event } from '#nuxtseo/h3'
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
+import type { AiReadyDatabaseEvent } from './context'
 import type { RawExecutor } from './drizzle/raw'
 import type { SeedRoutesOptions } from './seed'
-import { randomUUID } from 'uncrypto'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { checkAndHandleStale } from '../utils/checkStale'
@@ -16,11 +15,11 @@ export type { SeedRoutesOptions }
 export { resolveSeedRefreshWindowMs, SEED_REFRESH_WINDOW_MS } from './seed'
 
 /** Try to get the current H3Event from context or use provided event */
-function getEventFromContext(providedEvent?: H3Event): H3Event | undefined {
+function getEventFromContext(providedEvent?: AiReadyDatabaseEvent): AiReadyDatabaseEvent | undefined {
   if (providedEvent)
     return providedEvent
   try {
-    return useEvent() as H3Event
+    return useEvent() as AiReadyDatabaseEvent
   }
   catch {
     return undefined
@@ -45,7 +44,7 @@ type DumpSyncState
 
 let dumpSyncState: DumpSyncState = { _tag: 'Pending' }
 
-function syncBuildDump(event: H3Event | undefined): Promise<void> {
+function syncBuildDump(event: AiReadyDatabaseEvent | undefined): Promise<void> {
   if (dumpSyncState._tag === 'Synced')
     return Promise.resolve()
   if (dumpSyncState._tag === 'Syncing')
@@ -67,7 +66,7 @@ const RE_FTS_CHARS = /[*:^"()]/g
 const RE_WHITESPACE = /\s+/
 
 /** Get database, with dev mode notice and prerender handling */
-async function getDb(event?: H3Event): Promise<RawExecutor | null> {
+async function getDb(event?: AiReadyDatabaseEvent): Promise<RawExecutor | null> {
   if (import.meta.dev) {
     if (!devNoticeShown) {
       logger.info('Page data unavailable in dev. Run `nuxi generate` for full metadata.')
@@ -86,7 +85,7 @@ async function getDb(event?: H3Event): Promise<RawExecutor | null> {
 
   // `aiReady.database: false` ships no driver. Callers treat a null database
   // as "no page data", the same as dev, so llms.txt degrades to the sitemap.
-  const cfg = useRuntimeConfig(resolvedEvent) as { 'nuxt-ai-ready'?: { database?: { _tag?: 'Enabled' | 'Disabled' } } }
+  const cfg = useRuntimeConfig() as { 'nuxt-ai-ready'?: { database?: { _tag?: 'Enabled' | 'Disabled' } } }
   const database = cfg['nuxt-ai-ready']?.database?._tag
   if (database === 'Disabled')
     return null
@@ -326,7 +325,7 @@ function rowToData(row: PageRow): PageData {
  * Returns a Map for O(1) lookup when enriching sitemaps
  */
 export async function getPageLastmods(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
 ): Promise<Map<string, string>> {
   const db = await getDb(event)
   if (!db)
@@ -350,12 +349,12 @@ export async function getPageLastmods(
  * @param event - H3Event (optional, used for db context)
  * @param options - Query options
  */
-export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string, includeMarkdown: true }): Promise<PageData | undefined>
-export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
-export async function queryPages(event: H3Event | undefined, options: QueryPagesOptions & { includeMarkdown: true }): Promise<PageData[]>
-export async function queryPages(event?: H3Event, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
+export async function queryPages(event: AiReadyDatabaseEvent | undefined, options: QueryPagesOptions & { route: string, includeMarkdown: true }): Promise<PageData | undefined>
+export async function queryPages(event: AiReadyDatabaseEvent | undefined, options: QueryPagesOptions & { route: string }): Promise<PageEntry | PageData | undefined>
+export async function queryPages(event: AiReadyDatabaseEvent | undefined, options: QueryPagesOptions & { includeMarkdown: true }): Promise<PageData[]>
+export async function queryPages(event?: AiReadyDatabaseEvent, options?: QueryPagesOptions): Promise<PageEntry[] | PageData[]>
 export async function queryPages(
-  event?: H3Event,
+  event?: AiReadyDatabaseEvent,
   options: QueryPagesOptions = {},
 ): Promise<PageEntry | PageData | PageEntry[] | PageData[] | undefined> {
   const { route, includeMarkdown, where, limit, offset } = options
@@ -405,7 +404,7 @@ export interface StreamPagesOptions {
  * Yields pages one batch at a time to avoid loading all into memory
  */
 export async function* streamPages(
-  event?: H3Event,
+  event?: AiReadyDatabaseEvent,
   options: StreamPagesOptions = {},
 ): AsyncGenerator<PageData, void, unknown> {
   const db = await getDb(event)
@@ -449,7 +448,7 @@ export interface CountPagesOptions {
 /**
  * Count pages matching criteria
  */
-export async function countPages(event?: H3Event, options: CountPagesOptions = {}): Promise<number> {
+export async function countPages(event?: AiReadyDatabaseEvent, options: CountPagesOptions = {}): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
@@ -475,7 +474,7 @@ export interface SearchPagesOptions {
  * Note: FTS is only available at runtime, not during prerender
  */
 export async function searchPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   query: string,
   options: SearchPagesOptions = {},
 ): Promise<SearchResult[]> {
@@ -541,7 +540,7 @@ export interface UpsertPageInput {
 /**
  * Insert or update a page
  */
-export async function upsertPage(event: H3Event | undefined, page: UpsertPageInput): Promise<void> {
+export async function upsertPage(event: AiReadyDatabaseEvent | undefined, page: UpsertPageInput): Promise<void> {
   const db = await getDb(event)
   if (!db)
     return
@@ -587,7 +586,7 @@ export async function upsertPage(event: H3Event | undefined, page: UpsertPageInp
 /**
  * Check if a page is fresh (within TTL)
  */
-export async function isPageFresh(event: H3Event | undefined, route: string, ttlSeconds: number): Promise<boolean> {
+export async function isPageFresh(event: AiReadyDatabaseEvent | undefined, route: string, ttlSeconds: number): Promise<boolean> {
   if (ttlSeconds <= 0)
     return false
 
@@ -623,7 +622,7 @@ interface PageIndexStateRow {
  * extra round-trips per page).
  */
 export async function getPageIndexState(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   route: string,
 ): Promise<PageIndexState | undefined> {
   const db = await getDb(event)
@@ -648,7 +647,7 @@ export async function getPageIndexState(
  * Get existing content hash for a page (for change detection)
  * @internal
  */
-export async function getPageHash(event: H3Event | undefined, route: string): Promise<string | null> {
+export async function getPageHash(event: AiReadyDatabaseEvent | undefined, route: string): Promise<string | null> {
   const db = await getDb(event)
   if (!db)
     return null
@@ -672,7 +671,7 @@ function chunk<T>(items: T[], size: number): T[][] {
  * Seed routes from sitemap (insert with indexed=0 if not exists)
  */
 export async function seedRoutes(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   routes: Array<string | { route: string, locale?: string, url?: string }>,
   options: SeedRoutesOptions = {},
 ): Promise<number> {
@@ -738,7 +737,7 @@ export async function seedRoutes(
 }
 
 /** Remove a page after its route returns HTTP 410. */
-export async function prunePage(event: H3Event | undefined, route: string): Promise<void> {
+export async function prunePage(event: AiReadyDatabaseEvent | undefined, route: string): Promise<void> {
   const db = await getDb(event)
   if (!db)
     return
@@ -754,7 +753,7 @@ export async function prunePage(event: H3Event | undefined, route: string): Prom
  * pruned. Pass the window the seeder used; the default is the largest one.
  */
 export async function pruneStaleRoutes(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   staleThresholdSeconds: number,
   protectedSince?: number,
   refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
@@ -784,7 +783,7 @@ export async function pruneStaleRoutes(
  * Get stale routes that would be pruned (for preview)
  */
 export async function getStaleRoutes(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   staleThresholdSeconds: number,
   refreshWindowMs: number = SEED_REFRESH_WINDOW_MS,
 ): Promise<string[]> {
@@ -842,7 +841,7 @@ function rowToCronRun(row: CronRunRow): CronRun {
 /**
  * Start a cron run and return its ID
  */
-export async function startCronRun(event: H3Event | undefined): Promise<number | null> {
+export async function startCronRun(event: AiReadyDatabaseEvent | undefined): Promise<number | null> {
   const db = await getDb(event)
   if (!db)
     return null
@@ -859,7 +858,7 @@ export async function startCronRun(event: H3Event | undefined): Promise<number |
  * Complete a cron run with results
  */
 export async function completeCronRun(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   runId: number,
   result: {
     pagesIndexed: number
@@ -895,7 +894,7 @@ export async function completeCronRun(
  * Get recent cron runs
  */
 export async function getRecentCronRuns(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   limit = 10,
 ): Promise<CronRun[]> {
   const db = await getDb(event)
@@ -913,7 +912,7 @@ export async function getRecentCronRuns(
  * Clean up cron runs older than specified age
  */
 export async function pruneCronRunsByAge(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   maxAgeMs = 24 * 60 * 60 * 1000,
 ): Promise<number> {
   const db = await getDb(event)
@@ -952,7 +951,7 @@ export interface CronFastPathStatus {
  * Reduces 6+ sequential DB calls to 1
  */
 export async function getCronFastPathStatus(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   sitemapIntervalMinutes = 5,
 ): Promise<CronFastPathStatus | null> {
   const db = await getDb(event)
@@ -1019,8 +1018,8 @@ function cronLockField(db: RawExecutor, column: string, key: 't' | 'a' | 'e'): s
  * two isolates that start in the same millisecond. A legacy value that
  * predates tokens parses as no expiry, so it is treated as expired.
  */
-export async function tryAcquireCronLock(event: H3Event | undefined): Promise<CronLockAcquire> {
-  const token = randomUUID()
+export async function tryAcquireCronLock(event: AiReadyDatabaseEvent | undefined): Promise<CronLockAcquire> {
+  const token = crypto.randomUUID()
   const db = await getDb(event)
   if (!db)
     return { _tag: 'acquired', token }
@@ -1058,7 +1057,7 @@ export async function tryAcquireCronLock(event: H3Event | undefined): Promise<Cr
  * Release cron lock. Only deletes the row when its token is ours, so a run
  * that outlived the lock TTL cannot delete the new owner's lock.
  */
-export async function releaseCronLock(event: H3Event | undefined, token: string): Promise<void> {
+export async function releaseCronLock(event: AiReadyDatabaseEvent | undefined, token: string): Promise<void> {
   const db = await getDb(event)
   if (!db)
     return
@@ -1087,7 +1086,7 @@ function parseCronLockValue(value: string): CronLockRecord | null {
 /**
  * Get cron lock status for status endpoint
  */
-export async function getCronLockStatus(event: H3Event | undefined): Promise<CronLockStatus> {
+export async function getCronLockStatus(event: AiReadyDatabaseEvent | undefined): Promise<CronLockStatus> {
   const db = await getDb(event)
   if (!db)
     return { held: false, since: null, elapsedMs: null, stale: false }
@@ -1164,7 +1163,7 @@ function rowToSitemapEntry(row: SitemapRow): SitemapEntry {
  * Inserts new sitemaps, removes stale ones
  */
 export async function syncSitemaps(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   sitemaps: Array<{ name: string, route: string }>,
 ): Promise<{ added: number, removed: number }> {
   const db = await getDb(event)
@@ -1226,7 +1225,7 @@ export async function syncSitemaps(
  * Skips sitemaps crawled within minIntervalMinutes (default 5 min)
  */
 export async function getNextSitemapToCrawl(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   minIntervalMinutes = 5,
 ): Promise<SitemapEntry | null> {
   const db = await getDb(event)
@@ -1277,7 +1276,7 @@ export async function getNextSitemapToCrawl(
  * Returns null when the sitemap row doesn't exist yet.
  */
 export async function getSitemapLastCrawledAt(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
 ): Promise<number | null> {
   const db = await getDb(event)
@@ -1295,7 +1294,7 @@ export async function getSitemapLastCrawledAt(
  * Mark sitemap as successfully crawled
  */
 export async function markSitemapCrawled(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   urlCount: number,
 ): Promise<void> {
@@ -1319,7 +1318,7 @@ export async function markSitemapCrawled(
  * The hook may finish in waitUntil after cron has persisted a continuation.
  */
 export async function markSitemapSeeded(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   urlCount: number,
   expectedLastCrawledAt: number | null,
@@ -1348,7 +1347,7 @@ export async function markSitemapSeeded(
 
 /** Persist a resumable sitemap crawl without incrementing its error budget. */
 export async function markSitemapCrawlPartial(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   state: SitemapCrawlState,
 ): Promise<void> {
@@ -1371,7 +1370,7 @@ export async function markSitemapCrawlPartial(
  * Mark sitemap crawl as failed
  */
 export async function markSitemapError(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   name: string,
   error: string,
 ): Promise<void> {
@@ -1392,7 +1391,7 @@ export async function markSitemapError(
 /**
  * Reset all sitemap errors (called on build_id change)
  */
-export async function resetSitemapErrors(event: H3Event | undefined): Promise<number> {
+export async function resetSitemapErrors(event: AiReadyDatabaseEvent | undefined): Promise<number> {
   const db = await getDb(event)
   if (!db)
     return 0
@@ -1413,7 +1412,7 @@ export async function resetSitemapErrors(event: H3Event | undefined): Promise<nu
  * Get all sitemaps with their status
  */
 export async function getSitemapStatus(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
 ): Promise<SitemapStatusEntry[]> {
   const db = await getDb(event)
   if (!db)
@@ -1440,7 +1439,7 @@ export interface RecentPageActivity {
  * Get recently indexed pages
  */
 export async function getRecentlyIndexedPages(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   limit = 10,
 ): Promise<RecentPageActivity[]> {
   const db = await getDb(event)
@@ -1458,7 +1457,7 @@ export async function getRecentlyIndexedPages(
  * Count pages indexed in a time window
  */
 export async function countRecentlyIndexed(
-  event: H3Event | undefined,
+  event: AiReadyDatabaseEvent | undefined,
   sinceMs: number,
 ): Promise<number> {
   const db = await getDb(event)

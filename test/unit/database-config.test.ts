@@ -1,6 +1,6 @@
 import type { DatabaseInput, ResolveDatabaseInput } from '../../src/utils/database'
 import { describe, expect, it } from 'vitest'
-import { resolveDatabaseConfig, supportsNativeNodeSqlite } from '../../src/utils/database'
+import { resolveDatabaseConfig } from '../../src/utils/database'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from '../../src/utils/webmcp'
 
 function input(overrides: Partial<ResolveDatabaseInput> = {}): ResolveDatabaseInput {
@@ -20,18 +20,6 @@ function resolveDatabase(database: DatabaseInput | undefined, overrides: Partial
     throw new Error(`expected a resolved database, got: ${result.message}`)
   return result.database
 }
-
-describe('supportsNativeNodeSqlite', () => {
-  it.each([
-    ['22.12.0', false],
-    ['22.13.0', true],
-    ['23.3.0', false],
-    ['23.4.0', true],
-    ['24.0.0', true],
-  ] as const)('returns %s support as %s', (version, supported) => {
-    expect(supportsNativeNodeSqlite(version)).toBe(supported)
-  })
-})
 
 describe('resolveDatabaseConfig', () => {
   it('disables the database when no feature needs it', () => {

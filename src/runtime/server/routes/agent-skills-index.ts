@@ -1,11 +1,12 @@
+import { createError, defineEventHandler } from 'nuxt/server'
 import { agentSkillsIndex } from '#ai-ready-virtual/agent-skills.mjs'
-import { assertMethod, eventHandler, setHeader } from '#nuxtseo/h3'
 import { publicCacheControl } from '../../cache-control'
 
-export default eventHandler((event) => {
-  assertMethod(event, ['GET', 'HEAD'])
-  setHeader(event, 'Content-Type', 'application/json; charset=utf-8')
-  setHeader(event, 'Cache-Control', publicCacheControl(3600, 86400))
-  setHeader(event, 'Access-Control-Allow-Origin', '*')
+export default defineEventHandler((event) => {
+  if (!['GET', 'HEAD'].includes(event.req.method))
+    throw createError({ status: 405, statusText: 'Method Not Allowed' })
+  event.res.headers.set('Content-Type', 'application/json; charset=utf-8')
+  event.res.headers.set('Cache-Control', publicCacheControl(3600, 86400))
+  event.res.headers.set('Access-Control-Allow-Origin', '*')
   return agentSkillsIndex
 })

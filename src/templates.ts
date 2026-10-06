@@ -85,9 +85,9 @@ declare module '#ai-ready-virtual/i18n-runtime.mjs' {
 }
 
 declare module '#ai-ready-virtual/db-provider.mjs' {
-  import type { H3Event } from '#nuxtseo/h3'
+  import type { AiReadyDatabaseEvent } from '#ai-ready/server/db/context'
   import type { DrizzleDatabase } from '#ai-ready/server/db/drizzle/client'
-  export function createClient(event?: H3Event): Promise<DrizzleDatabase>
+  export function createClient(event?: AiReadyDatabaseEvent): Promise<DrizzleDatabase>
 }
 
 declare module '#ai-ready-virtual/db-schema.mjs' {

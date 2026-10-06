@@ -32,11 +32,11 @@ describe('llms.txt Markdown links in a hybrid build', async () => {
     expect(existsSync(join(buildDir!, 'output/public/llms.txt'))).toBe(true)
     expect(existsSync(join(buildDir!, 'output/public/docs/api.md'))).toBe(false)
 
-    const llmsTxt = await $fetch('/docs/llms.txt') as string
+    const llmsTxt = await $fetch<string>('/docs/llms.txt')
     expect(llmsTxt).toContain('(/docs/docs/api.md)')
     expect(llmsTxt).not.toContain('(/docs/api.md)')
 
-    const apiMarkdown = await $fetch('/docs/docs/api.md') as string
+    const apiMarkdown = await $fetch<string>('/docs/docs/api.md')
     expect(apiMarkdown).toContain('API Reference')
   })
 })

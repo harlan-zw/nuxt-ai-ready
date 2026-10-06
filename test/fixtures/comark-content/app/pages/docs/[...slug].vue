@@ -10,7 +10,7 @@ interface DocsPage {
 const route = useRoute()
 const { data: page } = await useAsyncData(
   `docs-${route.path}`,
-  () => $fetch('/api/docs', { query: { path: route.path } }) as Promise<DocsPage | null>,
+  () => $fetch<DocsPage | null>('/api/docs', { query: { path: route.path } }),
 )
 
 useSeoMeta({

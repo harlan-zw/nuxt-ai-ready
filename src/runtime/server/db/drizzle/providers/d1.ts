@@ -1,18 +1,19 @@
-import type { H3Event } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from '../../context'
 import { drizzle } from 'drizzle-orm/d1'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 
-export async function createClient(event?: H3Event) {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
+export async function createClient(event?: AiReadyDatabaseEvent) {
+  const config = useRuntimeConfig()['nuxt-ai-ready'] as {
     database: { bindingName?: string }
   }
 
   const bindingName = config.database.bindingName || 'DB'
   logger.debug(`[drizzle] Using D1 binding: ${bindingName}`)
 
-  const cfEnv = event?.context?.cloudflare?.env as Record<string, unknown> | undefined
+  const cloudflare = event?.context.cloudflare as { env?: Record<string, unknown> } | undefined
+  const cfEnv = cloudflare?.env
   const globalEnv = (globalThis as unknown as { __env__?: Record<string, unknown> }).__env__
   const d1 = cfEnv?.[bindingName] || globalEnv?.[bindingName]
 

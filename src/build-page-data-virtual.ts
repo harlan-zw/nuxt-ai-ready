@@ -1,7 +1,6 @@
 interface BuildPageDataVirtualOptions {
   buildDbPath: string
   markdownLinkAvailabilityPath: string
-  nativeNodeSqlite: boolean
   dev?: boolean
 }
 
@@ -15,13 +14,8 @@ export async function readMarkdownLinkAvailabilityFromFilesystem() { return { ru
 `
   }
 
-  const readRows = options.nativeNodeSqlite
-    ? `const { DatabaseSync } = await import('node' + ':sqlite')
+  const readRows = `const { DatabaseSync } = await import('node' + ':sqlite')
   const db = new DatabaseSync(dbPath, { open: true })
-  const rows = db.prepare(${JSON.stringify(SELECT_PAGE_DATA)}).all()
-  db.close()`
-    : `const Database = (await import('better-sqlite3')).default
-  const db = new Database(dbPath, { readonly: true })
   const rows = db.prepare(${JSON.stringify(SELECT_PAGE_DATA)}).all()
   db.close()`
 

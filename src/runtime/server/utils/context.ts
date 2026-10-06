@@ -1,4 +1,4 @@
-import type { H3Event } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from '../db/context'
 import { createSiteConfigStack } from 'site-config-stack'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 
@@ -14,8 +14,8 @@ export interface UniversalContext {
  * In request context: uses H3Event and nuxt-site-config middleware
  * In scheduled task: rebuilds from build-time site-config stack
  */
-export function createUniversalContext(event: H3Event | undefined): UniversalContext {
-  const runtimeConfig = useRuntimeConfig(event)
+export function createUniversalContext(event: AiReadyDatabaseEvent | undefined): UniversalContext {
+  const runtimeConfig = useRuntimeConfig()
 
   // Try request-time site config first (set by nuxt-site-config middleware)
   let siteUrl = (runtimeConfig.site as { url?: string } | undefined)?.url
@@ -41,7 +41,7 @@ export function createUniversalContext(event: H3Event | undefined): UniversalCon
 /**
  * Get site URL from context, throwing if not configured
  */
-export function requireSiteUrl(event: H3Event | undefined): string {
+export function requireSiteUrl(event: AiReadyDatabaseEvent | undefined): string {
   const ctx = createUniversalContext(event)
   if (!ctx.siteUrl) {
     throw new Error('Site URL not configured. Set site.url in nuxt.config.')

@@ -27,14 +27,14 @@ declare module '#ai-ready-virtual/logger.mjs' {
 }
 
 declare module '#ai-ready-virtual/db-provider.mjs' {
-  import type { H3Event } from '#nuxtseo/h3'
+  import type { AiReadyDatabaseEvent } from './runtime/server/db/context'
 
   interface DrizzleDatabase {
     dialect: 'sqlite' | 'postgres'
     db: unknown
   }
 
-  export function createClient(event?: H3Event): Promise<DrizzleDatabase>
+  export function createClient(event?: AiReadyDatabaseEvent): Promise<DrizzleDatabase>
 }
 
 declare module '#ai-ready-virtual/db-schema.mjs' {

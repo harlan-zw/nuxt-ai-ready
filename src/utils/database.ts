@@ -2,16 +2,6 @@ import { isAbsolute, join } from 'pathe'
 
 export type DatabaseType = 'sqlite' | 'bun' | 'd1' | 'libsql' | 'neon' | 'postgres'
 
-/** Node versions that expose `node:sqlite` without a command flag. */
-export function supportsNativeNodeSqlite(version: string): boolean {
-  const [major = 0, minor = 0] = version.split('.').map(Number)
-  if (major === 22)
-    return minor >= 13
-  if (major === 23)
-    return minor >= 4
-  return major > 23
-}
-
 /** Explicit opt-out value for `aiReady.database.type`. */
 export const DATABASE_TYPE_NONE = 'none'
 

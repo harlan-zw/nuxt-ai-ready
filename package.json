@@ -2,7 +2,7 @@
   "name": "nuxt-ai-ready",
   "type": "module",
   "version": "2.5.3",
-  "packageManager": "pnpm@12.6.0",
+  "packageManager": "pnpm@12.8.1",
   "description": "Best practice AI & LLM discoverability for Nuxt sites.",
   "author": {
     "name": "Harlan Wilton",
@@ -25,7 +25,8 @@
   "exports": {
     ".": {
       "types": "./dist/types.d.mts",
-      "import": "./dist/module.mjs"
+      "import": "./dist/module.mjs",
+      "default": "./dist/module.mjs"
     },
     "./mcp": {
       "types": "./mcp.d.ts",
@@ -46,6 +47,9 @@
     "skills",
     "webmcp.d.ts"
   ],
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -60,19 +64,19 @@
     "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",
-    "test": "pnpm run prepare:fixtures && vitest",
+    "test": "vitest run && pnpm test:nuxt5",
     "test:run": "pnpm run prepare:fixtures && vitest run && pnpm test:nuxt5",
     "test:unit": "vitest run --project=unit",
     "test:e2e": "pnpm run prepare:fixtures && vitest run --project=e2e",
     "test:dist": "node scripts/check-dist-imports.mjs",
     "typecheck": "nuxt typecheck && tsc -p test/types/tsconfig.json",
     "test:attw": "attw --pack",
-    "test:nuxt5": "pnpm pack --out test/fixtures/nuxt5/module.tgz && pnpm install --dir test/fixtures/nuxt5 --no-frozen-lockfile --force --update-checksums && pnpm --dir test/fixtures/nuxt5 test"
+    "test:nuxt5": "pnpm build && pnpm --dir test/fixtures/nuxt5 install --frozen-lockfile && pnpm --dir test/fixtures/nuxt5 test"
   },
   "peerDependencies": {
     "@libsql/client": "^0.18.0",
     "@neondatabase/serverless": "^1.0.0",
-    "better-sqlite3": "^11.0.0 || ^12.0.0 || ^13.0.0",
+    "nuxt": "^4.6.0 || ^5.0.0",
     "postgres": "^3.4.9"
   },
   "peerDependenciesMeta": {
@@ -80,9 +84,6 @@
       "optional": true
     },
     "@neondatabase/serverless": {
-      "optional": true
-    },
-    "better-sqlite3": {
       "optional": true
     },
     "postgres": {
@@ -102,11 +103,9 @@
     "nuxt-site-config": "catalog:nuxt",
     "nuxtseo-shared": "catalog:",
     "pathe": "catalog:",
-    "pkg-types": "catalog:",
     "site-config-stack": "catalog:",
     "sitemapd": "catalog:",
     "ufo": "catalog:",
-    "uncrypto": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
@@ -137,7 +136,6 @@
     "playwright": "catalog:dev-test",
     "playwright-core": "catalog:dev-test",
     "postgres": "catalog:",
-    "tinyglobby": "catalog:",
     "typescript": "catalog:dev-build",
     "unbuild": "catalog:",
     "vitest": "catalog:dev-test",
@@ -146,5 +144,11 @@
     "vue-tsc": "catalog:dev-build",
     "wrangler": "catalog:",
     "zod": "catalog:"
+  },
+  "build": {
+    "externals": [
+      "node:sqlite",
+      "nuxt/server"
+    ]
   }
 }

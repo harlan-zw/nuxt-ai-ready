@@ -17,7 +17,7 @@ server.stdout.on('data', chunk => output += chunk)
 
 async function waitForServer() {
   for (let attempt = 0; attempt < 100; attempt++) {
-    const match = output.match(/Listening on: (http:\/\/[^/]+)\//)
+    const match = output.match(/Listening on:? (http:\/\/[^/]+)\//)
     if (match)
       return match[1]
     if (server.exitCode !== null)
@@ -37,6 +37,11 @@ try {
     throw new Error(`Unexpected compatibility marker: ${JSON.stringify(result)}`)
   if (result.requestContextMarker !== 'nuxt-5-context')
     throw new Error(`Unexpected request context marker: ${JSON.stringify(result)}`)
+
+  const htmlResponse = await fetch(origin)
+  const html = await htmlResponse.text()
+  if (!html.includes('id="alias-app">false'))
+    throw new Error('The app alias did not render its value')
 
   const markdownResponse = await fetch(`${origin}/index.md`)
   if (!markdownResponse.ok)

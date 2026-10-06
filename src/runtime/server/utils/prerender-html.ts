@@ -1,3 +1,5 @@
+import type { NuxtRenderHTMLContext } from 'nuxt/app'
+
 /**
  * In-memory handover of rendered HTML from a page's SSR render to its `.md`
  * twin during prerendering.
@@ -11,7 +13,7 @@
  * Entries are deleted on consume; the few that are never consumed (error/noSSR
  * pages get no `.md` twin) live only for the prerender process lifetime.
  */
-const htmlByPath = new Map<string, string>()
+const htmlByPath = new Map<string, string | NuxtRenderHTMLContext>()
 
 // Match the key derivation of getMarkdownRenderInfo/toMarkdownPath: `/about/`
 // renders `/about.md`, whose page path resolves to `/about`.
@@ -19,7 +21,7 @@ function normalizeHtmlCachePath(path: string): string {
   return path.replace(/\/+$/, '') || '/'
 }
 
-export function storePrerenderedHtml(path: string, html: string): void {
+export function storePrerenderedHtml(path: string, html: string | NuxtRenderHTMLContext): void {
   htmlByPath.set(normalizeHtmlCachePath(path), html)
 }
 
@@ -27,5 +29,8 @@ export function consumePrerenderedHtml(path: string): string | undefined {
   const key = normalizeHtmlCachePath(path)
   const html = htmlByPath.get(key)
   htmlByPath.delete(key)
-  return html
+  if (!html || typeof html === 'string')
+    return html
+
+  return `<!DOCTYPE html><html ${html.htmlAttrs.join(' ')}><head>${html.head.join('')}</head><body ${html.bodyAttrs.join(' ')}>${html.bodyPrepend.join('')}${html.body.join('')}${html.bodyAppend.join('')}</body></html>`
 }

@@ -2,7 +2,7 @@ import type { McpServerCardConfig } from '../runtime/types'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { resolvePackageJSON } from 'pkg-types'
+import { resolvePackageMetadataPath } from '../package-metadata'
 import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../runtime/server/utils/discovery-response'
 
 export const MCP_SERVER_CARD_SCHEMA = 'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json'
@@ -212,8 +212,10 @@ export async function resolveInstalledMcpProtocolVersions(input: {
 }): Promise<McpProtocolVersionsResult> {
   const resolutionBases = [...new Set([...input.modulesDir, input.rootDir])]
   const sdkResolutionAttempts = resolutionBases.map(base =>
-    resolvePackageJSON('@nuxtjs/mcp-toolkit', { from: base })
-      .then(toolkitPackagePath => createRequire(toolkitPackagePath).resolve('@modelcontextprotocol/sdk/types.js')),
+    Promise.resolve().then(() => {
+      const toolkitPackagePath = resolvePackageMetadataPath('@nuxtjs/mcp-toolkit', base, input.modulesDir.includes(base) ? { searchDirectory: base } : undefined)
+      return createRequire(toolkitPackagePath).resolve('@modelcontextprotocol/sdk/types.js')
+    }),
   )
   return Promise.allSettled(sdkResolutionAttempts)
     .then((results) => {

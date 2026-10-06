@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { getRequestURL } from '#nuxtseo/h3'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 
 // Records how many times each route was SSR rendered during prerendering, then
@@ -28,10 +29,9 @@ export default defineNitroPlugin((nitroApp) => {
     return new URLSearchParams(path.slice(path.indexOf('?') + 1)).get('url') || path
   }
 
-  nitroApp.hooks.hook('render:response', (response, { event }) => {
-    if (!String(response.headers?.['content-type'] || '').includes('text/html'))
-      return
-    const route = routeOf(event.path)
+  nitroApp.hooks.hook('render:html', (_html, { event }) => {
+    const url = getRequestURL(event)
+    const route = routeOf(url.pathname + url.search)
     counts[route] = (counts[route] || 0) + 1
     // Written on every render because nitro offers no "prerender finished" hook
     // inside the server bundle. Writes are chained so they cannot interleave.

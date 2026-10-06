@@ -1,5 +1,4 @@
 // Shared database utilities for build-time and runtime
-import { subtle } from 'uncrypto'
 import { isMap, isScalar, parseDocument } from 'yaml'
 import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql'
 
@@ -32,7 +31,7 @@ function stripPageFrontmatter(markdown: string): string {
 export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(stripPageFrontmatter(markdown).trim())
-  const hashBuffer = await subtle.digest('SHA-256', data)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = [...new Uint8Array(hashBuffer)]
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
 }

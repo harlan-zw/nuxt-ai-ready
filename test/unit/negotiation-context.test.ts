@@ -10,14 +10,14 @@ vi.mock('#nuxtseo/nitro', () => ({
 vi.mock('#site-config/server/composables/utils', () => ({
   withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
 }))
-vi.mock('#site-config/server/middleware/init', () => ({ default: vi.fn() }))
+vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
 
 describe('negotiation locale context', () => {
   it.each([
     [{ host: 'fr.example.com' }, 'fr.example.com'],
     [{ 'host': 'internal.proxy', 'x-forwarded-host': 'fr.example.com' }, 'fr.example.com'],
   ])('uses the public request host: %j', (headers, expectedHost) => {
-    const event = { path: '/a-propos', node: { req: { headers } } } as unknown as H3Event
+    const event = { req: new Request('https://example.com/a-propos', { headers }), path: '/a-propos' } as unknown as H3Event
 
     const context = buildNegotiationContext(event, '/a-propos')
 

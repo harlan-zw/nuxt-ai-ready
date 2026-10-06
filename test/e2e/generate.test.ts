@@ -105,7 +105,7 @@ describe('nuxt generate (static build)', async () => {
     })
 
     it('contains only file-list links beneath H2 sections', async () => {
-      const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' }) as string
+      const llmsTxt = await $fetch<string>('/llms.txt', { responseType: 'text' })
 
       expectStrictFileListSections(llmsTxt)
     })

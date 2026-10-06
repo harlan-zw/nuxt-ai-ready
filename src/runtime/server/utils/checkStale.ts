@@ -1,5 +1,5 @@
-import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
+import type { AiReadyDatabaseEvent } from '../db/context'
 import type { DumpRow } from '../db/shared'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import {
@@ -48,7 +48,7 @@ function parseBuildMeta(value: unknown): BuildMeta | null {
 /**
  * Fetch build metadata from static assets
  */
-async function fetchBuildMeta(event?: H3Event): Promise<BuildMeta | null> {
+async function fetchBuildMeta(event?: AiReadyDatabaseEvent): Promise<BuildMeta | null> {
   logger.debug('[stale-check] Fetching meta...')
   return parseBuildMeta(await fetchPublicAsset<unknown>(event, '/__ai-ready/pages.meta.json'))
 }
@@ -56,7 +56,7 @@ async function fetchBuildMeta(event?: H3Event): Promise<BuildMeta | null> {
 /**
  * Fetch and decompress dump data
  */
-async function fetchDump(event?: H3Event): Promise<DumpRow[] | null> {
+async function fetchDump(event?: AiReadyDatabaseEvent): Promise<DumpRow[] | null> {
   logger.debug('[stale-check] Fetching dump...')
   const dumpData = await fetchPublicAsset<string>(event, '/__ai-ready/pages.dump', { responseType: 'text' })
 
@@ -75,21 +75,21 @@ async function fetchDump(event?: H3Event): Promise<DumpRow[] | null> {
 /**
  * Get stored build ID from database
  */
-async function getStoredBuildId(event?: H3Event): Promise<string | null> {
+async function getStoredBuildId(event?: AiReadyDatabaseEvent): Promise<string | null> {
   return getInfoValue(event, 'build_id')
 }
 
 /**
  * Set stored build ID in database
  */
-async function setStoredBuildId(event: H3Event | undefined, buildId: string): Promise<void> {
+async function setStoredBuildId(event: AiReadyDatabaseEvent | undefined, buildId: string): Promise<void> {
   await setInfoValue(event, 'build_id', buildId)
 }
 
 /**
  * Get last stale check timestamp from database
  */
-async function getLastStaleCheck(event?: H3Event): Promise<number | null> {
+async function getLastStaleCheck(event?: AiReadyDatabaseEvent): Promise<number | null> {
   const value = await getInfoValue(event, 'last_stale_check')
   return value ? Number.parseInt(value, 10) : null
 }
@@ -97,14 +97,14 @@ async function getLastStaleCheck(event?: H3Event): Promise<number | null> {
 /**
  * Set last stale check timestamp in database
  */
-async function setLastStaleCheck(event: H3Event | undefined): Promise<void> {
+async function setLastStaleCheck(event: AiReadyDatabaseEvent | undefined): Promise<void> {
   await setInfoValue(event, 'last_stale_check', Date.now().toString())
 }
 
 /**
  * Insert new pages from dump (as already indexed since dump has full content)
  */
-async function insertFromDump(event: H3Event | undefined, rows: DumpRow[]): Promise<void> {
+async function insertFromDump(event: AiReadyDatabaseEvent | undefined, rows: DumpRow[]): Promise<void> {
   if (rows.length === 0)
     return
   const { useRawDb } = await import('../db')
@@ -121,7 +121,7 @@ export const STALE_CHECK_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
  * 2. Build ID changed → compare hashes, only mark changed pages pending, add new pages from dump
  * Skips HTTP fetch if checked within 5 minutes and DB is populated
  */
-export async function checkAndHandleStale(event?: H3Event): Promise<StaleCheckResult> {
+export async function checkAndHandleStale(event?: AiReadyDatabaseEvent): Promise<StaleCheckResult> {
   const config = useRuntimeConfig()['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const debug = config.debug
 

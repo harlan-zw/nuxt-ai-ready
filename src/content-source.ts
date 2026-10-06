@@ -1,6 +1,6 @@
 import { hasNuxtModule, useNuxt } from '@nuxt/kit'
 import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
-import { readPackageJSON } from 'pkg-types'
+import { readPackageMetadata } from './package-metadata'
 
 /**
  * The content module that backs a route's Markdown, if any.
@@ -31,7 +31,7 @@ const COMARK_MINIMUM = [0, 1, 2] as const
  */
 async function comarkSatisfiesMinimum(): Promise<boolean> {
   const url = useNuxt().options.rootDir
-  const pkg = await readPackageJSON(COMARK_MODULE, { url }).catch(() => {
+  const pkg = await readPackageMetadata(COMARK_MODULE, url).catch(() => {
     // Declared as a module but not resolvable from the app. Treat it as absent
     // rather than failing the build; the HTML path still indexes every route.
     return null

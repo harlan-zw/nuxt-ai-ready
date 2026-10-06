@@ -1,8 +1,4 @@
-/**
- * Raw SQL execution utilities for Drizzle
- * Provides direct driver access for raw SQL queries
- */
-import type { H3Event } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from '../context'
 import type { DrizzleDatabase } from './client'
 import { useDrizzle } from './client'
 
@@ -216,7 +212,7 @@ export type RawExecutor = ReturnType<typeof getRawExecutor>
 /**
  * Get raw SQL executor from event context or create new one
  */
-export async function useRawDb(event?: H3Event): Promise<RawExecutor> {
+export async function useRawDb(event?: AiReadyDatabaseEvent): Promise<RawExecutor> {
   const client = await useDrizzle(event)
   return getRawExecutor(client)
 }

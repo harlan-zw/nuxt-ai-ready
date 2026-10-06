@@ -55,7 +55,7 @@ describe('llms-full.txt with an unopenable libsql database (#818)', async () => 
   })
 
   it('does not leak a raw database connection error', async () => {
-    const txt = await $fetch('/llms-full.txt', { responseType: 'text' }) as string
+    const txt = await $fetch<string>('/llms-full.txt', { responseType: 'text' })
 
     // The header is built from site config and must always render.
     expect(txt).toContain('# ')

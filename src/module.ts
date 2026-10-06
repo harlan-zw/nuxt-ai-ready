@@ -9,15 +9,15 @@ import { randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { addImports, addPlugin, addServerHandler, addServerImports, addServerPlugin, createResolver, defineNuxtModule, extendRouteRules, hasNuxtModule } from '@nuxt/kit'
+import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
 import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
-import { setupNitroRuntimeCompatibility } from 'nuxtseo-shared/kit'
-import { readPackageJSON, resolvePackageJSON } from 'pkg-types'
+import { setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
 import { createBuildPageDataVirtual } from './build-page-data-virtual'
 import { contentLookupModule, resolveContentSource } from './content-source'
 import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
+import { readPackageMetadata } from './package-metadata'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { toMarkdownPath } from './runtime/markdown-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
@@ -25,7 +25,7 @@ import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
-import { resolveDatabaseConfig, supportsNativeNodeSqlite } from './utils/database'
+import { resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
@@ -110,22 +110,22 @@ export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: 'nuxt-ai-ready',
     compatibility: {
-      nuxt: '>=4.0.0',
+      nuxt: '^4.6.0 || ^5.0.0',
     },
     configKey: 'aiReady',
   },
   moduleDependencies: {
     '@nuxtjs/robots': {
-      version: '>=6.0.0',
+      version: '>=7.0.0',
     },
     '@nuxtjs/sitemap': {
-      version: '>=8.3.0',
+      version: '>=9.0.0',
     },
     'nuxt-site-config': {
-      version: '>=3.2',
+      version: '>=5.0.0',
     },
     'nuxtseo-shared': {
-      version: '>=5.3.11',
+      version: '>=6.0.0',
     },
     '@nuxtjs/mcp-toolkit': {
       version: '>=0.18.0',
@@ -153,7 +153,7 @@ export default defineNuxtModule<ModuleOptions>({
     const nuxtSeoSharedI18nRuntimePath = resolveFromModule.resolve('nuxtseo-shared/i18n-runtime')
     const nuxtSeoSharedUtilsPath = resolveFromModule.resolve('nuxtseo-shared/utils')
     const { resolve } = createResolver(moduleEntryUrl)
-    const { version } = await readPackageJSON(resolve('../package.json'))
+    const { version } = await readPackageMetadata(resolve('../package.json'))
 
     logger.level = (config.debug || nuxt.options.debug) ? 4 : 3
 
@@ -161,6 +161,7 @@ export default defineNuxtModule<ModuleOptions>({
       logger.debug('Module is disabled, skipping setup.')
       return
     }
+    setupRuntimeAliases({ namespace: '#ai-ready', app: resolve('./runtime/app'), server: resolve('./runtime/server') }, nuxt)
 
     // Agent skills: `skills/<name>/SKILL.md` in the project and its layers is
     // discovered, merged with explicit config, offered to the
@@ -177,7 +178,7 @@ export default defineNuxtModule<ModuleOptions>({
       const { applyRootAlias, prepareAgentSkills, resolveAgentSkillsConfig } = await import('./utils/agent-skills')
       const prepared = await prepareAgentSkills(agentSkillsConfig, {
         rootDir: nuxt.options.rootDir,
-        scanDirs: nuxt.options._layers.map(layer => layer.config.rootDir ?? layer.cwd),
+        scanDirs: getLayerDirectories(nuxt).map(layer => layer.root),
       })
       if (prepared._tag === 'Invalid')
         throw agentSkillsError(prepared.issues)
@@ -347,27 +348,6 @@ export default defineNuxtModule<ModuleOptions>({
       from: resolve('./runtime'),
     })))
 
-    // Older Node versions need the optional better-sqlite3 fallback.
-    let betterSqlite3Availability: Promise<boolean> | undefined
-    const hasBetterSqlite3 = () => {
-      betterSqlite3Availability ||= resolvePackageJSON('better-sqlite3', { from: nuxt.options.rootDir })
-        .then(
-          () => true,
-          // Missing is expected when no requested feature uses SQLite.
-          () => false,
-        )
-      return betterSqlite3Availability
-    }
-    const nativeNodeSqlite = supportsNativeNodeSqlite(process.versions.node || '')
-    if (database._tag === 'Enabled' && database.type === 'sqlite' && !nativeNodeSqlite && !await hasBetterSqlite3()) {
-      throw new Error(
-        `[nuxt-ai-ready] SQLite needs "better-sqlite3" on Node ${process.versions.node}, but it isn't installed. `
-        + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
-        + `Node 22.13 and later use built-in \`node:sqlite\`. `
-        + `For edge deployments, configure D1, Neon, LibSQL, or Bun instead.`,
-      )
-    }
-
     let mcpAvailable = mcpToolkitState._tag === 'Enabled'
 
     // Register definition paths before later wrapper modules install Toolkit.
@@ -480,14 +460,6 @@ export default defineNuxtModule<ModuleOptions>({
     const preparing = (nuxt.options as typeof nuxt.options & { _prepare?: boolean })._prepare === true
     const prerenderEnabled = !preparing && !!(isStatic || hasPrerenderedRoutes)
 
-    // Build time page indexing writes its own SQLite file.
-    if (prerenderEnabled && !nativeNodeSqlite && !await hasBetterSqlite3()) {
-      throw new Error(
-        `[nuxt-ai-ready] Build time page indexing needs "better-sqlite3" on Node ${process.versions.node}. `
-        + `Add it to your app: \`npm i better-sqlite3\` (or \`pnpm add\` / \`yarn add\`). `
-        + `Node 22.13 and later need no extra package.`,
-      )
-    }
     const isSPA = nuxt.options.ssr === false
 
     let apiCatalogRegistered = false
@@ -750,6 +722,16 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
+      if (getNitroVersion(nuxt) === 3) {
+        const nativeConfig = nitroConfig as unknown as { noExternals?: boolean | (string | RegExp)[] }
+        if (nativeConfig.noExternals !== true)
+          nativeConfig.noExternals = [...nativeConfig.noExternals || [], 'nuxt-ai-ready']
+      }
+      else {
+        const externals = nitroConfig.externals ||= {}
+        externals.inline ||= []
+        externals.inline.push(resolve('./runtime'))
+      }
       // Enable async context to access the active request in nested functions (MCP handlers, etc.)
       // This enables access to H3Event and Cloudflare bindings from any async context
       nitroConfig.experimental = nitroConfig.experimental || {}
@@ -765,25 +747,15 @@ export default defineNuxtModule<ModuleOptions>({
       if (nitroCompatibility._tag === 'nitro-v3') {
         const nitro3Config = nitroConfig as unknown as {
           noExternals?: boolean | Array<string | RegExp>
-          rolldownConfig?: {
-            external?: unknown
-          }
           traceDeps?: Array<string | RegExp>
         }
-        const noExternals = Array.isArray(nitro3Config.noExternals) ? nitro3Config.noExternals : []
-        noExternals.push('sitemapd')
-        nitro3Config.noExternals = noExternals
+        if (nitro3Config.noExternals !== true)
+          nitro3Config.noExternals = [...nitro3Config.noExternals || [], 'sitemapd']
         if (!isEdgePreset) {
           nitro3Config.traceDeps ||= []
           nitro3Config.traceDeps.push('mdream*')
-          nitro3Config.rolldownConfig ||= {}
-          const external = nitro3Config.rolldownConfig.external
-          if (Array.isArray(external))
-            external.push('mdream')
-          else if (typeof external === 'string' || external instanceof RegExp)
-            nitro3Config.rolldownConfig.external = [external, 'mdream']
-          else if (!external)
-            nitro3Config.rolldownConfig.external = ['mdream']
+          // Nitro resolves native packages to absolute paths for prerendering.
+          // A bundler external would bypass that resolution and break pnpm consumers.
         }
       }
       else {
@@ -872,7 +844,6 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
       nitroConfig.virtual['#ai-ready-virtual/read-page-data.mjs'] = createBuildPageDataVirtual({
         buildDbPath,
         markdownLinkAvailabilityPath,
-        nativeNodeSqlite,
         dev: nuxt.options.dev,
       })
       // Runtime module exports empty arrays (pages read from database at runtime)
@@ -887,9 +858,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       // Database provider - tree-shakeable by aliasing to configured provider at build time.
       // A disabled database gets a stub so the driver never enters the bundle.
       const providerMap: Record<string, string> = {
-        sqlite: nativeNodeSqlite
-          ? '#ai-ready/server/db/drizzle/providers/node-sqlite'
-          : '#ai-ready/server/db/drizzle/providers/sqlite',
+        sqlite: '#ai-ready/server/db/drizzle/providers/node-sqlite',
         bun: '#ai-ready/server/db/drizzle/providers/bun',
         d1: '#ai-ready/server/db/drizzle/providers/d1',
         libsql: '#ai-ready/server/db/drizzle/providers/libsql',
@@ -956,7 +925,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
 
     if (prerenderEnabled) {
       // Captures rendered HTML so markdown.prerender can avoid a second SSR render.
-      addServerPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
+      addNitroPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
       addServerHandler({
         middleware: true,
         handler: resolve('./runtime/server/middleware/markdown.prerender'),
@@ -971,10 +940,12 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown'),
     })
-    addServerPlugin(resolve('./runtime/server/plugins/link-header'))
+    addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
+      ? './runtime/server/plugins/link-header-nitro3'
+      : './runtime/server/plugins/link-header'))
     // Runs Accept negotiation ahead of Nitro's static asset handler, which is
     // unshifted in front of every middleware when serveStatic is on (#82).
-    addServerPlugin(resolve('./runtime/server/plugins/markdown-negotiation'))
+    addNitroPlugin(resolve('./runtime/server/plugins/markdown-negotiation'))
 
     // Inject <link rel="alternate" type="text/markdown"> into HTML pages
     addPlugin({
@@ -1058,7 +1029,7 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
       addServerHandler({ route: '/__ai-ready/reindex', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/reindex.post'), lazy: true })
 
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
-      addServerPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
+      addNitroPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
     }
 
     // Cron endpoint (for Vercel and other HTTP-based cron systems)
@@ -1095,8 +1066,11 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
     }
 
     // Add lifecycle plugin to handle database connection cleanup
-    if (databaseEnabled)
-      addServerPlugin(resolve('./runtime/server/plugins/db-lifecycle'))
+    if (databaseEnabled) {
+      addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
+        ? './runtime/server/plugins/db-lifecycle-nitro3'
+        : './runtime/server/plugins/db-lifecycle'))
+    }
 
     if (nuxt.options.dev) {
       const { setupDevToolsUI } = await import('nuxtseo-shared/devtools')

@@ -1,4 +1,4 @@
-import type { H3Event } from '#nuxtseo/h3'
+import type { AiReadyDatabaseEvent } from '../../context'
 import { DatabaseSync } from 'node:sqlite'
 import { drizzle } from 'drizzle-orm/node-sqlite'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
@@ -6,8 +6,8 @@ import { logger } from '../../../logger'
 import { registerDriver } from '../raw'
 import { resolveWritableDbPath } from './dbPath'
 
-export async function createClient(event?: H3Event) {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as {
+export async function createClient(_event?: AiReadyDatabaseEvent) {
+  const config = useRuntimeConfig()['nuxt-ai-ready'] as {
     database: { filename?: string }
   }
 
