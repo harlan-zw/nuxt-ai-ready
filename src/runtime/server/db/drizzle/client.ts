@@ -27,8 +27,8 @@ function createDrizzleClient(event?: AiReadyDatabaseEvent): Promise<DrizzleDatab
 }
 
 type DrizzleWorkState
-  = | { _tag: 'ResponseOpen', owner: object, pending: Set<Promise<unknown>> }
-    | { _tag: 'ResponseEnded', owner: object, pending: Set<Promise<unknown>> }
+  = | { _tag: 'ResponseOpen', owner: object, pending: Set<Promise<unknown>>, cleanup: () => Promise<void> }
+    | { _tag: 'ResponseEnded', owner: object, pending: Set<Promise<unknown>>, cleanup: () => Promise<void> }
 
 function getRequestOwner(event: AiReadyDatabaseEvent): object {
   return event.node?.req ?? event.req ?? event
@@ -40,6 +40,7 @@ function getDrizzleWorkState(event: AiReadyDatabaseEvent): DrizzleWorkState {
     _tag: 'ResponseOpen',
     owner: getRequestOwner(event),
     pending: new Set(),
+    cleanup: () => closeDrizzle(event),
   }) as DrizzleWorkState
 }
 
@@ -49,7 +50,7 @@ export function trackDrizzleWork<T>(event: AiReadyDatabaseEvent, work: Promise<T
   const tracked = work.finally(async () => {
     state.pending.delete(tracked)
     if (state._tag === 'ResponseEnded' && state.pending.size === 0)
-      await closeDrizzle(event)
+      await state.cleanup()
   })
   state.pending.add(tracked)
   return tracked

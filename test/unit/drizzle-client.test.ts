@@ -85,4 +85,23 @@ describe('drizzle client lifecycle', () => {
     await finishDrizzleResponse({ context: portable.context, node: { req: request } })
     expect(mocks.closeDriver).toHaveBeenCalledExactlyOnceWith(client.db)
   })
+
+  it('closes the owner after a borrowed child finishes the final deferred task', async () => {
+    mocks.createClient.mockResolvedValue({ dialect: 'postgres', db: {} })
+    const { finishDrizzleResponse, trackDrizzleWork, useDrizzle } = await import('../../src/runtime/server/db/drizzle/client')
+    const owner = { context: {}, node: { req: { headers: {} } } }
+    const client = await useDrizzle(owner)
+    const child = { context: { ...owner.context }, node: { req: { headers: {} } } }
+    let release: (() => void) | undefined
+    const deferred = trackDrizzleWork(child, new Promise<void>((resolve) => {
+      release = resolve
+    }))
+
+    await finishDrizzleResponse(child)
+    await finishDrizzleResponse(owner)
+    expect(mocks.closeDriver).not.toHaveBeenCalled()
+    release?.()
+    await deferred
+    expect(mocks.closeDriver).toHaveBeenCalledExactlyOnceWith(client.db)
+  })
 })
