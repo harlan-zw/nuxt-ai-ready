@@ -115,7 +115,7 @@ function getErrorStatus(error: unknown): number | undefined {
 
 function fetchResource(path: string, options?: FetchOptions): Promise<FetchResult<unknown>> {
   return Promise.resolve()
-    .then(() => options ? globalThis.$fetch(path, options) : globalThis.$fetch(path))
+    .then(() => options ? globalThis.$fetch<unknown, string>(path, options) : globalThis.$fetch<unknown, string>(path))
     .then(
       value => ({ _tag: 'Ok', value }) as const,
       error => getErrorStatus(error) === 404

@@ -229,7 +229,7 @@ async function fetchLocalRoute(
           redirect: 'manual',
           signal: controller.signal,
         })
-      : globalThis.$fetch.raw(route, {
+      : globalThis.$fetch.raw<ReadableStream<Uint8Array>, string>(route, {
           responseType: 'stream',
           redirect: 'manual',
           retry: false,

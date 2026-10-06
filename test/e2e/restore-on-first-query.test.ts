@@ -23,7 +23,7 @@ describe('restore on first query', async () => {
   })
 
   it('lists prerendered pages before any MCP request or restore call', async () => {
-    const res = await $fetch('/__ai-ready/pages?route=/about') as { page: { route: string } | null }
+    const res = await $fetch<{ page: { route: string } | null }>('/__ai-ready/pages?route=/about')
 
     expect(res.page?.route).toBe('/about')
   })

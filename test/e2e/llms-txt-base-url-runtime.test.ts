@@ -21,7 +21,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
       body: { action: 'delete', route: '/docs/api' },
     })
 
-    const llmsTxt = await $fetch('/docs/llms.txt') as string
+    const llmsTxt = await $fetch<string>('/docs/llms.txt')
 
     expect(llmsTxt).toContain('[/about](/docs/about)')
     expect(llmsTxt).not.toContain('[/about](/docs/about/)')
@@ -33,7 +33,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
     expect(llmsTxt).toContain('[sitemap.xml](https://test.example.com/docs/sitemap.xml)')
     expect(llmsTxt).toContain('[robots.txt](https://test.example.com/docs/robots.txt)')
 
-    const secondLlmsTxt = await $fetch('/docs/llms.txt') as string
+    const secondLlmsTxt = await $fetch<string>('/docs/llms.txt')
     expect(secondLlmsTxt.match(/\[sitemap\.xml\]/g)).toHaveLength(1)
     expect(secondLlmsTxt.match(/\[robots\.txt\]/g)).toHaveLength(1)
   })
@@ -56,7 +56,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
       },
     })
 
-    const llmsTxt = await $fetch('/docs/llms.txt') as string
+    const llmsTxt = await $fetch<string>('/docs/llms.txt')
 
     expect(llmsTxt).toContain('[Persisted About](/docs/about)')
     expect(llmsTxt).toContain('[Persisted Docs API](/docs/docs/api)')
@@ -75,7 +75,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
   })
 
   it('fetches source HTML within the app base for explicit Markdown routes', async () => {
-    const markdown = await $fetch('/docs/about.md') as string
+    const markdown = await $fetch<string>('/docs/about.md')
 
     expect(markdown).toContain('Technology Stack')
     expect(markdown).not.toContain('# Page not found')
@@ -83,7 +83,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
   })
 
   it('preserves a logical route whose first segment matches the app base', async () => {
-    const markdown = await $fetch('/docs/docs/api.md') as string
+    const markdown = await $fetch<string>('/docs/docs/api.md')
 
     expect(markdown).toContain('API Reference')
     expect(markdown).toContain('canonical_url: "https://test.example.com/docs/docs/api"')
@@ -107,7 +107,7 @@ describe('ai-ready routes beneath an app base URL', async () => {
     expect(notFound).toContain('[Sitemap](https://test.example.com/docs/sitemap.xml)')
     expect(notFound).toContain('[llms.txt](https://test.example.com/docs/llms.txt)')
 
-    const llmsFullTxt = await $fetch('/docs/llms-full.txt') as string
+    const llmsFullTxt = await $fetch<string>('/docs/llms-full.txt')
     expect(llmsFullTxt).toContain('Canonical Origin: https://test.example.com/docs')
   })
 })

@@ -15,14 +15,14 @@ describe('llms.txt runtime Markdown links', async () => {
   })
 
   it('links eligible sitemap routes to the runtime Markdown handler', async () => {
-    const llmsTxt = await $fetch('/llms.txt') as string
+    const llmsTxt = await $fetch<string>('/llms.txt')
 
     expect(llmsTxt).toContain('[/about](/about.md)')
     expect(llmsTxt).toContain('[/docs/api](/docs/api.md)')
   })
 
   it('keeps canonical links for route types without a runtime Markdown handler', async () => {
-    const llmsTxt = await $fetch('/llms.txt') as string
+    const llmsTxt = await $fetch<string>('/llms.txt')
 
     expect(llmsTxt).toContain('[/api/status](/api/status)')
     expect(llmsTxt).toContain('[/_internal](/_internal)')

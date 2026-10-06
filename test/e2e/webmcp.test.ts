@@ -43,7 +43,7 @@ describe('webmcp', async () => {
   })
 
   it('exposes the webmcp options to the browser', async () => {
-    const html = await $fetch('/') as string
+    const html = await $fetch<string>('/')
 
     expect(html).toContain('maxOutputChars')
     expect(html).toContain('500')
