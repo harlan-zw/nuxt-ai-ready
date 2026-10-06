@@ -5,11 +5,9 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**/*.md'
+      - '**/README.md'
   # Every base, so stacked pull requests are tested too.
   pull_request:
-    paths-ignore:
-      - '**/*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
@@ -20,9 +18,7 @@ permissions:
 
 jobs:
   ci:
-    uses: harlan-zw/nuxt-seo/.github/workflows/reusable-ci.yml@09760efb0ffeac9f477673725c1c2f1fc8b1b049
-    with:
-      node-version: 22.22.3
+    uses: harlan-zw/nuxt-seo/.github/workflows/reusable-ci.yml@main
 
   test-postgres:
     runs-on: ubuntu-24.04-arm
@@ -44,7 +40,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/setup@v2
         with:
-          runtime: node@22.22.3
+          runtime: node@lts
           cache: true
           install: false
       - run: pnpm install --frozen-lockfile --trust-lockfile
