@@ -1,3 +1,11 @@
+## v2.5.3
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.2...v2.5.3)
+
+### 🩹 Fixes
+
+- Preserve private cache headers for Markdown responses ([#146](https://github.com/harlan-zw/nuxt-ai-ready/pull/146))
+
 ## v2.5.2
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.1...v2.5.2)
