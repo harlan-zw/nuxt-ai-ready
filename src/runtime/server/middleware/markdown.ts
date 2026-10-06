@@ -168,14 +168,14 @@ export default defineEventHandler(async (event) => {
     return response
 
   if (response.status === 404) {
-    setMarkdownHeaders(event, ctx)
+    setMarkdownHeaders(event, ctx, response.headers)
     setResponseStatus(event, 404)
     return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
 
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html')) {
-    setMarkdownHeaders(event, ctx)
+    setMarkdownHeaders(event, ctx, response.headers)
     setResponseStatus(event, 404)
     return notFoundMarkdown(ctx, canonicalUrl, buildFrontmatter)
   }
@@ -224,6 +224,6 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  setMarkdownHeaders(event, ctx)
+  setMarkdownHeaders(event, ctx, response.headers)
   return finalizeMarkdown(result.markdown)
 })
