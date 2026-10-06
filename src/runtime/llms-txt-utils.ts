@@ -196,7 +196,7 @@ export async function buildLlmsTxt(event: H3Event) {
   const i18nContext = { host: getRequestHost(event, { xForwardedHost: true }) }
   const baseURL = runtimeConfig.app.baseURL
   const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
-  const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL))
+  const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL), { withBase: true })
   const canonicalSiteUrl = siteConfig.url
     ? resolveUrl('/')
     : undefined

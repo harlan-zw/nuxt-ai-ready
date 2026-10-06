@@ -1,17 +1,18 @@
 import type { useNitroApp } from '#nuxtseo/nitro'
+import { getRequestURL } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { toLogicalRoute } from '../../route-path'
 import { storePrerenderedHtml } from '../utils/prerender-html'
 
 type NitroApp = ReturnType<typeof useNitroApp>
 
-// Capture every page's rendered HTML during prerendering so the markdown
-// prerender middleware can reuse it instead of re-rendering the page.
 export default function htmlCapturePlugin(nitroApp: NitroApp) {
   if (!import.meta.prerender)
     return
 
-  nitroApp.hooks.hook('render:response', (response, { event }) => {
-    if (typeof response.body !== 'string' || !String(response.headers?.['content-type'] || '').includes('text/html'))
-      return
-    storePrerenderedHtml(event.path, response.body)
+  nitroApp.hooks.hook('render:html', (html, { event }) => {
+    const baseURL = useRuntimeConfig(event).app.baseURL
+    // Keep the context until consumption so later render hooks can finish it.
+    storePrerenderedHtml(toLogicalRoute(getRequestURL(event).pathname, baseURL), html)
   })
 }

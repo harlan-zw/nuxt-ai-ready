@@ -118,7 +118,7 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
     config: runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig,
     path,
     resolvePath,
-    resolveUrl: (target: string) => withSiteUrl(event, resolvePath(target)),
+    resolveUrl: (target: string) => withSiteUrl(event, resolvePath(target), { withBase: true }),
     routeContext: { host: getRequestHost(event, { xForwardedHost: true }) },
   }
 }

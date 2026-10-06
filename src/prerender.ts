@@ -551,7 +551,7 @@ export function setupPrerenderHandler(
       if (!route.fileName?.endsWith('.md'))
         return
 
-      let pageRoute = route.route.replace(RE_MD_EXT, '')
+      let pageRoute = withLeadingSlash(route.fileName).replace(RE_MD_EXT, '')
       if (pageRoute === '/index')
         pageRoute = '/'
 
@@ -702,7 +702,7 @@ export function setupPrerenderHandler(
         if (!state.initialized)
           return
 
-        const sitemapContent = await crawlerFetch(state)('/sitemap.xml', {
+        const sitemapContent = await crawlerFetch(state)(toDeployedRoute('/sitemap.xml', nitro.options.baseURL), {
           headers: { 'x-nitro-prerender': '/sitemap.xml' },
           signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
         }).catch(() => {

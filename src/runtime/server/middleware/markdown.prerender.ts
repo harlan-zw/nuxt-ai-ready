@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   const { path } = renderInfo
   const runtimeConfig = fullRuntimeConfig['nuxt-ai-ready'] as any
   const deployedPath = toDeployedRoute(path, fullRuntimeConfig.app.baseURL)
-  const canonicalUrl = withSiteUrl(event, deployedPath)
+  const canonicalUrl = withSiteUrl(event, deployedPath, { withBase: true })
 
   // Prefer @nuxt/content source: skip HTML fetch + mdream when the route is
   // backed by a content collection. Body comes from the AST, so headings and

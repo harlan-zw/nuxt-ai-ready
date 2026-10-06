@@ -42,21 +42,17 @@ export default defineNitroPlugin((nitro) => {
     setHeader(event, 'link', getResponseStatus(event) >= 400 ? header.error : header.success)
   })
 
-  nitro.hooks.hook('render:response', (response, { event }) => {
+  nitro.hooks.hook('render:html', (_html, { event }) => {
     const header = (event as LinkHeaderEvent).context[STATUS_AWARE_LINK_HEADER]
-    const errorHeader = event.path.startsWith('/__nuxt_error') && getHeader(event, 'x-nuxt-error') === 'true'
+    // Nuxt forwards request headers to its internal error render.
+    const errorHeader = event.path.startsWith('/__nuxt_error')
       ? getHeader(event, ERROR_LINK_HEADER)
       : undefined
     if (errorHeader) {
-      response.headers ||= {}
-      response.headers.link = errorHeader
+      setHeader(event, 'link', errorHeader)
       return
     }
-    if (!header)
-      return
-
-    response.headers ||= {}
-    const statusCode = response.statusCode ?? getResponseStatus(event)
-    response.headers.link = statusCode >= 400 ? header.error : header.success
+    if (header)
+      setHeader(event, 'link', getResponseStatus(event) >= 400 ? header.error : header.success)
   })
 })
