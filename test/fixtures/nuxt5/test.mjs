@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { verifyErrorRepresentations } from './test-errors.ts'
 
 const cli = spawnSync(process.execPath, ['node_modules/nuxt-ai-ready-packed/dist/cli.mjs', '--version'], {
   cwd: import.meta.dirname,
@@ -48,6 +49,7 @@ async function waitForServer() {
 
 try {
   const origin = await waitForServer()
+  await verifyErrorRepresentations(origin)
   const response = await fetch(`${origin}/api/compat`)
   if (!response.ok)
     throw new Error(`Compatibility endpoint returned ${response.status}`)

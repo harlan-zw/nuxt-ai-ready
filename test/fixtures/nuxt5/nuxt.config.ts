@@ -32,6 +32,7 @@ export default defineNuxtConfig({
   modules: [verifyBuilder,NuxtRobots, NuxtSitemap, NuxtAiReady],
   mcp: false,
   aiReady: {
+    agentSkills: false,
     database: {
       type: 'sqlite',
     },
