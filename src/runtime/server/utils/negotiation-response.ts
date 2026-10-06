@@ -5,7 +5,7 @@ import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
-import { appendHeader, createError, getRequestHost, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
+import { appendHeader, createError, getHeader, getRequestHost, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
 import initSiteConfig from '#site-config/server/middleware/init'
@@ -70,9 +70,26 @@ export function setUncacheableHeaders(event: H3Event) {
   }
 }
 
-export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext) {
+export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sourceHeaders?: Headers) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
   setLinkHeader(event, ctx, 'markdown')
+  // A representation change must not turn a private response into public content.
+  const privateResponse = [
+    'cache-control',
+    'cdn-cache-control',
+    'cloudflare-cdn-cache-control',
+    'netlify-cdn-cache-control',
+    'vercel-cdn-cache-control',
+    'surrogate-control',
+  ].some((header) => {
+    const value = `${getResponseHeader(event, header) || ''},${sourceHeaders?.get(header) || ''}`
+    return /(?:^|,)\s*(?:private|no-store|no-cache)\s*(?:,|=|$)/i.test(value)
+  })
+  if (getHeader(event, 'cookie') || getHeader(event, 'authorization')
+    || getResponseHeader(event, 'set-cookie') || sourceHeaders?.has('set-cookie') || privateResponse) {
+    setUncacheableHeaders(event)
+    return
+  }
   const cacheHeaders = ctx.config.markdownCacheHeaders
   if (cacheHeaders) {
     const { maxAge, swr } = cacheHeaders
