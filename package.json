@@ -148,6 +148,7 @@
   },
   "build": {
     "externals": [
+      "node:sqlite",
       "nuxt/server"
     ]
   }

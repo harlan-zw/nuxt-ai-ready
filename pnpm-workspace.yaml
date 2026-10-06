@@ -79,7 +79,6 @@ packages:
 
 overrides:
   nuxtseo-shared: ^6.0.0
-  h3: ^1.15.11
   vue: ^3.5.43
 
 allowBuilds:
@@ -123,7 +122,7 @@ catalog:
   nuxtseo-shared: ^6.0.0
   pathe: ^2.0.3
   postgres: ^3.4.9
-  site-config-stack: ^4.2.3
+  site-config-stack: ^5.0.0
   sitemapd: ^0.2.2
   ufo: ^1.6.4
   unbuild: ^3.6.1

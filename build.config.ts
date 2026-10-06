@@ -21,6 +21,7 @@ export default defineBuildConfig({
     },
   },
   externals: [
+    'node:sqlite',
     '@modelcontextprotocol/sdk',
     'webpack',
     'webpack-virtual-modules',
