@@ -5,6 +5,8 @@ export interface AiCatalog {
   specVersion: '1.0'
   entries: Array<{
     identifier: string
+    displayName: string
+    description?: string
     type: typeof MCP_SERVER_CARD_MEDIA_TYPE
     url: string
   }>

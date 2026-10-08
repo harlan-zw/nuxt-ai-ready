@@ -23,7 +23,7 @@ import { toMarkdownPath } from './runtime/markdown-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
-import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
+import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
@@ -300,6 +300,10 @@ export default defineNuxtModule<ModuleOptions>({
       nuxt.options.mcp = configuredMcpOptions
       ;(nuxt.options.mcp as Record<string, unknown>).name = mcpServerCardName
     }
+    if (nuxt.options.mcp !== false && config.mcp?.tools !== false && hasMcpSiteTools) {
+      nuxt.options.mcp = configuredMcpOptions
+      nuxt.options.mcp.instructions ??= 'Use this server when you need information from this site\'s indexed pages. Read the available tool descriptions before choosing a tool.'
+    }
 
     // Detect @nuxtjs/i18n / nuxt-i18n-micro and resolve runtime locale config
     const i18nConfig = await detectI18n({ autoI18n: config.autoI18n })
@@ -535,7 +539,9 @@ export default defineNuxtModule<ModuleOptions>({
       const mcpLink = {
         title: 'MCP',
         href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
-        description: 'Model Context Protocol server endpoint for AI agent integration.',
+        description: config.mcp?.tools !== false && hasMcpSiteTools
+          ? 'Use this MCP endpoint when you need information from this site\'s indexed pages.'
+          : 'Model Context Protocol server endpoint for AI agent integration.',
       }
       const firstSection = mergedLlmsTxt.sections?.[0]
       if (firstSection) {
@@ -664,6 +670,8 @@ export default defineNuxtModule<ModuleOptions>({
         const document = resolveAiCatalog({
           siteUrl: siteConfig.url,
           serverCardName: card.name,
+          serverCardTitle: card.title,
+          serverCardDescription: card.description,
           serverCardUrl: withSiteUrl(mcpServerCardRoute, { withBase: true }),
         })
         const aiCatalogEtag = createAiCatalogEtag(document)
@@ -675,21 +683,23 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         const aiCatalogHandler = resolve('./runtime/server/routes/ai-catalog')
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'get', handler: aiCatalogHandler, lazy: true })
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'head', handler: aiCatalogHandler, lazy: true })
-        addServerHandler({ route: AI_CATALOG_PATH, method: 'options', handler: aiCatalogHandler, lazy: true })
-        extendRouteRules(AI_CATALOG_PATH, {
-          sitemap: false,
-          headers: {
-            'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-            'Access-Control-Allow-Methods': 'GET, HEAD',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Expose-Headers': 'ETag',
-            'Cache-Control': `public, max-age=${aiCatalogCacheMaxAge}`,
-            'Content-Type': AI_CATALOG_MEDIA_TYPE,
-            'ETag': aiCatalogEtag,
-          },
-        })
+        for (const route of [ARD_PATH, AI_CATALOG_PATH]) {
+          addServerHandler({ route, method: 'get', handler: aiCatalogHandler, lazy: true })
+          addServerHandler({ route, method: 'head', handler: aiCatalogHandler, lazy: true })
+          addServerHandler({ route, method: 'options', handler: aiCatalogHandler, lazy: true })
+          extendRouteRules(route, {
+            sitemap: false,
+            headers: {
+              'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+              'Access-Control-Allow-Methods': 'GET, HEAD',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Expose-Headers': 'ETag',
+              'Cache-Control': `public, max-age=${aiCatalogCacheMaxAge}`,
+              'Content-Type': AI_CATALOG_MEDIA_TYPE,
+              'ETag': aiCatalogEtag,
+            },
+          })
+        }
       }
     })
 

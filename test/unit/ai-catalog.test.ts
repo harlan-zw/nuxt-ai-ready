@@ -14,15 +14,28 @@ describe('ai catalog', () => {
     expect(resolveAiCatalog({
       siteUrl: 'https://skilld.dev/docs/',
       serverCardName: 'dev.skilld/registry',
+      serverCardTitle: 'Skilld registry',
+      serverCardDescription: 'Find agent skills.',
       serverCardUrl: 'https://skilld.dev/docs/agent/mcp/server-card',
     })).toEqual({
       specVersion: '1.0',
       entries: [{
         identifier: 'urn:air:skilld.dev:mcp:registry',
+        displayName: 'Skilld registry',
+        description: 'Find agent skills.',
         type: 'application/mcp-server-card+json',
         url: 'https://skilld.dev/docs/agent/mcp/server-card',
       }],
     })
+  })
+
+  it('uses the server identity when no display title is configured', () => {
+    const catalog = resolveAiCatalog({
+      siteUrl: 'https://example.com',
+      serverCardName: 'com.example/search',
+      serverCardUrl: 'https://example.com/mcp/server-card',
+    })
+    expect(catalog.entries[0]?.displayName).toBe('com.example/search')
   })
 
   it('creates stable strong ETags and matches conditional requests', () => {

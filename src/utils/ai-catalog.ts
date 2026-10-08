@@ -6,12 +6,15 @@ import {
 } from '../runtime/server/utils/discovery-response'
 
 export const AI_CATALOG_PATH = '/.well-known/ai-catalog.json'
+export const ARD_PATH = '/.well-known/ard.json'
 export { AI_CATALOG_MEDIA_TYPE } from '../runtime/server/utils/discovery-response'
 export type { AiCatalog }
 
 export function resolveAiCatalog(input: {
   siteUrl: string
   serverCardName: string
+  serverCardTitle?: string
+  serverCardDescription?: string
   serverCardUrl: string
 }): AiCatalog {
   const hostname = new URL(input.siteUrl).hostname
@@ -21,6 +24,8 @@ export function resolveAiCatalog(input: {
     specVersion: '1.0',
     entries: [{
       identifier: `urn:air:${hostname}:mcp:${serverName}`,
+      displayName: input.serverCardTitle || input.serverCardName,
+      ...(input.serverCardDescription ? { description: input.serverCardDescription } : {}),
       type: MCP_SERVER_CARD_MEDIA_TYPE,
       url: input.serverCardUrl,
     }],
