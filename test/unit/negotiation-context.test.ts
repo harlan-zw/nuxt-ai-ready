@@ -1,11 +1,13 @@
 import type { H3Event } from 'h3'
-import { describe, expect, it, vi } from 'vitest'
-import { getHeaders } from '#nuxtseo/h3'
-import { buildNegotiationContext, decideNegotiation } from '../../src/runtime/server/utils/negotiation-response'
+import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
+import { createSiteConfigStack } from 'site-config-stack'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getHeaders, getResponseHeader } from '#nuxtseo/h3'
+import { buildNegotiationContext, decideNegotiation, setLinkHeader, setStatusAwareHeader } from '../../src/runtime/server/utils/negotiation-response'
 
 const { match, config } = vi.hoisted(() => ({
   match: vi.fn((path: string) => ({ cache: path === '/disabled' })),
-  config: { 'app': { baseURL: '/' }, 'nuxt-ai-ready': { contentNegotiation: 'auto' } },
+  config: { 'app': { baseURL: '/' }, 'nuxt-ai-ready': { contentNegotiation: 'auto', i18n: null as RuntimeI18nConfig | null } },
 }))
 vi.mock('#nuxtseo/h3', async (original) => {
   const h3 = await original<typeof import('#nuxtseo/h3')>()
@@ -18,10 +20,99 @@ vi.mock('#nuxtseo/nitro', () => ({
   defineNitroPlugin: (plugin: unknown) => plugin,
   useRuntimeConfig: () => config,
 }))
-vi.mock('#site-config/server/composables/utils', () => ({
-  withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
-}))
+vi.mock('nuxt/server', () => ({ useRuntimeConfig: () => config }))
+// Simulate the supported Site Config API without the newer path resolver.
+vi.mock('#site-config/server/composables/utils', async () => {
+  const utils = await import('../../node_modules/nuxt-site-config/dist/runtime/server/composables/utils.js')
+  return { createSitePathResolver: undefined, withSiteUrl: utils.withSiteUrl }
+})
 vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
+
+beforeEach(() => {
+  config.app.baseURL = '/'
+  config['nuxt-ai-ready'].i18n = null
+})
+
+function headerEvent(origin: string, configuredUrl = true) {
+  const siteConfig = createSiteConfigStack()
+  siteConfig.push({ url: configuredUrl ? origin : undefined, env: 'production' })
+  const url = new URL('/about', origin)
+  const event = {
+    req: new Request(url),
+    url,
+    path: url.pathname,
+    res: { headers: new Headers() },
+    context: { siteConfig, siteConfigNitroOrigin: origin, _initedSiteConfig: true },
+  } as unknown as H3Event
+  return { event, siteConfig }
+}
+
+describe('request-specific header URL resolution', () => {
+  it('generates Link headers without createSitePathResolver', () => {
+    const { event } = headerEvent('https://example.com')
+    const context = buildNegotiationContext(event, '/about')
+
+    setLinkHeader(event, context, 'markdown')
+
+    expect(getResponseHeader(event, 'link')).toContain('<https://example.com/about>; rel="canonical"')
+  })
+
+  it('keeps relative links when site configuration cannot resolve', () => {
+    const { event, siteConfig } = headerEvent('https://example.com')
+    siteConfig.get = () => {
+      throw new Error('Site configuration unavailable')
+    }
+    const context = buildNegotiationContext(event, '/about')
+
+    setLinkHeader(event, context, 'html')
+
+    expect(getResponseHeader(event, 'link')).toBe('</about.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"')
+  })
+
+  it('keeps the request origin fallback and adds the app base once', () => {
+    config.app.baseURL = '/docs/'
+    const { event } = headerEvent('https://fallback.example', false)
+    const context = buildNegotiationContext(event, '/about')
+
+    setLinkHeader(event, context, 'markdown')
+
+    expect(getResponseHeader(event, 'link')).toContain('<https://fallback.example/docs/about>; rel="canonical"')
+    expect(getResponseHeader(event, 'link')).toContain('<https://fallback.example/docs/llms.txt>; rel="describedby"')
+  })
+
+  it('keeps each request origin separate when responses interleave', () => {
+    const first = headerEvent('https://one.example')
+    const second = headerEvent('https://two.example')
+    const firstContext = buildNegotiationContext(first.event, '/about')
+    const secondContext = buildNegotiationContext(second.event, '/about')
+
+    setLinkHeader(first.event, firstContext, 'html')
+    setLinkHeader(second.event, secondContext, 'html')
+    setLinkHeader(first.event, firstContext, 'markdown')
+
+    expect(getResponseHeader(first.event, 'link')).toContain('<https://one.example/about>; rel="canonical"')
+    expect(getResponseHeader(second.event, 'link')).toContain('<https://two.example/about.md>; rel="alternate"')
+  })
+
+  it('reads changes made by asynchronous hooks before the next header build', async () => {
+    config['nuxt-ai-ready'].i18n = {
+      defaultLocale: 'en',
+      strategy: 'prefix_except_default',
+      locales: [{ code: 'en', hreflang: 'en' }, { code: 'fr', hreflang: 'fr' }],
+    }
+    const { event, siteConfig } = headerEvent('https://before.example')
+    const context = buildNegotiationContext(event, '/about')
+    setStatusAwareHeader(event, context, 'html')
+    expect(getResponseHeader(event, 'link')).toContain('https://before.example/about.md')
+
+    await Promise.resolve()
+    siteConfig.push({ url: 'https://after.example', trailingSlash: true, _priority: 100 })
+    setLinkHeader(event, context, 'markdown')
+
+    expect(getResponseHeader(event, 'link')).toContain('<https://after.example/about/>; rel="canonical"')
+    expect(context.resolveUrl('/about')).toBe('https://after.example/about/')
+  })
+})
 
 describe('negotiation locale context', () => {
   it.each([
