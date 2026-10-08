@@ -9,9 +9,9 @@ const NEGOTIATION_CACHE_HEADERS = CONTENT_NEGOTIATION_VARY
 export interface NegotiationRouteRule {
   cache?: boolean | Record<string, unknown> & {
     headersOnly?: boolean
-    varies?: string[]
+    varies?: readonly string[]
   }
-  isr?: boolean | number | { expiration: number }
+  isr?: boolean | number | { expiration?: number | false }
 }
 
 export type ContentNegotiationResolution
