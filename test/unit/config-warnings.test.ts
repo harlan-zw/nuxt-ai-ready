@@ -9,6 +9,25 @@ const defaults = {
 }
 
 describe('resolveConfigurationWarnings', () => {
+  it('includes a working cache fix and explains why HTTP Vary alone is insufficient', () => {
+    const varies = ['accept', 'sec-fetch-dest', 'user-agent']
+    const [warning] = resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { maxAge: 3600 } } } })
+    expect(warning).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
+    expect(warning).toContain('Keep existing cache options and varies entries.')
+    expect(warning).toContain('HTTP Vary alone does not change Nitro\'s cache key.')
+    expect(warning).toContain('https://nuxtseo.com/docs/ai-ready/guides/markdown#cache-safety')
+    expect(resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { maxAge: 3600, varies } } } })).toEqual([])
+  })
+
+  it('includes the SSR-independent fix for ISR and unsafe explicit negotiation', () => {
+    const [isr] = resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { isr: true } } })
+    expect(isr).toContain('isr: false')
+    expect(isr).toContain('use explicit .md URLs')
+    const [override] = resolveConfigurationWarnings({ ...defaults, policy: 'enabled', routeRules: { '/docs/**': { cache: true } } })
+    expect(override).toContain('aiReady: { contentNegotiation: \'auto\' }')
+    expect(override).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
+  })
+
   it('warns when ISR and unvaried caches disable automatic negotiation', () => {
     const warnings = resolveConfigurationWarnings({
       ...defaults,
