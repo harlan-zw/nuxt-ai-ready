@@ -43,7 +43,9 @@ describe('database disabled', async () => {
   })
 
   it('returns empty runtime page data through the public server alias', async () => {
-    expect(await $fetch(url('/api/database'))).toEqual({
+    const response = await fetch(url('/api/database'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
       pages: [],
       page: null,
       count: 0,
