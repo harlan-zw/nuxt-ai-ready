@@ -88,6 +88,6 @@ describe('content negotiation with response caching', async () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/markdown')
-    expect(response.headers.get('vary')).toBeNull()
+    expect(response.headers.get('vary')).toBe('Accept')
   })
 })

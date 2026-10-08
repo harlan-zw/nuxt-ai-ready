@@ -17,6 +17,7 @@ describe('prerenderedMarkdownHeaderRules', () => {
     expect(rules).toHaveLength(1)
     expect(rules[0]!.route).toBe('/crawled.md')
     expect(rules[0]!.headers['Content-Type']).toBe('text/markdown; charset=utf-8')
+    expect(rules[0]!.headers.Vary).toBe('Accept')
     expect(rules[0]!.headers.Link).toContain('</crawled>; rel="alternate"; type="text/html"')
     expect(rules[0]!.headers.Link).toContain('</crawled>; rel="canonical"')
     expect(rules[0]!.headers.Link).toContain('</llms.txt>; rel="describedby"')

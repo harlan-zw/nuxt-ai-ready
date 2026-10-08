@@ -1,4 +1,5 @@
 import { defu } from 'defu'
+import { mergeVaryHeader } from '../runtime/cache-control'
 import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
@@ -84,6 +85,7 @@ export function prerenderedMarkdownHeaderRules(
         route: mdRoute,
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
+          'Vary': 'Accept',
           'Link': buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby),
         },
       })
@@ -157,6 +159,20 @@ export function applyStaticMarkdownHeaderPlan(
     }
     return
   }
-  for (const { route, headers } of plan.rules)
-    routeRules[route] = defu({ headers }, routeRules[route])
+  for (const { route, headers } of plan.rules) {
+    const existing = routeRules[route] as { headers?: Record<string, string> } | undefined
+    const merged = defu({ headers: { ...headers } }, existing)
+    const vary = Object.entries(existing?.headers || {})
+      .filter(([name]) => name.toLowerCase() === 'vary')
+      .map(([, value]) => value)
+      .join(', ')
+    if (headers.Vary) {
+      for (const name of Object.keys(merged.headers)) {
+        if (name.toLowerCase() === 'vary')
+          delete merged.headers[name]
+      }
+      merged.headers.Vary = mergeVaryHeader(vary, headers.Vary)
+    }
+    routeRules[route] = merged
+  }
 }

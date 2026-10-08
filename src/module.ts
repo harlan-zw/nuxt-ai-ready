@@ -1161,6 +1161,7 @@ export function trackDrizzleWork(event, work) { return work }
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
           'Link': buildStaticMarkdownLinkHeader(route, staticBaseURL, config.describedby !== false),
+          'Vary': 'Accept',
         },
       })
     }
@@ -1210,6 +1211,7 @@ export function trackDrizzleWork(event, work) { return work }
             'Content-Type',
             'text/markdown; charset=utf-8',
           )
+          mergedHeaders = ensureStaticHeader(mergedHeaders, '/*.md', 'Vary', 'Accept', 'append')
           if (config.describedby !== false) {
             mergedHeaders = ensureStaticHeader(
               mergedHeaders,

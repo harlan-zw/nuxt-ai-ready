@@ -64,6 +64,15 @@ describe('accept header negotiation for prerendered routes', async () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/markdown')
+    expect(response.headers.get('vary')).toContain('Accept')
+    expect(await response.text()).toContain('#')
+  })
+
+  it('returns markdown with Accept variation when following homepage negotiation', async () => {
+    const response = await fetch(url('/'), { headers: { Accept: 'text/markdown' } })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/markdown')
+    expect(response.headers.get('vary')).toContain('Accept')
     expect(await response.text()).toContain('#')
   })
 })
