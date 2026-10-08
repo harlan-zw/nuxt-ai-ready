@@ -8,7 +8,7 @@ import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
 import { appendHeader, createError, getHeader, getRequestHost, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { createSitePathResolver, withSiteUrl } from '#site-config/server/composables/utils'
+import * as siteConfigUtils from '#site-config/server/composables/utils'
 import { initRequestSiteConfig } from '#site-config/server/init'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
@@ -42,12 +42,17 @@ export interface NegotiationContext {
 type NegotiationResponse = Awaited<ReturnType<typeof sendRedirect>> | undefined
 
 function createHeaderUrlResolver(event: H3Event, ctx: NegotiationContext): LinkUrlResolver {
+  // `createSitePathResolver` was added after the supported Site Config floor.
+  // Older versions retain the established resolver through the context.
+  if (!siteConfigUtils.createSitePathResolver)
+    return ctx.resolveUrl
+
   // Capture site configuration only for this synchronous header build. The
   // context's live resolver still observes changes after asynchronous hooks.
   let resolveUrl: LinkUrlResolver | undefined
   return (path) => {
     // Keep setup inside the builder's existing relative-link error fallback.
-    resolveUrl ??= createSitePathResolver(event, { absolute: true, withBase: true })
+    resolveUrl ??= siteConfigUtils.createSitePathResolver(event, { absolute: true, withBase: true })
     return resolveUrl(ctx.resolvePath(path))
   }
 }
@@ -128,7 +133,7 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
     config: runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig,
     path,
     resolvePath,
-    resolveUrl: (target: string) => withSiteUrl(event, resolvePath(target), { withBase: true }),
+    resolveUrl: (target: string) => siteConfigUtils.withSiteUrl(event, resolvePath(target), { withBase: true }),
     routeContext: { host: getRequestHost(event, { xForwardedHost: true }) },
   }
 }

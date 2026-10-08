@@ -21,7 +21,11 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => config,
 }))
 vi.mock('nuxt/server', () => ({ useRuntimeConfig: () => config }))
-vi.mock('#site-config/server/composables/utils', async () => import('../../node_modules/nuxt-site-config/dist/runtime/server/composables/utils.js'))
+// Simulate the supported Site Config API without the newer path resolver.
+vi.mock('#site-config/server/composables/utils', async () => {
+  const utils = await import('../../node_modules/nuxt-site-config/dist/runtime/server/composables/utils.js')
+  return { createSitePathResolver: undefined, withSiteUrl: utils.withSiteUrl }
+})
 vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
 
 beforeEach(() => {
@@ -44,6 +48,15 @@ function headerEvent(origin: string, configuredUrl = true) {
 }
 
 describe('request-specific header URL resolution', () => {
+  it('generates Link headers without createSitePathResolver', () => {
+    const { event } = headerEvent('https://example.com')
+    const context = buildNegotiationContext(event, '/about')
+
+    setLinkHeader(event, context, 'markdown')
+
+    expect(getResponseHeader(event, 'link')).toContain('<https://example.com/about>; rel="canonical"')
+  })
+
   it('keeps relative links when site configuration cannot resolve', () => {
     const { event, siteConfig } = headerEvent('https://example.com')
     siteConfig.get = () => {
