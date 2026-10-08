@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 const cardRoute = '/docs/agent/mcp/server-card'
 const aiCatalogRoute = '/.well-known/ai-catalog.json'
+const ardRoute = '/.well-known/ard.json'
 
 async function mcpRequest(method: string, params?: Record<string, unknown>) {
   const response = await fetch('/docs/agent/mcp', {
@@ -79,6 +80,7 @@ describe('late MCP Server Card dependency', async () => {
 
     expect(cardResponse.name).toBe(initialize.result.serverInfo.name)
     expect(cardResponse.version).toBe(initialize.result.serverInfo.version)
+    expect(initialize.result.instructions).toBe('Read resources before calling tools.')
     expect(cardResponse.remotes[0].supportedProtocolVersions).toContain(initialize.result.protocolVersion)
     expect(tools.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'get_page_markdown',
@@ -143,8 +145,8 @@ describe('late MCP Server Card dependency', async () => {
     expect(homeResponse.headers.get('link')).toContain('rel="api-catalog"')
   })
 
-  it('publishes origin-level AI Catalog discovery for the Server Card', async () => {
-    const response = await fetch(aiCatalogRoute, {
+  it.each([aiCatalogRoute, ardRoute])('publishes named origin-level discovery at %s', async (route) => {
+    const response = await fetch(route, {
       headers: { accept: 'application/ai-catalog+json' },
     })
 
@@ -155,29 +157,31 @@ describe('late MCP Server Card dependency', async () => {
       specVersion: '1.0',
       entries: [{
         identifier: 'urn:air:late-mcp.example.com:mcp:ai-ready',
+        displayName: 'Late MCP discovery',
+        description: 'MCP server installed by a later wrapper module.',
         type: 'application/mcp-server-card+json',
         url: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
       }],
     })
   })
 
-  it('supports AI Catalog HEAD and conditional requests', async () => {
-    const first = await fetch(aiCatalogRoute)
+  it.each([aiCatalogRoute, ardRoute])('supports discovery HEAD and conditional requests at %s', async (route) => {
+    const first = await fetch(route)
     const etag = first.headers.get('etag')
     expect(etag).toMatch(/^"[a-f0-9]{64}"$/)
 
-    const head = await fetch(aiCatalogRoute, { method: 'HEAD' })
+    const head = await fetch(route, { method: 'HEAD' })
     expect(head.status).toBe(200)
     expect(await head.text()).toBe('')
 
-    const conditional = await fetch(aiCatalogRoute, {
+    const conditional = await fetch(route, {
       headers: { 'if-none-match': etag! },
     })
     expect(conditional.status).toBe(304)
     expect(await conditional.text()).toBe('')
   })
 
-  it.each([cardRoute, aiCatalogRoute])('supports browser CORS preflights for %s', async (route) => {
+  it.each([cardRoute, aiCatalogRoute, ardRoute])('supports browser CORS preflights for %s', async (route) => {
     const response = await fetch(route, {
       method: 'OPTIONS',
       headers: {
