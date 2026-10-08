@@ -42,6 +42,16 @@ describe('database disabled', async () => {
     expect(debug.config.database.type).toBe('none')
   })
 
+  it('returns empty runtime page data through the public server alias', async () => {
+    expect(await $fetch(url('/api/database'))).toEqual({
+      pages: [],
+      page: null,
+      count: 0,
+      search: [],
+      streamed: [],
+    })
+  })
+
   it('does not serve the runtime indexing endpoints', async () => {
     const [status, poll] = await Promise.all([
       fetch(url('/__ai-ready/status')),

@@ -2,6 +2,7 @@ import { resolve } from 'pathe'
 import { defineConfig, defineProject } from 'vitest/config'
 
 const aliases = {
+  '#ai-ready-virtual/database-runtime.mjs': resolve('./src/runtime/server/db/drizzle/index.ts'),
   // Virtual module aliases for unit tests - defaults to sqlite
   '#ai-ready-virtual/db-provider.mjs': resolve('./src/runtime/server/db/drizzle/providers/node-sqlite.ts'),
   '#ai-ready-virtual/db-schema.mjs': resolve('./src/runtime/server/db/schema/sqlite.ts'),
