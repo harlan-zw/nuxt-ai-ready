@@ -14,7 +14,7 @@
     "vue-router": "^5.3.1",
     "@nuxtjs/robots": "https://pkg.pr.new/nuxt-modules/robots/@nuxtjs/robots@24f4dcdbf3cd8d4c19a210b62eec8295eb4772a7",
     "@nuxtjs/sitemap": "https://pkg.pr.new/nuxt-modules/sitemap/@nuxtjs/sitemap@7879681b68064274eea0be819003669b9422b60d",
-    "nuxt-site-config": "https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@59e27b8dc55b21407ce19dfdbb7be0c6571e9490",
+    "nuxt-site-config": "https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@de5eb910ac100b3776d6481a09e79638c65a8ae7",
     "nuxt-ai-ready": "link:../../.."
   },
   "devDependencies": {
