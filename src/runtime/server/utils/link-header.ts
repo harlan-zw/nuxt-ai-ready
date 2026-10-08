@@ -35,16 +35,13 @@ function resolveHeaderUrl(path: string, resolveUrl?: LinkUrlResolver): string {
   }
 }
 
-/**
- * Build a comma-joined Link header value with the standard alternates plus i18n hreflang variants.
- */
-export function buildLinkHeader(
+/** Build the request-specific links shared by success and error responses. */
+function buildBaseParts(
   path: string,
   variant: 'html' | 'markdown',
   config: LinkHeaderConfig,
   resolveUrl?: LinkUrlResolver,
-  routeContext: RuntimeRouteContext = {},
-): string {
+): string[] {
   const parts: string[] = []
   if (variant === 'html') {
     const href = resolveHeaderUrl(toMarkdownPath(path), resolveUrl)
@@ -61,6 +58,17 @@ export function buildLinkHeader(
     parts.push(`<${encodePathForHeader(href)}>; rel="describedby"`)
   }
 
+  return parts
+}
+
+function appendLocaleParts(
+  parts: string[],
+  path: string,
+  variant: 'html' | 'markdown',
+  config: LinkHeaderConfig,
+  resolveUrl: LinkUrlResolver | undefined,
+  routeContext: RuntimeRouteContext,
+) {
   if (config.i18n) {
     const alternates = computeLocaleAlternates(path, config.i18n, routeContext)
     for (const alt of alternates) {
@@ -72,8 +80,46 @@ export function buildLinkHeader(
       parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; hreflang="${alt.hreflang}"`)
     }
   }
+}
+
+function appendCatalogPart(parts: string[], config: LinkHeaderConfig) {
   if (config.apiCatalog) {
-    parts.push(`<${encodePathForHeader(config.apiCatalog.href)}>; rel="api-catalog"`)
+    const catalog = `<${encodePathForHeader(config.apiCatalog.href)}>; rel="api-catalog"`
+    parts.push(catalog)
+    return catalog
   }
+}
+
+export function buildLinkHeader(
+  path: string,
+  variant: 'html' | 'markdown',
+  config: LinkHeaderConfig,
+  resolveUrl?: LinkUrlResolver,
+  routeContext: RuntimeRouteContext = {},
+): string {
+  const parts = buildBaseParts(path, variant, config, resolveUrl)
+  appendLocaleParts(parts, path, variant, config, resolveUrl, routeContext)
+  appendCatalogPart(parts, config)
   return parts.join(', ')
+}
+
+/** Resolve request-specific URLs once for both success and error responses. */
+export function buildStatusAwareLinkHeaders(
+  path: string,
+  variant: 'html' | 'markdown',
+  config: LinkHeaderConfig,
+  resolveUrl?: LinkUrlResolver,
+  routeContext: RuntimeRouteContext = {},
+): { error: string, success: string } {
+  const parts = buildBaseParts(path, variant, config, resolveUrl)
+  const safeParts = parts.slice()
+  const catalog = appendCatalogPart(safeParts, config)
+  const error = safeParts.join(', ')
+  if (!config.i18n)
+    return { error, success: error }
+
+  appendLocaleParts(parts, path, variant, config, resolveUrl, routeContext)
+  if (catalog)
+    parts.push(catalog)
+  return { error, success: parts.join(', ') }
 }

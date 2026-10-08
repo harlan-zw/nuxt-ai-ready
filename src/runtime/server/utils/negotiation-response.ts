@@ -14,7 +14,7 @@ import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { setStatusAwareLinkHeader } from '../plugins/link-header'
 import { CONTENT_NEGOTIATION_VARY } from './content-negotiation'
-import { buildLinkHeader } from './link-header'
+import { buildLinkHeader, buildStatusAwareLinkHeaders } from './link-header'
 import { toMarkdownRequest } from './markdown-request'
 import { resolveNegotiationDecision } from './negotiation-decision'
 
@@ -46,14 +46,13 @@ export function setLinkHeader(event: H3Event, ctx: NegotiationContext, variant: 
 }
 
 export function setStatusAwareHeader(event: H3Event, ctx: NegotiationContext, variant: 'html' | 'markdown') {
-  const successHeader = buildLinkHeader(ctx.path, variant, ctx.config, ctx.resolveUrl, ctx.routeContext)
   if (!ctx.config.i18n) {
-    setHeader(event, 'link', successHeader)
+    setLinkHeader(event, ctx, variant)
     return
   }
 
-  const safeHeader = buildLinkHeader(ctx.path, variant, { ...ctx.config, i18n: null }, ctx.resolveUrl, ctx.routeContext)
-  setStatusAwareLinkHeader(event, safeHeader, successHeader)
+  const headers = buildStatusAwareLinkHeaders(ctx.path, variant, ctx.config, ctx.resolveUrl, ctx.routeContext)
+  setStatusAwareLinkHeader(event, headers.error, headers.success)
 }
 
 export function setUncacheableHeaders(event: H3Event) {
