@@ -44,6 +44,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     aiReadyCompatMarker: 'nuxt-5',
   },
+  routeRules: {
+    '/cache/**': { cache: { maxAge: 3600, varies: ['accept'] } },
+  },
   vite: {
     resolve: {
       dedupe: ['nuxt', 'vue', 'vue-router'],

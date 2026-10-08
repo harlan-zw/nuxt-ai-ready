@@ -78,6 +78,7 @@ export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
   contentNegotiation: ContentNegotiationPolicy
+  botNegotiation: boolean
   version: string
   sitemapMd: boolean
   describedby: boolean
@@ -959,6 +960,7 @@ export function trackDrizzleWork(event, work) { return work }
         : config.contentNegotiation
           ? 'enabled'
           : 'disabled',
+      botNegotiation: config.botNegotiation === true,
       mdreamOptions: config.mdreamOptions || {},
       sitemapMd: config.sitemapMd !== false,
       describedby: config.describedby !== false,
@@ -1000,6 +1002,11 @@ export function trackDrizzleWork(event, work) { return work }
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown'),
     })
+    if (getNitroVersion(nuxt) === 3) {
+      // Nitro 3 response caches invoke the page handler without global middleware.
+      // Keep Markdown conversion behind application middleware, outside that cache.
+      extendRouteRules('/**.md', { cache: false })
+    }
     addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
       ? './runtime/server/plugins/link-header-nitro3'
       : './runtime/server/plugins/link-header'))
@@ -1160,6 +1167,7 @@ export function trackDrizzleWork(event, work) { return work }
         return
       const warnings = resolveConfigurationWarnings({
         policy: (nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig).contentNegotiation,
+        botNegotiation: config.botNegotiation === true,
         static: nitro.options.static === true || isStatic,
         siteUrl: siteConfig.url || undefined,
         routeRules: nitro.options.routeRules,

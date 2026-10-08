@@ -144,12 +144,20 @@ export interface ModuleOptions {
   debug?: boolean
 
   /**
-   * Negotiate Markdown on HTML routes through Accept and User-Agent headers.
+   * Negotiate Markdown on HTML routes through Accept headers.
    * Disable when a deployment cache cannot vary responses by request headers.
    * Explicit .md routes remain available.
    * @default Automatic per route
    */
   contentNegotiation?: boolean
+
+  /**
+   * Offer Markdown to AI bots even when their Accept header prefers HTML.
+   * Requires cache variation on Accept, Sec-Fetch-Dest, and User-Agent.
+   * Disable to avoid fragmenting caches by raw User-Agent strings.
+   * @default false
+   */
+  botNegotiation?: boolean
 
   /**
    * Publish an RFC 9727 API Catalog at `/.well-known/api-catalog`.

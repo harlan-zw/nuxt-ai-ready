@@ -6,7 +6,7 @@ describe('resolveContentNegotiation', () => {
     expect(resolveContentNegotiation({
       policy: 'auto',
       routeRule: {},
-    })).toEqual({ _tag: 'enabled', source: 'default' })
+    })).toEqual({ _tag: 'enabled', source: 'default', vary: 'Accept' })
   })
 
   it.each([
@@ -24,14 +24,13 @@ describe('resolveContentNegotiation', () => {
     expect(resolveContentNegotiation({
       policy: 'auto',
       routeRule: { isr: false },
-    })).toEqual({ _tag: 'enabled', source: 'default' })
+    })).toEqual({ _tag: 'enabled', source: 'default', vary: 'Accept' })
   })
 
   it.each([
     {},
     { maxAge: 3600 },
     { swr: true },
-    { maxAge: 3600, varies: ['accept', 'sec-fetch-dest'] },
   ])('disables negotiation for a route cache without complete variation using %o', (cache) => {
     expect(resolveContentNegotiation({
       policy: 'auto',
@@ -45,10 +44,17 @@ describe('resolveContentNegotiation', () => {
       routeRule: {
         cache: {
           maxAge: 3600,
-          varies: ['User-Agent', 'ACCEPT', 'Sec-Fetch-Dest'],
+          varies: ['ACCEPT'],
         },
       },
-    })).toEqual({ _tag: 'enabled', source: 'default' })
+    })).toEqual({ _tag: 'enabled', source: 'default', vary: 'Accept' })
+  })
+
+  it('requires all bot inputs only when bot negotiation is enabled', () => {
+    expect(resolveContentNegotiation({ policy: 'auto', botNegotiation: true, routeRule: { cache: { varies: ['accept'] } } }))
+      .toEqual({ _tag: 'disabled', source: 'route-cache' })
+    expect(resolveContentNegotiation({ policy: 'auto', botNegotiation: true, routeRule: { cache: { varies: ['accept', 'sec-fetch-dest', 'user-agent'] } } }))
+      .toMatchObject({ _tag: 'enabled' })
   })
 
   it.each([
@@ -58,7 +64,7 @@ describe('resolveContentNegotiation', () => {
     expect(resolveContentNegotiation({
       policy: 'auto',
       routeRule: { cache },
-    })).toEqual({ _tag: 'enabled', source: 'default' })
+    })).toEqual({ _tag: 'enabled', source: 'default', vary: 'Accept' })
   })
 
   it.each(['enabled', 'disabled'] as const)('honors an explicit %s override before route caching', (policy) => {

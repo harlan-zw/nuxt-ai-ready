@@ -1,6 +1,6 @@
 import type { ContentNegotiationResult } from '@mdream/js/negotiate'
 import type { H3Event } from '#nuxtseo/h3'
-import { negotiateContent } from '@mdream/js/negotiate'
+import { negotiateContent, parseAcceptHeader } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeaders } from '#nuxtseo/h3'
 import { isReservedPath } from '../../markdown-path'
@@ -24,35 +24,38 @@ export function toMarkdownRequest(event: H3Event, isPrerender = !!import.meta.pr
   return { path: event.path, headers: getHeaders(event), isPrerender }
 }
 
-// Pure counterpart of negotiateRepresentation: layers AI bot detection on top
-// of Accept header negotiation. AI bots get markdown unless navigating a browser.
-export function negotiateRequestRepresentation(request: MarkdownRequest): ContentNegotiationResult {
+// Bot negotiation is optional. Default negotiation depends only on Accept.
+export function negotiateRequestRepresentation(request: MarkdownRequest, botNegotiation = false): ContentNegotiationResult {
   if (request.isPrerender || request.headers['x-nitro-prerender'])
     return 'html'
 
   const accept = request.headers.accept
-  const secFetchDest = request.headers['sec-fetch-dest']
+  const preference = negotiateContent(accept)
+  if (!botNegotiation || preference !== 'html' || request.headers['sec-fetch-dest'] === 'document')
+    return preference
 
-  if (negotiateContent(accept) === 'markdown')
-    return 'markdown'
-
-  if (secFetchDest === 'document')
-    return 'html'
+  // A heuristic must not override an explicit Markdown rejection.
+  const entries = parseAcceptHeader(accept?.toLowerCase() || '')
+  const matching = ['text/markdown', 'text/*', '*/*']
+    .map(type => entries.filter(entry => entry.type === type))
+    .find(group => group.length > 0)
+  if (matching && matching.every(entry => entry.q === 0))
+    return preference
 
   const botInfo = getBotInfo(request.headers)
   if (botInfo?.category === 'ai')
     return 'markdown'
 
-  return negotiateContent(accept, secFetchDest)
+  return preference
 }
 
 // H3 wrapper over the pure negotiation above.
-export function negotiateRepresentation(event: H3Event): ContentNegotiationResult {
-  return negotiateRequestRepresentation(toMarkdownRequest(event))
+export function negotiateRepresentation(event: H3Event, botNegotiation = false): ContentNegotiationResult {
+  return negotiateRequestRepresentation(toMarkdownRequest(event), botNegotiation)
 }
 
 export type MarkdownRequestMode
-  = | { _tag: 'runtime', contentNegotiation: boolean }
+  = | { _tag: 'runtime', contentNegotiation: boolean, botNegotiation?: boolean }
     | { _tag: 'prerender' }
 
 export type MarkdownRenderInfo
@@ -91,7 +94,7 @@ export function getRequestRenderInfo(
   const negotiation: ContentNegotiationResult = isPrerender
     ? 'markdown'
     : mode.contentNegotiation
-      ? negotiateRequestRepresentation(request)
+      ? negotiateRequestRepresentation(request, mode.botNegotiation)
       : 'html'
 
   if (isExplicit) {
@@ -118,6 +121,6 @@ function normalizePath(path: string): string {
   return path
 }
 
-export function clientPrefersMarkdown(event: H3Event): boolean {
-  return negotiateRepresentation(event) === 'markdown'
+export function clientPrefersMarkdown(event: H3Event, botNegotiation = false): boolean {
+  return negotiateRepresentation(event, botNegotiation) === 'markdown'
 }

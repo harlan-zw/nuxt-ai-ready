@@ -56,7 +56,7 @@ describe('content negotiation with response caching', async () => {
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toBe('/index.md')
-    expect(response.headers.get('vary')).toBe('Accept-Encoding, Accept, Sec-Fetch-Dest, User-Agent')
+    expect(response.headers.get('vary')).toBe('Accept-Encoding, Accept')
     expect(response.headers.get('cache-control')).toContain('no-store')
     expect(response.headers.get('cdn-cache-control')).toBe('no-store')
     expect(response.headers.get('cloudflare-cdn-cache-control')).toBe('no-store')
@@ -78,7 +78,7 @@ describe('content negotiation with response caching', async () => {
     expect(markdownResponse.status).toBe(307)
     expect(htmlResponse.status).toBe(200)
     expect(htmlResponse.headers.get('content-type')).toContain('text/html')
-    expect(htmlResponse.headers.get('vary')).toBe('Accept, Sec-Fetch-Dest, User-Agent')
+    expect(htmlResponse.headers.get('vary')).toBe('Accept')
   })
 
   it('keeps explicit Markdown routes on ISR paths', async () => {

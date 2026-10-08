@@ -10,9 +10,9 @@ const defaults = {
 
 describe('resolveConfigurationWarnings', () => {
   it('includes a working cache fix and explains why HTTP Vary alone is insufficient', () => {
-    const varies = ['accept', 'sec-fetch-dest', 'user-agent']
+    const varies = ['accept']
     const [warning] = resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { maxAge: 3600 } } } })
-    expect(warning).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
+    expect(warning).toContain('cache: { varies: [\'accept\'] }')
     expect(warning).toContain('Keep existing cache options and varies entries.')
     expect(warning).toContain('HTTP Vary alone does not change Nitro\'s cache key.')
     expect(warning).toContain('https://nuxtseo.com/docs/ai-ready/guides/markdown#cache-safety')
@@ -24,8 +24,23 @@ describe('resolveConfigurationWarnings', () => {
     expect(isr).toContain('isr: false')
     expect(isr).toContain('use explicit .md URLs')
     const [override] = resolveConfigurationWarnings({ ...defaults, policy: 'enabled', routeRules: { '/docs/**': { cache: true } } })
-    expect(override).toContain('aiReady: { contentNegotiation: \'auto\' }')
-    expect(override).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
+    expect(override).toContain('Remove aiReady.contentNegotiation')
+    expect(override).not.toContain('contentNegotiation: \'auto\'')
+    expect(override).toContain('cache: { varies: [\'accept\'] }')
+  })
+
+  it('offers the cheaper bot opt-out before expensive cache variation', () => {
+    const [warning] = resolveConfigurationWarnings({ ...defaults, botNegotiation: true, routeRules: { '/docs/**': { cache: { varies: ['accept'] } } } })
+    expect(warning).toContain('aiReady: { botNegotiation: false }')
+    expect(warning).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
+    expect(warning).toContain('Raw User-Agent variation can create many cache entries.')
+    expect(resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { varies: ['accept'] } } } })).toEqual([])
+  })
+
+  it('restores automatic negotiation with a valid public configuration action', () => {
+    const [warning] = resolveConfigurationWarnings({ ...defaults, policy: 'disabled' })
+    expect(warning).toContain('Remove aiReady.contentNegotiation')
+    expect(warning).not.toContain('contentNegotiation: \'auto\'')
   })
 
   it('warns when ISR and unvaried caches disable automatic negotiation', () => {

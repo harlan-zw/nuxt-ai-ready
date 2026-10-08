@@ -14,7 +14,6 @@ import { mergeVaryHeader } from '../../cache-control'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { setStatusAwareLinkHeader } from '../plugins/link-header'
-import { CONTENT_NEGOTIATION_VARY } from './content-negotiation'
 import { buildLinkHeader, buildStatusAwareLinkHeaders } from './link-header'
 import { toMarkdownRequest } from './markdown-request'
 import { resolveNegotiationDecision } from './negotiation-decision'
@@ -149,6 +148,7 @@ interface RequestDecision {
   owner: object
   path: string
   policy: ModulePublicRuntimeConfig['contentNegotiation']
+  botNegotiation: boolean
   decision: NegotiationDecision
 }
 
@@ -168,16 +168,18 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
   const context = event.context as typeof event.context & { [REQUEST_DECISION]?: RequestDecision }
   const owner = event.node?.req ?? event.req ?? event
   let cached = context[REQUEST_DECISION]
-  if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation) {
+  if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation || cached.botNegotiation !== config.botNegotiation) {
     cached = {
       owner,
       path: event.path,
       policy: config.contentNegotiation,
+      botNegotiation: config.botNegotiation,
       decision: resolveNegotiationDecision({
         stage: 'middleware',
         request: toMarkdownRequest(event),
         routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
         policy: config.contentNegotiation,
+        botNegotiation: config.botNegotiation,
         artifactPaths: agentSkillArtifactPaths(),
       }),
     }
@@ -207,7 +209,7 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   context[APPLIED_KEY] = true
 
   if (decision._tag === 'not-acceptable') {
-    appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
+    appendHeader(event, 'vary', decision.vary)
     setUncacheableHeaders(event)
     throw createError({
       statusCode: 406,
@@ -223,7 +225,7 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   // HTML response continue.
   if (decision._tag === 'html') {
     if (decision.negotiation._tag === 'enabled')
-      appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
+      appendHeader(event, 'vary', decision.negotiation.vary)
     setStatusAwareHeader(event, ctx, 'html')
     return
   }
@@ -231,7 +233,7 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   // Implicit markdown: redirect to the `.md` twin so the prerendered file (or
   // the `.md` handler) answers. This keeps HTML and Markdown under separate
   // cache keys, which matters on CDNs that ignore Vary.
-  appendHeader(event, 'vary', CONTENT_NEGOTIATION_VARY)
+  appendHeader(event, 'vary', decision.vary)
   setLinkHeader(event, ctx, 'html')
   setUncacheableHeaders(event)
   return sendRedirect(event, ctx.resolvePath(toMarkdownPath(decision.path)), 307)
