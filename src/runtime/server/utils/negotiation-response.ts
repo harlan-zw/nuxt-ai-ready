@@ -125,6 +125,15 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
 
 type RouteRuleMatcher = (path: string) => NegotiationRouteRule
 
+const REQUEST_DECISION = Symbol('nuxt-ai-ready:negotiation')
+
+interface RequestDecision {
+  owner: object
+  path: string
+  policy: ModulePublicRuntimeConfig['contentNegotiation']
+  decision: NegotiationDecision
+}
+
 // The matcher compiles a radix router from the route rules. Route rules never
 // change while the server runs, so reuse the matcher per runtime config.
 let matcherCache: { config: object, match: RouteRuleMatcher } | undefined
@@ -138,13 +147,28 @@ function getRouteRuleMatcher(runtimeConfig: object): RouteRuleMatcher {
 export function decideNegotiation(event: H3Event, stage: NegotiationStage): NegotiationDecision {
   const runtimeConfig = useRuntimeConfig(event)
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  return resolveNegotiationDecision({
-    stage,
-    request: toMarkdownRequest(event),
-    routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
-    policy: config.contentNegotiation,
-    artifactPaths: agentSkillArtifactPaths(),
-  })
+  const context = event.context as typeof event.context & { [REQUEST_DECISION]?: RequestDecision }
+  const owner = event.node?.req ?? event.req ?? event
+  let cached = context[REQUEST_DECISION]
+  if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation) {
+    cached = {
+      owner,
+      path: event.path,
+      policy: config.contentNegotiation,
+      decision: resolveNegotiationDecision({
+        stage: 'middleware',
+        request: toMarkdownRequest(event),
+        routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
+        policy: config.contentNegotiation,
+        artifactPaths: agentSkillArtifactPaths(),
+      }),
+    }
+    context[REQUEST_DECISION] = cached
+  }
+  // Explicit Markdown must still wait behind static assets and auth middleware.
+  return stage === 'early' && cached.decision._tag === 'render'
+    ? { _tag: 'skip', reason: 'deferred' }
+    : cached.decision
 }
 
 /**

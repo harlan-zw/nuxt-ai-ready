@@ -871,6 +871,55 @@ export const logger = createModuleLogger('nuxt-ai-ready', ${!!config.debug})
   throw new Error('[nuxt-ai-ready] The database is disabled. Set \`aiReady.database\` to store pages at runtime.')
 }`
 
+      const databaseRuntime = '#ai-ready-virtual/database-runtime.mjs'
+      if (database._tag === 'Disabled') {
+        // The public database barrel also reaches the ORM queries and schema.
+        // Prerender reads use the separate raw-query facade, so replacing these
+        // entry points removes the runtime ORM without losing build-time pages.
+        const databaseExports = [
+          'useDrizzle',
+          'useRawDb',
+          'completeCronRun',
+          'countPages',
+          'deleteInfoValue',
+          'getAllPages',
+          'getContentHashes',
+          'getInfoValue',
+          'getNextSitemapToCrawl',
+          'getPageByRoute',
+          'getPageLastmods',
+          'getPendingPages',
+          'getRecentCronRuns',
+          'getSitemapStatus',
+          'initSchema',
+          'markPageIndexed',
+          'markRoutesPending',
+          'markSitemapCrawled',
+          'markSitemapCrawlPartial',
+          'markSitemapError',
+          'markSitemapSeeded',
+          'resetSitemapErrors',
+          'searchPages',
+          'seedRoutes',
+          'setInfoValue',
+          'startCronRun',
+          'syncSitemaps',
+          'upsertPage',
+        ]
+        nitroConfig.virtual[databaseRuntime] = `
+async function unavailable() {
+  throw new Error('[nuxt-ai-ready] The database is disabled. Set \`aiReady.database\` to store pages at runtime.')
+}
+export { ${databaseExports.map(name => `unavailable as ${name}`).join(', ')} }
+export async function closeDrizzle() {}
+export async function finishDrizzleResponse() {}
+export function trackDrizzleWork(event, work) { return work }
+`
+      }
+      else {
+        nitroConfig.virtual[databaseRuntime] = `export * from '#ai-ready/server/db/drizzle'`
+      }
+
       // Database schema - tree-shakeable by aliasing to sqlite or postgres at build time
       const schemaPath = database._tag === 'Enabled' && (database.type === 'neon' || database.type === 'postgres')
         ? '#ai-ready/server/db/schema/postgres'
