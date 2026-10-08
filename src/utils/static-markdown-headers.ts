@@ -161,7 +161,7 @@ export function applyStaticMarkdownHeaderPlan(
   }
   for (const { route, headers } of plan.rules) {
     const existing = routeRules[route] as { headers?: Record<string, string> } | undefined
-    const merged = defu({ headers }, existing)
+    const merged = defu({ headers: { ...headers } }, existing)
     const vary = Object.entries(existing?.headers || {})
       .filter(([name]) => name.toLowerCase() === 'vary')
       .map(([, value]) => value)
