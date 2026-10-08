@@ -93,11 +93,10 @@ describe('accept header content negotiation', async () => {
       expect(response.headers.get('content-type')).toContain('text/html')
     })
 
-    it('serves markdown for API clients with */*, no text/html', async () => {
+    it('serves markdown when a client prefers text/plain', async () => {
       const response = await fetch(url('/about'), {
         headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'User-Agent': 'ClaudeCode',
+          Accept: 'application/json, text/plain, */*',
         },
       })
 
@@ -193,7 +192,7 @@ describe('accept header content negotiation', async () => {
       })
 
       expect(response.status).toBe(406)
-      expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Dest, User-Agent')
+      expect(response.headers.get('vary')).toBe('Accept')
       expect(response.headers.get('cache-control')).toContain('no-store')
     })
 

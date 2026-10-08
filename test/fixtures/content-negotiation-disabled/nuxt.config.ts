@@ -15,7 +15,7 @@ export default defineNuxtConfig({
     '/about': {
       cache: {
         maxAge: 3600,
-        varies: ['accept', 'sec-fetch-dest', 'user-agent'],
+        varies: ['accept'],
       },
     },
     '/docs/**': { cache: { maxAge: 3600 } },

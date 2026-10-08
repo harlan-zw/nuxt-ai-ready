@@ -77,11 +77,33 @@ describe('negotiateRepresentation', () => {
     expect(negotiateRepresentation(event)).toBe('html')
   })
 
-  it('serves markdown to AI bots outside prerender', () => {
+  it('keeps bot HTML requests as HTML by default', () => {
     const event = mockEvent({
       'accept': 'text/html',
       'user-agent': 'Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)',
     })
-    expect(negotiateRepresentation(event)).toBe('markdown')
+    expect(negotiateRepresentation(event)).toBe('html')
+    expect(negotiateRepresentation(event, true)).toBe('markdown')
+  })
+
+  it.each(['', '*/*', 'text/*'])('keeps a bot with default Accept %s as HTML', (accept) => {
+    expect(negotiateRepresentation(mockEvent({ accept, 'user-agent': 'GPTBot' }))).toBe('html')
+  })
+
+  it('preserves explicit Markdown preferences during browser navigation', () => {
+    expect(negotiateRepresentation(mockEvent({ 'accept': 'text/markdown', 'sec-fetch-dest': 'document' }))).toBe('markdown')
+  })
+
+  it.each(['text/html,text/markdown;q=0', 'text/html,TEXT/MARKDOWN;Q=0', 'text/html,text/*;q=0', 'text/html,*/*;q=0', 'application/x-probe'])('honors format rejection with bot negotiation: %s', (accept) => {
+    expect(negotiateRepresentation(mockEvent({ accept, 'user-agent': 'GPTBot' }), true))
+      .toBe(accept.startsWith('text/html') ? 'html' : 'not-acceptable')
+  })
+
+  it.each(['text/html,text/markdown;q=0.5,text/*;q=0', 'text/html,text/plain;q=0,*/*;q=0.5'])('allows acceptable Markdown with bot negotiation: %s', (accept) => {
+    expect(negotiateRepresentation(mockEvent({ accept, 'user-agent': 'GPTBot' }), true)).toBe('markdown')
+  })
+
+  it('keeps browser navigation as HTML with bot negotiation', () => {
+    expect(negotiateRepresentation(mockEvent({ 'accept': 'text/html', 'user-agent': 'GPTBot', 'sec-fetch-dest': 'document' }), true)).toBe('html')
   })
 })

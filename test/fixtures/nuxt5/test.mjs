@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { verifyNegotiationCache } from '../../helpers/negotiation-cache.ts'
 
 const server = spawn(process.execPath, ['.output/server/index.mjs'], {
   cwd: import.meta.dirname,
@@ -29,6 +30,10 @@ async function waitForServer() {
 
 try {
   const origin = await waitForServer()
+  await verifyNegotiationCache(origin)
+  const protectedMarkdown = await fetch(`${origin}/cache/protected.md`)
+  if (protectedMarkdown.status !== 403)
+    throw new Error(`Markdown must preserve application access checks: ${protectedMarkdown.status}`)
   const response = await fetch(`${origin}/api/compat`)
   if (!response.ok)
     throw new Error(`Compatibility endpoint returned ${response.status}`)

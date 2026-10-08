@@ -10,6 +10,7 @@ function input(overrides: {
   routeRule?: NegotiationInput['routeRule']
   artifactPaths?: NegotiationInput['artifactPaths']
   isPrerender?: boolean
+  botNegotiation?: boolean
 }): NegotiationInput {
   return {
     stage: overrides.stage ?? 'early',
@@ -20,6 +21,7 @@ function input(overrides: {
     },
     routeRule: overrides.routeRule ?? {},
     policy: overrides.policy ?? 'auto',
+    botNegotiation: overrides.botNegotiation,
     artifactPaths: overrides.artifactPaths,
   }
 }
@@ -31,31 +33,32 @@ describe('resolveNegotiationDecision', () => {
     expect(resolveNegotiationDecision(input({
       path: '/about',
       headers: { accept: 'text/markdown' },
-    }))).toEqual({ _tag: 'redirect', path: '/about' })
+    }))).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
   })
 
   it('redirects the root path', () => {
     expect(resolveNegotiationDecision(input({
       path: '/',
       headers: { accept: 'text/markdown' },
-    }))).toEqual({ _tag: 'redirect', path: '/' })
+    }))).toEqual({ _tag: 'redirect', path: '/', vary: 'Accept' })
   })
 
   it('ignores the query string when it resolves the path', () => {
     expect(resolveNegotiationDecision(input({
       path: '/about?ref=agent',
       headers: { accept: 'text/markdown' },
-    }))).toEqual({ _tag: 'redirect', path: '/about' })
+    }))).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
   })
 
   it('redirects an AI bot that asks for HTML', () => {
     expect(resolveNegotiationDecision(input({
       path: '/about',
+      botNegotiation: true,
       headers: {
         'accept': 'text/html',
         'user-agent': 'Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)',
       },
-    }))).toEqual({ _tag: 'redirect', path: '/about' })
+    }))).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept, Sec-Fetch-Dest, User-Agent' })
   })
 
   it('passes browser navigation through as HTML', () => {
@@ -65,7 +68,7 @@ describe('resolveNegotiationDecision', () => {
     }))).toEqual({
       _tag: 'html',
       path: '/about',
-      negotiation: { _tag: 'enabled', source: 'default' },
+      negotiation: { _tag: 'enabled', source: 'default', vary: 'Accept' },
     })
   })
 
@@ -154,7 +157,7 @@ describe('resolveNegotiationDecision', () => {
         path: '/about',
         headers: { accept: 'application/pdf' },
         stage,
-      }))).toEqual({ _tag: 'not-acceptable' })
+      }))).toEqual({ _tag: 'not-acceptable', vary: 'Accept' })
     }
   })
 })

@@ -25,6 +25,7 @@ import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
+import { resolveConfigurationWarnings } from './utils/config-warnings'
 import { resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -77,6 +78,7 @@ export interface ModulePublicRuntimeConfig {
   debug: boolean
   debugCron: boolean
   contentNegotiation: ContentNegotiationPolicy
+  botNegotiation: boolean
   version: string
   sitemapMd: boolean
   describedby: boolean
@@ -958,6 +960,7 @@ export function trackDrizzleWork(event, work) { return work }
         : config.contentNegotiation
           ? 'enabled'
           : 'disabled',
+      botNegotiation: config.botNegotiation === true,
       mdreamOptions: config.mdreamOptions || {},
       sitemapMd: config.sitemapMd !== false,
       describedby: config.describedby !== false,
@@ -999,6 +1002,11 @@ export function trackDrizzleWork(event, work) { return work }
       middleware: true,
       handler: resolve('./runtime/server/middleware/markdown'),
     })
+    if (getNitroVersion(nuxt) === 3) {
+      // Nitro 3 response caches invoke the page handler without global middleware.
+      // Keep Markdown conversion behind application middleware, outside that cache.
+      extendRouteRules('/**.md', { cache: false })
+    }
     addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
       ? './runtime/server/plugins/link-header-nitro3'
       : './runtime/server/plugins/link-header'))
@@ -1104,7 +1112,6 @@ export function trackDrizzleWork(event, work) { return work }
       // Warn about unsupported/limited modes
       if (isSPA && !hasPrerenderedRoutes) {
         logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
-        logger.warn('For full functionality, enable SSR or prerender routes.')
       }
       else if (!isStatic && !hasPrerenderedRoutes) {
         logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
@@ -1154,6 +1161,30 @@ export function trackDrizzleWork(event, work) { return work }
     // presets apply to them. Every explicitly prerendered page route gets
     // relative canonical and describedby entries on its markdown twin.
     const staticBaseURL = nuxt.options.app.baseURL || '/'
+    const emittedWarnings = new Set<string>()
+    const warnConfiguration = (nitro: { options: { static?: boolean, routeRules: Parameters<typeof resolveConfigurationWarnings>[0]['routeRules'] } }) => {
+      if (preparing)
+        return
+      const warnings = resolveConfigurationWarnings({
+        policy: (nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig).contentNegotiation,
+        botNegotiation: config.botNegotiation === true,
+        static: nitro.options.static === true || isStatic,
+        siteUrl: siteConfig.url || undefined,
+        routeRules: nitro.options.routeRules,
+      })
+      for (const warning of warnings) {
+        if (!emittedWarnings.has(warning)) {
+          emittedWarnings.add(warning)
+          logger.warn(warning)
+        }
+      }
+    }
+    nuxt.hook('nitro:init', (nitro) => {
+      warnConfiguration(nitro)
+      nitro.hooks.hook('rollup:reload', () => warnConfiguration(nitro))
+    })
+    // Inline page rules and later modules can update rules after Nitro initializes.
+    nuxt.hook('nitro:build:before', warnConfiguration)
     for (const route of (nuxt.options.nitro.prerender?.routes || []) as string[]) {
       if (!isStaticMarkdownSourceRoute(route))
         continue

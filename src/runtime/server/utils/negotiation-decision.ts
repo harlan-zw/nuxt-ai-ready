@@ -1,7 +1,7 @@
 import type { ContentNegotiationPolicy } from '../../types'
 import type { ContentNegotiationResolution, NegotiationRouteRule } from './content-negotiation'
 import type { MarkdownRequest } from './markdown-request'
-import { resolveContentNegotiation } from './content-negotiation'
+import { getContentNegotiationVary, resolveContentNegotiation } from './content-negotiation'
 import { getRequestRenderInfo } from './markdown-request'
 
 /** Marks an internal HTML fetch that must bypass content negotiation. */
@@ -18,6 +18,7 @@ export interface NegotiationInput {
   request: MarkdownRequest
   routeRule: NegotiationRouteRule
   policy: ContentNegotiationPolicy
+  botNegotiation?: boolean
   /**
    * Routes that already serve a Markdown file verbatim, such as an agent skill
    * alias. They are answered by their own handler, never rendered.
@@ -27,9 +28,9 @@ export interface NegotiationInput {
 
 export type NegotiationDecision
   = | { _tag: 'skip', reason: 'well-known' | 'internal' | 'artifact' | 'not-a-page' | 'deferred' }
-    | { _tag: 'not-acceptable' }
+    | { _tag: 'not-acceptable', vary: ReturnType<typeof getContentNegotiationVary> }
     | { _tag: 'html', path: string, negotiation: ContentNegotiationResolution }
-    | { _tag: 'redirect', path: string }
+    | { _tag: 'redirect', path: string, vary: ReturnType<typeof getContentNegotiationVary> }
     | { _tag: 'render', path: string }
 
 /**
@@ -52,16 +53,17 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   if (request.headers[INTERNAL_HEADER])
     return { _tag: 'skip', reason: 'internal' }
 
-  const negotiation = resolveContentNegotiation({ policy: input.policy, routeRule: input.routeRule })
+  const negotiation = resolveContentNegotiation({ policy: input.policy, routeRule: input.routeRule, botNegotiation: input.botNegotiation })
   const renderInfo = getRequestRenderInfo(request, {
     _tag: 'runtime',
     contentNegotiation: negotiation._tag === 'enabled',
+    botNegotiation: input.botNegotiation,
   })
   if (!renderInfo)
     return { _tag: 'skip', reason: 'not-a-page' }
 
   if ('notAcceptable' in renderInfo)
-    return { _tag: 'not-acceptable' }
+    return { _tag: 'not-acceptable', vary: getContentNegotiationVary(input.botNegotiation) }
 
   if (renderInfo.isExplicit) {
     // The early stage never renders. A prerendered `.md` file answers first, and
@@ -72,7 +74,7 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   }
 
   if (renderInfo.negotiation === 'markdown')
-    return { _tag: 'redirect', path: renderInfo.path }
+    return { _tag: 'redirect', path: renderInfo.path, vary: getContentNegotiationVary(input.botNegotiation) }
 
   return { _tag: 'html', path: renderInfo.path, negotiation }
 }

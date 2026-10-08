@@ -7,7 +7,7 @@ import { buildNegotiationContext, decideNegotiation, setLinkHeader, setMarkdownH
 
 const { match, config } = vi.hoisted(() => ({
   match: vi.fn((path: string) => ({ cache: path === '/disabled' })),
-  config: { 'app': { baseURL: '/' }, 'nuxt-ai-ready': { contentNegotiation: 'auto', i18n: null as RuntimeI18nConfig | null } },
+  config: { 'app': { baseURL: '/' }, 'nuxt-ai-ready': { contentNegotiation: 'auto', botNegotiation: false, i18n: null as RuntimeI18nConfig | null } },
 }))
 vi.mock('#nuxtseo/h3', async (original) => {
   const h3 = await original<typeof import('#nuxtseo/h3')>()
@@ -31,6 +31,7 @@ vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
 beforeEach(() => {
   config.app.baseURL = '/'
   config['nuxt-ai-ready'].i18n = null
+  config['nuxt-ai-ready'].botNegotiation = false
 })
 
 function headerEvent(origin: string, configuredUrl = true) {
@@ -134,6 +135,13 @@ describe('negotiation locale context', () => {
 })
 
 describe('request-scoped negotiation', () => {
+  it('rechecks bot negotiation after its configuration changes', () => {
+    const event = { req: new Request('https://example.com/about', { headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' } }), path: '/about', context: {} } as unknown as H3Event
+    expect(decideNegotiation(event, 'early')).toMatchObject({ _tag: 'html', negotiation: { vary: 'Accept' } })
+    config['nuxt-ai-ready'].botNegotiation = true
+    expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept, Sec-Fetch-Dest, User-Agent' })
+  })
+
   it('reads headers and matches the route once across both stages', () => {
     vi.mocked(getHeaders).mockClear()
     match.mockClear()
@@ -147,7 +155,7 @@ describe('request-scoped negotiation', () => {
 
   it('rechecks the route policy after middleware rewrites the path', () => {
     const event = { req: new Request('https://example.com/about', { headers: { accept: 'text/markdown' } }), path: '/about', context: {} } as unknown as H3Event
-    expect(decideNegotiation(event, 'early')).toEqual({ _tag: 'redirect', path: '/about' })
+    expect(decideNegotiation(event, 'early')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
     Object.assign(event, { path: '/disabled' })
 
     expect(decideNegotiation(event, 'middleware')).toMatchObject({ _tag: 'html', path: '/disabled' })
@@ -159,6 +167,6 @@ describe('request-scoped negotiation', () => {
     const second = { req: new Request('https://example.com/about', { headers: { accept: 'text/markdown' } }), path: '/about', context } as unknown as H3Event
 
     expect(decideNegotiation(first, 'early')).toMatchObject({ _tag: 'html' })
-    expect(decideNegotiation(second, 'middleware')).toEqual({ _tag: 'redirect', path: '/about' })
+    expect(decideNegotiation(second, 'middleware')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
   })
 })
