@@ -1103,7 +1103,10 @@ export function trackDrizzleWork(event, work) { return work }
 
     if (!nuxt.options.dev && !nuxt.options._prepare) {
       // Warn about unsupported/limited modes
-      if (!isSPA && !isStatic && !hasPrerenderedRoutes) {
+      if (isSPA && !hasPrerenderedRoutes) {
+        logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
+      }
+      else if (!isStatic && !hasPrerenderedRoutes) {
         logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
       }
     }
@@ -1157,7 +1160,6 @@ export function trackDrizzleWork(event, work) { return work }
         return
       const warnings = resolveConfigurationWarnings({
         policy: (nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig).contentNegotiation,
-        ssr: nuxt.options.ssr !== false,
         static: nitro.options.static === true || isStatic,
         siteUrl: siteConfig.url || undefined,
         routeRules: nitro.options.routeRules,

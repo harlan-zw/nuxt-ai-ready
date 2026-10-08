@@ -3,7 +3,6 @@ import { resolveConfigurationWarnings } from '../../src/utils/config-warnings'
 
 const defaults = {
   policy: 'auto' as const,
-  ssr: true,
   static: false,
   siteUrl: 'https://example.com',
   routeRules: {},
@@ -77,15 +76,6 @@ describe('resolveConfigurationWarnings', () => {
   it.each([undefined, 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000'])('warns without a public site URL: %s', (siteUrl) => {
     expect(resolveConfigurationWarnings({ ...defaults, siteUrl })).toEqual([
       expect.stringContaining('Set site.url to the public production URL'),
-    ])
-  })
-
-  it('warns when global or route SSR is disabled', () => {
-    expect(resolveConfigurationWarnings({ ...defaults, ssr: false })).toEqual([
-      expect.stringContaining('ssr: false can leave public pages unreadable without JavaScript'),
-    ])
-    expect(resolveConfigurationWarnings({ ...defaults, routeRules: { '/app/**': { ssr: false } } })).toEqual([
-      expect.stringContaining('"/app/**": ssr: false can leave this route unreadable without JavaScript'),
     ])
   })
 

@@ -6,10 +6,9 @@ import { resolveContentNegotiation } from '../runtime/server/utils/content-negot
 
 export interface ConfigurationWarningInput {
   policy: ContentNegotiationPolicy
-  ssr: boolean
   static: boolean
   siteUrl: string | undefined
-  routeRules: Record<string, NegotiationRouteRule & { ssr?: boolean, redirect?: unknown, proxy?: unknown }>
+  routeRules: Record<string, NegotiationRouteRule & { redirect?: unknown, proxy?: unknown }>
 }
 
 /** Report configuration limits using the same cache policy as runtime negotiation. */
@@ -18,9 +17,6 @@ export function resolveConfigurationWarnings(input: ConfigurationWarningInput): 
   const hostname = input.siteUrl && URL.canParse(input.siteUrl) ? new URL(input.siteUrl).hostname : ''
   if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1' || hostname === '[::1]') {
     warnings.push('Set site.url to the public production URL. Discovery catalogs and canonical Markdown links need a public origin.')
-  }
-  if (!input.ssr) {
-    warnings.push('ssr: false can leave public pages unreadable without JavaScript. Enable SSR for public pages.')
   }
   if (input.policy === 'disabled') {
     warnings.push('contentNegotiation: false disables Accept and bot negotiation. Explicit .md URLs remain available; verify discovery links on your deployment.')
@@ -36,9 +32,6 @@ export function resolveConfigurationWarnings(input: ConfigurationWarningInput): 
     const rule = match(route)
     if (rule.redirect || rule.proxy)
       continue
-    if (input.ssr && rule.ssr === false) {
-      warnings.push(`"${route}": ssr: false can leave this route unreadable without JavaScript. Enable SSR for public pages.`)
-    }
     if (input.static || input.policy === 'disabled')
       continue
     const automatic = resolveContentNegotiation({ policy: 'auto', routeRule: rule })
