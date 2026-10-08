@@ -1,3 +1,5 @@
+import { mergeVaryHeader } from '../runtime/cache-control'
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -5,12 +7,14 @@ function escapeRegExp(value: string) {
 /**
  * Add a default header to a route block without creating a duplicate block.
  * Existing header values (including explicit removals) take precedence.
+ * Append mode merges list tokens; explicit removals still take precedence.
  */
 export function ensureStaticHeader(
   contents: string,
   route: string,
   name: string,
   value: string,
+  mode: 'default' | 'append' = 'default',
 ): string {
   const eol = contents.includes('\r\n') ? '\r\n' : '\n'
   const routePattern = new RegExp(`^${escapeRegExp(route)}[\\t ]*\\r?$`, 'gm')
@@ -43,6 +47,14 @@ export function ensureStaticHeader(
   )
 
   if (existingHeaderPattern.test(block)) {
+    if (mode === 'append') {
+      const valuePattern = new RegExp(`^([\\t ]+${escapedName}[\\t ]*:[\\t ]*)([^\\r\\n]*)(\\r?$)`, 'im')
+      const match = block.match(valuePattern)
+      if (match) {
+        const merged = block.replace(valuePattern, (_line, prefix: string, current: string, suffix: string) => `${prefix}${mergeVaryHeader(current, value)}${suffix}`)
+        return `${contents.slice(0, blockStart)}${merged}${contents.slice(blockEnd)}`
+      }
+    }
     return contents
   }
 

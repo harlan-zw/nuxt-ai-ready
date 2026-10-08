@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { ensureStaticHeader } from '../../src/utils/static-headers'
 
 describe('static headers', () => {
+  it.each([
+    ['Origin', 'Origin, Accept'],
+    ['accept, Origin', 'accept, Origin'],
+    ['*', '*'],
+  ])('adds Accept while preserving a static Vary value of %s', (current, expected) => {
+    const contents = `/*.md\n  Vary: ${current}\n`
+    expect(ensureStaticHeader(contents, '/*.md', 'Vary', 'Accept', 'append')).toBe(`/*.md\n  Vary: ${expected}\n`)
+  })
+
+  it('preserves an explicit Vary removal', () => {
+    const contents = '/*.md\n  ! Vary\n'
+    expect(ensureStaticHeader(contents, '/*.md', 'Vary', 'Accept', 'append')).toBe(contents)
+  })
+
   it('adds a route block when none exists', () => {
     expect(ensureStaticHeader('', '/*.md', 'Content-Type', 'text/markdown')).toBe([
       '/*.md',
