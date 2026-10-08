@@ -2,8 +2,8 @@ import type { H3Event } from 'h3'
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
 import { createSiteConfigStack } from 'site-config-stack'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getHeaders, getResponseHeader } from '#nuxtseo/h3'
-import { buildNegotiationContext, decideNegotiation, setLinkHeader, setStatusAwareHeader } from '../../src/runtime/server/utils/negotiation-response'
+import { getHeaders, getResponseHeader, setHeader } from '#nuxtseo/h3'
+import { buildNegotiationContext, decideNegotiation, setLinkHeader, setMarkdownHeaders, setStatusAwareHeader } from '../../src/runtime/server/utils/negotiation-response'
 
 const { match, config } = vi.hoisted(() => ({
   match: vi.fn((path: string) => ({ cache: path === '/disabled' })),
@@ -48,6 +48,12 @@ function headerEvent(origin: string, configuredUrl = true) {
 }
 
 describe('request-specific header URL resolution', () => {
+  it('adds Accept variation to Markdown without removing existing cache dimensions', () => {
+    const { event } = headerEvent('https://example.com')
+    setHeader(event, 'vary', 'Origin')
+    setMarkdownHeaders(event, buildNegotiationContext(event, '/about'))
+    expect(getResponseHeader(event, 'vary')).toBe('Origin, Accept')
+  })
   it('generates Link headers without createSitePathResolver', () => {
     const { event } = headerEvent('https://example.com')
     const context = buildNegotiationContext(event, '/about')

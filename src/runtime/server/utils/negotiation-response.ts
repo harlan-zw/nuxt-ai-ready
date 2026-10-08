@@ -10,6 +10,7 @@ import { appendHeader, createError, getHeader, getRequestHost, getRequestURL, ge
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import * as siteConfigUtils from '#site-config/server/composables/utils'
 import { initRequestSiteConfig } from '#site-config/server/init'
+import { mergeVaryHeader } from '../../cache-control'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { setStatusAwareLinkHeader } from '../plugins/link-header'
@@ -88,6 +89,8 @@ export function setUncacheableHeaders(event: H3Event) {
 
 export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sourceHeaders?: Headers) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
+  const vary = [getResponseHeader(event, 'vary'), sourceHeaders?.get('vary')].filter(Boolean).join(', ')
+  setHeader(event, 'vary', mergeVaryHeader(vary, 'Accept'))
   setLinkHeader(event, ctx, 'markdown')
   // A representation change must not turn a private response into public content.
   const privateResponse = [

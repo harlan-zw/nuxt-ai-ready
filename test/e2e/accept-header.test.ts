@@ -144,13 +144,14 @@ describe('accept header content negotiation', async () => {
   })
 
   describe('vary and link headers', () => {
-    it('does not vary the explicit markdown response', async () => {
+    it('keeps Accept in the final markdown response after negotiation', async () => {
       const response = await fetch(url('/about'), {
         headers: { Accept: 'text/markdown' },
       })
 
       expect(response.url).toContain('/about.md')
-      expect(response.headers.get('vary')).toBeNull()
+      expect(response.headers.get('content-type')).toContain('text/markdown')
+      expect(response.headers.get('vary')).toContain('Accept')
     })
 
     it('sets Vary: Accept on HTML response for negotiable routes', async () => {

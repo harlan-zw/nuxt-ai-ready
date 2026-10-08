@@ -174,6 +174,7 @@ describe('nuxt generate (static build)', async () => {
       ])
 
       expect(markdownResponse.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
+      expect(markdownResponse.headers.get('vary')).toContain('Accept')
       expect(htmlResponse.headers.get('content-type')).toContain('text/html')
     })
 

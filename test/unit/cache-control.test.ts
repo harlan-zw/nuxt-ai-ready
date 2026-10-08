@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { publicCacheControl } from '../../src/runtime/cache-control'
+import { mergeVaryHeader, publicCacheControl } from '../../src/runtime/cache-control'
 
 // Cloudflare turns off stale serving when `s-maxage` is present, so the
 // stale window would never apply at the edge.
@@ -10,5 +10,17 @@ describe('publicCacheControl', () => {
 
   it('omits the stale window when it is zero', () => {
     expect(publicCacheControl(600, 0)).toBe('public, max-age=600')
+  })
+})
+
+describe('mergeVaryHeader', () => {
+  it.each([
+    [undefined, 'Accept'],
+    ['Origin', 'Origin, Accept'],
+    ['accept, Origin', 'accept, Origin'],
+    ['*', '*'],
+    ['Accept-Encoding, origin, ORIGIN', 'Accept-Encoding, origin, Accept'],
+  ])('preserves cache dimensions from %s', (current, expected) => {
+    expect(mergeVaryHeader(current, 'Accept')).toBe(expected)
   })
 })

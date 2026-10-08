@@ -5,6 +5,17 @@ const headers = { 'Content-Type': 'text/markdown; charset=utf-8' }
 const twin = (i: number) => ({ route: `/page-${i}.md`, headers })
 
 describe('planStaticMarkdownHeaderRules', () => {
+  it('retains existing variation when applying generated Markdown headers', () => {
+    const routeRules = {
+      '/index.md': { headers: { vary: 'Origin' } },
+    } satisfies Record<string, { headers: Record<string, string> }>
+    applyStaticMarkdownHeaderPlan(routeRules, {
+      _tag: 'apply',
+      rules: [{ route: '/index.md', headers: { Vary: 'Accept' } }],
+    })
+    expect(routeRules['/index.md']?.headers).toEqual({ Vary: 'Origin, Accept' })
+  })
+
   it('applies every twin when the file stays under the limit', () => {
     const routeRules = { '/*': { headers: { 'X-A': '1' } }, '/llms.txt': { headers }, '/old': { redirect: '/new' } }
     const rules = [twin(1), twin(2)]
