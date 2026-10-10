@@ -2,12 +2,12 @@
 name: nuxt-ai-ready
 description: Add, configure, or debug AI and LLM discoverability in a Nuxt site with the nuxt-ai-ready module. Use when a task mentions llms.txt, llms-full.txt, serving pages as Markdown (.md routes, Accept text/markdown), an MCP server for site content, WebMCP or useWebMcpTool, Content Signals in robots.txt, agent skills discovery, runtime page indexing, queryPages or searchPages, or the aiReady config key. Gives the automatic outputs, the build versus runtime split, and the traps that leave output empty or stale.
 license: MIT
-compatibility: "Requires a project using nuxt-ai-ready. Requires Node.js ^22.22.3 || ^24.15.0 || >=26.0.0. Requires Nuxt ^4.6.0 || ^5.0.0."
+compatibility: "Requires Node.js ^22.22.3 || ^24.15.0 || >=26.0.0. Requires Nuxt ^4.6.0 || ^5.0.0."
 ---
 
 # nuxt-ai-ready
 
-Tested against `nuxt-ai-ready` 2.4.1 plus its unreleased fixes on `main`, on Nuxt 4.5 and Node 24 (requires Nuxt `>=4.0.0`).
+Tested against `nuxt-ai-ready` 2.4.1 plus its unreleased fixes on `main`, on Nuxt 4.5 and Node 24.
 The module converts rendered pages to Markdown with mdream and publishes `llms.txt`, `llms-full.txt`, and `.md` twins.
 Optional parts add MCP tools, WebMCP tools, and a runtime page index. Config key: `aiReady`. Docs: https://nuxtseo.com/ai-ready
 
