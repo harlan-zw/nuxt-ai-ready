@@ -19,7 +19,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   title: SITE_TOOL_CATALOG.list_pages.title,
   description: SITE_TOOL_CATALOG.list_pages.description,
   inputSchema,
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.listPages.mcp.enabled,
   cache: '1h',
   async handler({ limit, offset }) {

@@ -160,6 +160,25 @@ export function likeSubstring(term: string): string {
 /** Escape character to bind next to `likeSubstring` patterns. */
 export const LIKE_ESCAPE = '\\'
 
+const RE_FTS_TERM_SPLIT = /\s+/
+const RE_FTS_TOKEN_CHAR = /[\p{L}\p{N}]/u
+const RE_DOUBLE_QUOTE = /"/g
+
+/**
+ * Turn free text into an FTS5 MATCH expression that cannot throw. Each term
+ * becomes a quoted FTS5 string, so `-`, `.`, `'`, `AND`, `NOT` and `col:`
+ * filters stay literal text. The trailing `*` keeps prefix matching for
+ * partial words. A term with no letter or digit holds no token, so it is
+ * dropped. Returns null when no term remains.
+ */
+export function toFtsMatchQuery(query: string): string | null {
+  const terms = query
+    .split(RE_FTS_TERM_SPLIT)
+    .filter(term => RE_FTS_TOKEN_CHAR.test(term))
+    .map(term => `"${term.replace(RE_DOUBLE_QUOTE, '""')}"*`)
+  return terms.length ? terms.join(' ') : null
+}
+
 const MAX_BIND_PARAMS_PER_STATEMENT = 100
 
 /**

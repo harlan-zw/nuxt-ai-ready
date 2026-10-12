@@ -9,7 +9,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
 import { deriveLocale, SEED_REFRESH_WINDOW_MS } from '../seed'
-import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert } from '../shared'
+import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, toFtsMatchQuery } from '../shared'
 import { useDrizzle } from './client'
 import { getRawExecutor, useRawDb } from './raw'
 
@@ -252,14 +252,16 @@ export async function searchPages(
   const searchTerm = likeSubstring(query)
   const matches = (col: unknown) => sql`${col} LIKE ${searchTerm} ESCAPE ${LIKE_ESCAPE}`
 
-  // For SQLite, try FTS5 first via raw SQL
-  if (client.dialect === 'sqlite') {
+  // For SQLite, try FTS5 first via raw SQL. A query with no searchable term
+  // skips FTS and goes straight to LIKE, which still matches literal symbols.
+  const ftsQuery = toFtsMatchQuery(query)
+  if (client.dialect === 'sqlite' && ftsQuery) {
     try {
       const ftsResult = await (client.db as any).all(sql`
         SELECT p.route, p.title, p.description, p.headings, p.keywords, p.updated_at as "updatedAt", p.is_error as "isError"
         FROM ai_ready_pages p
         JOIN ai_ready_pages_fts fts ON p.id = fts.rowid
-        WHERE ai_ready_pages_fts MATCH ${query} AND p.is_error = 0
+        WHERE ai_ready_pages_fts MATCH ${ftsQuery} AND p.is_error = 0
         LIMIT ${limitNum}
       `)
 

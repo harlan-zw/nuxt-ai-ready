@@ -18,7 +18,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   title: SITE_TOOL_CATALOG.search_pages.title,
   description: SITE_TOOL_CATALOG.search_pages.description,
   inputSchema,
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.searchPages.mcp.enabled,
   cache: '5m',
   async handler({ query, limit }) {
