@@ -43,6 +43,38 @@ export type DatabaseDependentOption = typeof DATABASE_DEPENDENT_OPTIONS[number]
 
 export type DatabaseConsumer = DatabaseDependentOption | 'mcp' | 'webmcp'
 
+const DATABASE_CONSUMER_LABELS: Record<DatabaseConsumer, string> = {
+  runtimeSync: 'runtime indexing (`aiReady.runtimeSync`)',
+  cron: 'the indexing cron (`aiReady.cron`)',
+  mcp: 'MCP site tools (`@nuxtjs/mcp-toolkit`)',
+  webmcp: 'WebMCP site tools (`aiReady.webmcp`)',
+}
+
+/**
+ * Explain why setup needs `drizzle-orm` and how to install it. `peerRange` is
+ * the package's caret range, so its version is the lowest one it accepts.
+ * The highest match for a caret prerelease range can be an untested preview build.
+ */
+export function formatMissingDrizzleMessage(input: {
+  requested: Record<DatabaseConsumer, boolean>
+  peerRange: string | undefined
+}): string {
+  const consumers = (Object.keys(DATABASE_CONSUMER_LABELS) as DatabaseConsumer[])
+    .filter(consumer => input.requested[consumer])
+  const subject = consumers.length === 0
+    ? 'The `aiReady.database` option turns on the database.'
+    : `These features need the database: ${consumers.map(consumer => DATABASE_CONSUMER_LABELS[consumer]).join(', ')}.`
+  const version = input.peerRange?.replace(/^\^/, '')
+  const lines = [
+    subject,
+    'The database needs `drizzle-orm`. This app does not install it.',
+    `Install it: npx nypm add drizzle-orm${version ? `@${version}` : ''}`,
+  ]
+  if (consumers.length > 0 && consumers.every(consumer => consumer === 'mcp' || consumer === 'webmcp'))
+    lines.push('If you do not need the site tools, set `aiReady.database: false`.')
+  return lines.join('\n')
+}
+
 export interface ResolveDatabaseInput {
   database: DatabaseInput | undefined
   /** Project root, used to make a relative SQLite filename absolute. */

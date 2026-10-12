@@ -10,7 +10,7 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule } from '@nuxt/kit'
+import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, directoryToURL, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule, tryResolveModule } from '@nuxt/kit'
 import defu from 'defu'
 import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
@@ -30,7 +30,7 @@ import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig 
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
-import { resolveDatabaseConfig } from './utils/database'
+import { formatMissingDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
@@ -162,7 +162,7 @@ export default defineNuxtModule<ModuleOptions>({
     const nuxtSeoSharedI18nRuntimePath = resolveFromModule.resolve('nuxtseo-shared/i18n-runtime')
     const nuxtSeoSharedUtilsPath = resolveFromModule.resolve('nuxtseo-shared/utils')
     const { resolve } = createResolver(moduleEntryUrl)
-    const { version } = await readPackageMetadata(resolve('../package.json'))
+    const { version, peerDependencies } = await readPackageMetadata(resolve('../package.json'))
 
     logger.level = (config.debug || nuxt.options.debug) ? 4 : 3
 
@@ -239,18 +239,19 @@ export default defineNuxtModule<ModuleOptions>({
       && Object.values(requestedSiteTools.config).some(tool => tool.webmcp.enabled)
 
     // Parse the database option once. Features opt into storage as needed.
+    const databaseRequested = {
+      runtimeSync: !!config.runtimeSync,
+      cron: !!config.cron,
+      mcp: mcpNeedsDatabase,
+      webmcp: webmcpNeedsDatabase,
+    }
     const databaseResolution = resolveDatabaseConfig({
       database: config.database,
       rootDir: nuxt.options.rootDir,
       preset: String(nuxt.options.nitro.preset || ''),
       // Vercel Postgres sets POSTGRES_URL.
       hasPostgresUrl: !!(process.env.POSTGRES_URL || process.env.DATABASE_URL || (config.database || undefined)?.url),
-      requested: {
-        runtimeSync: !!config.runtimeSync,
-        cron: !!config.cron,
-        mcp: mcpNeedsDatabase,
-        webmcp: webmcpNeedsDatabase,
-      },
+      requested: databaseRequested,
     })
     if (databaseResolution._tag === 'Invalid')
       throw new Error(`[nuxt-ai-ready] ${databaseResolution.message}`)
@@ -258,6 +259,14 @@ export default defineNuxtModule<ModuleOptions>({
       logger[log.level](log.message)
     const database = databaseResolution.database
     const databaseEnabled = database._tag === 'Enabled'
+    // drizzle-orm is an optional peer, so only an enabled database resolves it.
+    // Nuxt's own modulesDir can reach a package manager's hoisted copy that
+    // the app never installed, so resolve from the app root only.
+    if (databaseEnabled) {
+      const drizzle = await tryResolveModule('drizzle-orm', directoryToURL(nuxt.options.rootDir))
+      if (!drizzle)
+        throw new Error(`[nuxt-ai-ready] ${formatMissingDrizzleMessage({ requested: databaseRequested, peerRange: peerDependencies['drizzle-orm'] })}`)
+    }
     if (!databaseEnabled)
       logger.debug('Database disabled. Page storage, runtime indexing and site tools are off.')
 
@@ -942,7 +951,9 @@ export function trackDrizzleWork(event, work) { return work }
       const schemaPath = database._tag === 'Enabled' && (database.type === 'neon' || database.type === 'postgres')
         ? '#ai-ready/server/db/schema/postgres'
         : '#ai-ready/server/db/schema/sqlite'
-      nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = `export * from '${schemaPath}'`
+      nitroConfig.virtual['#ai-ready-virtual/db-schema.mjs'] = database._tag === 'Enabled'
+        ? `export * from '${schemaPath}'`
+        : 'export {}'
 
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({

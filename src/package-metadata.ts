@@ -17,10 +17,19 @@ export function resolvePackageMetadataPath(specifier: string, base?: string, opt
   return path
 }
 
-export async function readPackageMetadata(specifier: string, base?: string, options?: { searchDirectory: string }): Promise<{ version?: string }> {
+export interface PackageMetadata {
+  version?: string
+  peerDependencies: Record<string, string>
+}
+
+export async function readPackageMetadata(specifier: string, base?: string, options?: { searchDirectory: string }): Promise<PackageMetadata> {
   const metadata: unknown = JSON.parse(await readFile(resolvePackageMetadataPath(specifier, base, options), 'utf8'))
   if (typeof metadata !== 'object' || metadata === null)
     throw new Error(`Invalid package metadata for ${specifier}.`)
   const version = 'version' in metadata ? metadata.version : undefined
-  return typeof version === 'string' ? { version } : {}
+  const peers = 'peerDependencies' in metadata ? metadata.peerDependencies : undefined
+  const peerDependencies = typeof peers === 'object' && peers !== null
+    ? Object.fromEntries(Object.entries(peers).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+    : {}
+  return typeof version === 'string' ? { version, peerDependencies } : { peerDependencies }
 }
