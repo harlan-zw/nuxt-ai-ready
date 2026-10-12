@@ -1,6 +1,7 @@
 import { defineEventHandler } from '#nuxtseo/h3'
 import { defineNitroPlugin, useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
+import { serveCloudflarePrerenderedPage } from '../utils/cloudflare-prerendered'
 import { applyNegotiation, decideNegotiation } from '../utils/negotiation-response'
 
 interface H3Layer {
@@ -47,7 +48,13 @@ function resolveH3Runtime(candidate: unknown): H3Runtime {
   return { _tag: 'unsupported' }
 }
 
-const negotiationHandler = defineEventHandler(event => applyNegotiation(event, decideNegotiation(event, 'early')))
+const negotiationHandler = defineEventHandler(async (event) => {
+  const decision = decideNegotiation(event, 'early')
+  const response = await applyNegotiation(event, decision)
+  if (response !== undefined || decision._tag !== 'html')
+    return response
+  return serveCloudflarePrerenderedPage(event)
+})
 
 /**
  * Run Accept negotiation in front of the Nitro static asset handler.

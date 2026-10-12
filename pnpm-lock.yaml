@@ -185,6 +185,9 @@ catalogs:
     citty:
       specifier: ^0.2.2
       version: 0.2.2
+    confbox:
+      specifier: ^0.3.1
+      version: 0.3.1
     consola:
       specifier: ^3.4.2
       version: 3.4.2
@@ -336,6 +339,9 @@ importers:
       citty:
         specifier: 'catalog:'
         version: 0.2.2
+      confbox:
+        specifier: 'catalog:'
+        version: 0.3.1
       consola:
         specifier: 'catalog:'
         version: 3.4.2

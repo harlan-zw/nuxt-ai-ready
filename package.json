@@ -96,6 +96,7 @@
     "@nuxtjs/robots": "catalog:nuxt",
     "@nuxtjs/sitemap": "catalog:nuxt",
     "citty": "catalog:",
+    "confbox": "catalog:",
     "consola": "catalog:",
     "defu": "catalog:",
     "drizzle-orm": "catalog:",
