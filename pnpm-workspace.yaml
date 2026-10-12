@@ -116,6 +116,7 @@ catalog:
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.16
   nuxtseo-shared: ^6.0.0
+  ohash: ^2.0.12
   pathe: ^2.0.3
   postgres: ^3.4.9
   site-config-stack: ^5.0.0

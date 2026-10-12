@@ -5,6 +5,7 @@ import siteTools from '#ai-ready-virtual/site-tools.mjs'
 import { useEvent } from '#nuxtseo/nitro'
 import { normalizeSiteRoute, SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { queryPages } from '../../db/queries'
+import { siteToolCacheKey } from '../cache-key'
 
 const inputSchema = {
   route: z.string().describe(SITE_TOOL_CATALOG.get_page_markdown.parameters.route),
@@ -17,7 +18,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   inputSchema,
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.getPageMarkdown.mcp.enabled,
-  cache: '5m',
+  cache: { maxAge: '5m', getKey: siteToolCacheKey },
   async handler({ route }) {
     const path = normalizeSiteRoute(route)
     if (!path) {
