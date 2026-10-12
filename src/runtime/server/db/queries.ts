@@ -8,7 +8,7 @@ import { logger } from '../logger'
 import { checkAndHandleStale } from '../utils/checkStale'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
 import { deriveLocale, SEED_REFRESH_WINDOW_MS } from './seed'
-import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, normalizeRoute, normalizeRouteKey } from './shared'
+import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, normalizeRoute, normalizeRouteKey, toFtsMatchQuery } from './shared'
 
 export type { SeedRoutesOptions }
 export { resolveSeedRefreshWindowMs, SEED_REFRESH_WINDOW_MS } from './seed'
@@ -62,7 +62,6 @@ function syncBuildDump(event: AiReadyDatabaseEvent | undefined): Promise<void> {
 }
 
 const RE_FTS_CHARS = /[*:^"()]/g
-const RE_WHITESPACE = /\s+/
 
 /** Get database, with dev mode notice and prerender handling */
 async function getDb(event?: AiReadyDatabaseEvent): Promise<RawExecutor | null> {
@@ -504,8 +503,9 @@ export async function searchPages(
     `, [searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, limit])
   }
 
-  // Add prefix matching for partial words
-  const terms = sanitized.split(RE_WHITESPACE).map(t => `${t}*`).join(' ')
+  const ftsQuery = toFtsMatchQuery(query)
+  if (!ftsQuery)
+    return []
 
   // BM25 weights: route, title, description, markdown, headings, keywords
   return db.all<SearchResult>(`
@@ -515,7 +515,7 @@ export async function searchPages(
     WHERE ai_ready_pages_fts MATCH ?
     ORDER BY score
     LIMIT ?
-  `, [terms, limit])
+  `, [ftsQuery, limit])
 }
 
 // ============================================================================
