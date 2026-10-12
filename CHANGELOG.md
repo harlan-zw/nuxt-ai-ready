@@ -1,3 +1,55 @@
+## v3.0.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.3...v3.0.0)
+
+### 🚀 Enhancements
+
+- ⚠️  Prepare AI Ready 3 for Nuxt 4.6 ([#148](https://github.com/harlan-zw/nuxt-ai-ready/pull/148))
+- Default to Accept-only negotiation with cache warnings ([#160](https://github.com/harlan-zw/nuxt-ai-ready/pull/160))
+
+### 🔥 Performance
+
+- Prune disabled storage and reuse request negotiation ([#153](https://github.com/harlan-zw/nuxt-ai-ready/pull/153))
+- **i18n:** Reuse common status-aware Link header work ([#154](https://github.com/harlan-zw/nuxt-ai-ready/pull/154))
+- Resolve site URLs once per header build ([#155](https://github.com/harlan-zw/nuxt-ai-ready/pull/155))
+- **cloudflare:** Preserve default static asset routing ([#170](https://github.com/harlan-zw/nuxt-ai-ready/pull/170))
+- **deps:** Install mdream from the registry instead of vendoring ([#171](https://github.com/harlan-zw/nuxt-ai-ready/pull/171))
+- **deps:** ⚠️  Make drizzle-orm an optional peer ([#172](https://github.com/harlan-zw/nuxt-ai-ready/pull/172))
+
+### 🩹 Fixes
+
+- **discovery:** Publish named ARD entries and agent guidance ([#158](https://github.com/harlan-zw/nuxt-ai-ready/pull/158))
+- **markdown:** Preserve Accept variation after negotiation ([#159](https://github.com/harlan-zw/nuxt-ai-ready/pull/159))
+- **skills:** Align metadata with the Agent Skills spec ([#161](https://github.com/harlan-zw/nuxt-ai-ready/pull/161))
+- **skills:** Discover public artifacts by default ([#163](https://github.com/harlan-zw/nuxt-ai-ready/pull/163))
+- **search:** Escape FTS5 queries and declare MCP tool hints ([#168](https://github.com/harlan-zw/nuxt-ai-ready/pull/168))
+- **cloudflare:** Negotiate prerendered page Markdown ([#164](https://github.com/harlan-zw/nuxt-ai-ready/pull/164))
+- **cloudflare:** Share discovery links on static assets ([#167](https://github.com/harlan-zw/nuxt-ai-ready/pull/167))
+
+### 💅 Refactors
+
+- Use native module dependencies for Site Config ([#162](https://github.com/harlan-zw/nuxt-ai-ready/pull/162))
+
+### 📖 Documentation
+
+- Add the module icon and unify the README badges ([#149](https://github.com/harlan-zw/nuxt-ai-ready/pull/149))
+- **examples:** Add a basic example ([#166](https://github.com/harlan-zw/nuxt-ai-ready/pull/166))
+- Add v3 release notes and Nuxt SEO v6 notes ([#165](https://github.com/harlan-zw/nuxt-ai-ready/pull/165))
+
+### 🏡 Chore
+
+- Schedule weekly package maintenance ([#150](https://github.com/harlan-zw/nuxt-ai-ready/pull/150))
+- Remove Renovate ([#169](https://github.com/harlan-zw/nuxt-ai-ready/pull/169))
+
+### 🤖 CI
+
+- **nightly:** Pin runner to ubuntu-24.04 ([#157](https://github.com/harlan-zw/nuxt-ai-ready/pull/157))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Prepare AI Ready 3 for Nuxt 4.6 ([#148](https://github.com/harlan-zw/nuxt-ai-ready/pull/148))
+- **deps:** ⚠️  Make drizzle-orm an optional peer ([#172](https://github.com/harlan-zw/nuxt-ai-ready/pull/172))
+
 ## v2.5.3
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.2...v2.5.3)
