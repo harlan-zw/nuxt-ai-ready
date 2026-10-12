@@ -8,7 +8,7 @@ import type { ResolvedWebMcpConfig } from './utils/webmcp'
 import { randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
@@ -21,6 +21,7 @@ import { resolveModuleEntryUrl } from './module-resolver'
 import { readPackageMetadata } from './package-metadata'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { toMarkdownPath } from './runtime/markdown-path'
+import { toDeployedRoute } from './runtime/route-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
@@ -39,7 +40,7 @@ import {
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
-import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, enforceStaticHeaderBudget, ensureStaticHeader } from './utils/static-headers'
+import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
 import { applyStaticMarkdownHeaderPlan, buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -1230,25 +1231,57 @@ export function trackDrizzleWork(event, work) { return work }
         applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
       })
       nitro.hooks.hook('compiled', async () => {
-        const headersPath = join(nitro.options.output.publicDir, '_headers')
+        const generatedHeadersPath = join(nitro.options.output.publicDir, '_headers')
+        let headersPath = generatedHeadersPath
+        let staticDiscoverySupported = isCloudflarePreset
+        if (isCloudflarePreset) {
+          const wranglerPath = join(nitro.options.output.serverDir, 'wrangler.json')
+          const wrangler = await readFile(wranglerPath, 'utf8').then(contents => JSON.parse(contents) as { assets?: { directory?: string }, pages_build_output_dir?: string }).catch((error: NodeJS.ErrnoException) => {
+            if (error.code === 'ENOENT')
+              return undefined
+            throw error
+          })
+          const assetsDirectory = wrangler?.assets?.directory || wrangler?.pages_build_output_dir
+          const assetsRoot = assetsDirectory
+            ? resolvePath(dirname(wranglerPath), assetsDirectory)
+            : String(nitro.options.preset).startsWith('cloudflare-pages')
+              ? nitro.options.output.dir
+              : resolvePath(nitro.options.output.publicDir, ...staticBaseURL.split('/').filter(Boolean).map(() => '..'))
+          const assetPath = relative(nitro.options.output.dir, assetsRoot)
+          if (assetPath === '..' || assetPath.startsWith('../')) {
+            staticDiscoverySupported = false
+            logger.warn('Skipped shared discovery headers because Cloudflare assets are outside the Nitro output directory.')
+          }
+          else {
+            headersPath = join(assetsRoot, '_headers')
+          }
+        }
         logger.debug(`Checking for _headers file: ${headersPath}`)
         const exists = await access(headersPath).then(() => true).catch(() => false)
-        if (exists) {
-          const headers = await readFile(headersPath, 'utf8')
+        if (exists || isCloudflarePreset) {
+          const readHeaders = (path: string) => readFile(path, 'utf8').catch((error: NodeJS.ErrnoException) => {
+            if (error.code === 'ENOENT')
+              return ''
+            throw error
+          })
+          const rootHeaders = exists ? await readHeaders(headersPath) : ''
+          const generatedHeaders = generatedHeadersPath === headersPath ? '' : await readHeaders(generatedHeadersPath)
+          const headers = [rootHeaders, generatedHeaders].filter(Boolean).join('\n')
+          const markdownPattern = isCloudflarePreset ? toDeployedRoute('/*.md', staticBaseURL) : '/*.md'
           // The /*.md glob cannot express a per-route canonical, so it carries
           // the describedby entry for every markdown file the exact rules above
           // do not cover (crawled pages).
           let mergedHeaders = ensureStaticHeader(
             headers,
-            '/*.md',
+            markdownPattern,
             'Content-Type',
             'text/markdown; charset=utf-8',
           )
-          mergedHeaders = ensureStaticHeader(mergedHeaders, '/*.md', 'Vary', 'Accept', 'append')
+          mergedHeaders = ensureStaticHeader(mergedHeaders, markdownPattern, 'Vary', 'Accept', 'append')
           if (config.describedby !== false) {
             mergedHeaders = ensureStaticHeader(
               mergedHeaders,
-              '/*.md',
+              markdownPattern,
               'Link',
               staticDescribedbyEntry(nitro.options.baseURL || '/'),
             )
@@ -1260,6 +1293,17 @@ export function trackDrizzleWork(event, work) { return work }
           // file or another module; the route rule plan above is the
           // primary control.
           if (isCloudflarePreset) {
+            const hasArtifact = (route: string) => access(join(nitro.options.output.publicDir, route)).then(() => true).catch((error: NodeJS.ErrnoException) => {
+              if (error.code === 'ENOENT')
+                return false
+              throw error
+            })
+            const discovery: string[] = []
+            if (staticDiscoverySupported && config.describedby !== false && await hasArtifact('/llms.txt'))
+              discovery.push(staticDescribedbyEntry(staticBaseURL))
+            if (staticDiscoverySupported && apiCatalogConfig && await hasArtifact(API_CATALOG_PATH))
+              discovery.push(`<${encodeURI(apiCatalogConfig.href)}>; rel="api-catalog"`)
+            mergedHeaders = mergeStaticDiscoveryHeaders(mergedHeaders, staticBaseURL, discovery)
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
@@ -1268,7 +1312,7 @@ export function trackDrizzleWork(event, work) { return work }
             if (budget.total > CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
               logger.warn(`_headers still has ${budget.total} rules after dropping the .md rules. Cloudflare will reject the deploy until the other rules fit under ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}.`)
           }
-          if (mergedHeaders !== headers) {
+          if (mergedHeaders !== rootHeaders || !exists) {
             await writeFile(headersPath, mergedHeaders)
             logger.debug('Merged .md charset header into _headers')
           }

@@ -1,0 +1,8 @@
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Discovery-Test: previous
+
+/*
+  X-Frame-Options: DENY
+  X-Discovery-Test: preserved
+  Link: </styles.css>; rel="preload"; as="style"

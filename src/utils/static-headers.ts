@@ -1,4 +1,5 @@
 import { mergeVaryHeader } from '../runtime/cache-control'
+import { toDeployedRoute } from '../runtime/route-path'
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -54,7 +55,12 @@ export function ensureStaticHeader(
       const valuePattern = new RegExp(`^([\\t ]+${escapedName}[\\t ]*:[\\t ]*)([^\\r\\n]*)(\\r?$)`, 'im')
       const match = block.match(valuePattern)
       if (match) {
-        const merged = block.replace(valuePattern, (_line, prefix: string, current: string, suffix: string) => `${prefix}${mergeVaryHeader(current, value)}${suffix}`)
+        const merged = block.replace(valuePattern, (_line, prefix: string, current: string, suffix: string) => {
+          const appended = name.toLowerCase() === 'link'
+            ? current.includes(value) ? current : [current, value].filter(Boolean).join(', ')
+            : mergeVaryHeader(current, value)
+          return `${prefix}${appended}${suffix}`
+        })
         return `${contents.slice(0, blockStart)}${merged}${contents.slice(blockEnd)}`
       }
     }
@@ -63,6 +69,43 @@ export function ensureStaticHeader(
 
   const prefix = blockStart === routeLineEnd ? eol : ''
   return `${contents.slice(0, blockStart)}${prefix}  ${name}: ${value}${eol}${contents.slice(blockStart)}`
+}
+
+/** Share discovery entries across static assets without multiplying page rules. */
+export function mergeStaticDiscoveryHeaders(contents: string, baseURL: string, entries: readonly string[]): string {
+  if (entries.length === 0)
+    return contents
+  const route = toDeployedRoute('/*', baseURL)
+  const blocks = splitHeaderBlocks(contents)
+  const matching = blocks.filter(block => block.route === route)
+  let merged = matching[0]?.text || ''
+  for (const block of matching.slice(1)) {
+    for (const line of block.text.split(/(?<=\n)/).slice(1)) {
+      const header = line.match(/^[\t ]+([^:\s]+):[\t ]*([^\r\n]*)/)
+      if (header?.[1]?.toLowerCase() === 'link') {
+        merged = ensureStaticHeader(merged, route, header[1], header[2]!, 'append')
+      }
+      else if (header) {
+        const existing = new RegExp(`^[\\t ]+${escapeRegExp(header[1]!)}[\\t ]*:[^\\r\\n]*(?:\\r?\\n|$)`, 'gim')
+        merged = ensureStaticHeader(merged.replace(existing, ''), route, header[1]!, header[2]!)
+      }
+      else {
+        merged += line
+      }
+    }
+  }
+  if (matching.length > 1) {
+    let inserted = false
+    contents = blocks.map((block) => {
+      if (block.route !== route)
+        return block.text
+      if (inserted)
+        return ''
+      inserted = true
+      return merged
+    }).join('')
+  }
+  return entries.reduce((headers, entry) => ensureStaticHeader(headers, route, 'Link', entry, 'append'), contents)
 }
 
 /** Cloudflare rejects a `_headers` file with more rules than this (code 100324). */
