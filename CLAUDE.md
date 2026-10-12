@@ -66,7 +66,7 @@ During prerender, the module:
 
 Page storage and FTS5 search via drizzle-orm, tables prefixed `ai_ready_`:
 - **schema/**: SQLite and Postgres table definitions; **schema-sql.ts**: raw SQL + FTS5 triggers
-- **drizzle/providers/**: sqlite (better-sqlite3), bun, node-sqlite, d1, libsql, neon, postgres clients
+- **drizzle/providers/**: node-sqlite (the `sqlite` type), bun, d1, libsql, neon, postgres clients
 - **queries.ts** (raw SQL adapters) and **drizzle/queries.ts**: two parallel query layers, keep both in sync
 - **shared.ts**: shared row mapping; dump export/import for serverless cold starts lives in `utils/checkStale.ts`
 
