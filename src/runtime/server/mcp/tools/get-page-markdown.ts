@@ -15,7 +15,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   title: SITE_TOOL_CATALOG.get_page_markdown.title,
   description: SITE_TOOL_CATALOG.get_page_markdown.description,
   inputSchema,
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.getPageMarkdown.mcp.enabled,
   cache: '5m',
   async handler({ route }) {
