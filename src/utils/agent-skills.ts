@@ -184,12 +184,14 @@ async function resolveLocalEntry(
   skill: Extract<AgentSkillConfig, { source: 'local' }>,
   index: number,
   rootDir: string,
+  publicDirs: readonly string[],
 ): Promise<
   | { _tag: 'Resolved', entry: AgentSkillsIndexEntry, routes: string[], content: string }
   | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }
 > {
   const file = resolve(rootDir, skill.file)
-  if (isAbsolute(skill.file) || !isWithinDirectory(rootDir, file)) {
+  const publicDirectory = publicDirs.map(directory => resolve(directory, 'skills')).find(directory => isWithinDirectory(directory, file))
+  if (isAbsolute(skill.file) || (!isWithinDirectory(rootDir, file) && !publicDirectory)) {
     return {
       _tag: 'Invalid',
       issues: [{
@@ -199,9 +201,9 @@ async function resolveLocalEntry(
       }],
     }
   }
-  return Promise.all([realpath(rootDir), realpath(file)])
-    .then(([realRootDir, realFile]) => {
-      if (!isWithinDirectory(realRootDir, realFile)) {
+  return Promise.all([realpath(rootDir), realpath(file), publicDirectory ? realpath(publicDirectory) : undefined])
+    .then(([realRootDir, realFile, realPublicDirectory]) => {
+      if (!isWithinDirectory(realRootDir, realFile) && !(realPublicDirectory && isWithinDirectory(realPublicDirectory, realFile))) {
         return {
           _tag: 'Invalid' as const,
           issues: [{
@@ -257,6 +259,8 @@ async function resolveLocalEntry(
 }
 
 export interface ResolveAgentSkillsOptions {
+  /** Trusted public directories resolved by Nuxt, including sibling layers. */
+  publicDirs?: readonly string[]
   /**
    * Whether the module owns the `/sitemap.md` route. Mirrors the `sitemapMd`
    * module option, which is enabled unless set to false.
@@ -304,7 +308,7 @@ export async function resolveAgentSkillsConfig(
 
   const skills = configuredSkills as AgentSkillConfig[]
   const resolved = await Promise.all(skills.map((skill, index) => skill.source === 'local'
-    ? resolveLocalEntry(skill, index, rootDir)
+    ? resolveLocalEntry(skill, index, rootDir, options.publicDirs ?? [])
     : Promise.resolve({ _tag: 'Resolved' as const, entry: resolveExternalEntry(skill) })))
   const fileIssues = resolved.flatMap(result => result._tag === 'Invalid' ? result.issues : [])
   if (fileIssues.length > 0)
@@ -341,9 +345,9 @@ export async function resolveAgentSkillsConfig(
 }
 
 export interface DiscoverAgentSkillsOptions {
-  /** The Nuxt root. Every published file must resolve inside it. */
+  /** The Nuxt root used to resolve relative artifact paths. */
   rootDir: string
-  /** Directories to scan: the project root and its layers. Entries outside `rootDir` are skipped. */
+  /** Explicit directories stay inside rootDir; trusted public directories may belong to sibling layers. */
   scanDirs: readonly string[]
   /** Directory name under each scan directory, such as `skills`. */
   dir: string
@@ -375,7 +379,7 @@ export async function discoverAgentSkills(options: DiscoverAgentSkillsOptions): 
   const seen = new Set<string>()
   for (const scanDir of options.scanDirs) {
     const base = resolve(scanDir, dir)
-    if (!isWithinDirectory(options.rootDir, base) && base !== options.rootDir)
+    if (!options.publicOnly && !isWithinDirectory(options.rootDir, base) && base !== options.rootDir)
       continue
     const entries = await readdir(base, { withFileTypes: true }).catch(() => {
       // A scan directory with no `<dir>` folder is the common case, not a fault.

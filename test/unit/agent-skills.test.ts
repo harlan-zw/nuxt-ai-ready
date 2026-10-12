@@ -533,6 +533,30 @@ describe('prepareAgentSkills and resolve with aliases', () => {
     })
   })
 
+  it('publishes a sibling layer public skill while rejecting private external files', async () => {
+    const workspace = await skillsRoot({
+      'apps/site/README.md': '# Site',
+      'layers/base/assets/skills/seo-audit/SKILL.md': localSkill,
+      'layers/base/skills/site-review/SKILL.md': reviewSkill,
+    })
+    const rootDir = join(workspace, 'apps/site')
+    const publicDirs = [join(workspace, 'layers/base/assets')]
+    const prepared = await prepareAgentSkills({}, { rootDir, scanDirs: [rootDir], publicDirs })
+    expect(prepared._tag).toBe('Ok')
+    if (prepared._tag !== 'Ok')
+      return
+    await expect(resolveAgentSkillsConfig({ skills: prepared.skills }, rootDir, { publicDirs })).resolves.toMatchObject({
+      _tag: 'Enabled',
+      localArtifacts: { '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill },
+    })
+    await expect(resolveAgentSkillsConfig({ skills: [{
+      source: 'local',
+      name: 'site-review',
+      description: 'Review a site\'s pages for content quality issues.',
+      file: '../../layers/base/skills/site-review/SKILL.md',
+    }] }, rootDir, { publicDirs })).resolves.toMatchObject({ _tag: 'Invalid' })
+  })
+
   it('rejects a public skill symlink to a private file', async () => {
     const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
     const destination = join(rootDir, 'public/skills/seo-audit')

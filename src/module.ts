@@ -196,7 +196,7 @@ export default defineNuxtModule<ModuleOptions>({
       agentSkillsResult = await resolveAgentSkillsConfig(
         { ...agentSkillsConfig, skills: rooted.skills },
         nuxt.options.rootDir,
-        { sitemapMd: config.sitemapMd !== false },
+        { sitemapMd: config.sitemapMd !== false, publicDirs: getLayerDirectories(nuxt).map(layer => layer.public) },
       )
       if (agentSkillsResult._tag === 'Invalid')
         throw agentSkillsError(agentSkillsResult.issues)
