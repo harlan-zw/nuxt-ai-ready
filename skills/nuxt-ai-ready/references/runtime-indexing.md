@@ -9,15 +9,15 @@ The database stays off until a feature needs it: `runtimeSync`, `cron`, MCP page
 Every driver needs the optional `drizzle-orm` peer. Install it with `npx nypm add drizzle-orm@1.0.0-rc.4`. Without it, the build fails and names the feature.
 Prerendering always writes a temporary SQLite index and a dump at `/__ai-ready/pages.dump`.
 
-Driver selection:
+Driver selection. The Install column lists what the driver needs in addition to `drizzle-orm`. Each package is an optional peer, so the app installs it:
 
 | Platform | Driver | Install |
 |----------|--------|---------|
-| Node 22.13 and later | `node:sqlite` | nothing |
-| Node before 22.13 | `better-sqlite3` | `better-sqlite3`, or the build fails |
+| Node.js | `node:sqlite` | nothing |
 | Bun | `bun:sqlite` | nothing |
 | Cloudflare preset | D1 | a binding |
-| Vercel with `POSTGRES_URL` | Neon | nothing |
+| Vercel with `POSTGRES_URL` | Neon | `@neondatabase/serverless` |
+| `database: { type: 'libsql' }` | LibSQL | `@libsql/client` |
 | `database: { type: 'postgres' }` | PostgreSQL | `postgres` |
 
 The build machine always uses SQLite, also for a D1 deployment.
