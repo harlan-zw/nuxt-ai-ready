@@ -497,6 +497,73 @@ describe('mergeAgentSkills and applyRootAlias', () => {
 })
 
 describe('prepareAgentSkills and resolve with aliases', () => {
+  it('discovers public skills without publishing private project instructions', async () => {
+    const rootDir = await skillsRoot({
+      'skills/site-review/SKILL.md': reviewSkill,
+      'public/skills/seo-audit/SKILL.md': localSkill,
+    })
+    await expect(prepareAgentSkills({}, { rootDir, scanDirs: [rootDir] })).resolves.toMatchObject({
+      _tag: 'Ok',
+      skills: [{ name: 'seo-audit', file: 'public/skills/seo-audit/SKILL.md', alias: '/skills/seo-audit/SKILL.md' }],
+    })
+  })
+
+  it('uses configured public directories and preserves project precedence over layers', async () => {
+    const rootDir = await skillsRoot({
+      'static/skills/seo-audit/SKILL.md': localSkill,
+      'layers/base/assets/skills/seo-audit/SKILL.md': localSkill.replace('critical', 'layer'),
+      'layers/base/assets/skills/site-review/SKILL.md': reviewSkill,
+    })
+    const result = await prepareAgentSkills({}, {
+      rootDir,
+      scanDirs: [rootDir, join(rootDir, 'layers/base')],
+      publicDirs: [join(rootDir, 'static'), join(rootDir, 'layers/base/assets')],
+    })
+    expect(result).toMatchObject({ _tag: 'Ok', skills: [
+      { name: 'seo-audit', file: 'static/skills/seo-audit/SKILL.md', alias: '/skills/seo-audit/SKILL.md' },
+      { name: 'site-review', file: 'layers/base/assets/skills/site-review/SKILL.md', alias: '/skills/site-review/SKILL.md' },
+    ] })
+  })
+
+  it('keeps root skills available through explicit directory configuration', async () => {
+    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    await expect(prepareAgentSkills({ dir: 'skills' }, { rootDir, scanDirs: [rootDir] })).resolves.toMatchObject({
+      _tag: 'Ok',
+      skills: [{ name: 'seo-audit', file: 'skills/seo-audit/SKILL.md' }],
+    })
+  })
+
+  it('publishes a sibling layer public skill while rejecting private external files', async () => {
+    const workspace = await skillsRoot({
+      'apps/site/README.md': '# Site',
+      'layers/base/assets/skills/seo-audit/SKILL.md': localSkill,
+      'layers/base/skills/site-review/SKILL.md': reviewSkill,
+    })
+    const rootDir = join(workspace, 'apps/site')
+    const publicDirs = [join(workspace, 'layers/base/assets')]
+    const prepared = await prepareAgentSkills({}, { rootDir, scanDirs: [rootDir], publicDirs })
+    expect(prepared._tag).toBe('Ok')
+    if (prepared._tag !== 'Ok')
+      return
+    await expect(resolveAgentSkillsConfig({ skills: prepared.skills }, rootDir, { publicDirs })).resolves.toMatchObject({
+      _tag: 'Enabled',
+      localArtifacts: { '/.well-known/agent-skills/seo-audit/SKILL.md': localSkill },
+    })
+    await expect(resolveAgentSkillsConfig({ skills: [{
+      source: 'local',
+      name: 'site-review',
+      description: 'Review a site\'s pages for content quality issues.',
+      file: '../../layers/base/skills/site-review/SKILL.md',
+    }] }, rootDir, { publicDirs })).resolves.toMatchObject({ _tag: 'Invalid' })
+  })
+
+  it('rejects a public skill symlink to a private file', async () => {
+    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    const destination = join(rootDir, 'public/skills/seo-audit')
+    await mkdir(destination, { recursive: true })
+    await symlink(join(rootDir, 'skills/seo-audit/SKILL.md'), join(destination, 'SKILL.md'))
+    await expect(prepareAgentSkills({}, { rootDir, scanDirs: [rootDir] })).resolves.toMatchObject({ _tag: 'Invalid' })
+  })
   it.each([true, 0, 42, null, [], ['skills'], {}].map(dir => ({ dir })))('rejects invalid dir: $dir', async ({ dir }) => {
     // @ts-expect-error Config from JavaScript can contain invalid values.
     await expect(prepareAgentSkills({ dir }, { rootDir: '/app', scanDirs: [] })).resolves.toEqual({
@@ -515,7 +582,7 @@ describe('prepareAgentSkills and resolve with aliases', () => {
   })
 
   it('serves a discovered skill at its mirrored path, at /SKILL.md, and in the index', async () => {
-    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    const rootDir = await skillsRoot({ 'public/skills/seo-audit/SKILL.md': localSkill })
 
     const prepared = await prepareAgentSkills({}, { rootDir, scanDirs: [rootDir] })
     expect(prepared._tag).toBe('Ok')
@@ -546,7 +613,7 @@ describe('prepareAgentSkills and resolve with aliases', () => {
   })
 
   it('turns discovery off with dir: false', async () => {
-    const rootDir = await skillsRoot({ 'skills/seo-audit/SKILL.md': localSkill })
+    const rootDir = await skillsRoot({ 'public/skills/seo-audit/SKILL.md': localSkill })
     await expect(prepareAgentSkills({ dir: false }, { rootDir, scanDirs: [rootDir] })).resolves.toEqual({ _tag: 'Ok', skills: [] })
   })
 })

@@ -85,7 +85,7 @@ describe('agent skills discovery', async () => {
     await expect(response.text()).resolves.toBe(localSkill)
   })
 
-  it('discovers skills/<name>/SKILL.md without config and mirrors the repository path', async () => {
+  it('discovers skills/<name>/SKILL.md from an explicit directory and mirrors its path', async () => {
     const reviewSkill = await readFile(resolve('../fixtures/agent-skills/skills/site-review/SKILL.md'), 'utf8')
     const index = await fetch('/.well-known/agent-skills/index.json').then(response => response.json()) as { skills: Array<{ name: string, url: string }> }
     expect(index.skills.map(skill => skill.name)).toEqual(['site-review', 'seo-audit', 'seo-toolkit'])
