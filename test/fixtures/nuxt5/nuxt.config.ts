@@ -30,7 +30,7 @@ function verifyBuilder(_options: unknown, nuxt: Nuxt) {
 export default defineNuxtConfig({
   workspaceDir: import.meta.dirname,
   future: { compatibilityVersion: 5 },
-  modules: [verifyBuilder,NuxtRobots, NuxtSitemap, NuxtAiReady],
+  modules: [NuxtSiteConfig, verifyBuilder,NuxtRobots, NuxtSitemap, NuxtAiReady],
   mcp: false,
   aiReady: {
     agentSkills: false,

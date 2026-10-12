@@ -9,9 +9,10 @@ import { randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule } from '@nuxt/kit'
 import defu from 'defu'
-import { installNuxtSiteConfig, useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
+import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
 import { createBuildPageDataVirtual } from './build-page-data-virtual'
 import { contentLookupModule, resolveContentSource } from './content-source'
@@ -117,16 +118,18 @@ export default defineNuxtModule<ModuleOptions>({
     configKey: 'aiReady',
   },
   moduleDependencies: {
-    '@nuxtjs/robots': {
+    [fileURLToPath(import.meta.resolve('@nuxtjs/robots'))]: {
       version: '>=7.0.0',
     },
-    '@nuxtjs/sitemap': {
+    [fileURLToPath(import.meta.resolve('@nuxtjs/sitemap'))]: {
       version: '>=9.0.0',
     },
-    'nuxt-site-config': {
+    // Keep package-relative resolution until the minimum Nuxt version includes this fix:
+    // https://github.com/nuxt/nuxt/pull/36542
+    [fileURLToPath(import.meta.resolve('nuxt-site-config'))]: {
       version: '>=5.0.0',
     },
-    'nuxtseo-shared': {
+    [fileURLToPath(import.meta.resolve('nuxtseo-shared'))]: {
       version: '>=6.0.0',
     },
     '@nuxtjs/mcp-toolkit': {
@@ -261,8 +264,6 @@ export default defineNuxtModule<ModuleOptions>({
     const siteToolsConfig = siteToolsResult.config
     const hasMcpSiteTools = Object.values(siteToolsConfig).some(tool => tool.mcp.enabled)
 
-    // Install site config for accessing site name and description
-    await installNuxtSiteConfig()
     const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
 
     const siteConfig = useSiteConfig()

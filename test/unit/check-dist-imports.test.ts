@@ -12,6 +12,41 @@ afterEach(async () => {
 })
 
 describe('published import closure', () => {
+  it.each([true, false])('checks the package behind a resolved module dependency, declared: %s', async (declared) => {
+    const packageRoot = await mkdtemp(resolve(tmpdir(), 'nuxt-ai-ready-dist-check-'))
+    temporaryDirectories.push(packageRoot)
+    await Promise.all([
+      mkdir(resolve(packageRoot, 'dist'), { recursive: true }),
+      mkdir(resolve(packageRoot, 'node_modules/nested-module'), { recursive: true }),
+    ])
+    await Promise.all([
+      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({
+        files: ['dist'],
+        main: './dist/module.mjs',
+        dependencies: declared ? { 'nested-module': '^1.0.0' } : {},
+      })),
+      writeFile(resolve(packageRoot, 'node_modules/nested-module/package.json'), JSON.stringify({
+        name: 'nested-module',
+        version: '1.0.0',
+        type: 'module',
+        exports: './index.mjs',
+      })),
+      writeFile(resolve(packageRoot, 'node_modules/nested-module/index.mjs'), 'export default () => {}'),
+      writeFile(resolve(packageRoot, 'dist/module.mjs'), [
+        'import { fileURLToPath } from \'node:url\'',
+        'export default Object.assign(() => {}, { getModuleDependencies: () => ({',
+        '  [fileURLToPath(import.meta.resolve(\'nested-module\'))]: { version: \'>=1\' }',
+        '}) })',
+      ].join('\n')),
+    ])
+
+    const result = await execa(process.execPath, [scriptPath, packageRoot], { reject: false })
+
+    expect(result.exitCode).toBe(declared ? 0 : 1)
+    if (!declared)
+      expect(result.stderr).toContain('- nested-module')
+  })
+
   it('rejects missing imports, unpublished source escapes, and broken declarations', async () => {
     const packageRoot = await mkdtemp(resolve(tmpdir(), 'nuxt-ai-ready-dist-check-'))
     temporaryDirectories.push(packageRoot)
