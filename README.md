@@ -36,7 +36,7 @@ Nuxt AI Ready implements both. It converts your pages to markdown, generates llm
 Install `nuxt-ai-ready` dependency to your project:
 
 ```bash
-npx nuxi@latest module add nuxt-ai-ready
+npx nuxt module add nuxt-ai-ready
 ```
 
 > [!TIP]

@@ -54,7 +54,7 @@ Traps:
 
 ## Server query helpers
 
-`queryPages`, `searchPages`, `countPages`, `streamPages`, `indexPage`, and `indexPageByRoute` are auto-imported in Nitro code. Other exports need `import { ... } from '#ai-ready'`.
+`queryPages`, `searchPages`, `countPages`, `streamPages`, `indexPage`, and `indexPageByRoute` are auto-imported in Nitro code. Other exports need `import { ... } from '#ai-ready/server'`.
 
 ```ts
 // server/api/search.get.ts
@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
 
 - `searchPages` returns `[]` in dev and during prerender. On SQLite and D1, `score` is BM25 and lower ranks first. PostgreSQL returns `score: 0`.
 - `queryPages(event, { route })` returns one page or `undefined`. Without `route` it returns an array. Add `includeMarkdown: true` for the body.
-- Raw SQL: `useRawDb` from `#ai-ready`. `useDatabase` does not exist.
+- Raw SQL: `useRawDb` from `#ai-ready/server`. `useDatabase` does not exist.
 - The event goes in a different position: `indexPage(route, html, options, event)` and `indexPageByRoute(route, event, options)`.
 - `indexPage` throws on failure. `indexPageByRoute` returns `{ success: false, error }`.
 
