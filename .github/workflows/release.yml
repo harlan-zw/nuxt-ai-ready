@@ -44,8 +44,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --trust-lockfile
 
-      - name: Pack portable release archive
-        run: node scripts/pack-preview.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
+      - name: Pack release archive
+        run: pnpm pack --out "$RUNNER_TEMP/nuxt-ai-ready.tgz"
 
       - name: Check packed manifest
         run: node scripts/check-pack-manifest.mjs "$RUNNER_TEMP/nuxt-ai-ready.tgz"
