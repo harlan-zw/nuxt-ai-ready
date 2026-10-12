@@ -1213,7 +1213,9 @@ export function trackDrizzleWork(event, work) { return work }
       // static handlers apply them at runtime.
       const isCloudflarePreset = String(nitro.options.preset || '').startsWith('cloudflare')
       nitro.hooks.hook('prerender:done', async () => {
-        if (['cloudflare', 'cloudflare-module', 'cloudflare-durable'].includes(String(nitro.options.preset)) && !nitro.options.static && config.contentNegotiation !== false) {
+        // Adding Worker-first routes makes ordinary static HTML requests invoke
+        // the Worker too. Keep asset routing user-owned unless explicitly enabled.
+        if (['cloudflare', 'cloudflare-module', 'cloudflare-durable'].includes(String(nitro.options.preset)) && !nitro.options.static && config.contentNegotiation === true) {
           const pages = cloudflarePrerenderedPages(nitro._prerenderedRoutes || [], staticBaseURL)
           const cloudflare = nitro.options.cloudflare ||= {}
           const wrangler = cloudflare.wrangler ||= {}

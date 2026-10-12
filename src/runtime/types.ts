@@ -146,6 +146,8 @@ export interface ModuleOptions {
    * Negotiate Markdown on HTML routes through Accept headers.
    * Disable when a deployment cache cannot vary responses by request headers.
    * Explicit .md routes remain available.
+   * On Cloudflare Workers, true also routes prerendered HTML through the Worker.
+   * Automatic negotiation preserves the existing Cloudflare asset routing.
    * @default Automatic per route
    */
   contentNegotiation?: boolean
