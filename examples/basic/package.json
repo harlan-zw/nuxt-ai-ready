@@ -1,0 +1,16 @@
+{
+  "name": "nuxt-ai-ready-basic-example",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "nuxt": "^4.6.0",
+    "nuxt-ai-ready": "latest",
+    "vue": "^3.5.43"
+  }
+}
