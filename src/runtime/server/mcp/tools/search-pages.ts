@@ -5,6 +5,7 @@ import siteTools from '#ai-ready-virtual/site-tools.mjs'
 import { useEvent } from '#nuxtseo/nitro'
 import { SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { searchPages } from '../../db/queries'
+import { siteToolCacheKey } from '../cache-key'
 
 const inputSchema = {
   query: z.string().describe(SITE_TOOL_CATALOG.search_pages.parameters.query),
@@ -20,7 +21,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   inputSchema,
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.searchPages.mcp.enabled,
-  cache: '5m',
+  cache: { maxAge: '5m', getKey: siteToolCacheKey },
   async handler({ query, limit }) {
     const event = useEvent() as H3Event
     const results = await searchPages(event, query, { limit })

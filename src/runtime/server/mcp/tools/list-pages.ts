@@ -6,6 +6,7 @@ import siteTools from '#ai-ready-virtual/site-tools.mjs'
 import { useEvent } from '#nuxtseo/nitro'
 import { SITE_TOOL_CATALOG } from '../../../site-tool-catalog'
 import { countPages, queryPages } from '../../db/queries'
+import { siteToolCacheKey } from '../cache-key'
 
 const inputSchema = {
   limit: z.number().int().min(1).max(50).optional().default(siteTools.listPages.defaultLimit).describe(
@@ -21,7 +22,7 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   inputSchema,
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   enabled: () => siteTools.listPages.mcp.enabled,
-  cache: '1h',
+  cache: { maxAge: '1h', getKey: siteToolCacheKey },
   async handler({ limit, offset }) {
     const event = useEvent() as H3Event
     const pages = await queryPages(event, { limit, offset }) as PageEntry[]
