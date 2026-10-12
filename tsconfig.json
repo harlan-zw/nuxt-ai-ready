@@ -1,4 +1,4 @@
 {
   "extends": "./.nuxt/tsconfig.json",
-  "exclude": ["dist", "devtools"]
+  "exclude": ["**/dist", "devtools", "test/fixtures/nuxt5"]
 }
