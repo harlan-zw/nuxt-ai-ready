@@ -7,7 +7,7 @@ pnpm install
 pnpm dev
 ```
 
-Then request the generated files:
+While the dev server runs, request `llms.txt` and the Markdown version of `/about`:
 
 ```bash
 curl http://localhost:3000/llms.txt
