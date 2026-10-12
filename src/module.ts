@@ -168,7 +168,7 @@ export default defineNuxtModule<ModuleOptions>({
     }
     setupRuntimeAliases({ namespace: '#ai-ready', app: resolve('./runtime/app'), server: resolve('./runtime/server') }, nuxt)
 
-    // Agent skills: `skills/<name>/SKILL.md` in the project and its layers is
+    // Agent skills: `public/skills/<name>/SKILL.md` in the project and its layers is
     // discovered, merged with explicit config, offered to the
     // `ai-ready:agent-skills` hook, then given its root alias and resolved.
     const agentSkillsConfig: false | AgentSkillsConfig = config.agentSkills === false ? false : (config.agentSkills ?? {})
@@ -184,6 +184,7 @@ export default defineNuxtModule<ModuleOptions>({
       const prepared = await prepareAgentSkills(agentSkillsConfig, {
         rootDir: nuxt.options.rootDir,
         scanDirs: getLayerDirectories(nuxt).map(layer => layer.root),
+        publicDirs: getLayerDirectories(nuxt).map(layer => layer.public),
       })
       if (prepared._tag === 'Invalid')
         throw agentSkillsError(prepared.issues)

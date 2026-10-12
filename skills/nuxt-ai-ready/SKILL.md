@@ -34,7 +34,7 @@ With no `aiReady` config, the module adds:
 - `<link rel="alternate" type="text/markdown">` and `<link rel="describedby" href="/llms.txt">` in HTML, plus matching `Link` headers.
 - `/sitemap.md`, and a `## Sitemap` footer on every generated `.md` page. Set `sitemapMd: false` to remove both.
 - Nuxt Content v3 `page` collections: the `.md` route serves the source Markdown, not converted HTML. Set `contentSource: false` to convert HTML.
-- Agent skills: every `skills/<name>/SKILL.md` in the project root or a local layer is published at `/.well-known/agent-skills/`, at `/skills/<name>/SKILL.md`, and in `llms.txt`. With one skill it is also served at `/SKILL.md`. Set `agentSkills: false` to publish nothing.
+- Agent skills: `public/skills/<name>/SKILL.md` in the project or a local layer is published at `/.well-known/agent-skills/`, `/skills/<name>/SKILL.md`, and in `llms.txt`. Custom public directories are supported. One local skill is also served at `/SKILL.md`. Set `agentSkills: false` to publish nothing.
 
 Off by default: Content Signals, MCP, WebMCP, runtime sync, cron, and the database.
 
@@ -92,7 +92,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 - **Dev has no page data.** Query helpers, MCP tools, and search return empty results in `nuxi dev`. Test with `nuxi build` and `node .output/server/index.mjs`.
 - **Response caching turns negotiation off.** An ISR, `swr`, or `cache` route rule without `varies: ['accept', 'sec-fetch-dest', 'user-agent']` serves HTML to Markdown clients. The `.md` URL still works. For a CDN that caches by URL only, set `contentNegotiation: false`.
 - **Emptying `ctx.markdown` does not hide a page.** It drops the body from `llms-full.txt`. The URL stays in `llms.txt` and in the index. Use `sitemap.exclude` for discovery, and access control for private pages.
-- **A project `skills/` folder is public.** Agent skills discovery publishes it with no opt in. Rename the folder with `agentSkills.dir`, or set `agentSkills: false`.
+- **Root `skills/` folders require explicit publication.** Automatic discovery scans public directories only. Set `agentSkills.dir: 'skills'` to publish root skills intentionally.
 - **The same hook name exists twice.** `ai-ready:page:markdown` is a Nuxt hook (`nuxt.config` `hooks`, prerender only) and a Nitro hook (`nitroApp.hooks`, every HTML conversion). They receive different context. The Nitro `ctx.event` is undefined when indexing runs outside a request.
 - **`database: false` conflicts with `runtimeSync` and `cron`.** The build fails and names the option.
 

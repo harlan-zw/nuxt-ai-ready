@@ -85,11 +85,10 @@ export interface AgentSkillsConfig {
    */
   skills?: AgentSkillConfig[]
   /**
-   * Directory scanned for `<name>/SKILL.md` in the project root and in every
-   * layer inside it. Each match is published as a local skill and also served
-   * at `/<dir>/<name>/SKILL.md`, mirroring the repository path. `false` turns
-   * discovery off.
-   * @default 'skills'
+   * Explicit directory scanned for `<name>/SKILL.md` in the project root and its layers.
+   * By default, only `skills/<name>/SKILL.md` inside their resolved public directories is discovered.
+   * Public skills are also served at `/skills/<name>/SKILL.md`.
+   * An explicit directory uses `/<dir>/<name>/SKILL.md`. `false` disables discovery.
    */
   dir?: string | false
   /**

@@ -347,6 +347,8 @@ export interface DiscoverAgentSkillsOptions {
   scanDirs: readonly string[]
   /** Directory name under each scan directory, such as `skills`. */
   dir: string
+  /** Reject artifacts escaping the discovered directory through symlinks. */
+  publicOnly?: boolean
 }
 
 export interface DiscoveredAgentSkills {
@@ -383,6 +385,19 @@ export async function discoverAgentSkills(options: DiscoverAgentSkillsOptions): 
       if (seen.has(entry.name))
         continue
       const file = join(base, entry.name, 'SKILL.md')
+      if (options.publicOnly) {
+        const resolvedFile = await realpath(file).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT')
+            return null
+          throw error
+        })
+        if (resolvedFile === null)
+          continue
+        if (!isWithinDirectory(await realpath(base), resolvedFile)) {
+          issues.push({ field: 'file', message: `${toPosix(relative(options.rootDir, file))} must resolve within its public skills directory` })
+          continue
+        }
+      }
       const content = await readFile(file, 'utf8').catch(() => {
         // A directory without a SKILL.md is not a skill; skip it.
         return null
@@ -450,6 +465,8 @@ export function applyRootAlias(
 export interface PrepareAgentSkillsOptions {
   rootDir: string
   scanDirs: readonly string[]
+  /** Nuxt's resolved public directories, including custom project and layer paths. */
+  publicDirs?: readonly string[]
 }
 
 /**
@@ -466,7 +483,14 @@ export async function prepareAgentSkills(
     return { _tag: 'Invalid', issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }] }
   const discovered = config.dir === false
     ? { skills: [], issues: [] }
-    : await discoverAgentSkills({ rootDir: options.rootDir, scanDirs: options.scanDirs, dir: config.dir ?? 'skills' })
+    : await discoverAgentSkills({
+        rootDir: options.rootDir,
+        scanDirs: config.dir === undefined
+          ? options.publicDirs ?? options.scanDirs.map(directory => join(directory, 'public'))
+          : options.scanDirs,
+        dir: config.dir ?? 'skills',
+        publicOnly: config.dir === undefined,
+      })
   if (discovered.issues.length > 0)
     return { _tag: 'Invalid', issues: discovered.issues }
   return { _tag: 'Ok', skills: mergeAgentSkills(discovered.skills, (config.skills ?? []) as AgentSkillConfig[]) }

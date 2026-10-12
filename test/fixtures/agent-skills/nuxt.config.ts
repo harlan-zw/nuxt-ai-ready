@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   },
   aiReady: {
     agentSkills: {
+      dir: 'skills',
       skills: [
         {
           source: 'local',
