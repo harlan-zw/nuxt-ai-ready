@@ -1,3 +1,11 @@
+## v3.0.1
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.0...v3.0.1)
+
+### 💅 Refactors
+
+- **mcp:** Derive tool cache keys from a hash ([#177](https://github.com/harlan-zw/nuxt-ai-ready/pull/177))
+
 ## v3.0.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v2.5.3...v3.0.0)
