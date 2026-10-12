@@ -22,8 +22,8 @@ async function fixture(metadata: string) {
 describe('readPackageMetadata', () => {
   it('reads a dependency version when package exports hide package.json', async () => {
     const base = await fixture(JSON.stringify({ name: 'metadata-package', version: '3.0.0', exports: './entry.mjs' }))
-    expect(await readPackageMetadata('metadata-package', base)).toEqual({ version: '3.0.0' })
-    expect(await readPackageMetadata(join(base, 'node_modules/metadata-package/entry.mjs'))).toEqual({ version: '3.0.0' })
+    expect(await readPackageMetadata('metadata-package', base)).toEqual({ version: '3.0.0', peerDependencies: {} })
+    expect(await readPackageMetadata(join(base, 'node_modules/metadata-package/entry.mjs'))).toEqual({ version: '3.0.0', peerDependencies: {} })
   })
 
   it('rejects a missing dependency', async () => {
@@ -44,6 +44,6 @@ describe('readPackageMetadata', () => {
     await writeFile(join(dependency, 'package.json'), JSON.stringify({ version: '4.0.0', exports: './entry.mjs' }))
     await writeFile(join(dependency, 'entry.mjs'), '')
 
-    expect(await readPackageMetadata('metadata-package', base, { searchDirectory: modules })).toEqual({ version: '4.0.0' })
+    expect(await readPackageMetadata('metadata-package', base, { searchDirectory: modules })).toEqual({ version: '4.0.0', peerDependencies: {} })
   })
 })

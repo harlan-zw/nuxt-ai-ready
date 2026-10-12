@@ -6,6 +6,7 @@ If each deployment prerenders all content, you do not need runtime sync.
 ## When the database is on
 
 The database stays off until a feature needs it: `runtimeSync`, `cron`, MCP page tools, WebMCP page tools, or an explicit `database` config.
+Every driver needs the optional `drizzle-orm` peer. Install it with `npx nypm add drizzle-orm@1.0.0-rc.4`. Without it, the build fails and names the feature.
 Prerendering always writes a temporary SQLite index and a dump at `/__ai-ready/pages.dump`.
 
 Driver selection:

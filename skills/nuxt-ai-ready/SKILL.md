@@ -15,6 +15,7 @@ Optional parts add MCP tools, WebMCP tools, and a runtime page index. Config key
 
 Included in `@nuxtjs/seo` v6. If the app uses `@nuxtjs/seo`, configure the `aiReady` key and do not add the module again.
 Nuxt SEO uses AI Ready's own defaults. It overrides no `aiReady` option.
+With these defaults the database stays off, so the app does not need `drizzle-orm`.
 
 The package installs `@nuxtjs/robots` and `@nuxtjs/sitemap` and loads them as module dependencies. Configure them with the `robots` and `sitemap` keys.
 
@@ -82,9 +83,9 @@ export default defineNuxtConfig({ aiReady: { contentSignal: { search: true } } }
 // robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=no
 ```
 
-MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. MCP needs a running server; `nuxt generate` output cannot host it.
+MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it.
 
-WebMCP: set `webmcp: true`. This registers the same three tools in the browser and auto-imports `useWebMcpTool()` and `useWebMcpSupported()`. Without `webmcp`, those composables are not defined.
+WebMCP: set `webmcp: true`. This registers the same three tools in the browser and auto-imports `useWebMcpTool()` and `useWebMcpSupported()`. The tools need the database and `drizzle-orm`. Without `webmcp`, those composables are not defined.
 
 Runtime indexing, database drivers, Cloudflare D1, and the server query helpers: see [references/runtime-indexing.md](references/runtime-indexing.md).
 
@@ -98,10 +99,12 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 - **Root `skills/` folders require explicit publication.** Automatic discovery scans public directories only. Set `agentSkills.dir: 'skills'` to publish root skills intentionally.
 - **The same hook name exists twice.** `ai-ready:page:markdown` is a Nuxt hook (`nuxt.config` `hooks`, prerender only) and a Nitro hook (`nitroApp.hooks`, every HTML conversion). They receive different context. The Nitro `ctx.event` is undefined when indexing runs outside a request.
 - **`database: false` conflicts with `runtimeSync` and `cron`.** The build fails and names the option.
+- **A database feature without `drizzle-orm` fails the build.** `runtimeSync`, `cron`, MCP site tools, WebMCP site tools, and an explicit `database` option turn on the database. The error names the feature and the install command. If MCP Toolkit serves only your own tools, set `database: false` instead.
 
 ## Version limits
 
 - v3 requires Nuxt `^4.6.0 || ^5.0.0` and Node `^22.22.3 || ^24.15.0 || >=26.0.0`. Upgrade Nuxt before the module.
+- v3 does not install `drizzle-orm`. It is an optional peer. If a feature uses the database, run `npx nypm add drizzle-orm@1.0.0-rc.4`.
 - v3 removed the `better-sqlite3` fallback. SQLite uses `node:sqlite`. Remove `better-sqlite3` if only this module used it.
 - v3 negotiates on `Accept` only. To serve Markdown to AI bot user agents again, set `botNegotiation: true` and vary caches on `accept`, `sec-fetch-dest`, and `user-agent`.
 - v3 discovers skills in `public/skills/<name>/SKILL.md` by default. Root `skills/` stays private. Move public skills, or set `agentSkills.dir: 'skills'`.

@@ -76,6 +76,7 @@
   "peerDependencies": {
     "@libsql/client": "^0.18.0",
     "@neondatabase/serverless": "^1.0.0",
+    "drizzle-orm": "^1.0.0-rc.4",
     "nuxt": "^4.6.0 || ^5.0.0",
     "postgres": "^3.4.9"
   },
@@ -84,6 +85,9 @@
       "optional": true
     },
     "@neondatabase/serverless": {
+      "optional": true
+    },
+    "drizzle-orm": {
       "optional": true
     },
     "postgres": {
@@ -99,7 +103,6 @@
     "confbox": "catalog:",
     "consola": "catalog:",
     "defu": "catalog:",
-    "drizzle-orm": "catalog:",
     "mdream": "catalog:",
     "nuxt-site-config": "catalog:nuxt",
     "nuxtseo-shared": "catalog:",
@@ -125,6 +128,7 @@
     "@vueuse/nuxt": "catalog:nuxt",
     "better-sqlite3": "catalog:",
     "bumpp": "catalog:",
+    "drizzle-orm": "catalog:",
     "eslint": "catalog:dev-lint",
     "eslint-plugin-harlanzw": "catalog:",
     "execa": "catalog:",
