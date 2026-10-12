@@ -105,6 +105,7 @@ catalog:
   better-sqlite3: ^13.0.3
   bumpp: ^12.3.0
   citty: ^0.2.2
+  confbox: ^0.3.1
   consola: ^3.4.2
   defu: ^6.1.7
   drizzle-orm: 1.0.0-rc.4

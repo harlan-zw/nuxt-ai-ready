@@ -1,0 +1,5 @@
+[assets]
+run_worker_first = ["/about*"]
+
+[env.review.assets]
+run_worker_first = ["/docs/api*"]
