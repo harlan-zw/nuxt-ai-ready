@@ -6,6 +6,7 @@ const { resolve } = createResolver(import.meta.url)
 const cardRoute = '/docs/agent/mcp/server-card'
 const aiCatalogRoute = '/.well-known/ai-catalog.json'
 const ardRoute = '/.well-known/ard.json'
+const wellKnownCardRoutes = ['/.well-known/mcp/server-card.json', '/.well-known/mcp.json']
 
 async function mcpRequest(method: string, params?: Record<string, unknown>) {
   const response = await fetch('/docs/agent/mcp', {
@@ -90,7 +91,9 @@ describe('late MCP Server Card dependency', async () => {
     expect(resources.result.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({ uri: 'resource://nuxt-ai-ready/pages' }),
     ]))
-    expect(llmsTxt).toContain('[MCP](https://late-mcp.example.com/docs/agent/mcp)')
+    expect(llmsTxt).toContain('[MCP server card](https://late-mcp.example.com/docs/.well-known/mcp/server-card.json)')
+    expect(llmsTxt).toContain('Connect an MCP client to https://late-mcp.example.com/docs/agent/mcp')
+    expect(llmsTxt).not.toContain('](https://late-mcp.example.com/docs/agent/mcp)')
     expect(sitemap).not.toContain('/agent/mcp/server-card')
     expect(devtools.config.mcp).toEqual({
       enabled: true,
@@ -98,6 +101,34 @@ describe('late MCP Server Card dependency', async () => {
       resources: true,
     })
     expect(seoPro).toEqual({ mcp: true })
+  })
+
+  it.each(wellKnownCardRoutes)('serves the same card at the well-known path %s', async (route) => {
+    const [response, card] = await Promise.all([
+      fetch(route),
+      fetch(cardRoute).then(response => response.json()),
+    ])
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('application/mcp-server-card+json')
+    expect(response.headers.get('cache-control')).toBe('public, max-age=900')
+    await expect(response.json()).resolves.toEqual(card)
+  })
+
+  it('links a card URL from llms.txt that resolves', async () => {
+    const llmsTxt = await fetch('/llms.txt').then(response => response.text())
+    const href = llmsTxt.match(/\[MCP server card\]\(([^)]+)\)/)?.[1]
+    expect(href).toBeDefined()
+
+    const response = await fetch(new URL(href!).pathname)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('application/mcp-server-card+json')
+  })
+
+  it('leaves the well-known card paths out of the sitemap', async () => {
+    const sitemap = await fetch('/sitemap.xml').then(response => response.text())
+
+    expect(sitemap).not.toContain('/.well-known/mcp')
   })
 
   it('supports HEAD without a response body', async () => {
@@ -181,7 +212,7 @@ describe('late MCP Server Card dependency', async () => {
     expect(await conditional.text()).toBe('')
   })
 
-  it.each([cardRoute, aiCatalogRoute, ardRoute])('supports browser CORS preflights for %s', async (route) => {
+  it.each([cardRoute, ...wellKnownCardRoutes, aiCatalogRoute, ardRoute])('supports browser CORS preflights for %s', async (route) => {
     const response = await fetch(route, {
       method: 'OPTIONS',
       headers: {
