@@ -16,6 +16,16 @@ describe('nuxt-ai-ready e2e', async () => {
     expect(markdown).toContain('#') // Should contain markdown headers
   })
 
+  it('points a runtime Markdown page at llms.txt right after its frontmatter', async () => {
+    const markdown = await $fetch<string>('/about.md')
+    expect(markdown).toMatch(/^---\n[\s\S]*?\n---\n\n> Index of every page on this site: \[llms\.txt\]\(https:\/\/test\.example\.com\/llms\.txt\)\n\n/)
+  })
+
+  it('leaves the llms.txt directive out of HTML by default', async () => {
+    const html = await $fetch<string>('/about')
+    expect(html.slice(html.indexOf('<body'))).not.toContain('llms.txt')
+  })
+
   it('converts an @handle page to markdown', async () => {
     // /@login is a profile namespace, not a Vite internal. Reserving all of
     // /@ left these pages advertising a .md the handler refused to serve.

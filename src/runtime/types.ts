@@ -579,6 +579,22 @@ export interface LlmsTxtConfig {
    * @default true
    */
   markdownLinks?: boolean
+  /**
+   * Point each page at llms.txt, so an agent that lands on one page finds the
+   * whole site's index.
+   */
+  directive?: {
+    /**
+     * Add a blockquote line after the frontmatter of every page's `.md` response.
+     * @default true
+     */
+    markdown?: boolean
+    /**
+     * Add a visually hidden link to `/llms.txt` at the top of every HTML page's body.
+     * @default false
+     */
+    html?: boolean
+  }
   /** The sections of the documentation */
   sections?: LlmsTxtSection[]
   /** Additional heading-free preamble notes rendered before file-list sections */
