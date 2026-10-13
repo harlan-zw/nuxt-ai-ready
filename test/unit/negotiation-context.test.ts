@@ -49,6 +49,26 @@ function headerEvent(origin: string, configuredUrl = true) {
 }
 
 describe('request-specific header URL resolution', () => {
+  it('preserves the source Content-Signal policy after conversion', () => {
+    const { event } = headerEvent('https://example.com')
+    const sourceHeaders = new Headers({ 'Content-Signal': 'ai-train=no, search=yes', 'ETag': 'html-body', 'Content-Length': '123' })
+
+    setMarkdownHeaders(event, buildNegotiationContext(event, '/about'), sourceHeaders)
+
+    expect(getResponseHeader(event, 'content-signal')).toBe('ai-train=no, search=yes')
+    expect(getResponseHeader(event, 'etag')).toBeUndefined()
+    expect(getResponseHeader(event, 'content-length')).toBeUndefined()
+  })
+
+  it('keeps an explicit Markdown response policy ahead of the source policy', () => {
+    const { event } = headerEvent('https://example.com')
+    setHeader(event, 'Content-Signal', 'search=no')
+
+    setMarkdownHeaders(event, buildNegotiationContext(event, '/about'), new Headers({ 'Content-Signal': 'search=yes' }))
+
+    expect(getResponseHeader(event, 'content-signal')).toBe('search=no')
+  })
+
   it('adds Accept variation to Markdown without removing existing cache dimensions', () => {
     const { event } = headerEvent('https://example.com')
     setHeader(event, 'vary', 'Origin')

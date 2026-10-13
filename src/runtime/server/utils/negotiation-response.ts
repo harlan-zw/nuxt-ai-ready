@@ -88,6 +88,10 @@ export function setUncacheableHeaders(event: H3Event) {
 
 export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sourceHeaders?: Headers) {
   setHeader(event, 'content-type', 'text/markdown; charset=utf-8')
+  // Usage policy survives a representation change. An explicit twin policy wins.
+  const sourcePolicy = sourceHeaders?.get('content-signal')
+  if (sourcePolicy !== null && sourcePolicy !== undefined && getResponseHeader(event, 'content-signal') === undefined)
+    setHeader(event, 'content-signal', sourcePolicy)
   const vary = [getResponseHeader(event, 'vary'), sourceHeaders?.get('vary')].filter(Boolean).join(', ')
   setHeader(event, 'vary', mergeVaryHeader(vary, 'Accept'))
   setLinkHeader(event, ctx, 'markdown')

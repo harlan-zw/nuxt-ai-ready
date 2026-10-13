@@ -1,5 +1,5 @@
 import { createResolver } from '@nuxt/kit'
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
+import { $fetch, fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -34,5 +34,14 @@ describe('robots.txt content signals', async () => {
 
     // Should have User-agent: * somewhere before the directives
     expect(robotsTxt).toContain('User-agent: *')
+  })
+
+  it('keeps the source response policy on its Markdown twin', async () => {
+    const html = await fetch('/about')
+    const markdown = await fetch('/about.md')
+
+    expect(html.headers.get('content-signal')).toBe('ai-train=no, search=yes')
+    expect(markdown.headers.get('content-signal')).toBe(html.headers.get('content-signal'))
+    expect(markdown.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
   })
 })
