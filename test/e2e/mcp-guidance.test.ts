@@ -38,6 +38,6 @@ describe('mcp agent guidance', async () => {
     expect(handshake.result.instructions).toContain('Use this server when you need information from this site\'s indexed pages.')
 
     const llmsTxt = await fetch('/llms.txt').then(response => response.text())
-    expect(llmsTxt).toContain('Use this MCP endpoint when you need information from this site\'s indexed pages.')
+    expect(llmsTxt).toMatch(/^- \[MCP server card\]\(\S+\/\.well-known\/mcp\/server-card\.json\): Connect an MCP client to \S+\/mcp when you need information from this site's indexed pages\.$/m)
   })
 })
