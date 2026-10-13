@@ -84,3 +84,24 @@ export interface SeedRoutesOptions {
    */
   refreshWindowMs?: number
 }
+
+export type SeedRoute = string | { route: string, locale?: string, url?: string, lastmod?: string | Date }
+
+/** Parse source dates once, so equivalent W3C date representations compare equal. */
+export function parseSourceLastmod(input: string | Date | undefined): string | null {
+  if (input === undefined)
+    return null
+  if (typeof input === 'string' && (input.length > 64 || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(input)))
+    return null
+  const date = new Date(input)
+  if (!Number.isFinite(date.getTime()))
+    return null
+  // Date silently rolls invalid calendar dates into the next month.
+  if (typeof input === 'string') {
+    const calendarDate = input.slice(0, 10)
+    const parsedCalendarDate = new Date(calendarDate)
+    if (!Number.isFinite(parsedCalendarDate.getTime()) || parsedCalendarDate.toISOString().slice(0, 10) !== calendarDate)
+      return null
+  }
+  return date.toISOString()
+}

@@ -3,7 +3,7 @@
  * Used by shared.ts during nuxi generate/build
  */
 
-export const SCHEMA_VERSION = 'v2.3.0'
+export const SCHEMA_VERSION = 'v2.4.0'
 
 /**
  * Allowed FTS5 tokenizer values. The configured value gets interpolated into the
@@ -50,6 +50,7 @@ export function buildSchemaSql(opts: SchemaOptions = {}): string[] {
       keywords TEXT NOT NULL DEFAULT '[]',
       content_hash TEXT,
       updated_at TEXT NOT NULL,
+      source_lastmod TEXT,
       indexed_at INTEGER NOT NULL,
       is_error INTEGER NOT NULL DEFAULT 0,
       indexed INTEGER NOT NULL DEFAULT 0,

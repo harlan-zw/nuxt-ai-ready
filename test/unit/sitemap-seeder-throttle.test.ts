@@ -25,7 +25,7 @@ vi.mock('#ai-ready-virtual/logger.mjs', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }))
 
-type ResolvedHandler = (ctx: { urls: Array<{ loc: string }>, sitemapName: string, event: H3Event }) => Promise<void>
+type ResolvedHandler = (ctx: { urls: Array<{ loc: string, lastmod?: string | Date }>, sitemapName: string, event: H3Event }) => Promise<void>
 
 async function loadHandler(): Promise<ResolvedHandler> {
   vi.resetModules()
@@ -71,6 +71,32 @@ describe('sitemap-seeder throttle', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('seeds source dates before adding dates from the index', async () => {
+    mocks.getPageLastmods.mockResolvedValue(new Map([
+      ['/about', '2026-08-02'],
+      ['/source', '2026-08-03'],
+    ]))
+    mocks.getSitemapLastCrawledAt.mockResolvedValue(null)
+    const handler = await loadHandler()
+    const { deferred, event } = makeEvent()
+    const urls = [
+      { loc: 'https://example.com/about' },
+      { loc: 'https://example.com/source', lastmod: '2026-08-01' },
+    ]
+
+    await handler({ urls, sitemapName: 'sitemap.xml', event })
+    await Promise.all(deferred)
+
+    expect(mocks.seedRoutes).toHaveBeenCalledWith(event, [
+      { route: '/about', url: 'https://example.com/about', lastmod: undefined },
+      { route: '/source', url: 'https://example.com/source', lastmod: '2026-08-01' },
+    ], { refreshWindowMs: 24 * 60 * 60 * 1000 })
+    expect(urls).toEqual([
+      { loc: 'https://example.com/about', lastmod: '2026-08-02' },
+      { loc: 'https://example.com/source', lastmod: '2026-08-01' },
+    ])
   })
 
   it('throttles re-seeding while the throttle read times out', async () => {
