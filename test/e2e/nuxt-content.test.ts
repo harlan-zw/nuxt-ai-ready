@@ -24,6 +24,14 @@ describe('@nuxt/content integration', async () => {
     expect(md).toContain('- bullet one')
   })
 
+  it('resolves root-relative links in source markdown against the site origin', async () => {
+    const md = await $fetch<string>('/blog/hello-world.md')
+    expect(md).toContain('[the about page](https://test.example.com/about)')
+    expect(md).toContain('`[inline code](/kept)`')
+    expect(md).toContain('[sitemap](https://test.example.com/sitemap.md)')
+    expect(md).not.toMatch(/\]\(\/(?!kept)/)
+  })
+
   it('falls through to HTML conversion for non-content routes', async () => {
     const md = await $fetch('/about.md')
     expect(typeof md).toBe('string')

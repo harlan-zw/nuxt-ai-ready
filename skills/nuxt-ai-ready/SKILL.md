@@ -124,7 +124,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 ## Config
 
-- `llmsTxt.markdownLinks` (`false`): link page entries in `llms.txt` to their `.md` twins.
+- `llmsTxt.markdownLinks` (`true`): link page entries in `llms.txt` to their `.md` twins. `false` links canonical URLs. With `site.url` set, page links in `llms.txt`, `sitemap.md`, and `.md` bodies are absolute.
 - `describedby` (`true`): the `describedby` link tag and header.
 - `tools.<listPages|searchPages|getPageMarkdown>.<mcp|webmcp>.enabled`: attach a built in tool to one transport only.
 - `autoI18n` (`true`): with `@nuxtjs/i18n`, adds hreflang `Link` headers and a languages section in `llms.txt`.

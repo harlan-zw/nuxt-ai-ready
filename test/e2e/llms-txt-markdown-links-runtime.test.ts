@@ -17,17 +17,17 @@ describe('llms.txt runtime Markdown links', async () => {
   it('links eligible sitemap routes to the runtime Markdown handler', async () => {
     const llmsTxt = await $fetch<string>('/llms.txt')
 
-    expect(llmsTxt).toContain('[/about](/about.md)')
-    expect(llmsTxt).toContain('[/docs/api](/docs/api.md)')
+    expect(llmsTxt).toContain('[/about](https://test.example.com/about.md)')
+    expect(llmsTxt).toContain('[/docs/api](https://test.example.com/docs/api.md)')
   })
 
   it('keeps canonical links for route types without a runtime Markdown handler', async () => {
     const llmsTxt = await $fetch<string>('/llms.txt')
 
-    expect(llmsTxt).toContain('[/api/status](/api/status)')
-    expect(llmsTxt).toContain('[/_internal](/_internal)')
-    expect(llmsTxt).toContain('[/guide.pdf](/guide.pdf)')
-    expect(llmsTxt).toContain('[/image.avif](/image.avif)')
+    expect(llmsTxt).toContain('[/api/status](https://test.example.com/api/status)')
+    expect(llmsTxt).toContain('[/_internal](https://test.example.com/_internal)')
+    expect(llmsTxt).toContain('[/guide.pdf](https://test.example.com/guide.pdf)')
+    expect(llmsTxt).toContain('[/image.avif](https://test.example.com/image.avif)')
     expect(llmsTxt).not.toContain('/api/status.md')
     expect(llmsTxt).not.toContain('/_internal.md')
     expect(llmsTxt).not.toContain('/guide.pdf.md')

@@ -27,23 +27,23 @@ describe('llms.txt Markdown links in a static build', async () => {
   it('links generated and copied Markdown files using the deployed base URL', async () => {
     const llmsTxt = await readFile(getPublicPath('llms.txt'), 'utf8')
 
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/index\.md\): /)
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/docs\/about\.md\): /)
-    expect(llmsTxt).toContain('(/docs/docs/published.md)')
-    expect(llmsTxt).toContain('(/docs/docs/space%20route.md)')
-    expect(llmsTxt.match(/\]\(\/docs\/about\.md\)/g)).toHaveLength(1)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(https:\/\/test\.example\.com\/docs\/index\.md\): /)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(https:\/\/test\.example\.com\/docs\/about\.md\): /)
+    expect(llmsTxt).toContain('(https://test.example.com/docs/docs/published.md)')
+    expect(llmsTxt).toContain('(https://test.example.com/docs/docs/space%20route.md)')
+    expect(llmsTxt.match(/\]\(https:\/\/test\.example\.com\/docs\/about\.md\)/g)).toHaveLength(1)
   })
 
   it('keeps canonical links when no deployable Markdown representation exists', async () => {
     const llmsTxt = await readFile(getPublicPath('llms.txt'), 'utf8')
 
-    expect(llmsTxt).toContain('](/docs/guide.html)')
+    expect(llmsTxt).toContain('](https://test.example.com/docs/guide.html)')
     expect(llmsTxt).not.toContain('/guide.html.md')
-    expect(llmsTxt).toContain('](/docs/legacy)')
+    expect(llmsTxt).toContain('](https://test.example.com/docs/legacy)')
     expect(llmsTxt).not.toContain('/legacy.md')
-    expect(llmsTxt).toContain('(/docs/docs/ignored)')
+    expect(llmsTxt).toContain('(https://test.example.com/docs/docs/ignored)')
     expect(llmsTxt).not.toContain('/docs/docs/ignored.md')
-    expect(llmsTxt).toContain('(/docs/docs/api)')
+    expect(llmsTxt).toContain('(https://test.example.com/docs/docs/api)')
     expect(llmsTxt).not.toContain('/docs/docs/api.md')
   })
 

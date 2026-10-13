@@ -8,6 +8,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
 import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
+import { absoluteSiteUrl } from './markdown-links'
 import { hasMarkdownTwin, toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
 import { queryPages } from './server/db/queries'
@@ -308,6 +309,11 @@ export async function buildLlmsTxt(event: H3Event) {
       return deployedPathname
     }
   }
+
+  // An agent that fetched llms.txt on its own has no base URL for a
+  // root-relative link, so every page link carries the site origin.
+  const resolvePagePath = resolvePageHref
+  resolvePageHref = pathname => absoluteSiteUrl(resolvePagePath(pathname), canonicalSiteUrl)
 
   for (const page of [...prerendered, ...other])
     page.href = resolvePageHref(page.pathname)

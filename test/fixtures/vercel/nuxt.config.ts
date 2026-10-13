@@ -14,6 +14,9 @@ export default defineNuxtConfig({
       failOnError: false,
     },
   },
+  aiReady: {
+    llmsTxt: { markdownLinks: false },
+  },
   site: {
     url: 'https://test.example.com',
     name: 'Test Site',

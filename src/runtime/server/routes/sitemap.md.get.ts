@@ -4,6 +4,7 @@ import { eventHandler, setHeader } from '#nuxtseo/h3'
 import { defineCachedFunction, useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { publicCacheControl } from '../../cache-control'
+import { absoluteSiteUrl } from '../../markdown-links'
 import { toMarkdownPath } from '../../markdown-path'
 import { toDeployedRoute } from '../../route-path'
 import { queryPages } from '../db/queries'
@@ -23,11 +24,12 @@ async function buildSitemapMarkdown(event: H3Event): Promise<string> {
   }
 
   const baseURL = useRuntimeConfig(event).app.baseURL
+  const siteConfig = getSiteConfig(event)
   return buildSitemapMd(
     pages.map(page => ({ route: page.route, title: page.title, updatedAt: page.updatedAt })),
     {
-      siteName: getSiteConfig(event).name,
-      resolveHref: route => toDeployedRoute(toMarkdownPath(route), baseURL),
+      siteName: siteConfig.name,
+      resolveHref: route => absoluteSiteUrl(toDeployedRoute(toMarkdownPath(route), baseURL), siteConfig.url),
     },
   )
 }

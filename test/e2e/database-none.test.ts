@@ -17,7 +17,7 @@ describe('database disabled', async () => {
     const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
     expect(llmsTxt).toMatch(RE_MD_H1)
-    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/about\)/)
+    expect(llmsTxt).toMatch(/- \[[^\]]+\]\(https:\/\/test\.example\.com\/about\.md\)/)
     expect(llmsTxt).toContain('## LLM Resources')
   })
 

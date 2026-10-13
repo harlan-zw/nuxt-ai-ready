@@ -453,14 +453,14 @@ export default defineNuxtModule<ModuleOptions>({
     // Merge default sections with user config
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
-          markdownLinks: config.llmsTxt.markdownLinks ?? false,
+          markdownLinks: config.llmsTxt.markdownLinks ?? true,
           sections: [
             ...defaultLlmsTxtSections,
             ...(config.llmsTxt.sections || []),
           ],
           notes: config.llmsTxt.notes,
         }
-      : { markdownLinks: false, sections: defaultLlmsTxtSections }
+      : { markdownLinks: true, sections: defaultLlmsTxtSections }
 
     // Allow other modules to extend llms.txt content via hook
     const llmsTxtPayload = {
