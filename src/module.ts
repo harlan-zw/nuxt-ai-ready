@@ -42,7 +42,7 @@ import {
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
-import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
+import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
 import { applyStaticMarkdownHeaderPlan, buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -1354,6 +1354,9 @@ export function trackDrizzleWork(event, work) { return work }
             if (staticDiscoverySupported && apiCatalogConfig && await hasArtifact(API_CATALOG_PATH))
               discovery.push(`<${encodeURI(apiCatalogConfig.href)}>; rel="api-catalog"`)
             mergedHeaders = mergeStaticDiscoveryHeaders(mergedHeaders, staticBaseURL, discovery)
+            // Cloudflare joins a header every matching rule sets, so the exact
+            // `.md` rules, the `/*.md` glob and `/*` must not repeat a value.
+            mergedHeaders = dedupeStaticHeaders(mergedHeaders, ['Content-Type', 'Link', 'Vary'])
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
