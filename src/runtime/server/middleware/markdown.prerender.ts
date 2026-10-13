@@ -1,6 +1,7 @@
 import { createError, defineEventHandler } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { withSiteUrl } from '#site-config/server/composables/utils'
+import { absoluteMarkdownLinks } from '../../markdown-links'
 import { toDeployedRoute } from '../../route-path'
 import { logger } from '../logger'
 import { convertHtmlToMarkdown, extractLastUpdated } from '../utils'
@@ -67,7 +68,7 @@ export default defineEventHandler(async (event) => {
       canonical_url: canonicalUrl,
       last_updated: contentPage.updatedAt,
     })
-    const markdown = `${frontmatter}\n${contentPage.markdown}`
+    const markdown = `${frontmatter}\n${absoluteMarkdownLinks(contentPage.markdown, canonicalUrl)}`
     const headings = extractHeadingsFromMarkdown(contentPage.markdown)
     const keywords = extractKeywords(contentPage.markdown, '')
     return JSON.stringify({

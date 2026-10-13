@@ -3,6 +3,7 @@ import type { NegotiationContext } from '../utils/negotiation-response'
 import { createError, defineEventHandler, getRequestURL, setHeader, setResponseStatus } from '#nuxtseo/h3'
 import { useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
+import { absoluteMarkdownLinks } from '../../markdown-links'
 import { logger } from '../logger'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { resolveMarkdownRedirect } from '../utils/markdown-redirect'
@@ -62,9 +63,11 @@ export default defineEventHandler(async (event) => {
   const ctx = buildNegotiationContext(event, decision.path)
   const { path, config, resolvePath, resolveUrl, routeContext } = ctx
   const canonicalUrl = resolveUrl(path)
-  const finalizeMarkdown = (markdown: string) => config.sitemapMd === false
+  // Source Markdown keeps its root-relative links. Read on its own, such a
+  // link has no page URL to resolve against, so every one gets the origin.
+  const finalizeMarkdown = (markdown: string) => absoluteMarkdownLinks(config.sitemapMd === false
     ? markdown
-    : appendSitemapSection(markdown, resolvePath(SITEMAP_MD_ROUTE))
+    : appendSitemapSection(markdown, resolvePath(SITEMAP_MD_ROUTE)), canonicalUrl)
 
   const [
     { tryGetContentMarkdown },

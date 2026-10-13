@@ -54,7 +54,7 @@ describe('cloudflare module build output', async () => {
     expect(llmsTxt).toMatch(RE_MD_PAGES_HEADING)
 
     // Should have page routes
-    expect(llmsTxt).toContain('(/index.md):')
-    expect(llmsTxt).toContain('(/about.md):')
+    expect(llmsTxt).toContain('(https://test.example.com/index.md):')
+    expect(llmsTxt).toContain('(https://test.example.com/about.md):')
   })
 })

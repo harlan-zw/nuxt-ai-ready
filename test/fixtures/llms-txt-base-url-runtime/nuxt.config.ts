@@ -7,6 +7,7 @@ export default defineNuxtConfig({
   },
   aiReady: {
     llmsTxtCacheSeconds: 0,
+    llmsTxt: { markdownLinks: false },
   },
   nitro: {
     prerender: {

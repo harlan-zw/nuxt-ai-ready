@@ -23,10 +23,10 @@ describe('ai-ready routes beneath an app base URL', async () => {
 
     const llmsTxt = await $fetch<string>('/docs/llms.txt')
 
-    expect(llmsTxt).toContain('[/about](/docs/about)')
-    expect(llmsTxt).not.toContain('[/about](/docs/about/)')
-    expect(llmsTxt).toContain('[/docs/api](/docs/docs/api)')
-    expect(llmsTxt).not.toContain('[/about](/about)')
+    expect(llmsTxt).toContain('[/about](https://test.example.com/docs/about)')
+    expect(llmsTxt).not.toContain('[/about](https://test.example.com/docs/about/)')
+    expect(llmsTxt).toContain('[/docs/api](https://test.example.com/docs/docs/api)')
+    expect(llmsTxt).not.toContain('[/about](https://test.example.com/about)')
     expect(llmsTxt).not.toContain('.md')
     expect(llmsTxt).toContain('Canonical Origin: https://test.example.com/docs')
     expect(llmsTxt).toContain('[Full Content](https://test.example.com/docs/llms-full.txt)')
@@ -58,8 +58,8 @@ describe('ai-ready routes beneath an app base URL', async () => {
 
     const llmsTxt = await $fetch<string>('/docs/llms.txt')
 
-    expect(llmsTxt).toContain('[Persisted About](/docs/about)')
-    expect(llmsTxt).toContain('[Persisted Docs API](/docs/docs/api)')
+    expect(llmsTxt).toContain('[Persisted About](https://test.example.com/docs/about)')
+    expect(llmsTxt).toContain('[Persisted Docs API](https://test.example.com/docs/docs/api)')
     expect(llmsTxt).not.toContain('/docs/docs/about')
     expect(llmsTxt.match(/\/docs\/about/g)).toHaveLength(1)
   })

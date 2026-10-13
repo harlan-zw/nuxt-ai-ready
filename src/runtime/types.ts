@@ -576,7 +576,7 @@ export interface LlmsTxtConfig {
    * Rewrite automatically generated page links to their Markdown representation
    * when the final static output contains the file or the deployment retains
    * the runtime Markdown handler.
-   * @default false
+   * @default true
    */
   markdownLinks?: boolean
   /** The sections of the documentation */
