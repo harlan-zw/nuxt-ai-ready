@@ -1,6 +1,6 @@
 import type { ConsolaReporter } from 'consola'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
 import { setup, useTestContext } from '@nuxt/test-utils'
 import { consola } from 'consola'
@@ -25,12 +25,24 @@ describe('cloudflare _headers rule budget', async () => {
     rootDir: resolve('../fixtures/cloudflare-headers-budget'),
     server: false,
     build: true,
+    nuxtConfig: {
+      nitro: {
+        compatibilityDate: '2026-10-08',
+        cloudflare: { deployConfig: true, wrangler: { name: 'headers-budget-test' } },
+      },
+    },
   })
 
   it('keeps the file inside the limit', async () => {
-    const headers = await readFile(join(useTestContext().nuxt!.options.buildDir, 'output/public/_headers'), 'utf8')
+    // Cloudflare serves the `_headers` file from the Wrangler assets directory.
+    const wranglerPath = join(useTestContext().nuxt!.options.buildDir, 'output/server/wrangler.json')
+    const wrangler = JSON.parse(await readFile(wranglerPath, 'utf8')) as { assets: { directory: string } }
+    const headers = await readFile(join(dirname(wranglerPath), wrangler.assets.directory, '_headers'), 'utf8')
+    const rules = headers.match(RE_RULE)!
 
-    expect(headers.match(RE_RULE)!.length).toBeLessThanOrEqual(100)
+    // The route rules Nitro writes are present, so the count is real.
+    expect(rules).toContain('/llms.txt')
+    expect(rules.length).toBeLessThanOrEqual(100)
   })
 
   // The site owner cannot act on it, so it must not be a warning.
