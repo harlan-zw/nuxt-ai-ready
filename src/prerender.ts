@@ -355,6 +355,19 @@ async function processSitemapEntry(
 
   const mdRoute = toMarkdownPath(route)
   const mdUrl = toDeployedRoute(mdRoute, nitro.options.baseURL)
+  // Sitemap discovery uses its own fetch loop, outside Nitro's prerender queue.
+  // Respect exclusions for both the source page and its generated twin.
+  const candidates = [route, toDeployedRoute(route, nitro.options.baseURL), mdRoute, mdUrl]
+  const ignored = nitro.options.prerender.ignore.some(pattern => candidates.some((path) => {
+    if (typeof pattern === 'string')
+      return path.startsWith(pattern)
+    if (typeof pattern === 'function')
+      return pattern(path) === true
+    return pattern.test(path)
+  }))
+  if (ignored)
+    return { crawled: false, skipped: true }
+
   logger.debug(`Fetching markdown for ${route} → ${mdUrl}`)
 
   // Error pages are filtered by prerender middleware (returns 404 for __NUXT_ERROR__ pages)
