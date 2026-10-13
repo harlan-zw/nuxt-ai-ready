@@ -1,3 +1,17 @@
+## v3.0.2
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.1...v3.0.2)
+
+### 🔥 Performance
+
+- Register the prerender middleware only while prerendering ([#183](https://github.com/harlan-zw/nuxt-ai-ready/pull/183))
+
+### 🩹 Fixes
+
+- Skip the status-aware Link header once a response is sent ([#180](https://github.com/harlan-zw/nuxt-ai-ready/pull/180))
+- Publish the restore dump only with a runtime database ([#181](https://github.com/harlan-zw/nuxt-ai-ready/pull/181))
+- Reject a drizzle-orm install outside the peer range ([#182](https://github.com/harlan-zw/nuxt-ai-ready/pull/182))
+
 ## v3.0.1
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.0...v3.0.1)
