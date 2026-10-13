@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   sitemap: { zeroPrerender: true },
   robots: { robotsTxt: false },
   aiReady: {
-    mcp: false,
+    mcp: { tools: false, resources: false },
     sitemapMd: false,
     llmsFullTxt: false,
     llmsTxt: {
