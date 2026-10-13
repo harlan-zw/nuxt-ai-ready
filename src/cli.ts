@@ -6,6 +6,7 @@ import { consola } from 'consola'
 import { colors } from 'consola/utils'
 import { join, resolve } from 'pathe'
 import { readPackageMetadata } from './package-metadata'
+import { auditSite, parseAuditOptions } from './readiness-audit'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const secretPath = join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret')
@@ -63,6 +64,32 @@ const main = defineCommand({
     version: await readPackageMetadata(import.meta.url).then(p => p.version || '0.0.0'),
   },
   subCommands: {
+    audit: () => defineCommand({
+      meta: { name: 'audit', description: 'Check a public page and its agent discovery documents' },
+      args: {
+        url: { type: 'positional', required: true, description: 'Public page URL' },
+        base: { type: 'string', default: '/', description: 'Application base path, such as /docs/' },
+        capabilities: { type: 'string', description: 'Check declared features: llms,api-catalog,ai-catalog,mcp,skills' },
+        json: { type: 'boolean', description: 'Print structured JSON results' },
+      },
+      async run({ args }) {
+        const parsed = parseAuditOptions(args)
+        if (parsed._tag === 'Err')
+          throw new Error(parsed.message)
+        const report = await auditSite(parsed.value, { fetch })
+        if (args.json) {
+          process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+        }
+        else {
+          consola.info(`Readiness audit: ${report.url}`)
+          for (const check of report.checks)
+            consola.log(`${check.status.toUpperCase()} ${check.id}: ${check.detail}`)
+        }
+        if (report.checks.some(check => check.status === 'fail'))
+          process.exitCode = 1
+      },
+    }),
+
     status: () => defineCommand({
       meta: {
         name: 'status',
