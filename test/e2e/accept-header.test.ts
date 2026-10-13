@@ -36,6 +36,22 @@ describe('accept header content negotiation', async () => {
   })
 
   describe('redirect to .md', () => {
+    it('negotiates the advertised Markdown twin of a numeric dotted page', async () => {
+      const html = await fetch(url('/v1.2'), { headers: { Accept: 'text/html' } })
+      expect(html.headers.get('link')).toContain('/v1.2.md')
+
+      const negotiated = await fetch(url('/v1.2'), {
+        headers: { Accept: 'text/markdown' },
+        redirect: 'manual',
+      })
+      expect(negotiated.status).toBe(307)
+      expect(negotiated.headers.get('location')).toBe('/v1.2.md')
+
+      const markdown = await fetch(url('/v1.2.md'))
+      expect(markdown.headers.get('content-type')).toContain('text/markdown')
+      expect(await markdown.text()).toContain('# Version 1.2')
+    })
+
     it('returns 307 redirect to .md when Accept is text/markdown', async () => {
       const response = await fetch(url('/about'), {
         headers: { Accept: 'text/markdown' },

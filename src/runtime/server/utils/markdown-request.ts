@@ -3,7 +3,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import { negotiateContent, parseAcceptHeader } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeaders } from '#nuxtseo/h3'
-import { isReservedPath } from '../../markdown-path'
+import { hasMarkdownTwin, isReservedPath } from '../../markdown-path'
 
 const RE_MD_EXT = /\.md$/
 
@@ -85,10 +85,7 @@ export function getRequestRenderInfo(
   if (isPrerender && !isExplicit)
     return null
 
-  const lastSegment = originalPath.split('/').pop() || ''
-  const hasExtension = lastSegment.includes('.')
-  const extension = hasExtension ? lastSegment.substring(lastSegment.lastIndexOf('.')) : ''
-  if (hasExtension && extension !== '.md')
+  if (!isExplicit && !hasMarkdownTwin(originalPath))
     return null
 
   const negotiation: ContentNegotiationResult = isPrerender
