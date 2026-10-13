@@ -5,6 +5,7 @@
 import type { LlmsTxtConfig } from '../../types'
 import { joinURL } from 'ufo'
 import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
+import { escapeMarkdownHtml } from '../../markdown-text'
 
 const RE_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n*/
 const RE_INLINE_WHITESPACE = /\s+/g
@@ -17,8 +18,8 @@ export function formatPageForLlmsFullTxt(
   siteUrl?: string,
 ): string {
   const canonicalUrl = siteUrl ? joinURL(siteUrl, route) : route
-  const pageTitle = (title && title !== route ? title : route).trim().replace(RE_INLINE_WHITESPACE, ' ')
-  const pageDescription = description.trim().replace(RE_INLINE_WHITESPACE, ' ')
+  const pageTitle = escapeMarkdownHtml((title && title !== route ? title : route).trim().replace(RE_INLINE_WHITESPACE, ' '))
+  const pageDescription = escapeMarkdownHtml(description.trim().replace(RE_INLINE_WHITESPACE, ' '))
   const content = markdown.replace(RE_FRONTMATTER, '').trim()
 
   const parts = ['---', '', `- **Page:** ${pageTitle}`, `- **Source:** ${canonicalUrl}`]
@@ -40,9 +41,9 @@ export interface SiteInfo {
 }
 
 export function buildLlmsFullTxtHeader(siteInfo?: SiteInfo, llmsTxtConfig?: LlmsTxtConfig): string {
-  const parts: string[] = [`# ${siteInfo?.name || siteInfo?.url || 'Site'}`]
+  const parts: string[] = [`# ${escapeMarkdownHtml(siteInfo?.name || siteInfo?.url || 'Site')}`]
   if (siteInfo?.description)
-    parts.push('', `> ${siteInfo.description}`)
+    parts.push('', `> ${escapeMarkdownHtml(siteInfo.description)}`)
   if (siteInfo?.url)
     parts.push('', `Canonical Origin: ${siteInfo.url}`)
 

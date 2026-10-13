@@ -1,4 +1,5 @@
 import { toMarkdownPath } from '../../markdown-path'
+import { escapeMarkdownHtml } from '../../markdown-text'
 import { toDeployedRoute } from '../../route-path'
 
 export const SITEMAP_MD_ROUTE = '/sitemap.md'
@@ -19,7 +20,7 @@ function topSegment(route: string): string {
 }
 
 function escapeTitle(title: string): string {
-  return title.replaceAll('[', '\\[').replaceAll(']', '\\]')
+  return escapeMarkdownHtml(title).replaceAll('[', '\\[').replaceAll(']', '\\]')
 }
 
 function formatEntry(entry: SitemapMdEntry, resolveHref: (route: string) => string): string {
@@ -52,7 +53,7 @@ export function buildSitemapMd(entries: SitemapMdEntry[], options: SitemapMdOpti
     return a.localeCompare(b)
   })
 
-  const parts = [`# ${options.siteName || 'Site'} Sitemap`, '', 'All pages in Markdown format.']
+  const parts = [`# ${escapeMarkdownHtml(options.siteName || 'Site')} Sitemap`, '', 'All pages in Markdown format.']
   for (const key of keys) {
     parts.push('', `## ${key || 'Root'}`)
     for (const entry of groups.get(key)!)
