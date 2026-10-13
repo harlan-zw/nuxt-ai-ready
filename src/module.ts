@@ -43,6 +43,7 @@ import {
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
+import { opaqueJsonModule } from './utils/opaque-json-module'
 import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
 import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
@@ -879,8 +880,10 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
 `
       }
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
+      // Skill files are user text served byte for byte against their index
+      // digest, so the bundler must not see them as code.
       nitroConfig.virtual['#ai-ready-virtual/agent-skills.mjs'] = agentSkillsResult._tag === 'Enabled'
-        ? `export const agentSkillsIndex = ${JSON.stringify(agentSkillsResult.index)}\nexport const localAgentSkillArtifacts = ${JSON.stringify(agentSkillsResult.localArtifacts)}`
+        ? opaqueJsonModule({ agentSkillsIndex: agentSkillsResult.index, localAgentSkillArtifacts: agentSkillsResult.localArtifacts })
         : 'export const agentSkillsIndex = null\nexport const localAgentSkillArtifacts = {}'
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
