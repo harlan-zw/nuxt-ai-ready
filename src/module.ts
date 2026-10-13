@@ -20,7 +20,6 @@ import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { readPackageMetadata } from './package-metadata'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
-import { toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute } from './runtime/route-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
@@ -43,7 +42,7 @@ import {
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
 import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
-import { applyStaticMarkdownHeaderPlan, buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
+import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
 const MODULE_PACKAGE_NAME = 'nuxt-ai-ready'
@@ -1203,10 +1202,6 @@ export function trackDrizzleWork(event, work) { return work }
       extendRouteRules(SITEMAP_MD_ROUTE, { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
     }
 
-    // Nitro's static handler answers prerendered `.md` files before any
-    // middleware (#82), so route rules are the only header mechanism server
-    // presets apply to them. Every explicitly prerendered page route gets
-    // relative canonical and describedby entries on its markdown twin.
     const staticBaseURL = nuxt.options.app.baseURL || '/'
     const emittedWarnings = new Set<string>()
     const warnConfiguration = (nitro: { options: { static?: boolean, routeRules: Parameters<typeof resolveConfigurationWarnings>[0]['routeRules'] } }) => {
@@ -1232,17 +1227,6 @@ export function trackDrizzleWork(event, work) { return work }
     })
     // Inline page rules and later modules can update rules after Nitro initializes.
     nuxt.hook('nitro:build:before', warnConfiguration)
-    for (const route of (nuxt.options.nitro.prerender?.routes || []) as string[]) {
-      if (!isStaticMarkdownSourceRoute(route))
-        continue
-      extendRouteRules(toMarkdownPath(route), {
-        headers: {
-          'Content-Type': 'text/markdown; charset=utf-8',
-          'Link': buildStaticMarkdownLinkHeader(route, staticBaseURL, config.describedby !== false),
-          'Vary': 'Accept',
-        },
-      })
-    }
 
     // Falling back to the shared rule is expected on a large site, and the
     // site owner has nothing to change, so this is information, not a warning.
@@ -1259,8 +1243,11 @@ export function trackDrizzleWork(event, work) { return work }
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
-      // Crawler-discovered pages queue their `.md` twin while prerendering, so
-      // they never appear in the config-time route list above. Once Nitro
+      // Nitro's static handler answers prerendered `.md` files before any
+      // middleware (#82), so route rules are the only header mechanism server
+      // presets apply to them. Only a page that prerendered as HTML gets a
+      // twin, and a config route can be JSON or XML, so the rules come from
+      // the twins Nitro wrote, not from the configured routes. Once Nitro
       // finishes, every twin it actually wrote gets the exact same headers via
       // route rules. Presets bake those into `_headers` at `compiled`, and
       // static handlers apply them at runtime.
