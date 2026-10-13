@@ -110,6 +110,14 @@ export default defineEventHandler(async (event) => {
         message: `Failed to fetch HTML for ${path}`,
       })
     }
+    // Only an HTML page has a Markdown twin. A JSON, XML or text route such
+    // as an API catalog or a feed gets none, as at runtime.
+    if (!response.headers.get('content-type')?.includes('text/html')) {
+      return createError({
+        statusCode: 404,
+        message: `Not an HTML page: ${path}`,
+      })
+    }
 
     html = await response.text()
     logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
