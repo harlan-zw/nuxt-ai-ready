@@ -54,6 +54,15 @@ describe('sitemap admission and split llms.txt discovery', async () => {
     expect((await fetch('/llms/unknown.txt')).status).toBe(404)
   })
 
+  it('leaves application pages beneath /llms/ available', async () => {
+    const response = await fetch('/llms/guide')
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('Application discovery guide')
+    const head = await fetch('/llms/guide', { method: 'HEAD' })
+    expect(head.status).toBe(200)
+    expect(await head.text()).toBe('')
+  })
+
   it('leaves disabled full content to the application', async () => {
     expect((await fetch('/llms-full.txt')).status).toBe(404)
     expect(await (await fetch('/about.md')).text()).toContain('About')

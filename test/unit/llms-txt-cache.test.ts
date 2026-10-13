@@ -31,6 +31,7 @@ const { default: llmsTxtHandler } = await import('../../src/runtime/server/route
 
 const app = createApp()
 app.use(llmsTxtHandler)
+app.use(() => 'Application guide')
 const request = toWebHandler(app)
 
 async function getLlmsTxt() {
@@ -49,7 +50,24 @@ function cachedOptions() {
 describe('gET /llms.txt internal cache', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    buildLlmsTxtFiles.mockReset().mockResolvedValue({ '/llms.txt': '# llms.txt content' })
     config.llmsTxtCacheSeconds = 600
+  })
+
+  it.each(['GET', 'POST', 'HEAD'])('allows application routes beneath /llms/ with method %s', async (method) => {
+    const response = await request(new Request('http://localhost/llms/guide', { method }))
+    expect(response.status).toBe(200)
+    if (method !== 'HEAD')
+      expect(await response.text()).toBe('Application guide')
+    expect(buildLlmsTxtFiles).not.toHaveBeenCalled()
+  })
+
+  it.each(['/llms/Skills.TXT', '/LLMS/Skills.TXT'])('serves accepted configured path %s with its exact file key', async (path) => {
+    config.llmsTxtCacheSeconds = 0
+    buildLlmsTxtFiles.mockResolvedValueOnce({ '/llms.txt': 'Root', [path]: 'Configured skills' })
+    const response = await request(new Request(`http://localhost${path}`))
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('Configured skills')
   })
 
   it('uses llmsTxtCacheSeconds as the cached function maxAge', async () => {

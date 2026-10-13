@@ -1099,9 +1099,9 @@ export function trackDrizzleWork(event, work) { return work }
     })
     // gets replaced with a static file
     if (generateLlmsTxt) {
-      for (const route of ['/llms.txt', '/llms/**'])
-        // Override filename method inference so HEAD reaches the same handler.
-        addServerHandler({ route, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
+      // Nitro strips a route prefix from middleware paths. The handler needs
+      // the full path to distinguish generated files from application routes.
+      addServerHandler({ middleware: true, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
     }
     if (config.llmsFullTxt !== false)
       addServerHandler({ route: '/llms-full.txt', method: undefined, handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
