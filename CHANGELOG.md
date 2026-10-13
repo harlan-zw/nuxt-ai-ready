@@ -1,3 +1,16 @@
+## v3.0.4
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.3...v3.0.4)
+
+### 🩹 Fixes
+
+- Keep mdream external in Nitro 3 prerender builds ([#188](https://github.com/harlan-zw/nuxt-ai-ready/pull/188))
+- Write Markdown twins only for HTML pages ([#189](https://github.com/harlan-zw/nuxt-ai-ready/pull/189))
+
+### ✅ Tests
+
+- **cloudflare:** Count the deployed _headers rules in the budget test ([#190](https://github.com/harlan-zw/nuxt-ai-ready/pull/190))
+
 ## v3.0.3
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.2...v3.0.3)
