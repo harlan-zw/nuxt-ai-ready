@@ -101,7 +101,7 @@ export function formatLlmsTxtPageLink(page: LlmsTxtPageLink): string {
   const truncatedDescription = description
     ? `${description.substring(0, 160)}${description.length > 160 ? '...' : ''}`
     : undefined
-  return normalizeLink({ title, href, description: truncatedDescription })
+  return normalizeLink({ title, href, description: truncatedDescription ? escapeMarkdownHtml(truncatedDescription) : undefined })
 }
 
 /**

@@ -24,6 +24,11 @@ describe('llms.txt files', () => {
       .toContain('<details>Authored Markdown</details>')
   })
 
+  it('keeps automatic page descriptions literal', () => {
+    expect(formatLlmsTxtPageLink({ pathname: '/', title: 'Home', description: 'Use <head> & metadata' }))
+      .toBe('- [Home](/): Use &lt;head&gt; &amp; metadata')
+  })
+
   it('keeps a small site inline', () => {
     const files = build(2)
     expect([...files.keys()]).toEqual(['/llms.txt'])
