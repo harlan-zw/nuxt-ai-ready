@@ -70,7 +70,7 @@ describe('ai-ready hooks e2e', async () => {
       expect(llmsTxt).toContain('**Custom Hook Section:**')
       expect(llmsTxt).not.toContain('## Custom Hook Section')
       expect(llmsTxt).toContain('This was added by a hook!')
-      expect(llmsTxt).toContain('(/docs/api.md)')
+      expect(llmsTxt).toContain('(https://test.example.com/docs/api.md)')
     })
 
     it('should generate llms-full.txt with hook modifications', async () => {

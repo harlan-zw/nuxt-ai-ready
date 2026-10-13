@@ -488,12 +488,23 @@ async function crawlSitemapContent(
   return crawlSitemapEntries(state, nuxt, nitro, urls)
 }
 
-async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, documents = new Map<string, () => string>()): Promise<void> {
-  const sitemap = nuxt.options.sitemap as { sitemaps?: boolean | Record<string, unknown>, sitemapName?: string, sitemapsPathPrefix?: string }
+interface PrerenderSitemapConfig {
+  sitemaps?: boolean | Record<string, { sitemapName?: string, _route?: string, route?: string }>
+  sitemapName?: string
+  sitemapsPathPrefix?: string
+}
+
+async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, sitemap: PrerenderSitemapConfig, documents = new Map<string, () => string>()): Promise<void> {
   const names = state.llmsTxtConfig?.sitemaps
   const singleName = (sitemap.sitemapName || 'sitemap.xml').replace(/\.xml$/, '')
   const roots = sitemap.sitemaps && typeof sitemap.sitemaps === 'object'
-    ? Object.keys(sitemap.sitemaps).filter(name => name !== 'index' && (names === undefined || names.includes(name))).map(name => joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`))
+    ? Object.entries(sitemap.sitemaps).flatMap(([key, definition]) => {
+        const name = (definition.sitemapName || key).replace(/\.xml$/, '')
+        if (key === 'index' || (names !== undefined && !names.includes(name)))
+          return []
+        const route = definition._route || definition.route
+        return [route ? toLogicalRoute(route, nitro.options.baseURL) : joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`)]
+      })
     : names !== undefined && !names.includes(sitemap.sitemaps ? 'chunks' : singleName)
       ? []
       : [sitemap.sitemaps ? '/sitemap_index.xml' : `/${sitemap.sitemapName || 'sitemap.xml'}`]
@@ -820,14 +831,14 @@ export function setupPrerenderHandler(
 
     if (useSitemapHook) {
       // sitemap:prerender:done fires after sitemap.xml is written
-      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ name: string, content: string }> }) => (async () => {
+      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { options: PrerenderSitemapConfig, sitemaps: Array<{ name: string, content: string }> }) => (async () => {
         if (!state.initialized)
           return
 
         // Follow selected roots, not every generated document or the global index.
         // A chunk inherits admission through its selected parent sitemap.
         const documents = new Map(ctx.sitemaps.map(sitemap => [toLogicalRoute(sitemap.name, nitro.options.baseURL), () => sitemap.content]))
-        await crawlConfiguredSitemaps(state, nuxt, nitro, documents)
+        await crawlConfiguredSitemaps(state, nuxt, nitro, ctx.options, documents)
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
@@ -840,7 +851,7 @@ export function setupPrerenderHandler(
         if (!state.initialized)
           return
 
-        await crawlConfiguredSitemaps(state, nuxt, nitro)
+        await crawlConfiguredSitemaps(state, nuxt, nitro, (nuxt.options.sitemap || {}) as PrerenderSitemapConfig)
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()

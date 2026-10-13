@@ -14,6 +14,7 @@ describe('static split discovery files beneath a base URL', async () => {
     server: false,
     nuxtConfig: {
       app: { baseURL: '/registry/' },
+      sitemap: { sitemapsPathPrefix: '/catalog/' },
       robots: { robotsTxt: false },
       nitro: { static: true, prerender: { routes: ['/about'], crawlLinks: false, failOnError: true } },
     },
