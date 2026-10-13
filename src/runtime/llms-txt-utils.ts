@@ -1,42 +1,25 @@
 import type { H3Event } from '#nuxtseo/h3'
-import type { PageEntry } from './server/db/queries'
+import type { LlmsTxtPage } from './llms-txt-files'
+import type { PageMetadata } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { decodePath } from 'ufo'
-import { getRequestHost } from '#nuxtseo/h3'
+import { createError, getRequestHost, getRequestURL } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
 import { withSiteTrailingSlash, withSiteUrl } from '#site-config/server/composables/utils'
-import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
+import { createLlmsTxtFiles } from './llms-txt-files'
 import { hasMarkdownTwin, toMarkdownPath } from './markdown-path'
 import { normalizePersistedRoute, toDeployedRoute, toLogicalRoute } from './route-path'
-import { queryPages } from './server/db/queries'
+import { queryPageMetadata, queryPages } from './server/db/queries'
 import { logger } from './server/logger'
-import { fetchSitemapUrls } from './server/utils/sitemap'
+import { fetchSitemapUrlGroups, getSitemapsFromConfig } from './server/utils/sitemap'
 
-export { normalizeLlmsTxtConfig }
+export { normalizeLlmsTxtConfig } from './llms-txt-format'
 
-interface PageItem {
-  pathname: string
-  href?: string
-  title?: string
-  description?: string
-  locale?: string
-}
-
-interface MarkdownLinkAvailability {
-  runtimeMarkdownAvailable: boolean
-  paths: Set<string>
-}
-
-async function findMarkdownLinkAvailability(): Promise<MarkdownLinkAvailability> {
-  if (!import.meta.prerender) {
-    return {
-      runtimeMarkdownAvailable: true,
-      paths: new Set(),
-    }
-  }
-
+async function findMarkdownLinkAvailability() {
+  if (!import.meta.prerender)
+    return { runtimeMarkdownAvailable: true, paths: new Set<string>() }
   const { readMarkdownLinkAvailabilityFromFilesystem } = await import('#ai-ready-virtual/read-page-data.mjs')
   const availability = await readMarkdownLinkAvailabilityFromFilesystem()
   return {
@@ -45,319 +28,108 @@ async function findMarkdownLinkAvailability(): Promise<MarkdownLinkAvailability>
   }
 }
 
-/**
- * Get group prefix for a URL (1 or 2 segments)
- */
-function getGroupPrefix(url: string, depth: 1 | 2): string {
-  const segments = url.split('/').filter(Boolean)
-  if (segments.length === 0)
-    return '/'
-  if (depth === 1 || segments.length === 1)
-    return `/${segments[0]}`
-  return `/${segments[0]}/${segments[1]}`
-}
-
-function getPathSegments(pathname: string): string[] {
-  return pathname.split('/').filter((s): s is string => Boolean(s))
-}
-
-interface GroupAnalysis {
-  twoSegmentCount: Map<string, number>
-  segmentHasNested: Map<string, boolean>
-}
-
-function analyzePageGroups(pages: PageItem[]): GroupAnalysis {
-  const twoSegmentCount = new Map<string, number>()
-  const segmentHasNested = new Map<string, boolean>()
-
-  for (const page of pages) {
-    const prefix = getGroupPrefix(page.pathname, 2)
-    twoSegmentCount.set(prefix, (twoSegmentCount.get(prefix) || 0) + 1)
-
-    const segments = getPathSegments(page.pathname)
-    const firstSegment = segments[0] || ''
-    if (!segmentHasNested.has(firstSegment))
-      segmentHasNested.set(firstSegment, false)
-    if (segments.length > 1)
-      segmentHasNested.set(firstSegment, true)
-  }
-
-  return { twoSegmentCount, segmentHasNested }
-}
-
-function getPageGroupKey(pathname: string, { twoSegmentCount, segmentHasNested }: GroupAnalysis): string {
-  const segments = getPathSegments(pathname)
-  const firstSegment = segments[0] || ''
-
-  const twoSegPrefix = getGroupPrefix(pathname, 2)
-  const twoSegCount = twoSegmentCount.get(twoSegPrefix) || 0
-  let groupKey = twoSegCount > 1 ? twoSegPrefix : `/${firstSegment}`
-
-  if (segments.length <= 1 && !segmentHasNested.get(firstSegment))
-    groupKey = ''
-
-  return groupKey
-}
-
-/**
- * Sort pages by URL path in hierarchical order (directory tree structure)
- * Groups by up to 2 segments, with root-level pages without nesting grouped together
- */
-function sortPagesByPath(pages: PageItem[]): PageItem[] {
-  const analysis = analyzePageGroups(pages)
-
-  return pages.sort((a, b) => {
-    const segmentsA = getPathSegments(a.pathname)
-    const segmentsB = getPathSegments(b.pathname)
-
-    const groupKeyA = getPageGroupKey(a.pathname, analysis)
-    const groupKeyB = getPageGroupKey(b.pathname, analysis)
-
-    // Root group (empty string) comes first
-    if (groupKeyA === '' && groupKeyB !== '')
-      return -1
-    if (groupKeyA !== '' && groupKeyB === '')
-      return 1
-
-    // If in different groups, sort by group key
-    if (groupKeyA !== groupKeyB)
-      return groupKeyA.localeCompare(groupKeyB)
-
-    // Within same group, sort by full URL path
-    // Root (/) always comes first within root group
-    if (segmentsA.length === 0)
-      return -1
-    if (segmentsB.length === 0)
-      return 1
-
-    // Compare segment by segment
-    const minLen = Math.min(segmentsA.length, segmentsB.length)
-    for (let i = 0; i < minLen; i++) {
-      const cmp = segmentsA[i]!.localeCompare(segmentsB[i]!)
-      if (cmp !== 0)
-        return cmp
-    }
-
-    // If all compared segments are equal, shorter path comes first
-    return segmentsA.length - segmentsB.length
-  })
-}
-
-/**
- * Format sorted pages with group separators (blank lines between groups)
- */
-function formatPagesWithGroups(pages: PageItem[]): string[] {
-  if (pages.length === 0)
-    return []
-
-  const analysis = analyzePageGroups(pages)
-  const lines: string[] = []
-  let currentGroup = ''
-  let segmentGroupIndex = 0
-  let urlsInCurrentGroup = 0
-
-  for (const page of pages) {
-    const groupKey = getPageGroupKey(page.pathname, analysis)
-
-    // Detect group change
-    if (groupKey !== currentGroup) {
-      // Add blank line after previous group based on rules
-      if (urlsInCurrentGroup > 0) {
-        const shouldAddBlankLine = segmentGroupIndex === 0 // Always after first group
-          || (segmentGroupIndex >= 1 && segmentGroupIndex <= 2 && urlsInCurrentGroup > 1) // Groups 2-3 if > 1 URL
-
-        if (shouldAddBlankLine)
-          lines.push('')
-      }
-
-      currentGroup = groupKey
-      segmentGroupIndex++
-      urlsInCurrentGroup = 0
-    }
-
-    urlsInCurrentGroup++
-
-    lines.push(formatLlmsTxtPageLink(page))
-  }
-
-  return lines
-}
-
-export async function buildLlmsTxt(event: H3Event) {
+/** One discovery snapshot supplies the root and every bounded child file. */
+export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, string>> {
   const runtimeConfig = useRuntimeConfig(event)
   const aiReadyConfig = runtimeConfig['nuxt-ai-ready'] as any
-  const sitemapConfig = runtimeConfig.sitemap as { sitemaps?: Record<string, { sitemapName: string }> } | undefined
   const siteConfig = getSiteConfig(event)
-  const llmsTxtConfig = aiReadyConfig.llmsTxt as LlmsTxtConfig
+  const config = aiReadyConfig.llmsTxt as LlmsTxtConfig
+  const baseURL = runtimeConfig.app.baseURL
+  const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL), { withBase: true })
+  const resolvePageUrl = (path: string) => resolveUrl(withSiteTrailingSlash(event, path))
+  const canonicalSiteUrl = siteConfig.url ? resolveUrl('/') : undefined
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
   const i18nRuntime = i18n
     ? { _tag: 'enabled' as const, config: i18n, ...await import('./llms-txt-i18n') }
     : { _tag: 'disabled' as const }
   const i18nContext = { host: getRequestHost(event, { xForwardedHost: true }) }
-  const baseURL = runtimeConfig.app.baseURL
-  const resolvePath = (path: string) => withSiteTrailingSlash(event, toDeployedRoute(path, baseURL))
-  const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL), { withBase: true })
-  const canonicalSiteUrl = siteConfig.url
-    ? resolveUrl('/')
-    : undefined
+  const parts = [`# ${(siteConfig.name || canonicalSiteUrl || 'Site').replace(/\s+/g, ' ').trim()}`]
+  if (siteConfig.description)
+    parts.push('', `> ${siteConfig.description.replace(/\s+/g, ' ').trim()}`)
+  if (canonicalSiteUrl)
+    parts.push('', `Canonical Origin: ${canonicalSiteUrl}`)
 
-  const parts: string[] = []
-
-  // Header
-  parts.push(`# ${siteConfig.name || canonicalSiteUrl}`)
-  if (siteConfig.description) {
-    parts.push(`\n> ${siteConfig.description}`)
-  }
-  if (canonicalSiteUrl) {
-    parts.push(`\nCanonical Origin: ${canonicalSiteUrl}`)
-  }
-
-  parts.push('')
-
-  // Add sitemap and robots.txt to the first section (LLM Resources)
-  const sections = llmsTxtConfig.sections?.map(section => ({
-    ...section,
-    links: section.links ? [...section.links] : undefined,
-  })) ?? []
-  if (sections[0]?.links) {
-    const sitemapRoutes = sitemapConfig?.sitemaps
-      ? Object.values(sitemapConfig.sitemaps).map(s => s.sitemapName)
-      : ['sitemap.xml']
-    for (const name of sitemapRoutes) {
-      sections[0].links.push({
-        title: name,
-        href: resolveUrl(`/${name}`),
-        description: 'XML sitemap for search engines and crawlers.',
-      })
+  const sections = config.sections?.map(section => ({ ...section, links: section.links ? [...section.links] : undefined })) ?? []
+  const resources = sections.find(section => section.title === 'LLM Resources' && !section.sitemap)
+  if (resources) {
+    resources.links ||= []
+    for (const sitemap of getSitemapsFromConfig(event).filter(sitemap => config.sitemaps === undefined || config.sitemaps.includes(sitemap.name))) {
+      resources.links.push({ title: `${sitemap.name}.xml`, href: resolveUrl(toLogicalRoute(sitemap.route, baseURL)), description: 'XML sitemap for search engines and crawlers.' })
     }
-    sections[0].links.push({
-      title: 'robots.txt',
-      href: resolveUrl('/robots.txt'),
-      description: 'Crawler rules and permissions.',
+    if (!getSitemapsFromConfig(event).length && (config.sitemaps === undefined || config.sitemaps.includes('sitemap')))
+      resources.links.push({ title: 'sitemap.xml', href: resolveUrl('/sitemap.xml'), description: 'XML sitemap for search engines and crawlers.' })
+    resources.links.push({ title: 'robots.txt', href: resolveUrl('/robots.txt'), description: 'Crawler rules and permissions.' })
+  }
+
+  if (config.pages === false && !sections.some(section => section.sitemap))
+    return Object.fromEntries(createLlmsTxtFiles({ header: parts.join('\n'), config, sections, pages: [], sitemapPages: new Map(), resolveUrl }))
+
+  // Database rows supply metadata. The selected sitemap supplies admission.
+  const groups = await fetchSitemapUrlGroups(event, config.sitemaps)
+  const allowedOrigin = canonicalSiteUrl ? new URL(canonicalSiteUrl).origin : undefined
+  const requestOrigin = getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
+  const sitemapPaths = new Map<string, Set<string>>()
+  for (const [name, urls] of groups) {
+    const paths = new Set<string>()
+    for (const entry of urls) {
+      const url = URL.canParse(entry.loc, canonicalSiteUrl || 'http://localhost') ? new URL(entry.loc, canonicalSiteUrl || 'http://localhost') : undefined
+      if (!url || url.search || url.hash || (allowedOrigin && url.origin !== allowedOrigin && url.origin !== requestOrigin))
+        continue
+      const path = toLogicalRoute(url.pathname, baseURL)
+      paths.add(path)
+    }
+    sitemapPaths.set(name, paths)
+  }
+  const admitted = new Set([...sitemapPaths.values()].flatMap(paths => [...paths]))
+  let stored: PageMetadata[] = []
+  if (aiReadyConfig.database?._tag !== 'Disabled') {
+    const read = config.pages === 'all'
+      ? Promise.all([queryPages(event), queryPages(event, { where: { hasError: true } })]).then(results => results.flat())
+      // Include legacy deployed routes without scanning every retired database row.
+      : queryPageMetadata(event, [...admitted].flatMap(path => [path, toDeployedRoute(path, baseURL)]))
+    stored = await read.catch((error) => {
+      logger.warn(`[ai-ready] Database unavailable for llms.txt. Using sitemap metadata: ${error instanceof Error ? error.message : String(error)}`)
+      return []
     })
   }
-
-  // Sections (LLM Resources, etc)
-  const normalizedContent = normalizeLlmsTxtConfig({ ...llmsTxtConfig, sections })
-  if (normalizedContent) {
-    parts.push(normalizedContent)
-    parts.push('')
+  const errorPaths = new Set(stored.filter(page => page.isError).map(page => normalizePersistedRoute(page.route, admitted, baseURL)))
+  const metadata = new Map(stored.map(page => [normalizePersistedRoute(page.route, admitted, baseURL), page]))
+  const availability = config.markdownLinks ? await findMarkdownLinkAvailability() : undefined
+  const href = (path: string) => {
+    const markdownPath = toMarkdownPath(path)
+    if (availability && (availability.paths.has(decodePath(toDeployedRoute(markdownPath, baseURL))) || (availability.runtimeMarkdownAvailable && hasMarkdownTwin(path))))
+      return resolveUrl(markdownPath)
+    return resolvePageUrl(path)
   }
-
-  // Pages section - combine prerendered pages + sitemap (SSR)
-  // Fetch pages (excludes errors by default) and sitemap URLs in parallel.
-  // A database failure (e.g. read-only filesystem) must not 500 the route:
-  // degrade to sitemap-only pages so llms.txt still lists discoverable URLs.
-  const urlsPromise = fetchSitemapUrls(event)
-  let pages: PageEntry[] = []
-  let errorPages: PageEntry[] = []
-  try {
-    ;[pages, errorPages] = await Promise.all([
-      queryPages(event) as Promise<PageEntry[]>,
-      queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
-    ])
-  }
-  catch (err) {
-    logger.warn(
-      `[ai-ready] Database unavailable for llms.txt, falling back to sitemap-only pages: `
-      + `${err instanceof Error ? err.message : String(err)}`,
-    )
-  }
-  const urls = await urlsPromise
-  const sitemapPaths = urls.map(url => toLogicalRoute(url.loc, baseURL))
-  const sitemapPathSet = new Set(sitemapPaths)
-
-  // Build prerendered list and track seen/error paths
-  const seenPaths = new Set<string>()
-  const errorSet = new Set(errorPages.map(p => normalizePersistedRoute(p.route, sitemapPathSet, baseURL)))
-  const prerendered: PageItem[] = []
-
-  for (const page of pages) {
-    const pathname = normalizePersistedRoute(page.route, sitemapPathSet, baseURL)
-    if (seenPaths.has(pathname))
+  const pageMap = new Map<string, LlmsTxtPage>()
+  const candidates = config.pages === 'all' ? new Set([...admitted, ...metadata.keys()]) : admitted
+  for (const pathname of [...candidates].sort()) {
+    if (errorPaths.has(pathname))
       continue
-    seenPaths.add(pathname)
-    prerendered.push({ pathname, title: page.title, description: page.description, locale: page.locale })
+    const page = metadata.get(pathname)
+    const locale = page?.locale || (i18nRuntime._tag === 'enabled' ? i18nRuntime.resolveLocaleFromRoute(pathname, i18nRuntime.config, i18nContext).locale : undefined)
+    pageMap.set(pathname, { pathname, href: href(pathname), title: page?.title, description: page?.description, locale })
   }
-
-  const devModeHint = import.meta.dev && prerendered.length === 0 ? ' (dev mode - run `nuxi generate` for page titles)' : ''
-
-  // Collect SSR pages from sitemap that weren't prerendered
-  // Filter out error routes detected during prerender
-  const other: PageItem[] = []
-  for (const pathname of sitemapPaths) {
-    if (!seenPaths.has(pathname) && !errorSet.has(pathname)) {
-      const locale = i18nRuntime._tag === 'enabled'
-        ? i18nRuntime.resolveLocaleFromRoute(pathname, i18nRuntime.config, i18nContext).locale
-        : undefined
-      other.push({ pathname, locale })
-      seenPaths.add(pathname)
-    }
-  }
-
-  let resolvePageHref = resolvePath
-  if (llmsTxtConfig.markdownLinks) {
-    const markdownLinkAvailability = await findMarkdownLinkAvailability()
-    resolvePageHref = (pathname: string): string => {
-      const deployedPathname = resolvePath(pathname)
-      const markdownPath = resolvePath(toMarkdownPath(pathname))
-      if (markdownLinkAvailability.paths.has(decodePath(markdownPath))
-        || (markdownLinkAvailability.runtimeMarkdownAvailable && hasMarkdownTwin(pathname))) {
-        return markdownPath
-      }
-      return deployedPathname
-    }
-  }
-
-  for (const page of [...prerendered, ...other])
-    page.href = resolvePageHref(page.pathname)
-
-  // i18n: filter to default-locale pages, then emit Available Languages header
+  let rootContent: string | undefined
   if (i18nRuntime._tag === 'enabled') {
-    const pageCounts = new Map<string, number>()
-    for (const locale of i18nRuntime.config.locales) pageCounts.set(locale.code, 0)
-    for (const p of [...prerendered, ...other]) {
-      const code = p.locale || i18nRuntime.resolveLocaleFromRoute(p.pathname, i18nRuntime.config, i18nContext).locale
-      pageCounts.set(code, (pageCounts.get(code) ?? 0) + 1)
+    const counts = new Map<string, number>()
+    for (const page of pageMap.values())
+      counts.set(page.locale!, (counts.get(page.locale!) || 0) + 1)
+    rootContent = i18nRuntime.formatAvailableLanguagesSection(i18nRuntime.config, counts, href, i18nContext).join('\n')
+    for (const [path, page] of pageMap) {
+      if (page.locale !== i18nRuntime.config.defaultLocale)
+        pageMap.delete(path)
     }
-    parts.push(...i18nRuntime.formatAvailableLanguagesSection(i18nRuntime.config, pageCounts, resolvePageHref, i18nContext))
-    parts.push('')
   }
+  const sitemapPages = new Map([...sitemapPaths].map(([name, paths]) => [name, [...paths].flatMap(path => pageMap.has(path) ? [pageMap.get(path)!] : [])]))
+  return Object.fromEntries(createLlmsTxtFiles({ header: parts.join('\n'), config, sections, rootContent, pages: config.pages === false ? [] : [...pageMap.values()], sitemapPages, resolveUrl }))
+}
 
-  // When i18n active, default-locale pages are inlined; non-default-locale pages
-  // are referenced via the Available Languages section above (Anthropic precedent).
-  const isDefaultLocale = (item: PageItem): boolean => {
-    if (i18nRuntime._tag === 'disabled')
-      return true
-    const code = item.locale || i18nRuntime.resolveLocaleFromRoute(item.pathname, i18nRuntime.config, i18nContext).locale
-    return code === i18nRuntime.config.defaultLocale
-  }
-
-  const filteredPrerendered = i18nRuntime._tag === 'enabled' ? prerendered.filter(isDefaultLocale) : prerendered
-  const filteredOther = i18nRuntime._tag === 'enabled' ? other.filter(isDefaultLocale) : other
-
-  // Sort and format pages
-  const sortedPrerendered = sortPagesByPath(filteredPrerendered)
-  const sortedOther = sortPagesByPath(filteredOther)
-
-  if (sortedPrerendered.length > 0 && sortedOther.length > 0) {
-    parts.push(`## Prerendered Pages${devModeHint}\n`)
-    parts.push(...formatPagesWithGroups(sortedPrerendered))
-    parts.push('')
-    parts.push('## Other Pages\n')
-    parts.push(...formatPagesWithGroups(sortedOther))
-    parts.push('')
-  }
-  else if (sortedPrerendered.length > 0) {
-    parts.push(`## Pages${devModeHint}\n`)
-    parts.push(...formatPagesWithGroups(sortedPrerendered))
-    parts.push('')
-  }
-  else if (sortedOther.length > 0) {
-    parts.push(`## Pages${devModeHint}\n`)
-    parts.push(...formatPagesWithGroups(sortedOther))
-    parts.push('')
-  }
-
-  return parts.join('\n')
+export async function buildLlmsTxt(event: H3Event): Promise<string> {
+  const files = await buildLlmsTxtFiles(event)
+  const path = toLogicalRoute(event.path.split('?')[0]!, useRuntimeConfig(event).app.baseURL)
+  const content = files[path]
+  if (content === undefined)
+    throw createError({ statusCode: 404, statusMessage: 'llms.txt file not found' })
+  return content
 }

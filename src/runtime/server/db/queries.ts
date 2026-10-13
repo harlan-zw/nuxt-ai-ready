@@ -131,6 +131,7 @@ async function getPrerenderDb(): Promise<RawExecutor> {
       const isErrorQuery = sql.includes('is_error = 1') || (params.includes(1) && sql.includes('is_error'))
       const excludeErrors = sql.includes('is_error = 0')
       const includeMarkdown = wantsMarkdown(sql)
+      const admittedRoutes = sql.includes('WHERE route IN (') ? new Set(params) : undefined
 
       if (isErrorQuery) {
         return [...errorRoutes].map(route => ({
@@ -147,8 +148,8 @@ async function getPrerenderDb(): Promise<RawExecutor> {
         })) as T[]
       }
 
-      const filtered = excludeErrors ? pages.filter(p => !errorRoutes.has(p.route)) : pages
-      return filtered.map(p => ({
+      const filtered = pages.filter(p => (!excludeErrors || !errorRoutes.has(p.route)) && (!admittedRoutes || admittedRoutes.has(p.route)))
+      const rows = filtered.map(p => ({
         route: p.route,
         title: p.title,
         description: p.description,
@@ -159,7 +160,14 @@ async function getPrerenderDb(): Promise<RawExecutor> {
         is_error: errorRoutes.has(p.route) ? 1 : 0,
         indexed: 1,
         locale: p.locale || '',
-      })) as T[]
+      }))
+      if (admittedRoutes && !excludeErrors) {
+        for (const route of errorRoutes) {
+          if (admittedRoutes.has(route))
+            rows.push({ route, title: '', description: '', headings: [], keywords: '[]', updated_at: '', is_error: 1, indexed: 0, locale: '' })
+        }
+      }
+      return rows as T[]
     },
     first: async <T>(sql: string, params: unknown[] = []): Promise<T | undefined> => {
       if (sql.includes('WHERE route = ?')) {
@@ -224,6 +232,28 @@ export interface PageEntry {
 
 export interface PageData extends PageEntry {
   markdown: string
+}
+
+export type PageMetadata = Pick<PageEntry, 'route' | 'title' | 'description' | 'isError' | 'locale'>
+
+/** Read only admitted page metadata. Each query fits D1's 100 parameter limit. */
+export async function queryPageMetadata(event: AiReadyDatabaseEvent | undefined, routes: readonly string[]): Promise<PageMetadata[]> {
+  if (!routes.length)
+    return []
+  const db = await getDb(event)
+  if (!db)
+    return []
+  const unique = [...new Set(routes)]
+  const pages: PageMetadata[] = []
+  for (let i = 0; i < unique.length; i += 100) {
+    const batch = unique.slice(i, i + 100)
+    const rows = await db.all<Pick<PageRow, 'route' | 'title' | 'description' | 'is_error' | 'locale'>>(
+      `SELECT route, title, description, is_error, locale FROM ai_ready_pages WHERE route IN (${batch.map(() => '?').join(', ')})`,
+      batch,
+    )
+    pages.push(...rows.map(row => ({ route: row.route, title: row.title, description: row.description, isError: row.is_error === 1, locale: row.locale || '' })))
+  }
+  return pages
 }
 
 export interface SearchResult {

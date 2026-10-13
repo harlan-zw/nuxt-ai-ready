@@ -1,4 +1,4 @@
-import { eventHandler, sendIterable, setHeader, setResponseHeader } from '#nuxtseo/h3'
+import { assertMethod, eventHandler, sendIterable, setHeader, setResponseHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { withSiteUrl } from '#site-config/server/composables/utils'
@@ -10,6 +10,7 @@ import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../utils/llms-
 // llms-full.txt is streamed during prerender directly to public dir
 // At runtime, this handler streams pages from the database
 export default eventHandler(async (event) => {
+  assertMethod(event, 'GET', true)
   // During prerender, return placeholder (static file will be used)
   if (import.meta.prerender) {
     setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')

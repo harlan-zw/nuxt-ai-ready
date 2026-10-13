@@ -20,6 +20,7 @@ import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { readPackageMetadata } from './package-metadata'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { parseLlmsTxtConfig } from './runtime/llms-txt-files'
 import { toDeployedRoute } from './runtime/route-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
 import { registerTypeTemplates } from './templates'
@@ -91,6 +92,7 @@ export interface ModulePublicRuntimeConfig {
   version: string
   sitemapMd: boolean
   describedby: boolean
+  llmsFullTxt?: boolean
   mdreamOptions: ModuleOptions['mdreamOptions']
   markdownCacheHeaders: Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>
   database: ResolvedDatabase
@@ -427,13 +429,15 @@ export default defineNuxtModule<ModuleOptions>({
     const llmsFullRoute = withSiteUrl('llms-full.txt', { withBase: true })
     defaultLlmsTxtSections.push({
       title: 'LLM Resources',
-      links: [
-        {
-          title: 'Full Content',
-          href: llmsFullRoute,
-          description: 'Complete page content in markdown format.',
-        },
-      ],
+      links: config.llmsFullTxt === false
+        ? []
+        : [
+            {
+              title: 'Full Content',
+              href: llmsFullRoute,
+              description: 'Complete page content in markdown format.',
+            },
+          ],
     })
 
     if (agentSkillsResult._tag === 'Enabled' && agentSkillsConfig !== false && agentSkillsConfig.llmsTxt !== false) {
@@ -441,19 +445,31 @@ export default defineNuxtModule<ModuleOptions>({
       defaultLlmsTxtSections.push({
         title: 'Agent Skills',
         description: `Skills an agent can install from this site. The index at ${indexUrl} carries a sha256 digest for each one.`,
-        links: agentSkillsResult.links.map(link => ({
+        links: [{ title: 'Agent Skills index', href: indexUrl, description: 'Every published skill and its sha256 digest.' }, ...agentSkillsResult.links.map(link => ({
           title: link.name,
           href: link.source === 'local'
             ? withSiteUrl(link.href.slice(1), { withBase: true })
             : resolveExternalSkillUrl(link.href, indexUrl),
           description: link.description,
-        })),
+        }))],
       })
     }
 
     // Merge default sections with user config
+    const parsedLlmsTxt = parseLlmsTxtConfig(config.llmsTxt || {})
+    if (parsedLlmsTxt._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${parsedLlmsTxt.message}`)
+    const publicLlmsTxt = await Promise.all(getLayerDirectories(nuxt).map(layer =>
+      access(join(layer.public, 'llms.txt')).then(() => true).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT')
+          return false
+        throw error
+      }),
+    ))
+    const generateLlmsTxt = config.llmsTxt !== false && !publicLlmsTxt.some(Boolean)
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
+          ...parsedLlmsTxt.config,
           markdownLinks: config.llmsTxt.markdownLinks ?? false,
           sections: [
             ...defaultLlmsTxtSections,
@@ -471,6 +487,9 @@ export default defineNuxtModule<ModuleOptions>({
     await nuxt.callHook('ai-ready:llms-txt' as any, llmsTxtPayload)
     mergedLlmsTxt.sections = llmsTxtPayload.sections
     mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
+    const parsedHookLlmsTxt = parseLlmsTxtConfig(mergedLlmsTxt)
+    if (parsedHookLlmsTxt._tag === 'Invalid')
+      throw new Error(`[nuxt-ai-ready] ${parsedHookLlmsTxt.message}`)
 
     const prerenderCacheDir = join(nuxt.options.rootDir, 'node_modules/.cache/nuxt-seo/ai-ready/routes')
     // Build-time database path (separate from runtime DB which may be D1/LibSQL)
@@ -497,6 +516,8 @@ export default defineNuxtModule<ModuleOptions>({
       if (apiCatalogRegistered)
         return
       apiCatalogRegistered = true
+      const resources = mergedLlmsTxt.sections?.find(section => section.title === 'LLM Resources')
+      resources?.links?.push({ title: 'API catalog', href: catalog.href, description: 'The public API and service descriptions.' })
 
       addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog'), lazy: true })
       const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
@@ -992,6 +1013,7 @@ export function trackDrizzleWork(event, work) { return work }
       // so a page's Markdown comes from the collection rather than from a
       // second SSR render. See src/content-source.ts.
       nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = contentLookupModule(contentSource)
+      nitroConfig.virtual['#ai-ready-virtual/sitemap-config.mjs'] = `export { default } from '#sitemap-virtual/static-config.mjs'`
     })
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
@@ -1012,6 +1034,7 @@ export function trackDrizzleWork(event, work) { return work }
         swr: true,
       }) as Required<NonNullable<ModuleOptions['markdownCacheHeaders']>>,
       llmsTxt: mergedLlmsTxt,
+      llmsFullTxt: config.llmsFullTxt !== false,
       llmsTxtCacheSeconds: config.llmsTxtCacheSeconds ?? 600,
       prerenderCacheDir,
       database,
@@ -1073,10 +1096,15 @@ export function trackDrizzleWork(event, work) { return work }
       src: resolve('./runtime/app/plugins/md-alternate.server'),
     })
     // gets replaced with a static file
-    addServerHandler({ route: '/llms.txt', handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
-    addServerHandler({ route: '/llms-full.txt', handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
+    if (generateLlmsTxt) {
+      for (const route of ['/llms.txt', '/llms/**'])
+        // Override filename method inference so HEAD reaches the same handler.
+        addServerHandler({ route, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
+    }
+    if (config.llmsFullTxt !== false)
+      addServerHandler({ route: '/llms-full.txt', method: undefined, handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
     if (config.sitemapMd !== false) {
-      addServerHandler({ route: SITEMAP_MD_ROUTE, handler: resolve('./runtime/server/routes/sitemap.md.get'), lazy: true })
+      addServerHandler({ route: SITEMAP_MD_ROUTE, method: undefined, handler: resolve('./runtime/server/routes/sitemap.md.get'), lazy: true })
     }
     if (agentSkillsResult._tag === 'Enabled') {
       addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index'), lazy: true })
@@ -1173,7 +1201,7 @@ export function trackDrizzleWork(event, work) { return work }
 
     if (prerenderEnabled) {
       const { setupPrerenderHandler } = await import('./prerender')
-      setupPrerenderHandler(config, buildDbPath, {
+      setupPrerenderHandler({ ...config, llmsTxt: generateLlmsTxt ? config.llmsTxt : false }, buildDbPath, {
         name: siteConfig.name,
         url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
         description: siteConfig.description,
@@ -1203,7 +1231,7 @@ export function trackDrizzleWork(event, work) { return work }
     }
 
     // Add route rules for static files with proper charset
-    for (const route of ['/llms.txt', '/llms-full.txt']) {
+    for (const route of [generateLlmsTxt && '/llms.txt', generateLlmsTxt && '/llms/**', config.llmsFullTxt !== false && '/llms-full.txt'].filter((route): route is string => Boolean(route))) {
       extendRouteRules(route, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     }
     if (config.sitemapMd !== false) {

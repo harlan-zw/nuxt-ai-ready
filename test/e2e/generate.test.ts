@@ -85,9 +85,9 @@ describe('nuxt generate (static build)', async () => {
     it('includes page routes with descriptions', async () => {
       const llmsTxt = await $fetch('/llms.txt', { responseType: 'text' })
 
-      // Pages listed as "- [Title](/route): description"
-      expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/\): /)
-      expect(llmsTxt).toMatch(/- \[[^\]]+\]\(\/about\): /)
+      // Pages listed as "- [Title](https://test.example.com/route): description"
+      expect(llmsTxt).toMatch(/- \[[^\]]+\]\(https:\/\/test\.example\.com\/\): /)
+      expect(llmsTxt).toMatch(/- \[[^\]]+\]\(https:\/\/test\.example\.com\/about\): /)
     })
 
     it('includes page descriptions', async () => {

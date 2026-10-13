@@ -1,5 +1,5 @@
 import { createResolver } from '@nuxt/kit'
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
+import { $fetch, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -37,9 +37,9 @@ describe('llms.txt runtime generation with sitemap', async () => {
 
     // Should have Pages section with sitemap URLs
     expect(llmsTxt).toContain('## Pages')
-    expect(llmsTxt).toContain('[/about](/about)')
-    expect(llmsTxt).toContain('[/docs/getting-started](/docs/getting-started)')
-    expect(llmsTxt).toContain('[/docs/api](/docs/api)')
+    expect(llmsTxt).toContain('[/about](https://test.example.com/about)')
+    expect(llmsTxt).toContain('[/docs/getting-started](https://test.example.com/docs/getting-started)')
+    expect(llmsTxt).toContain('[/docs/api](https://test.example.com/docs/api)')
   })
 
   it('llms.txt content is valid markdown format', async () => {
@@ -53,5 +53,13 @@ describe('llms.txt runtime generation with sitemap', async () => {
 
     // Should have sitemap/robots links with absolute URLs
     expect(llmsTxt).toMatch(RE_MD_ABS_LINK)
+  })
+
+  it('supports HEAD on discovery exports', async () => {
+    for (const path of ['/llms.txt', '/llms-full.txt', '/sitemap.md']) {
+      const response = await fetch(url(path), { method: 'HEAD' })
+      expect(response.status, path).toBe(200)
+      expect(await response.text()).toBe('')
+    }
   })
 })

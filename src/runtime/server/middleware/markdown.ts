@@ -25,7 +25,7 @@ function notFoundMarkdown(
     ``,
     `- [Sitemap](${resolveUrl('/sitemap.xml')})`,
     `- [llms.txt](${resolveUrl('/llms.txt')})`,
-    `- [llms-full.txt](${resolveUrl('/llms-full.txt')})`,
+    ...(config.llmsFullTxt === false ? [] : [`- [llms-full.txt](${resolveUrl('/llms-full.txt')})`]),
     ``,
   ].join('\n')
 
