@@ -1,5 +1,6 @@
+import { Window } from 'happy-dom'
 import { describe, expect, it } from 'vitest'
-import { insertLlmsTxtDirective, llmsTxtDirective } from '../../src/runtime/llms-txt-directive'
+import { insertLlmsTxtDirective, llmsTxtDirective, llmsTxtDirectiveHtml } from '../../src/runtime/llms-txt-directive'
 
 const href = 'https://example.com/llms.txt'
 const directive = llmsTxtDirective(href)
@@ -21,5 +22,26 @@ describe('insertLlmsTxtDirective', () => {
   it('adds the line once', () => {
     const once = insertLlmsTxtDirective('---\ntitle: "About"\n---\n# About\n', href)
     expect(insertLlmsTxtDirective(once, href)).toBe(once)
+  })
+
+  it.each(['\n', '\r\n'])('preserves empty frontmatter with %j line endings', (newline) => {
+    const frontmatter = `---${newline}---${newline}`
+    const markdown = `${frontmatter}${newline}# Page`
+    expect(insertLlmsTxtDirective(markdown, href)).toBe(`${frontmatter}\n${directive}\n\n# Page`)
+  })
+
+  it('adds the leading directive when the body contains a fenced example', () => {
+    const markdown = `---\ntitle: Example\n---\n\n# Page\n\n\`\`\`md\n${directive}\n\`\`\``
+    expect(insertLlmsTxtDirective(markdown, href)).toBe(`---\ntitle: Example\n---\n\n${directive}\n\n# Page\n\n\`\`\`md\n${directive}\n\`\`\``)
+  })
+})
+
+describe('llmsTxtDirectiveHtml', () => {
+  it('keeps the visually hidden index link outside sequential keyboard navigation', () => {
+    const window = new Window()
+    window.document.body.innerHTML = llmsTxtDirectiveHtml('/llms.txt')
+    const link = window.document.querySelector('a')!
+    expect(link.tabIndex).toBe(-1)
+    expect(link.getAttribute('href')).toBe('/llms.txt')
   })
 })
