@@ -22,7 +22,9 @@ function getBuildLlmsTxtCached(maxAge: number) {
 export default eventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as any
   const cacheSeconds = runtimeConfig.llmsTxtCacheSeconds
-  const cacheEnabled = !import.meta.dev && cacheSeconds > 0
+  // Build output must reflect this build's page index and configuration.
+  // An early queued request or a previous build can populate Nitro's cache.
+  const cacheEnabled = !import.meta.dev && !import.meta.prerender && cacheSeconds > 0
 
   const content = cacheEnabled
     ? await getBuildLlmsTxtCached(cacheSeconds)(event)
