@@ -1145,6 +1145,7 @@ export function trackDrizzleWork(event, work) { return work }
         ftsTokenizer,
         i18n: i18nConfig,
         artifactRoutes: agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+        runtimeDatabase: database._tag,
       })
     }
 

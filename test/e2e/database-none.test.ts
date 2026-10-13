@@ -54,6 +54,16 @@ describe('database disabled', async () => {
     })
   })
 
+  it('does not publish the runtime database restore files', async () => {
+    const [dump, meta] = await Promise.all([
+      fetch(url('/__ai-ready/pages.dump')),
+      fetch(url('/__ai-ready/pages.meta.json')),
+    ])
+
+    expect(dump.status).toBe(404)
+    expect(meta.status).toBe(404)
+  })
+
   it('does not serve the runtime indexing endpoints', async () => {
     const [status, poll] = await Promise.all([
       fetch(url('/__ai-ready/status')),
