@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../../src/runtime/server/utils/llms-full'
 
 describe('llms-full.txt formatter', () => {
@@ -85,6 +86,27 @@ Setext heading
     expect(result).toContain('- **Page:** Page title')
     expect(result).toContain('- **Description:** First line second line')
     expect(result).toContain('# Exact\n\nBody')
+  })
+
+  it('keeps image metadata when replacing frontmatter with page labels', () => {
+    const markdown = '---\ntitle: Guide\nmeta:\n  og:image: https://example.com/cover.png\n  og:image:alt: "A guide: from the source"\n  twitter:image: https://example.com/social.png\n  author: Writer\n---\n\n# Guide'
+    const result = formatPageForLlmsFullTxt('/guide', 'Guide', '', markdown)
+    const metadata = parse(result.match(/```yaml\n([\s\S]*?)\n```/)?.[1] || '')
+
+    expect(metadata).toEqual({ meta: {
+      'og:image': 'https://example.com/cover.png',
+      'og:image:alt': 'A guide: from the source',
+      'twitter:image': 'https://example.com/social.png',
+    } })
+    expect(result).toContain('# Guide')
+    expect(result).not.toContain('title: Guide')
+  })
+
+  it.each(['[invalid', 'plain text', 'meta: [not, a, mapping]'])('keeps the page body when image frontmatter is invalid: %s', (frontmatter) => {
+    const result = formatPageForLlmsFullTxt('/guide', 'Guide', '', `---\n${frontmatter}\n---\n\n# Guide`)
+
+    expect(result).toContain('# Guide')
+    expect(result).not.toContain('```yaml')
   })
 
   it('builds a header without a synthetic Pages hierarchy', () => {

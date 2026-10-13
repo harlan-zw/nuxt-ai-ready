@@ -7,9 +7,9 @@ const LEADING_BLOCK_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 const PAGE_FRONTMATTER_KEYS = new Set(['title', 'description', 'meta', 'canonical_url', 'last_updated', 'locale', 'alternates'])
 
 /**
- * Strip the frontmatter this module writes. A leading `---` block is only
- * frontmatter when it parses as a YAML map holding one of our keys; otherwise
- * it is body content, such as text between two horizontal rules.
+ * Strip conversion fields while retaining image metadata for content hashing.
+ * A leading `---` block is only frontmatter when it holds a recognized key.
+ * Other leading blocks remain body content, such as text between horizontal rules.
  */
 function stripPageFrontmatter(markdown: string): string {
   const match = markdown.match(LEADING_BLOCK_RE)
@@ -19,14 +19,34 @@ function stripPageFrontmatter(markdown: string): string {
   if (document.errors.length || !isMap(document.contents))
     return markdown
   const isPageFrontmatter = document.contents.items.some(item => isScalar(item.key) && PAGE_FRONTMATTER_KEYS.has(String(item.key.value)))
-  return isPageFrontmatter ? markdown.slice(match[0].length) : markdown
+  if (!isPageFrontmatter)
+    return markdown
+
+  const body = markdown.slice(match[0].length)
+  const meta = document.get('meta', true)
+  const images: Array<[string, string | number]> = []
+  if (isMap(meta)) {
+    for (const { key, value } of meta.items) {
+      if (!isScalar(key) || typeof key.value !== 'string' || !isScalar(value))
+        continue
+      if (key.value !== 'og:image' && !key.value.startsWith('og:image:') && key.value !== 'twitter:image' && !key.value.startsWith('twitter:image:'))
+        continue
+      if (typeof value.value === 'string' || (typeof value.value === 'number' && Number.isFinite(value.value)))
+        images.push([key.value, value.value])
+    }
+  }
+  if (!images.length)
+    return body
+
+  images.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+  return JSON.stringify([images, body.trim()])
 }
 
 /**
  * Compute content hash for change detection (first 16 chars of SHA-256).
- * Hash the page body only. Frontmatter holds per-conversion fields
- * (`canonical_url`, `last_updated`) that differ between the build and runtime
- * paths, so hashing it marks unchanged pages as changed.
+ * Hash the page body and image metadata. Other frontmatter holds fields
+ * (`canonical_url`, `last_updated`) that can differ between conversion paths.
+ * Those fields stay excluded so unchanged pages keep the same hash.
  */
 export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()

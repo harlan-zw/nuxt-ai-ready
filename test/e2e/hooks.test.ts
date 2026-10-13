@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 
 describe('ai-ready hooks e2e', async () => {
   await setup({
@@ -57,6 +58,20 @@ describe('ai-ready hooks e2e', async () => {
       const frontmatter = aboutMarkdown.split('---')[1]
       expect(frontmatter).toMatch(/^description: "Learn about this test site/m)
       expect(frontmatter).not.toMatch(/^\s+description:/m)
+    })
+
+    it('preserves image metadata and JSON-LD in prerendered twins and full exports', async () => {
+      const markdown = await $fetch<string>('/about.md')
+      const frontmatter = parse(markdown.match(/^---\n([\s\S]*?)\n---/)![1]!)
+      const expected = { '@context': 'https://schema.org', '@type': 'Article', 'headline': 'Metadata in every conversion path' }
+      const structuredData = (value: string) => [...value.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => JSON.parse(match[1]!))
+
+      expect(frontmatter.meta['og:image']).toBe('https://test.example.com/cover.png')
+      expect(structuredData(markdown)).toContainEqual(expected)
+
+      const fullExport = await $fetch<string>('/llms-full.txt')
+      expect(fullExport).toContain('https://test.example.com/cover.png')
+      expect(structuredData(fullExport)).toContainEqual(expected)
     })
   })
 
