@@ -32,6 +32,9 @@ describe('static configured section discovery', async () => {
     }
     await walk('/llms.txt')
     const all = [...documents.values()].join('\n')
+    for (let i = 0; i < 25; i++)
+      expect(all).toContain(`First paragraph ${i}.\n\nSecond paragraph ${i}.`)
+    expect(all).not.toContain('Hidden optional context.')
     for (const group of ['required', 'optional']) {
       for (let i = 0; i < 40; i++)
         expect(all.split(`](https://resources.example.com/${group}-${i})`)).toHaveLength(2)

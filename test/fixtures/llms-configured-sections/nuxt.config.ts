@@ -15,7 +15,7 @@ export default defineNuxtConfig({
           href: `https://resources.example.com/${optional ? 'optional' : 'required'}-${i}`,
           description: 'Complete instructions: '.repeat(10),
         })),
-      })), { title: 'Selected pages', sitemap: 'sitemap', path: '/llms/Skills.TXT' }],
+      })), ...Array.from({ length: 25 }, (_, i) => ({ title: `Context ${i}`, description: [`First paragraph ${i}.`, `Second paragraph ${i}.`] })), { title: 'Ignored context', optional: true, description: 'Hidden optional context.' }, { title: 'Selected pages', sitemap: 'sitemap', path: '/llms/Skills.TXT' }],
     },
   },
 })

@@ -143,6 +143,37 @@ describe('llms.txt files', () => {
     expect([...files.values()].join('\n')).toContain('](/page-299)')
   })
 
+  it.each([false, true])('preserves description-only sections across reachable bounded files, mixed lists: %s', (mixed) => {
+    const contexts = Array.from({ length: 25 }, (_, i) => ({ title: `Context ${i}`, description: [`First paragraph ${i}.`, `Second paragraph ${i}.`] }))
+    const sections = [...contexts, { title: 'Ignored', optional: true, description: 'Hidden optional context.' }, ...(mixed ? [{ title: 'Resources', links: [{ title: 'Resource', href: 'https://resources.example.com/resource' }] }, { title: 'Selected', sitemap: 'selected' }] : [])]
+    const files = createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections, pages: mixed ? [{ pathname: '/about' }] : [], sitemapPages: new Map([['selected', [{ pathname: '/selected' }]]]), resolveUrl })
+    const seen = new Set<string>()
+    function visit(path: string) {
+      if (seen.has(path))
+        return
+      seen.add(path)
+      const text = files.get(path)!
+      expect(text.length).toBeLessThanOrEqual(1024)
+      for (const match of text.matchAll(/\]\(https:\/\/example.com(\/llms\/[^)]+)\)/g))
+        visit(match[1]!)
+    }
+    visit('/llms.txt')
+    expect(seen.size).toBe(files.size)
+    const all = [...seen].map(path => files.get(path)).join('\n')
+    for (let i = 0; i < contexts.length; i++)
+      expect(all).toContain(`First paragraph ${i}.\n\nSecond paragraph ${i}.`)
+    expect(all).not.toContain('Hidden optional context.')
+    if (mixed) {
+      expect(all.split('](https://resources.example.com/resource)')).toHaveLength(2)
+      expect(all.split('](/about)')).toHaveLength(2)
+      expect(all.split('](/selected)')).toHaveLength(2)
+    }
+  })
+
+  it('rejects description-only context that cannot fit one bounded document', () => {
+    expect(() => createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections: [{ title: 'Context', description: 'Required instructions. '.repeat(100) }], pages: [], sitemapPages: new Map(), resolveUrl })).toThrow(/maxLength/)
+  })
+
   it('splits valid long descriptions even when each leaf holds only one link', () => {
     const links = Array.from({ length: 20 }, (_, i) => ({ title: `Resource ${i}`, href: `https://example.com/resource-${i}`, description: 'Detailed instructions. '.repeat(30) }))
     const files = createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections: [{ title: 'Resources', links }], pages: [], sitemapPages: new Map(), resolveUrl })

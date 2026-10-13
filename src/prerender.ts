@@ -484,9 +484,13 @@ export async function crawlSitemapContent(
       if (parsePrerenderRoute(entry.loc, nitro.options.baseURL)._tag === 'Invalid')
         continue
       const url = new URL(entry.loc, origin)
-      if (url.origin !== origin || seen.has(url.href))
+      if (url.origin !== origin)
         continue
-      const localDocument = documents.get(toLogicalRoute(url.pathname, nitro.options.baseURL))
+      const documentKey = toLogicalRoute(url.pathname, nitro.options.baseURL)
+      const localDocument = documents.get(documentKey)
+      const identity = localDocument ? `local:${documentKey}` : url.href
+      if (seen.has(identity))
+        continue
       // Generated documents are already bounded by the configured sitemap.
       // Only fetched documents consume the untrusted traversal budget.
       if (!localDocument && (depth >= 3 || budget.fetched >= 100)) {
@@ -496,7 +500,7 @@ export async function crawlSitemapContent(
         }
         continue
       }
-      seen.add(url.href)
+      seen.add(identity)
       if (!localDocument)
         budget.fetched++
       const content = localDocument?.() ?? await crawlerFetch(state)(`${url.pathname}${url.search}`, {

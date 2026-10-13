@@ -138,10 +138,18 @@ export function createLlmsTxtFiles(input: LlmsTxtFilesInput): Map<string, string
   const pageIndexSpace = input.pages.some(page => !assigned.has(page.pathname)) ? render('', 'Pages', [link('Pages', '/llms/_pages.txt')]).length : 1
   let rootHeader = `${input.header.trim()}\n\n${normalizeLlmsTxtConfig({ ...input.config, sections })}${input.rootContent ? `\n\n${input.rootContent}` : ''}`
   if (rootHeader.length + pageIndexSpace > maxLength) {
-    const references = sections.flatMap((section, index) => {
-      if (!section.links?.length)
-        return [section]
+    const references = sections.flatMap<LlmsTxtSection>((section, index) => {
       const path = `/llms/_configured-${index + 1}.txt`
+      if (!section.links?.length) {
+        const context = normalizeLlmsTxtConfig({ sections: [section] })
+        if (!context)
+          return []
+        const body = `${input.header.trim()}\n\n${context}\n\n${link('llms.txt', '/llms.txt')}\n`
+        if (body.length > maxLength)
+          throw new Error('An llms.txt entry exceeds llmsTxt.maxLength. Shorten the entry or increase the limit.')
+        files.set(path, body)
+        return [{ title: section.title, links: [{ title: section.title, href: input.resolveUrl(path) }] }]
+      }
       const text = normalizeLlmsTxtConfig({ sections: [{ ...section, description: section.optional ? section.description : undefined }] })
       const lines = text.split('\n').slice(2)
       const description = Array.isArray(section.description) ? section.description.join(' ') : section.description
