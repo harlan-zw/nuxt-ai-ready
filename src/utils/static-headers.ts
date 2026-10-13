@@ -151,35 +151,74 @@ export function matchingStaticContentSignals(routeRules: Record<string, object |
   })
 }
 
-/** Specific usage policies replace broader policies instead of joining their values. */
+/** Normalize usage policy precedence without changing other header precedence. */
 export function normalizeStaticContentSignalHeaders(contents: string): string {
-  let blocks = splitHeaderBlocks(contents)
-  if (!blocks.some(block => /^\s+content-signal\s*:/im.test(block.text)))
+  const parsed = splitHeaderBlocks(contents)
+  if (!parsed.some(block => /^\s+content-signal\s*:/im.test(block.text)))
     return contents
-  const specificity = (route: string | null) => route === null ? -1 : route.replace(/\*|:\w+/g, '').length * 10 - (route.match(/\*|:\w+/g)?.length || 0)
-  const hasPolicy = (block: HeaderBlock) => /^\s+(?:content-signal\s*:|!\s*content-signal\s*$)/im.test(block.text)
+  const policyLine = /^[\t ]+(?:content-signal\s*:.*|!\s*content-signal\s*)$/i
+  const hasPolicy = (block: HeaderBlock) => block.text.split(/\r?\n/).slice(1).some(line => policyLine.test(line))
   const repeated = new Map<string, HeaderBlock[]>()
-  blocks.forEach((block) => {
+  for (const block of parsed) {
     if (block.route !== null)
       repeated.set(block.route, [...repeated.get(block.route) || [], block])
-  })
+  }
   const combined = new Set<string>()
-  // A repeated pattern keeps its first position in Cloudflare's rule map.
-  // One block lets its final policy move after broader policies.
-  blocks = blocks.flatMap((block) => {
+  const blocks = parsed.flatMap((block) => {
     const group = block.route === null ? [] : repeated.get(block.route)!
     if (group.length < 2 || !group.some(hasPolicy))
       return [block]
     if (combined.has(block.route!))
       return []
     combined.add(block.route!)
-    const policyLine = /^\s+(?:content-signal\s*:.*|!\s*content-signal\s*)$/i
-    const lines = group.flatMap(entry => entry.text.split(/\r?\n/).slice(1))
-    const lastPolicy = group.filter(hasPolicy).at(-1)!.text.split(/\r?\n/).slice(1).filter(line => policyLine.test(line))
-    return [{ route: block.route, text: `${block.route}\n${[...lines.filter(line => !policyLine.test(line)), ...lastPolicy].join('\n')}\n` }]
+    // Cloudflare keeps the final repeated rule at its first position.
+    // Preserve that rule's unrelated fields, and retain the final explicit policy.
+    const lines = group.at(-1)!.text.split(/\r?\n/).slice(1).filter(line => !policyLine.test(line))
+    const policy = group.filter(hasPolicy).at(-1)!.text.split(/\r?\n/).slice(1).filter(line => policyLine.test(line))
+    return [{ route: block.route, text: `${block.route}\n${[...lines, ...policy].join('\n')}\n` }]
   })
-  const policies = blocks.filter(hasPolicy).sort((a, b) => specificity(a.route) - specificity(b.route))
-  return blocks.map(original => hasPolicy(original) ? policies.shift()! : original).map((block) => {
+  const policyOnly = (block: HeaderBlock) => hasPolicy(block)
+    && block.text.split(/\r?\n/).slice(1).every(line => !line.trim() || line.trimStart().startsWith('#') || policyLine.test(line))
+  const policyValue = (block: HeaderBlock) => block.text.match(/^[\t ]+content-signal\s*:\s*(.*)$/im)?.[1]?.trim() ?? null
+  const edges = blocks.map(() => new Set<number>())
+  const incoming = blocks.map(() => 0)
+  const connect = (before: number, after: number) => {
+    if (!edges[before]!.has(after)) {
+      edges[before]!.add(after)
+      incoming[after]!++
+    }
+  }
+  let previousUnrelated: number | undefined
+  for (let index = 0; index < blocks.length; index++) {
+    if (!policyOnly(blocks[index]!)) {
+      if (previousUnrelated !== undefined)
+        connect(previousUnrelated, index)
+      previousUnrelated = index
+    }
+  }
+  for (let broad = 0; broad < blocks.length; broad++) {
+    const source = blocks[broad]!
+    if (!hasPolicy(source) || source.route === null)
+      continue
+    for (let narrow = 0; narrow < blocks.length; narrow++) {
+      const target = blocks[narrow]!
+      if (broad !== narrow && hasPolicy(target) && target.route !== null
+        && policyValue(source) !== policyValue(target) && coversPattern(source.route, target.route))
+        connect(broad, narrow)
+    }
+  }
+  const ordered: HeaderBlock[] = []
+  const emitted = new Set<number>()
+  while (ordered.length < blocks.length) {
+    const next = incoming.findIndex((count, index) => count === 0 && !emitted.has(index))
+    if (next === -1)
+      throw new Error('Content-Signal rules conflict with other header ordering. Place broader mixed policy rules before narrower rules.')
+    emitted.add(next)
+    ordered.push(blocks[next]!)
+    for (const target of edges[next]!)
+      incoming[target]!--
+  }
+  return ordered.map((block) => {
     const text = block.text.trimEnd()
     if (!/^\s+content-signal\s*:/im.test(text) || /^\s+!\s*content-signal\s*$/im.test(text))
       return `${text}\n`
