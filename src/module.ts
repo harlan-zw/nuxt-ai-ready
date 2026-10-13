@@ -29,6 +29,7 @@ import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig 
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
+import { applyDefaultContentSignal } from './utils/content-signal'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -416,6 +417,13 @@ export default defineNuxtModule<ModuleOptions>({
       if (config.contentSignal.contentUsage !== false)
         group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
       groups.push(group)
+    }
+    else if (config.contentSignal === undefined) {
+      // Robots calls this hook once its groups include any merged robots.txt
+      // file, so a policy the site already states is visible here.
+      nuxt.hook('robots:config' as any, (robotsConfig: { groups: Parameters<typeof applyDefaultContentSignal>[0] }) => {
+        applyDefaultContentSignal(robotsConfig.groups)
+      })
     }
 
     // Register type templates for Nitro hooks and virtual modules
@@ -975,7 +983,7 @@ export function trackDrizzleWork(event, work) { return work }
 
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
-        contentSignal: config.contentSignal || false,
+        contentSignal: config.contentSignal ?? { search: true, aiInput: true },
         mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false) && hasMcpSiteTools, resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`

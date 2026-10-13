@@ -76,11 +76,11 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-Allow Content Signals. An omitted permission renders as `no`:
+Content Signals. Without config, robots.txt gets `Content-Signal: search=yes, ai-input=yes` and no `ai-train`. A robots group or merged robots.txt that already sets `Content-Signal` replaces the default. `contentSignal: false` removes the line. An object states the whole policy, so an omitted permission renders as `no`:
 
 ```ts
-export default defineNuxtConfig({ aiReady: { contentSignal: { search: true } } })
-// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=no
+export default defineNuxtConfig({ aiReady: { contentSignal: { search: true, aiInput: true, aiTrain: false } } })
+// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=yes
 ```
 
 MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it.
