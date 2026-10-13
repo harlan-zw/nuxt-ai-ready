@@ -31,7 +31,7 @@ A page visit in dev or production does not index anything.
 
 With no `aiReady` config, the module adds:
 
-- `/llms.txt`: site name, description, resource links, and a `## Pages` list. In dev it lists sitemap routes without titles.
+- `/llms.txt`: site name, description, resource links, and current sitemap pages. Stored pages supply metadata. Large lists split under `/llms/`.
 - `/llms-full.txt`: the full Markdown of each prerendered page. Only prerendered pages go in the static file.
 - A `.md` twin per page. `/about` becomes `/about.md`, and `/` becomes `/index.md`. Paths under `/api` and `/_` get none.
 - Accept negotiation: a request that prefers `text/markdown` gets a `307` to the `.md` URL. Responses send `Vary: Accept`. AI bot user agents get Markdown only with `botNegotiation: true`.
@@ -56,6 +56,32 @@ export default defineNuxtConfig({
   },
 })
 ```
+
+Publish separate discovery files from named sitemaps. Use module configuration before writing sitemap and database middleware:
+
+```ts
+export default defineNuxtConfig({
+  aiReady: {
+    llmsFullTxt: false,
+    llmsTxt: {
+      markdownLinks: true,
+      sitemaps: ['pages', 'skills', 'demos'],
+      sections: [
+        { title: 'Skills', sitemap: 'skills', path: '/llms/skills.txt' },
+        { title: 'Demos', sitemap: 'demos', path: '/llms/demos.txt' },
+      ],
+    },
+  },
+})
+```
+
+The root links each section file. Chunked sitemaps keep their configured name.
+Every file stays within `maxLength`, default 80,000 characters. Static builds emit every linked child.
+GET and HEAD work on every generated discovery file. Empty sections produce no link or file.
+
+For manual discovery, place `public/llms.txt`. The module preserves it and keeps Markdown conversion enabled.
+If a server handler owns discovery, set `llmsTxt: false`.
+Use `llmsFullTxt: false` instead of redirecting the full export to the index.
 
 Remove an element from the Markdown on every path, build and runtime. Put it in `mdreamOptions`; the defaults `minimal` and `clean` stay on:
 
@@ -91,6 +117,8 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 ## Traps
 
+- **Discovery is not authorization.** Selected sitemaps exclude stale rows from `llms.txt`; they do not delete stored content or protect other APIs.
+- **Custom route policies must allow Markdown twins.** If middleware rejects `/skills/planning.md`, allow it whenever `/skills/planning` is allowed.
 - **The same edit in both hooks applies twice.** During prerendering the Nitro `ai-ready:page:markdown` hook runs, then the Nuxt hook of the same name. Put an edit in one of them, not both.
 - **Content source pages skip conversion hooks.** A Nuxt Content page ignores `mdreamOptions` and both Nitro hooks.
 - **Dev has no page data.** Query helpers, MCP tools, and search return empty results in `nuxt dev`. Test with `nuxt build` and `node .output/server/index.mjs`.
@@ -124,6 +152,11 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 ## Config
 
+- `llmsTxt` (`object`): generated discovery. Set `false` for application-owned server routes. A public `llms.txt` disables generation automatically.
+- `llmsTxt.pages` (`'sitemap'`): sitemap admission. Use `'all'` for stored pages outside the sitemap, or `false` for configured sections only.
+- `llmsTxt.sitemaps`: selected sitemap names. An empty array stops sitemap discovery.
+- `llmsTxt.maxLength` (`80000`): maximum characters per file. Minimum `1024`. Larger lists split without dropping links.
+- `llmsFullTxt` (`true`): generate the full export and advertise its link. Set `false` to omit both.
 - `llmsTxt.markdownLinks` (`false`): link page entries in `llms.txt` to their `.md` twins.
 - `describedby` (`true`): the `describedby` link tag and header.
 - `tools.<listPages|searchPages|getPageMarkdown>.<mcp|webmcp>.enabled`: attach a built in tool to one transport only.
