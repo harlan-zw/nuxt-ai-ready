@@ -654,10 +654,14 @@ export function setupPrerenderHandler(
       // deployment. The prerendered llms.txt route reads this build-only file.
       if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
         const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
+        // Nitro 3 deprecates `srcDir` and leaves it unset; its ignore
+        // patterns resolve from `serverDir`, which may be `false`.
+        const options = nitro.options as typeof nitro.options & { serverDir?: string | false }
+        const ignoreBaseDir = options.srcDir || (typeof options.serverDir === 'string' ? options.serverDir : undefined) || options.rootDir
         const paths = await findOutputMarkdownPaths(
           nitro.options.output.publicDir,
           nitro.options.baseURL,
-          nitro.options.srcDir,
+          ignoreBaseDir,
           nitro.options.ignore,
           nitro.options.publicAssets,
         )
