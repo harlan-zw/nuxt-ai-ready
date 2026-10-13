@@ -29,7 +29,7 @@ import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig 
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
-import { applyDefaultContentSignal } from './utils/content-signal'
+import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -397,32 +397,14 @@ export default defineNuxtModule<ModuleOptions>({
     // and the SSR render each conversion needs.
     const contentSource = await resolveContentSource(config.contentSource !== false)
 
-    if (typeof config.contentSignal === 'object') {
-      // robots may be undefined (no explicit `robots` key) or `false` (disabled); fall back to {} so we can attach groups
-      const robotsOpts = (nuxt.options.robots || {}) as Record<string, unknown>
-      nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
-      const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
-      robotsOpts.groups = groups
-      const group: Record<string, unknown> = {
-        userAgent: '*',
-        // Preserve nuxt-robots' default wildcard rule so the injected group remains valid.
-        disallow: [''],
-        // Object form renders one comma-separated line; an array renders one line per entry, which validators reject.
-        contentSignal: {
-          'ai-train': config.contentSignal.aiTrain ? 'yes' : 'no',
-          'search': config.contentSignal.search ? 'yes' : 'no',
-          'ai-input': config.contentSignal.aiInput ? 'yes' : 'no',
-        },
-      }
-      if (config.contentSignal.contentUsage !== false)
-        group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
-      groups.push(group)
-    }
-    else if (config.contentSignal === undefined) {
-      // Robots calls this hook once its groups include any merged robots.txt
-      // file, so a policy the site already states is visible here.
-      nuxt.hook('robots:config' as any, (robotsConfig: { groups: Parameters<typeof applyDefaultContentSignal>[0] }) => {
-        applyDefaultContentSignal(robotsConfig.groups)
+    // Robots copies its options when it installs, and `@nuxtjs/seo` installs
+    // it before this module, so writing `nuxt.options.robots` here is lost.
+    // Its `robots:config` hook passes the resolved groups, including any
+    // merged robots.txt file, whatever the install order.
+    const contentSignalPolicy = resolveContentSignalPolicy(config.contentSignal)
+    if (contentSignalPolicy._tag !== 'Disabled') {
+      nuxt.hook('robots:config' as any, (robotsConfig: { groups: Parameters<typeof applyContentSignalPolicy>[0] }) => {
+        applyContentSignalPolicy(robotsConfig.groups, contentSignalPolicy)
       })
     }
 
