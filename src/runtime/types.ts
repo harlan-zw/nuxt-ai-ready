@@ -206,7 +206,9 @@ export interface ModuleOptions {
   /**
    * Structured llms.txt configuration
    */
-  llmsTxt?: LlmsTxtConfig
+  llmsTxt?: LlmsTxtConfig | false
+  /** Generate and serve llms-full.txt. Set false to omit the export and its discovery link. */
+  llmsFullTxt?: boolean
 
   /**
    * Generate a Markdown sitemap at `/sitemap.md` from indexed pages and end
@@ -558,6 +560,10 @@ export interface LlmsTxtLink {
  * Section in llms.txt
  */
 export interface LlmsTxtSection {
+  /** Generate a separate file from these sitemap names. Chunked sitemaps retain their configured name. */
+  sitemap?: string | string[]
+  /** Generated file path. Defaults to /llms/<sitemap>.txt. */
+  path?: string
   /** The title of the section */
   title: string
   /** Description rendered in the heading-free preamble, or in each optional link note (can be array for multiple paragraphs) */
@@ -572,6 +578,12 @@ export interface LlmsTxtSection {
  * Structured llms.txt configuration
  */
 export interface LlmsTxtConfig {
+  /** Page admission. Sitemap URLs are authoritative by default. Use all to include stored pages outside the sitemap. */
+  pages?: 'sitemap' | 'all' | false
+  /** Only read these sitemap names. An empty array disables sitemap page discovery. */
+  sitemaps?: string[]
+  /** Maximum characters per generated file. Large lists become linked files. Minimum 1024. Default 80000. */
+  maxLength?: number
   /**
    * Rewrite automatically generated page links to their Markdown representation
    * when the final static output contains the file or the deployment retains

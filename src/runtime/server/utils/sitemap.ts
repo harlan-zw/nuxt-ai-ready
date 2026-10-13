@@ -12,6 +12,8 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { SitemapCrawlState } from './sitemap-crawl-state'
 import { createSitemapReader } from 'sitemapd'
 import { parseSitemap } from 'sitemapd/parse'
+import staticSitemapConfig from '#ai-ready-virtual/sitemap-config.mjs'
+import { getRequestURL } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { getCfEnv, hasAssets } from './cloudflare'
@@ -59,8 +61,8 @@ export type SitemapCrawlResult
  */
 export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
   const runtimeConfig = useRuntimeConfig(event)
-  const sitemapConfig = runtimeConfig.sitemap as {
-    sitemaps?: Record<string, { sitemapName?: string, _route?: string }>
+  const sitemapConfig = { ...staticSitemapConfig, ...runtimeConfig.sitemap } as {
+    sitemaps?: Record<string, { sitemapName?: string, _route?: string, route?: string }>
     isMultiSitemap?: boolean
   } | undefined
 
@@ -73,11 +75,12 @@ export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
     // Skip 'index' entry (sitemap index, not actual sitemap)
     if (key === 'index')
       continue
-    // Only include sitemaps with routes
-    if (sitemap._route) {
+    // Automatic chunks have no route. Their index is the discovery root.
+    const route = sitemap._route || sitemap.route || (key === 'chunks' ? sitemapConfig.sitemaps.index?._route || sitemapConfig.sitemaps.index?.route : undefined)
+    if (route) {
       sitemaps.push({
-        name: sitemap.sitemapName || key,
-        route: sitemap._route,
+        name: (sitemap.sitemapName || key).replace(/\.xml$/, ''),
+        route: route.startsWith('/') ? route : `/${route}`,
       })
     }
   }
@@ -450,6 +453,8 @@ export async function crawlSitemapByRoute(
   const usePublicAsset = config.sitemapPrerendered && hasAssets(event)
   const configuredSiteUrl = createUniversalContext(event).siteUrl ?? SITEMAP_FALLBACK_ORIGIN
   const siteUrl = parseAbsoluteUrl(configuredSiteUrl)
+  // Development sitemaps use the local server origin, including their chunk links.
+  const requestOrigin = import.meta.dev && event ? getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin : undefined
   if (siteUrl._tag === 'error') {
     return {
       _tag: 'failed',
@@ -494,7 +499,7 @@ export async function crawlSitemapByRoute(
       const target = parseAbsoluteUrl(request.url)
       if (target._tag === 'error')
         return { _tag: 'deny', reason: `Invalid sitemap target: ${request.url}` }
-      if (target.value.origin !== siteUrl.value.origin) {
+      if (target.value.origin !== siteUrl.value.origin && target.value.origin !== requestOrigin) {
         return {
           _tag: 'deny',
           reason: `Sitemap target origin ${target.value.origin} differs from ${siteUrl.value.origin}`,
@@ -607,24 +612,28 @@ export async function fetchSitemapByRoute(
  * Fetch all URLs from all sitemaps (or single sitemap if not multi-sitemap)
  * Used for backwards compatibility and llms.txt generation
  */
-export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
+export async function fetchSitemapUrlGroups(event: H3Event, names?: readonly string[]): Promise<Map<string, SitemapUrl[]>> {
   const sitemaps = getSitemapsFromConfig(event)
+  const groups = new Map<string, SitemapUrl[]>()
 
   // Multi-sitemap: fetch from each configured sitemap
   if (sitemaps.length > 0) {
     logger.debug(`[sitemap] Multi-sitemap mode: ${sitemaps.length} sitemaps`)
-    const allUrls: SitemapUrl[] = []
-
     for (const sitemap of sitemaps) {
+      if (names !== undefined && !names.includes(sitemap.name))
+        continue
       // Include whatever URLs we got even on a partial failure: for llms.txt a
       // partial page list beats none. The error is already logged downstream and
       // matters to the cron crawl-status path, not to URL aggregation here.
       const { urls } = await fetchSitemapByRoute(event, sitemap.route)
-      allUrls.push(...urls)
+      groups.set(sitemap.name, [...(groups.get(sitemap.name) || []), ...urls])
     }
 
-    return allUrls
+    return groups
   }
+
+  if (names !== undefined && !names.includes('sitemap'))
+    return groups
 
   // Single sitemap fallback: fetch /sitemap.xml
   logger.debug(`[sitemap] Single sitemap mode: /sitemap.xml`)
@@ -637,5 +646,10 @@ export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
     logger.warn('Sitemap is empty - add routes to sitemap or configure sitemap.sources in nuxt.config')
   }
 
-  return urls
+  groups.set('sitemap', urls)
+  return groups
+}
+
+export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
+  return [...(await fetchSitemapUrlGroups(event)).values()].flat()
 }

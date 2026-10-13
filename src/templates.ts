@@ -46,7 +46,11 @@ export {}
   // Type definitions for virtual modules
   addTemplate({
     filename: 'types/ai-ready-virtual.d.ts',
-    getContents: () => `declare module '#ai-ready-virtual/read-page-data.mjs' {
+    getContents: () => `declare module '#ai-ready-virtual/sitemap-config.mjs' {
+  const config: { sitemaps?: Record<string, { sitemapName?: string, route?: string, _route?: string }> }
+  export default config
+}
+declare module '#ai-ready-virtual/read-page-data.mjs' {
   export function readMarkdownLinkAvailabilityFromFilesystem(): Promise<{
     runtimeMarkdownAvailable: boolean
     paths: string[]

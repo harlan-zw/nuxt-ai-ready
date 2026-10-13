@@ -42,6 +42,7 @@ describe('external agent skill links in llms.txt', () => {
     await nuxt.ready().finally(() => nuxt.close())
 
     expect(sections?.find(section => section.title === 'Agent Skills')?.links).toEqual([
+      { title: 'Agent Skills index', href: `${siteUrl}/docs/.well-known/agent-skills/index.json`, description: 'Every published skill and its sha256 digest.' },
       { title: 'external-tool', href: expected, description: 'Use the external tool.' },
     ])
   })

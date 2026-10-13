@@ -8,6 +8,7 @@ const aliases = {
   '#ai-ready-virtual/db-schema.mjs': resolve('./src/runtime/server/db/schema/sqlite.ts'),
   '#ai-ready-virtual/i18n-runtime.mjs': 'nuxtseo-shared/i18n-runtime',
   '#ai-ready-virtual/logger.mjs': resolve('./src/runtime/server/logger.ts'),
+  '#ai-ready-virtual/sitemap-config.mjs': resolve('./test/unit/shims/sitemap-config.ts'),
   '#nuxtseo/h3': resolve('./test/unit/shims/h3.ts'),
   '#nuxtseo/nitro': resolve('./test/unit/shims/nitro.ts'),
 }
