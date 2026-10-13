@@ -15,6 +15,7 @@ import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { parsePrerenderRoute, resolvePrerenderFile } from './prerender-path'
 import { insertLlmsTxtDirective } from './runtime/llms-txt-directive'
 import { absoluteSiteUrl } from './runtime/markdown-links'
 import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
@@ -313,7 +314,12 @@ async function processSitemapEntry(
   const loc = typeof entry === 'string' ? entry : entry.loc
   const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
   // Handle both absolute URLs and relative paths
-  const route = toLogicalRoute(loc, nitro.options.baseURL)
+  const parsedRoute = parsePrerenderRoute(loc, nitro.options.baseURL)
+  if (parsedRoute._tag === 'Invalid') {
+    logger.warn(`Skipping unsafe sitemap URL: ${loc}`)
+    return { crawled: false, skipped: true }
+  }
+  const route = parsedRoute.route
 
   if (!hasMarkdownTwin(route))
     return { crawled: false, skipped: true }
@@ -324,8 +330,9 @@ async function processSitemapEntry(
       const assetBase = asset.baseURL || '/'
       if (!route.startsWith(assetBase))
         continue
-      const source = join(asset.dir, route.slice(assetBase.length))
-      for (const htmlPath of [`${source}.html`, join(source, 'index.html')]) {
+      const assetRoute = route.slice(assetBase.length)
+      for (const htmlRoute of [`${assetRoute}.html`, `${assetRoute}/index.html`]) {
+        const htmlPath = resolvePrerenderFile(asset.dir, htmlRoute)
         const existing = await stat(htmlPath).catch((error) => {
           if (error.code === 'ENOENT')
             return undefined
@@ -392,7 +399,7 @@ async function processSitemapEntry(
       const assetBase = asset.baseURL || '/'
       if (!mdRoute.startsWith(assetBase))
         continue
-      const source = join(asset.dir, mdRoute.slice(assetBase.length))
+      const source = resolvePrerenderFile(asset.dir, mdRoute.slice(assetBase.length))
       const existing = await stat(source).catch((error) => {
         if (error.code === 'ENOENT')
           return undefined
@@ -405,7 +412,7 @@ async function processSitemapEntry(
     await nitro.hooks.callHook('prerender:generate', generated, nitro)
     if (generated.skip || generated.error)
       return { crawled: true, skipped: false }
-    const filePath = join(nitro.options.output.publicDir, mdRoute)
+    const filePath = resolvePrerenderFile(nitro.options.output.publicDir, mdRoute)
     await mkdir(dirname(filePath), { recursive: true })
     await writeFile(filePath, generated.contents || '', 'utf8')
     nitro._prerenderedRoutes!.push(generated)
@@ -464,6 +471,8 @@ async function crawlSitemapContent(
     let crawled = 0
     const origin = new URL(state.siteInfo?.url || 'http://localhost').origin
     for (const entry of result.document.entries) {
+      if (parsePrerenderRoute(entry.loc, nitro.options.baseURL)._tag === 'Invalid')
+        continue
       const url = new URL(entry.loc, origin)
       if (url.origin !== origin || seen.has(url.href))
         continue
@@ -564,6 +573,7 @@ export function detectSitemapPrerender(sitemapName = 'sitemap.xml'): { useSitema
 }
 
 async function prerenderRoute(nitro: Nitro, route: string, fetch: PrerenderFetch) {
+  const filePath = resolvePrerenderFile(nitro.options.output.publicDir, route)
   const start = Date.now()
   const encodedRoute = encodeURI(route)
   const fetchUrl = withBase(encodedRoute, nitro.options.baseURL)
@@ -574,7 +584,6 @@ async function prerenderRoute(nitro: Nitro, route: string, fetch: PrerenderFetch
     retryDelay: nitro.options.prerender.retryDelay,
   })
 
-  const filePath = join(nitro.options.output.publicDir, route)
   logger.debug(`Creating directory for prerender: ${dirname(filePath)}`)
   await mkdir(dirname(filePath), { recursive: true })
 
@@ -803,12 +812,16 @@ export function setupPrerenderHandler(
           seen.add(route)
           const stats = await prerenderRoute(nitro, route, crawlerFetch(state))
           llmsSize += stats.size
-          const body = await readFile(join(nitro.options.output.publicDir, route), 'utf-8')
+          const body = await readFile(resolvePrerenderFile(nitro.options.output.publicDir, route), 'utf-8')
           for (const match of body.matchAll(/\]\(([^)]+)\)/g)) {
-            const target = new URL(match[1]!, siteInfo?.url || 'http://localhost')
-            if (siteInfo?.url && target.origin !== new URL(siteInfo.url).origin)
+            const origin = new URL(siteInfo?.url || 'http://localhost').origin
+            const parsedTarget = parsePrerenderRoute(match[1]!, nitro.options.baseURL)
+            if (parsedTarget._tag === 'Invalid')
               continue
-            const path = toLogicalRoute(target.pathname, nitro.options.baseURL)
+            const target = new URL(match[1]!, origin)
+            if (target.origin !== origin)
+              continue
+            const path = parsedTarget.route
             if (path.startsWith('/llms/') && path.endsWith('.txt'))
               pending.push(path)
           }
