@@ -39,8 +39,9 @@ With no `aiReady` config, the module adds:
 - `/sitemap.md`, and a `## Sitemap` footer on every generated `.md` page. Set `sitemapMd: false` to remove both.
 - Nuxt Content v3 `page` collections: the `.md` route serves the source Markdown, not converted HTML. Set `contentSource: false` to convert HTML.
 - Agent skills: `public/skills/<name>/SKILL.md` in the project or a local layer is published at `/.well-known/agent-skills/`, `/skills/<name>/SKILL.md`, and in `llms.txt`. Custom public directories are supported. One local skill is also served at `/SKILL.md`. Set `agentSkills: false` to publish nothing.
+- `Content-Signal: search=yes, ai-input=yes` in `robots.txt`. Set `contentSignal: false` to remove it.
 
-Off by default: Content Signals, MCP, WebMCP, runtime sync, cron, and the database.
+Off by default: MCP, WebMCP, runtime sync, cron, and the database.
 
 ## Common tasks
 
