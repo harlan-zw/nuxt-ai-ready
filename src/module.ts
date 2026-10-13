@@ -28,8 +28,9 @@ import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSk
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
-import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
+import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
+import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -43,6 +44,7 @@ import {
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
+import { opaqueJsonModule } from './utils/opaque-json-module'
 import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
 import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
@@ -399,26 +401,15 @@ export default defineNuxtModule<ModuleOptions>({
     // and the SSR render each conversion needs.
     const contentSource = await resolveContentSource(config.contentSource !== false)
 
-    if (typeof config.contentSignal === 'object') {
-      // robots may be undefined (no explicit `robots` key) or `false` (disabled); fall back to {} so we can attach groups
-      const robotsOpts = (nuxt.options.robots || {}) as Record<string, unknown>
-      nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
-      const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
-      robotsOpts.groups = groups
-      const group: Record<string, unknown> = {
-        userAgent: '*',
-        // Preserve nuxt-robots' default wildcard rule so the injected group remains valid.
-        disallow: [''],
-        // Object form renders one comma-separated line; an array renders one line per entry, which validators reject.
-        contentSignal: {
-          'ai-train': config.contentSignal.aiTrain ? 'yes' : 'no',
-          'search': config.contentSignal.search ? 'yes' : 'no',
-          'ai-input': config.contentSignal.aiInput ? 'yes' : 'no',
-        },
-      }
-      if (config.contentSignal.contentUsage !== false)
-        group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
-      groups.push(group)
+    // Robots copies its options when it installs, and `@nuxtjs/seo` installs
+    // it before this module, so writing `nuxt.options.robots` here is lost.
+    // Its `robots:config` hook passes the resolved groups, including any
+    // merged robots.txt file, whatever the install order.
+    const contentSignalPolicy = resolveContentSignalPolicy(config.contentSignal)
+    if (contentSignalPolicy._tag !== 'Disabled') {
+      nuxt.hook('robots:config' as any, (robotsConfig: { groups: Parameters<typeof applyContentSignalPolicy>[0] }) => {
+        applyContentSignalPolicy(robotsConfig.groups, contentSignalPolicy)
+      })
     }
 
     // Register type templates for Nitro hooks and virtual modules
@@ -470,14 +461,14 @@ export default defineNuxtModule<ModuleOptions>({
     const mergedLlmsTxt: LlmsTxtConfig = config.llmsTxt
       ? {
           ...parsedLlmsTxt.config,
-          markdownLinks: config.llmsTxt.markdownLinks ?? false,
+          markdownLinks: config.llmsTxt.markdownLinks ?? true,
           sections: [
             ...defaultLlmsTxtSections,
             ...(config.llmsTxt.sections || []),
           ],
           notes: config.llmsTxt.notes,
         }
-      : { markdownLinks: false, sections: defaultLlmsTxtSections }
+      : { markdownLinks: true, sections: defaultLlmsTxtSections }
 
     // Allow other modules to extend llms.txt content via hook
     const llmsTxtPayload = {
@@ -910,8 +901,10 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
 `
       }
       nitroConfig.virtual['#ai-ready-virtual/site-tools.mjs'] = `export default ${JSON.stringify(siteToolsConfig)}`
+      // Skill files are user text served byte for byte against their index
+      // digest, so the bundler must not see them as code.
       nitroConfig.virtual['#ai-ready-virtual/agent-skills.mjs'] = agentSkillsResult._tag === 'Enabled'
-        ? `export const agentSkillsIndex = ${JSON.stringify(agentSkillsResult.index)}\nexport const localAgentSkillArtifacts = ${JSON.stringify(agentSkillsResult.localArtifacts)}`
+        ? opaqueJsonModule({ agentSkillsIndex: agentSkillsResult.index, localAgentSkillArtifacts: agentSkillsResult.localArtifacts })
         : 'export const agentSkillsIndex = null\nexport const localAgentSkillArtifacts = {}'
       const markdownLinkAvailabilityPath = join(dirname(buildDbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
 
@@ -1004,7 +997,7 @@ export function trackDrizzleWork(event, work) { return work }
 
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
-        contentSignal: config.contentSignal || false,
+        contentSignal: config.contentSignal ?? { search: true, aiInput: true },
         mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false) && hasMcpSiteTools, resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`
@@ -1298,15 +1291,16 @@ export function trackDrizzleWork(event, work) { return work }
           const assets = wrangler.assets ||= {}
           const fileRouting = await readCloudflareAssetRouting(nitro.options.rootDir)
           const routing = defu({ value: assets.run_worker_first }, { value: fileRouting.root }).value
-          cloudflareNegotiationPatterns(routing, pages)
+          // Exact page paths while they fit the 100-entry limit, directory
+          // globs past it. The fallback list below stays exact either way.
+          const additions = cloudflareWorkerFirstAdditions(routing, pages)
           const environmentConfig = wrangler as typeof wrangler & { env?: Record<string, { assets?: { run_worker_first?: boolean | string[] } }> }
           const configuredEnvironments = Object.values(environmentConfig.env || {}).flatMap(env => env.assets?.run_worker_first === undefined ? [] : [env.assets.run_worker_first])
           const fallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [...fileRouting.environments, ...configuredEnvironments])
-          const addedPaths = cloudflareStaticFallbackPaths(routing, pages)
           // Nitro merges the file again when writing wrangler.json. Add only
-          // new paths here, or every file-backed pattern would be duplicated.
-          if (addedPaths.length > 0)
-            assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...addedPaths]
+          // new patterns here, or every file-backed pattern would be duplicated.
+          if (additions.length > 0)
+            assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...additions]
           ;(nitro.options.runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig).cloudflarePrerenderedPages = fallbackPaths
         }
         const plan = planStaticMarkdownHeaderRules(

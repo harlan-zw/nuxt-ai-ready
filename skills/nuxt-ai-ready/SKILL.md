@@ -39,8 +39,9 @@ With no `aiReady` config, the module adds:
 - `/sitemap.md`, and a `## Sitemap` footer on every generated `.md` page. Set `sitemapMd: false` to remove both.
 - Nuxt Content v3 `page` collections: the `.md` route serves the source Markdown, not converted HTML. Set `contentSource: false` to convert HTML.
 - Agent skills: `public/skills/<name>/SKILL.md` in the project or a local layer is published at `/.well-known/agent-skills/`, `/skills/<name>/SKILL.md`, and in `llms.txt`. Custom public directories are supported. One local skill is also served at `/SKILL.md`. Set `agentSkills: false` to publish nothing.
+- `Content-Signal: search=yes, ai-input=yes` in `robots.txt`. Set `contentSignal: false` to remove it.
 
-Off by default: Content Signals, MCP, WebMCP, runtime sync, cron, and the database.
+Off by default: MCP, WebMCP, runtime sync, cron, and the database.
 
 ## Common tasks
 
@@ -102,11 +103,11 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-Allow Content Signals. An omitted permission renders as `no`:
+Content Signals. Without config, robots.txt gets `Content-Signal: search=yes, ai-input=yes` and no `ai-train`. A robots group or merged robots.txt that already sets `Content-Signal` replaces the default. `contentSignal: false` removes the line. An object states the whole policy, so an omitted permission renders as `no`:
 
 ```ts
-export default defineNuxtConfig({ aiReady: { contentSignal: { search: true } } })
-// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=no
+export default defineNuxtConfig({ aiReady: { contentSignal: { search: true, aiInput: true, aiTrain: false } } })
+// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=yes
 ```
 
 MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it. The server card is served at `/mcp/server-card`, `/.well-known/mcp/server-card.json`, and `/.well-known/mcp.json`. llms.txt links the card, never the endpoint, because the endpoint answers GET with 405 or 406. `mcpServerCard: false` removes the card routes and the llms.txt entry.
@@ -122,6 +123,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 - **The same edit in both hooks applies twice.** During prerendering the Nitro `ai-ready:page:markdown` hook runs, then the Nuxt hook of the same name. Put an edit in one of them, not both.
 - **Content source pages skip conversion hooks.** A Nuxt Content page ignores `mdreamOptions` and both Nitro hooks.
 - **Dev has no page data.** Query helpers, MCP tools, and search return empty results in `nuxt dev`. Test with `nuxt build` and `node .output/server/index.mjs`.
+- **Cloudflare static pages negotiate only with `contentNegotiation: true`.** The default leaves prerendered HTML on the asset service, so `Accept: text/markdown` gets HTML there. With `true`, prerendered pages go into `assets.run_worker_first`: exact paths up to Cloudflare's 100 entries, directory globs such as `/docs/*` past that. More than 100 top-level pages fail the build; set broader patterns yourself.
 - **Response caching turns negotiation off.** An ISR, `swr`, or `cache` route rule without `varies: ['accept']` serves HTML to Markdown clients. With `botNegotiation: true`, the rule needs `varies: ['accept', 'sec-fetch-dest', 'user-agent']`. The `.md` URL still works. For a CDN that caches by URL only, set `contentNegotiation: false`.
 - **Emptying `ctx.markdown` does not hide a page.** It drops the body from `llms-full.txt`. The URL stays in `llms.txt` and in the index. Use `sitemap.exclude` for discovery, and access control for private pages.
 - **Root `skills/` folders require explicit publication.** Automatic discovery scans public directories only. Set `agentSkills.dir: 'skills'` to publish root skills intentionally.
@@ -157,7 +159,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 - `llmsTxt.sitemaps`: selected sitemap names. An empty array stops sitemap discovery.
 - `llmsTxt.maxLength` (`80000`): maximum characters per file. Minimum `1024`. Larger lists split without dropping links.
 - `llmsFullTxt` (`true`): generate the full export and advertise its link. Set `false` to omit both.
-- `llmsTxt.markdownLinks` (`false`): link page entries in `llms.txt` to their `.md` twins.
+- `llmsTxt.markdownLinks` (`true`): link page entries in `llms.txt` to their `.md` twins. `false` links canonical URLs. With `site.url` set, page links in `llms.txt`, `sitemap.md`, and `.md` bodies are absolute.
 - `describedby` (`true`): the `describedby` link tag and header.
 - `tools.<listPages|searchPages|getPageMarkdown>.<mcp|webmcp>.enabled`: attach a built in tool to one transport only.
 - `autoI18n` (`true`): with `@nuxtjs/i18n`, adds hreflang `Link` headers and a languages section in `llms.txt`.

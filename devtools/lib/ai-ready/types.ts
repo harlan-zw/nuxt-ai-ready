@@ -4,7 +4,7 @@ export interface DevtoolsConfig {
   sitemapPrerendered: boolean
   markdownCacheHeaders: { maxAge: number, swr: boolean }
   llmsTxtCacheSeconds: number
-  contentSignal: false | { aiTrain: boolean, search: boolean, aiInput: boolean }
+  contentSignal: false | { aiTrain?: boolean, search?: boolean, aiInput?: boolean }
   mcp: { enabled: boolean, tools: boolean, resources: boolean }
   cron: boolean
 }

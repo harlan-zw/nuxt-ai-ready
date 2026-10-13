@@ -26,8 +26,10 @@ describe('static generation beneath an app base URL', async () => {
 
     expect(llmsTxt).toContain('[API Reference - Docs](https://test.example.com/docs/docs/api)')
     expect(llmsTxt).toContain('[About · Test Site — UTF-8 Support](https://test.example.com/docs/about)')
-    expect(llmsTxt).not.toContain('](https://test.example.com/docs/api)')
-    expect(llmsTxt).not.toContain('](https://test.example.com/docs/about/)')
+    expect(llmsTxt).not.toContain('](/docs/api)')
+    expect(llmsTxt).not.toContain('](/docs/')
+    expect(llmsTxt).not.toContain('https://test.example.com/docs/api)')
+    expect(llmsTxt).not.toContain('https://test.example.com/docs/about/)')
     expect(llmsTxt).not.toContain('/docs/missing')
     expect(llmsTxt).toContain('Canonical Origin: https://test.example.com/docs')
     expect(llmsTxt).toContain('[Full Content](https://test.example.com/docs/llms-full.txt)')

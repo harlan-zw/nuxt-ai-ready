@@ -37,9 +37,10 @@ describe('llms.txt runtime generation with sitemap', async () => {
 
     // Should have Pages section with sitemap URLs
     expect(llmsTxt).toContain('## Pages')
-    expect(llmsTxt).toContain('[/about](https://test.example.com/about)')
-    expect(llmsTxt).toContain('[/docs/getting-started](https://test.example.com/docs/getting-started)')
-    expect(llmsTxt).toContain('[/docs/api](https://test.example.com/docs/api)')
+    expect(llmsTxt).toContain('[/about](https://test.example.com/about.md)')
+    expect(llmsTxt).toContain('[/docs/getting-started](https://test.example.com/docs/getting-started.md)')
+    expect(llmsTxt).toContain('[/docs/api](https://test.example.com/docs/api.md)')
+    expect(llmsTxt).not.toMatch(/\]\(\//)
   })
 
   it('llms.txt content is valid markdown format', async () => {

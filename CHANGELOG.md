@@ -1,3 +1,12 @@
+## v3.1.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.4...v3.1.0)
+
+### 🚀 Enhancements
+
+- **mcp:** Serve the server card at the well-known paths ([#193](https://github.com/harlan-zw/nuxt-ai-ready/pull/193))
+- Send a Content-Signal line by default and under @nuxtjs/seo ([#192](https://github.com/harlan-zw/nuxt-ai-ready/pull/192))
+
 ## v3.0.4
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.3...v3.0.4)

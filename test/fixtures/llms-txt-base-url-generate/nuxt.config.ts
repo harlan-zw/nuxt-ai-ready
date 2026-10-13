@@ -5,6 +5,9 @@ export default defineNuxtConfig({
   app: {
     baseURL: '/docs/',
   },
+  aiReady: {
+    llmsTxt: { markdownLinks: false },
+  },
   nitro: {
     static: true,
     prerender: {

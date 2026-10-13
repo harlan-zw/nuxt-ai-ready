@@ -226,7 +226,12 @@ export interface ModuleOptions {
   describedby?: boolean
 
   /**
-   * Content Signal Directives
+   * Content Signal directives for robots.txt.
+   *
+   * Unset, robots.txt gets `Content-Signal: search=yes, ai-input=yes` and no
+   * `ai-train` preference, unless a robots group already sets one. An object
+   * states the whole policy: each permission left out is sent as `no`.
+   * `false` sends no Content-Signal line.
    */
   contentSignal?: false | {
     /**
@@ -583,7 +588,7 @@ export interface LlmsTxtConfig {
    * Rewrite automatically generated page links to their Markdown representation
    * when the final static output contains the file or the deployment retains
    * the runtime Markdown handler.
-   * @default false
+   * @default true
    */
   markdownLinks?: boolean
   /** The sections of the documentation */

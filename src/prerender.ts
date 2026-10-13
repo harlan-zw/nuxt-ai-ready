@@ -15,6 +15,7 @@ import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { absoluteSiteUrl } from './runtime/markdown-links'
 import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
@@ -692,7 +693,7 @@ export function setupPrerenderHandler(
       // additionalFields, so write the markdown straight to disk.
       route.contents = options.sitemapMd === false
         ? parsed.markdown
-        : appendSitemapSection(parsed.markdown, toDeployedRoute(SITEMAP_MD_ROUTE, nitro.options.baseURL))
+        : appendSitemapSection(parsed.markdown, absoluteSiteUrl(toDeployedRoute(SITEMAP_MD_ROUTE, nitro.options.baseURL), siteInfo?.url))
       route.contentType = 'text/markdown; charset=utf-8'
       state.totalProcessingTime += Date.now() - pageStartTime
     })
@@ -769,10 +770,14 @@ export function setupPrerenderHandler(
       // deployment. The prerendered llms.txt route reads this build-only file.
       if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
         const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
+        // Nitro 3 deprecates `srcDir` and leaves it unset; its ignore
+        // patterns resolve from `serverDir`, which may be `false`.
+        const options = nitro.options as typeof nitro.options & { serverDir?: string | false }
+        const ignoreBaseDir = options.srcDir || (typeof options.serverDir === 'string' ? options.serverDir : undefined) || options.rootDir
         const paths = await findOutputMarkdownPaths(
           nitro.options.output.publicDir,
           nitro.options.baseURL,
-          nitro.options.srcDir,
+          ignoreBaseDir,
           nitro.options.ignore,
           nitro.options.publicAssets,
         )
