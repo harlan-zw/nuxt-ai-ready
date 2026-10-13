@@ -1003,11 +1003,21 @@ export function trackDrizzleWork(event, work) { return work }
     } as any
 
     if (prerenderEnabled) {
-      // Captures rendered HTML so markdown.prerender can avoid a second SSR render.
-      addNitroPlugin(resolve('./runtime/server/plugins/html-capture.prerender'))
+      // The prerenderer is a separate Nitro build. Registering the prerender
+      // handler and plugin there only keeps them, and the mdream engine they
+      // import, out of the deployed server bundle.
       addServerHandler({
         middleware: true,
+        env: 'prerender',
         handler: resolve('./runtime/server/middleware/markdown.prerender'),
+      })
+      // Captures rendered HTML so markdown.prerender can avoid a second SSR render.
+      // Nitro plugins have no `env` filter, so add it to the prerenderer config.
+      const htmlCapturePlugin = resolve('./runtime/server/plugins/html-capture.prerender')
+      nuxt.hook('nitro:init', (nitro) => {
+        nitro.hooks.hook('prerender:config', (prerenderConfig) => {
+          prerenderConfig.plugins = [...prerenderConfig.plugins || [], htmlCapturePlugin]
+        })
       })
       addPlugin({
         mode: 'server',
