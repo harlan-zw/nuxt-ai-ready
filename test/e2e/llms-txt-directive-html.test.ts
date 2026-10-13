@@ -1,3 +1,4 @@
+import type { HTMLAnchorElement } from 'happy-dom'
 import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { Window } from 'happy-dom'
