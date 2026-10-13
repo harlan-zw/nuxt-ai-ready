@@ -1,3 +1,11 @@
+## v3.0.3
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.2...v3.0.3)
+
+### 🩹 Fixes
+
+- **cloudflare:** Report the shared Markdown header rule as info ([#185](https://github.com/harlan-zw/nuxt-ai-ready/pull/185))
+
 ## v3.0.2
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.1...v3.0.2)
@@ -11,6 +19,7 @@
 - Skip the status-aware Link header once a response is sent ([#180](https://github.com/harlan-zw/nuxt-ai-ready/pull/180))
 - Publish the restore dump only with a runtime database ([#181](https://github.com/harlan-zw/nuxt-ai-ready/pull/181))
 - Reject a drizzle-orm install outside the peer range ([#182](https://github.com/harlan-zw/nuxt-ai-ready/pull/182))
+- **cloudflare:** Send each static header value once per path ([#184](https://github.com/harlan-zw/nuxt-ai-ready/pull/184))
 
 ## v3.0.1
 
