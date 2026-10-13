@@ -136,6 +136,12 @@ export function parseMcpServerCardConfig(input: unknown): McpServerCardConfigRes
   }
 }
 
+/**
+ * Origin-level paths that agent readiness scanners probe for a server card.
+ * The first one is the card's canonical well-known URL.
+ */
+export const MCP_SERVER_CARD_WELL_KNOWN_PATHS = ['/.well-known/mcp/server-card.json', '/.well-known/mcp.json'] as const
+
 export function resolveMcpServerCardRoute(mcpRoute: string): string {
   return `${mcpRoute.replace(/\/+$/, '') || '/mcp'}/server-card`
 }

@@ -224,7 +224,12 @@ export interface ModuleOptions {
   describedby?: boolean
 
   /**
-   * Content Signal Directives
+   * Content Signal directives for robots.txt.
+   *
+   * Unset, robots.txt gets `Content-Signal: search=yes, ai-input=yes` and no
+   * `ai-train` preference, unless a robots group already sets one. An object
+   * states the whole policy: each permission left out is sent as `no`.
+   * `false` sends no Content-Signal line.
    */
   contentSignal?: false | {
     /**

@@ -29,12 +29,14 @@ import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig 
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
+import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
   createMcpServerCardEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
+  MCP_SERVER_CARD_WELL_KNOWN_PATHS,
   parseMcpServerCardConfig,
   resolveInstalledMcpProtocolVersions,
   resolveMcpServerCard,
@@ -396,26 +398,15 @@ export default defineNuxtModule<ModuleOptions>({
     // and the SSR render each conversion needs.
     const contentSource = await resolveContentSource(config.contentSource !== false)
 
-    if (typeof config.contentSignal === 'object') {
-      // robots may be undefined (no explicit `robots` key) or `false` (disabled); fall back to {} so we can attach groups
-      const robotsOpts = (nuxt.options.robots || {}) as Record<string, unknown>
-      nuxt.options.robots = robotsOpts as unknown as typeof nuxt.options.robots
-      const groups = (robotsOpts.groups || []) as Array<Record<string, unknown>>
-      robotsOpts.groups = groups
-      const group: Record<string, unknown> = {
-        userAgent: '*',
-        // Preserve nuxt-robots' default wildcard rule so the injected group remains valid.
-        disallow: [''],
-        // Object form renders one comma-separated line; an array renders one line per entry, which validators reject.
-        contentSignal: {
-          'ai-train': config.contentSignal.aiTrain ? 'yes' : 'no',
-          'search': config.contentSignal.search ? 'yes' : 'no',
-          'ai-input': config.contentSignal.aiInput ? 'yes' : 'no',
-        },
-      }
-      if (config.contentSignal.contentUsage !== false)
-        group.contentUsage = [`train-ai=${config.contentSignal.aiTrain ? 'y' : 'n'}`]
-      groups.push(group)
+    // Robots copies its options when it installs, and `@nuxtjs/seo` installs
+    // it before this module, so writing `nuxt.options.robots` here is lost.
+    // Its `robots:config` hook passes the resolved groups, including any
+    // merged robots.txt file, whatever the install order.
+    const contentSignalPolicy = resolveContentSignalPolicy(config.contentSignal)
+    if (contentSignalPolicy._tag !== 'Disabled') {
+      nuxt.hook('robots:config' as any, (robotsConfig: { groups: Parameters<typeof applyContentSignalPolicy>[0] }) => {
+        applyContentSignalPolicy(robotsConfig.groups, contentSignalPolicy)
+      })
     }
 
     // Register type templates for Nitro hooks and virtual modules
@@ -561,21 +552,26 @@ export default defineNuxtModule<ModuleOptions>({
         return
       }
 
-      const mcpLink = {
-        title: 'MCP',
-        href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
-        description: config.mcp?.tools !== false && hasMcpSiteTools
-          ? 'Use this MCP endpoint when you need information from this site\'s indexed pages.'
-          : 'Model Context Protocol server endpoint for AI agent integration.',
-      }
-      const firstSection = mergedLlmsTxt.sections?.[0]
-      if (firstSection) {
-        firstSection.links ||= []
-        if (!firstSection.links.some(link => link.title === mcpLink.title))
-          firstSection.links.push(mcpLink)
-      }
-      else {
-        mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+      // The endpoint answers GET with 405 or 406, so llms.txt link checkers
+      // count it as broken. The card is a readable document that names it.
+      if (mcpServerCardResult._tag === 'Enabled') {
+        const endpoint = withSiteUrl(finalMcpToolkitState.route, { withBase: true })
+        const mcpLink = {
+          title: 'MCP server card',
+          href: withSiteUrl(MCP_SERVER_CARD_WELL_KNOWN_PATHS[0].slice(1), { withBase: true }),
+          description: config.mcp?.tools !== false && hasMcpSiteTools
+            ? `Connect an MCP client to ${endpoint} when you need information from this site's indexed pages.`
+            : `Connect an MCP client to ${endpoint} to use this site's Model Context Protocol server.`,
+        }
+        const firstSection = mergedLlmsTxt.sections?.[0]
+        if (firstSection) {
+          firstSection.links ||= []
+          if (!firstSection.links.some(link => link.title === mcpLink.title))
+            firstSection.links.push(mcpLink)
+        }
+        else {
+          mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+        }
       }
 
       const mcpServerCardRoute = resolveMcpServerCardRoute(finalMcpToolkitState.route)
@@ -675,21 +671,23 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       const handler = resolve('./runtime/server/routes/mcp-server-card')
-      addServerHandler({ route: mcpServerCardRoute, method: 'get', handler, lazy: true })
-      addServerHandler({ route: mcpServerCardRoute, method: 'head', handler, lazy: true })
-      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler, lazy: true })
-      extendRouteRules(mcpServerCardRoute, {
-        sitemap: false,
-        headers: {
-          'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-          'Access-Control-Allow-Methods': 'GET, HEAD',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Expose-Headers': 'ETag',
-          'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
-          'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
-          'ETag': etag,
-        },
-      })
+      for (const route of [mcpServerCardRoute, ...MCP_SERVER_CARD_WELL_KNOWN_PATHS]) {
+        addServerHandler({ route, method: 'get', handler, lazy: true })
+        addServerHandler({ route, method: 'head', handler, lazy: true })
+        addServerHandler({ route, method: 'options', handler, lazy: true })
+        extendRouteRules(route, {
+          sitemap: false,
+          headers: {
+            'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+            'Access-Control-Allow-Methods': 'GET, HEAD',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'ETag',
+            'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
+            'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
+            'ETag': etag,
+          },
+        })
+      }
 
       if (siteConfig.url) {
         const document = resolveAiCatalog({
@@ -975,7 +973,7 @@ export function trackDrizzleWork(event, work) { return work }
 
       // Devtools metadata (build-time config not available in runtime config)
       nitroConfig.virtual['#ai-ready-virtual/devtools-meta.mjs'] = `export const devtoolsMeta = ${JSON.stringify({
-        contentSignal: config.contentSignal || false,
+        contentSignal: config.contentSignal ?? { search: true, aiInput: true },
         mcp: { enabled: mcpAvailable, tools: mcpAvailable && (config.mcp?.tools !== false) && hasMcpSiteTools, resources: mcpAvailable && (config.mcp?.resources !== false) },
         cron: !!config.cron,
       })}`

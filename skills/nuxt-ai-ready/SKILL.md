@@ -39,8 +39,9 @@ With no `aiReady` config, the module adds:
 - `/sitemap.md`, and a `## Sitemap` footer on every generated `.md` page. Set `sitemapMd: false` to remove both.
 - Nuxt Content v3 `page` collections: the `.md` route serves the source Markdown, not converted HTML. Set `contentSource: false` to convert HTML.
 - Agent skills: `public/skills/<name>/SKILL.md` in the project or a local layer is published at `/.well-known/agent-skills/`, `/skills/<name>/SKILL.md`, and in `llms.txt`. Custom public directories are supported. One local skill is also served at `/SKILL.md`. Set `agentSkills: false` to publish nothing.
+- `Content-Signal: search=yes, ai-input=yes` in `robots.txt`. Set `contentSignal: false` to remove it.
 
-Off by default: Content Signals, MCP, WebMCP, runtime sync, cron, and the database.
+Off by default: MCP, WebMCP, runtime sync, cron, and the database.
 
 ## Common tasks
 
@@ -76,14 +77,14 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-Allow Content Signals. An omitted permission renders as `no`:
+Content Signals. Without config, robots.txt gets `Content-Signal: search=yes, ai-input=yes` and no `ai-train`. A robots group or merged robots.txt that already sets `Content-Signal` replaces the default. `contentSignal: false` removes the line. An object states the whole policy, so an omitted permission renders as `no`:
 
 ```ts
-export default defineNuxtConfig({ aiReady: { contentSignal: { search: true } } })
-// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=no
+export default defineNuxtConfig({ aiReady: { contentSignal: { search: true, aiInput: true, aiTrain: false } } })
+// robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=yes
 ```
 
-MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it.
+MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it. The server card is served at `/mcp/server-card`, `/.well-known/mcp/server-card.json`, and `/.well-known/mcp.json`. llms.txt links the card, never the endpoint, because the endpoint answers GET with 405 or 406. `mcpServerCard: false` removes the card routes and the llms.txt entry.
 
 WebMCP: set `webmcp: true`. This registers the same three tools in the browser and auto-imports `useWebMcpTool()` and `useWebMcpSupported()`. The tools need the database and `drizzle-orm`. Without `webmcp`, those composables are not defined.
 

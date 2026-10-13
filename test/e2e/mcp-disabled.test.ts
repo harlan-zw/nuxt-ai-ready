@@ -13,9 +13,11 @@ describe('disabled MCP Toolkit', async () => {
 
   it('does not advertise or serve an unavailable MCP endpoint', async () => {
     const llmsTxt = await $fetch<string>('/llms.txt')
-    expect(llmsTxt).not.toContain('[MCP]')
+    expect(llmsTxt).not.toContain('[MCP')
     expect((await fetch('/mcp')).status).toBe(404)
     expect((await fetch('/mcp/server-card')).status).toBe(404)
+    expect((await fetch('/.well-known/mcp/server-card.json')).status).toBe(404)
+    expect((await fetch('/.well-known/mcp.json')).status).toBe(404)
     expect((await fetch('/.well-known/api-catalog')).status).toBe(404)
     expect((await fetch('/.well-known/ai-catalog.json')).status).toBe(404)
   })
