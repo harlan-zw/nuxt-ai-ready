@@ -1,3 +1,20 @@
+## v3.3.1
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.3.0...v3.3.1)
+
+### 🩹 Fixes
+
+- **llms.txt:** Complete bounded section trees and preserve application routes ([#207](https://github.com/harlan-zw/nuxt-ai-ready/pull/207)).
+- **markdown:** Preserve source Content-Signal headers ([#208](https://github.com/harlan-zw/nuxt-ai-ready/pull/208)).
+- **sitemap:** Preserve source modification dates during indexing ([#212](https://github.com/harlan-zw/nuxt-ai-ready/pull/212)).
+- **markdown:** Keep metadata titles literal instead of interpreting angle brackets as HTML ([#211](https://github.com/harlan-zw/nuxt-ai-ready/pull/211)).
+- **markdown:** Require mdream 2.0.3 so underlined text stays readable instead of becoming strikethrough ([mdream #367](https://github.com/harlan-zw/mdream/pull/367)).
+
+### 📝 Migration
+
+Update the lockfile, rebuild generated Markdown, and refresh stored Markdown bodies.
+Existing bodies retain their previous conversion until they are rebuilt or indexed again.
+
 ## v3.3.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.2.0...v3.3.0)

@@ -17,6 +17,21 @@ minimumReleaseAgeExclude:
   - '@nuxt/vite-server@4.6.0'
   - nuxt@4.6.0
   - '@harlan-zw/comark-content@0.2.0'
+  - '@mdream/js@2.0.3'
+  - '@mdream/rust-android-arm-eabi@2.0.3'
+  - '@mdream/rust-android-arm64@2.0.3'
+  - '@mdream/rust-darwin-arm64@2.0.3'
+  - '@mdream/rust-darwin-x64@2.0.3'
+  - '@mdream/rust-freebsd-x64@2.0.3'
+  - '@mdream/rust-linux-arm-gnueabihf@2.0.3'
+  - '@mdream/rust-linux-arm64-gnu@2.0.3'
+  - '@mdream/rust-linux-arm64-musl@2.0.3'
+  - '@mdream/rust-linux-x64-gnu@2.0.3'
+  - '@mdream/rust-linux-x64-musl@2.0.3'
+  - '@mdream/rust-wasm32-wasi@2.0.3'
+  - '@mdream/rust-win32-arm64-msvc@2.0.3'
+  - '@mdream/rust-win32-x64-msvc@2.0.3'
+  - mdream@2.0.3
 
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 262800
@@ -100,7 +115,7 @@ onlyBuiltDependencies:
 catalog:
   '@harlan-zw/comark-content': ^0.2.0
   '@libsql/client': ^0.18.0
-  '@mdream/js': ^2.0.1
+  '@mdream/js': ^2.0.3
   '@types/better-sqlite3': ^9.6.0
   better-sqlite3: ^13.0.3
   bumpp: ^12.3.0
@@ -112,7 +127,7 @@ catalog:
   eslint-plugin-harlanzw: ^0.23.0
   execa: ^10.0.1
   h3: ^2.0.1
-  mdream: ^2.0.1
+  mdream: ^2.0.3
   nitropack: ^2.13.4
   nuxtseo-layer-devtools: ^5.3.16
   nuxtseo-shared: ^6.0.0
