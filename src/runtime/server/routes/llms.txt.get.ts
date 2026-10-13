@@ -23,15 +23,17 @@ function getBuildLlmsTxtCached(maxAge: number) {
 }
 
 export default eventHandler(async (event) => {
-  assertMethod(event, 'GET', true)
   const runtimeConfig = useRuntimeConfig(event)
+  const path = toLogicalRoute(event.path.split('?')[0]!, runtimeConfig.app.baseURL)
+  if (path !== '/llms.txt' && !/^\/llms\/[^/]+\.txt$/i.test(path))
+    return
+  assertMethod(event, 'GET', true)
   const config = runtimeConfig['nuxt-ai-ready'] as any
   const cacheSeconds = config.llmsTxtCacheSeconds
   const cacheEnabled = !import.meta.dev && cacheSeconds > 0
   const files = cacheEnabled
     ? await getBuildLlmsTxtCached(cacheSeconds)(event)
     : await buildLlmsTxtFiles(event)
-  const path = toLogicalRoute(event.path.split('?')[0]!, runtimeConfig.app.baseURL)
   const content = files[path]
   if (content === undefined)
     throw createError({ statusCode: 404, statusMessage: 'llms.txt file not found' })

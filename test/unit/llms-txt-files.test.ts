@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLlmsTxtFiles, parseLlmsTxtConfig } from '../../src/runtime/llms-txt-files'
+import { normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt-format'
 
 const header = '# Example\n\n> Example site\n\n'
 const resolveUrl = (path: string) => `https://example.com${path}`
@@ -79,6 +80,87 @@ describe('llms.txt files', () => {
     }
     visit('/llms.txt')
     expect(visited.size).toBe(files.size)
+  })
+
+  it.each([false, true])('splits configured links without losing descriptions or optional semantics: %s', (optional) => {
+    const description = 'A full link description. '.repeat(8)
+    const links = Array.from({ length: 100 }, (_, i) => ({ title: `Skill ${i}`, href: `https://example.com/custom-${i}`, description }))
+    const section = { title: 'Skills', description: 'Install a skill.', optional, links }
+    const files = createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections: [section], pages: [{ pathname: '/about' }], sitemapPages: new Map(), resolveUrl })
+    const seen = new Set<string>()
+    function visit(path: string) {
+      if (seen.has(path))
+        return
+      seen.add(path)
+      const text = files.get(path)!
+      expect(text.length).toBeLessThanOrEqual(1024)
+      for (const match of text.matchAll(/\]\(https:\/\/example.com(\/llms\/[^)]+)\)/g))
+        visit(match[1]!)
+      if (optional && path !== '/llms.txt')
+        expect(text).toContain('## Optional')
+    }
+    visit('/llms.txt')
+    expect(seen.size).toBe(files.size)
+    const all = [...files.values()].join('\n')
+    for (const entry of links)
+      expect(all.split(`](${entry.href})`)).toHaveLength(2)
+    expect(all).toContain(description.trim())
+    expect(files.get('/llms.txt')).toContain('Install a skill.')
+    expect(files.get('/llms.txt')).toContain('](/about)')
+  })
+
+  it('bounds a root containing many small configured sections with sitemap and automatic pages', () => {
+    const sections = Array.from({ length: 100 }, (_, i) => ({ title: `Group ${i}`, optional: i % 2 === 0, description: `Group description ${i}`, links: [{ title: `Custom ${i}`, href: `https://example.com/custom-${i}` }] }))
+    const files = createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections: [...sections, { title: 'Selected', sitemap: 'selected' }], pages: [{ pathname: '/about' }], sitemapPages: new Map([['selected', [{ pathname: '/selected' }]]]), resolveUrl })
+    const seen = new Set<string>()
+    function visit(path: string) {
+      if (seen.has(path))
+        return
+      seen.add(path)
+      const text = files.get(path)!
+      expect(text.length).toBeLessThanOrEqual(1024)
+      for (const match of text.matchAll(/\]\(https:\/\/example.com(\/llms\/[^)]+)\)/g))
+        visit(match[1]!)
+    }
+    visit('/llms.txt')
+    expect(seen.size).toBe(files.size)
+    const all = [...files.values()].join('\n')
+    for (let i = 0; i < 100; i++) {
+      expect(all.split(`](https://example.com/custom-${i})`)).toHaveLength(2)
+      expect(all).toContain(`Group description ${i}`)
+    }
+    expect(all.split('](/about)')).toHaveLength(2)
+    expect(all.split('](/selected)')).toHaveLength(2)
+    expect(files.get('/llms.txt')).toContain('## Optional')
+  })
+
+  it('reserves space for automatic page discovery beside a nearly full configured root', () => {
+    const sections = [{ title: 'Resources', links: Array.from({ length: 30 }, (_, i) => ({ title: `Resource ${i}`, href: `https://example.com/${'long-resource-name-'.repeat(4)}${i}` })) }]
+    const maxLength = `${header.trim()}\n\n${normalizeLlmsTxtConfig({ sections })}`.length + 20
+    const files = createLlmsTxtFiles({ header, config: { maxLength }, sections, pages: Array.from({ length: 300 }, (_, i) => ({ pathname: `/page-${i}` })), sitemapPages: new Map(), resolveUrl })
+    for (const text of files.values())
+      expect(text.length).toBeLessThanOrEqual(maxLength)
+    expect([...files.values()].join('\n')).toContain('](/page-299)')
+  })
+
+  it('splits valid long descriptions even when each leaf holds only one link', () => {
+    const links = Array.from({ length: 20 }, (_, i) => ({ title: `Resource ${i}`, href: `https://example.com/resource-${i}`, description: 'Detailed instructions. '.repeat(30) }))
+    const files = createLlmsTxtFiles({ header, config: { maxLength: 1024 }, sections: [{ title: 'Resources', links }], pages: [], sitemapPages: new Map(), resolveUrl })
+    for (const text of files.values())
+      expect(text.length).toBeLessThanOrEqual(1024)
+    const all = [...files.values()].join('\n')
+    for (const entry of links)
+      expect(all.split(`](${entry.href})`)).toHaveLength(2)
+    const seen = new Set<string>()
+    function visit(path: string) {
+      if (seen.has(path))
+        return
+      seen.add(path)
+      for (const match of files.get(path)!.matchAll(/\]\(https:\/\/example.com(\/llms\/[^)]+)\)/g))
+        visit(match[1]!)
+    }
+    visit('/llms.txt')
+    expect(seen.size).toBe(files.size)
   })
 
   it.each([
