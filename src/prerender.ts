@@ -24,6 +24,7 @@ import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
 import { resolvePageUpdatedAt } from './runtime/server/utils/page-updated-at'
 import { appendSitemapSection, SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
+import { matchingStaticContentSignals } from './utils/static-headers'
 
 const PRERENDER_PAGE_TIMEOUT = 30000 // 30s per-page timeout for prerender self-fetches
 type PrerenderFetch = ReturnType<typeof createPrerenderFetch>['fetch']
@@ -41,6 +42,7 @@ export interface ParsedMarkdownResult {
   headings: Array<Record<string, string>>
   keywords?: string[]
   updatedAt?: string
+  contentSignal?: string
 }
 
 interface SitemapEntry {
@@ -719,6 +721,18 @@ export function setupPrerenderHandler(
       await initPromise
 
       const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
+      if (parsed.contentSignal !== undefined) {
+        ;(route as PrerenderRoute & { contentSignal?: string }).contentSignal = parsed.contentSignal
+        // Cloudflare serves directory-index HTML at a trailing-slash URL.
+        for (const sourceRoute of pageRoute === '/' ? ['/'] : [pageRoute, `${pageRoute}/`]) {
+          if (matchingStaticContentSignals(nitro.options.routeRules, sourceRoute).includes(parsed.contentSignal))
+            continue
+          const source = nitro.options.routeRules[sourceRoute] ||= {}
+          source.headers ||= {}
+          if (!Object.keys(source.headers).some(name => name.toLowerCase() === 'content-signal'))
+            source.headers['Content-Signal'] = parsed.contentSignal
+        }
+      }
       if (!state.prerenderedRoutes.has(pageRoute))
         await processMarkdownRoute(state, nuxt, pageRoute, parsed)
 

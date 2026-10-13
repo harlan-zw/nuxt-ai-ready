@@ -11,7 +11,7 @@ import { buildFrontmatter } from '../utils/frontmatter'
 import { extractKeywords } from '../utils/keywords'
 import { getMarkdownRenderInfo } from '../utils/markdown-request'
 import { agentSkillArtifactPaths } from '../utils/negotiation-response'
-import { consumePrerenderedHtml } from '../utils/prerender-html'
+import { consumePrerenderedContentSignal, consumePrerenderedHtml } from '../utils/prerender-html'
 import { isSitemapMdRequest } from '../utils/sitemap-md'
 
 // Pull headings out of source markdown for the page-data record. mdream
@@ -49,6 +49,7 @@ export default defineEventHandler(async (event) => {
     return
 
   const { path } = renderInfo
+  let contentSignal = consumePrerenderedContentSignal(path)
   const runtimeConfig = fullRuntimeConfig['nuxt-ai-ready'] as any
   const deployedPath = toDeployedRoute(path, fullRuntimeConfig.app.baseURL)
   const canonicalUrl = withSiteUrl(event, deployedPath, { withBase: true })
@@ -77,6 +78,7 @@ export default defineEventHandler(async (event) => {
       description: contentPage.description || '',
       headings,
       keywords,
+      ...(contentSignal !== undefined && { contentSignal }),
       // Only a real content date feeds the page index and sitemap lastmod.
       ...(contentPage.updatedAt && { updatedAt: contentPage.updatedAt }),
     })
@@ -121,10 +123,15 @@ export default defineEventHandler(async (event) => {
     }
 
     html = await response.text()
+    const fetchedPolicy = response.headers.get('content-signal')
+    const sharedPolicy = (fullRuntimeConfig['nuxt-robots'] as { contentSignalHeader?: string } | undefined)?.contentSignalHeader
+    if (fetchedPolicy !== null && fetchedPolicy !== sharedPolicy)
+      contentSignal = fetchedPolicy
     logger.debug(`[markdown.prerender] Fetched HTML for ${path} (${html.length} bytes)`)
     // the fetch above re-rendered the page, which the capture plugin stored
     // again; nothing will consume that copy, so drop it
     consumePrerenderedHtml(path)
+    consumePrerenderedContentSignal(path)
   }
 
   // Skip error pages that returned 200 (e.g., Vue Router "no match" pages)
@@ -160,6 +167,7 @@ export default defineEventHandler(async (event) => {
     description: result.description,
     headings: result.headings,
     keywords,
+    ...(contentSignal !== undefined && { contentSignal }),
     ...(result.updatedAt && { updatedAt: result.updatedAt }),
   })
 })

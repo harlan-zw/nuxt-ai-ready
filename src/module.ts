@@ -45,7 +45,7 @@ import {
   resolveMcpServerCardRoute,
 } from './utils/mcp-server-card'
 import { opaqueJsonModule } from './utils/opaque-json-module'
-import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from './utils/static-headers'
+import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders, normalizeStaticContentSignalHeaders } from './utils/static-headers'
 import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
@@ -1062,9 +1062,12 @@ export function trackDrizzleWork(event, work) { return work }
       // Captures rendered HTML so markdown.prerender can avoid a second SSR render.
       // Nitro plugins have no `env` filter, so add it to the prerenderer config.
       const htmlCapturePlugin = resolve('./runtime/server/plugins/html-capture.prerender')
+      const policyCapturePlugin = resolve(getNitroVersion(nuxt) === 3
+        ? './runtime/server/plugins/content-signal-capture-nitro3.prerender'
+        : './runtime/server/plugins/content-signal-capture.prerender')
       nuxt.hook('nitro:init', (nitro) => {
         nitro.hooks.hook('prerender:config', (prerenderConfig) => {
-          prerenderConfig.plugins = [...prerenderConfig.plugins || [], htmlCapturePlugin]
+          prerenderConfig.plugins = [...prerenderConfig.plugins || [], htmlCapturePlugin, policyCapturePlugin]
         })
       })
       addPlugin({
@@ -1409,11 +1412,14 @@ export function trackDrizzleWork(event, work) { return work }
             // Cloudflare joins a header every matching rule sets, so the exact
             // `.md` rules, the `/*.md` glob and `/*` must not repeat a value.
             mergedHeaders = dedupeStaticHeaders(mergedHeaders, ['Content-Type', 'Link', 'Vary'])
+            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders)
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
               noteSharedMarkdownRule(budget.total + budget.dropped, budget.dropped)
             }
+            if (budget.total > CLOUDFLARE_STATIC_HEADER_RULE_LIMIT && /^\s+(?:content-signal\s*:|!\s*content-signal\s*$)/im.test(budget.contents))
+              throw new Error(`Content-Signal policy rules exceed Cloudflare's ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}-rule limit. Reduce per-page policies or use a shared policy.`)
             if (budget.total > CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
               logger.warn(`_headers still has ${budget.total} rules after dropping the .md rules. Cloudflare will reject the deploy until the other rules fit under ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}.`)
           }

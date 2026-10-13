@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { prerenderedMarkdownHeaderRules } from '../../src/utils/static-markdown-headers'
 
 describe('prerenderedMarkdownHeaderRules', () => {
+  it('preserves the source usage policy on a prerendered twin', () => {
+    const rules = prerenderedMarkdownHeaderRules(
+      [{ route: '/about.md', fileName: '/about.md', contentSignal: 'ai-train=no, search=yes' }],
+      '/',
+      true,
+      [],
+    )
+    expect(rules[0]!.headers['Content-Signal']).toBe('ai-train=no, search=yes')
+  })
   it('builds an exact rule for a crawled-only markdown twin', () => {
     const rules = prerenderedMarkdownHeaderRules(
       [

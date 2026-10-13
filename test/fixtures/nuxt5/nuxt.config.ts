@@ -32,8 +32,10 @@ export default defineNuxtConfig({
     aiReadyCompatMarker: 'nuxt-5',
   },
   routeRules: {
+    '/': { headers: { 'CONTENT-SIGNAL': 'ai-train=no' } },
     '/cache/**': { cache: { maxAge: 3600, varies: ['accept'] } },
   },
+  nitro: { prerender: { routes: ['/'] } },
   vite: {
     resolve: {
       dedupe: ['nuxt', 'vue', 'vue-router'],
