@@ -13,7 +13,7 @@ vi.mock('#ai-ready-virtual/sitemap-config.mjs', () => ({ default: {
   },
 } }))
 vi.mock('#nuxtseo/nitro', () => ({
-  fetchRawWithEvent: (event: H3Event, request: RequestInfo | URL, init?: RequestInit) => event.fetch(request, init),
+  fetchRawWithEvent: (event: H3Event, ...args: Parameters<H3Event['fetch']>) => event.fetch(...args),
   useRuntimeConfig: () => ({
     'app': { baseURL: '/registry/' },
     'site': { url: 'https://example.com' },
