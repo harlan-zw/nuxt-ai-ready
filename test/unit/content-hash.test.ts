@@ -12,6 +12,26 @@ describe('computeContentHash', () => {
   it('changes when the body changes', async () => {
     expect(await computeContentHash('# A')).not.toBe(await computeContentHash('# B'))
   })
+
+  it.each(['og:image', 'og:image:alt', 'twitter:image'])('changes when only %s metadata changes', async (key) => {
+    const page = (value: string) => `---\ntitle: Guide\nmeta:\n  ${key}: ${value}\n---\n\n# Same body`
+
+    expect(await computeContentHash(page('first'))).not.toBe(await computeContentHash(page('second')))
+  })
+
+  it('changes when image metadata is added or removed', async () => {
+    const body = '# Same body'
+    const withImage = `---\nmeta:\n  og:image: https://example.com/cover.png\n---\n\n${body}`
+
+    expect(await computeContentHash(withImage)).not.toBe(await computeContentHash(body))
+  })
+
+  it('ignores image key order and unrelated frontmatter changes', async () => {
+    const first = '---\ncanonical_url: https://example.com/guide\nlast_updated: 2026-10-14\nmeta:\n  author: First\n  og:image: https://example.com/cover.png\n  og:image:alt: Cover\n---\n\n# Guide'
+    const second = '---\ncanonical_url: https://other.example/guide\nlast_updated: 2026-10-15\nmeta:\n  og:image:alt: "Cover"\n  og:image: https://example.com/cover.png\n  author: Second\n---\n\n# Guide'
+
+    expect(await computeContentHash(first)).toBe(await computeContentHash(second))
+  })
   it('hashes a body that opens with horizontal rules', async () => {
     const withRules = '---\nIntro between rules.\n---\n\n# Title'
     const without = '# Title'

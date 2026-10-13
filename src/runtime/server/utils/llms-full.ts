@@ -4,11 +4,33 @@
 
 import type { LlmsTxtConfig } from '../../types'
 import { joinURL } from 'ufo'
+import { isMap, isScalar, parseDocument, stringify } from 'yaml'
 import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
 import { escapeMarkdownHtml } from '../../markdown-text'
 
-const RE_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n*/
+const RE_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n*/
 const RE_INLINE_WHITESPACE = /\s+/g
+
+function imageMetadataFence(frontmatter: string): string | undefined {
+  const document = parseDocument(frontmatter)
+  const meta = document.get('meta', true)
+  if (document.errors.length || !isMap(meta))
+    return
+
+  const images: Record<string, string | number> = {}
+  for (const { key, value } of meta.items) {
+    if (!isScalar(key) || typeof key.value !== 'string' || !isScalar(value))
+      continue
+    if (key.value !== 'og:image' && !key.value.startsWith('og:image:') && key.value !== 'twitter:image' && !key.value.startsWith('twitter:image:'))
+      continue
+    if (typeof value.value === 'string' || (typeof value.value === 'number' && Number.isFinite(value.value)))
+      images[key.value] = value.value
+  }
+  if (!Object.keys(images).length)
+    return
+
+  return `\`\`\`yaml\n${stringify({ meta: images }, { lineWidth: 0 }).trimEnd()}\n\`\`\``
+}
 
 export function formatPageForLlmsFullTxt(
   route: string,
@@ -25,6 +47,10 @@ export function formatPageForLlmsFullTxt(
   const parts = ['---', '', `- **Page:** ${pageTitle}`, `- **Source:** ${canonicalUrl}`]
   if (pageDescription)
     parts.push(`- **Description:** ${pageDescription}`)
+  const frontmatter = markdown.match(RE_FRONTMATTER)?.[1]
+  const images = frontmatter && imageMetadataFence(frontmatter)
+  if (images)
+    parts.push('', images)
   parts.push('')
   if (content) {
     parts.push(content)

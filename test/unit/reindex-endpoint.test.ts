@@ -99,6 +99,31 @@ describe('pOST /__ai-ready/reindex', () => {
     expect(state?.indexedAt).toBeGreaterThan(0)
   })
 
+  it('preserves page metadata in indexed Markdown retrieved from the database', async () => {
+    const structuredData = { '@context': 'https://schema.org', '@type': 'Article', 'headline': 'Indexed metadata' }
+    fetchWithEvent.mockResolvedValue(html('Metadata').replace('</head>', `<meta property="og:image" content="https://example.com/cover.png"><script type="application/ld+json">${JSON.stringify(structuredData)}</script></head>`))
+
+    const { status } = await reindex('?route=/metadata')
+    const page = await queryPages(readerEvent(), { route: '/metadata', includeMarkdown: true })
+
+    expect(status).toBe(200)
+    expect(JSON.parse(page!.markdown.match(/```json\n([\s\S]*?)\n```/)![1]!)).toEqual(structuredData)
+    expect(page?.markdown).toContain('https://example.com/cover.png')
+  })
+
+  it('reports image-only edits as a content change and ignores an unchanged image', async () => {
+    const withImage = (image: string) => html('Image').replace('</head>', `<meta property="og:image" content="https://example.com/${image}.png"></head>`)
+    fetchWithEvent.mockResolvedValue(withImage('first'))
+    await reindex('?route=/image')
+
+    fetchWithEvent.mockResolvedValue(withImage('second'))
+    const changed = await reindex('?route=/image')
+    const unchanged = await reindex('?route=/image')
+
+    expect(changed.body.contentChanged).toBe(true)
+    expect(unchanged.body.contentChanged).toBe(false)
+  })
+
   it('reports a fetch failure without crashing and writes nothing', async () => {
     fetchWithEvent.mockRejectedValue(new Error('connect ECONNREFUSED'))
 

@@ -7,6 +7,50 @@ import { stripLlmsTxtDirectiveHtml } from '../llms-txt-directive'
 import { hoistMetaDescription } from './utils/frontmatter'
 
 const RE_NBSP = /\u00A0/g
+const JSON_LD_MAX_BYTES = 65536
+const JSON_LD_MAX_BLOCKS = 16
+const IMAGE_META_FIELDS = [
+  'og:image',
+  'og:image:url',
+  'og:image:secure_url',
+  'og:image:type',
+  'og:image:width',
+  'og:image:height',
+  'og:image:alt',
+  'twitter:image',
+  'twitter:image:src',
+  'twitter:image:alt',
+]
+
+type JsonLdBlock = { _tag: 'Preserved', markdown: string, bytes: number } | { _tag: 'Skipped' }
+
+function parseJsonLdBlock(text: string, remainingBytes: number): JsonLdBlock {
+  // Reject large input before parsing. UTF-8 uses at least one byte per character.
+  if (text.length > remainingBytes)
+    return { _tag: 'Skipped' }
+  const content = text.trim()
+  if (!content)
+    return { _tag: 'Skipped' }
+
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  }
+  catch {
+    // Malformed optional metadata must not prevent serving the page's Markdown.
+    return { _tag: 'Skipped' }
+  }
+  const isObject = (item: unknown) => typeof item === 'object' && item !== null && !Array.isArray(item)
+  if (!isObject(value) && !(Array.isArray(value) && value.every(isObject)))
+    return { _tag: 'Skipped' }
+
+  // Preserve numbers without reserialization. Escape NBSP before prose normalization.
+  const markdown = `\`\`\`json\n${content.replace(RE_NBSP, '\\u00a0')}\n\`\`\``
+  const bytes = new TextEncoder().encode(markdown).byteLength + 2
+  if (bytes > remainingBytes)
+    return { _tag: 'Skipped' }
+  return { _tag: 'Preserved', markdown, bytes }
+}
 
 // Replace NBSP (U+00A0) with regular spaces to avoid encoding display issues
 function normalizeWhitespace(text: string): string {
@@ -20,6 +64,7 @@ interface ExtractedMeta {
   headings: Array<Record<string, string>>
   updatedAt?: string
   textContent: string[]
+  jsonLd: { blocks: string[], bytes: number }
 }
 
 // Build mdream options with extraction plugin
@@ -34,6 +79,15 @@ function buildMdreamOptions(
   // extraction selectors below sometimes fire with empty textContent and would
   // clobber the values, so we don't register them here.
   const extraction: MdreamOptions['extraction'] = {
+    'script[type]': (el) => {
+      if (el.attributes.type?.trim().toLowerCase() !== 'application/ld+json' || meta.jsonLd.blocks.length >= JSON_LD_MAX_BLOCKS)
+        return
+      const block = parseJsonLdBlock(el.textContent, JSON_LD_MAX_BYTES - meta.jsonLd.bytes)
+      if (block._tag === 'Preserved') {
+        meta.jsonLd.blocks.push(block.markdown)
+        meta.jsonLd.bytes += block.bytes
+      }
+    },
     'meta[name="keywords"]': (el) => { meta.metaKeywords = el.attributes.content || '' },
     'h1, h2, h3, h4, h5, h6': (el) => {
       const text = el.textContent?.trim()
@@ -59,6 +113,7 @@ function buildMdreamOptions(
   // agent-readability audit looks for canonical_url and last_updated.
   const frontmatter: MdreamOptions['frontmatter'] = {
     additionalFields,
+    metaFields: [...IMAGE_META_FIELDS],
     onExtract: (fm) => {
       if (fm.title)
         meta.title = fm.title
@@ -125,15 +180,16 @@ export async function convertHtmlToMarkdown(
   mdreamOptions: ModuleOptions['mdreamOptions'],
   opts: ConvertHtmlOptions,
 ) {
-  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [] }
+  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [], jsonLd: { blocks: [], bytes: 0 } }
   const options = buildMdreamOptions(url, mdreamOptions, meta, opts.extractUpdatedAt ?? false, opts.additionalFrontmatter ?? {})
 
   const nitroApp = useNitroApp()
   await nitroApp.hooks.callHook('ai-ready:mdreamConfig', options)
 
+  const convertedMarkdown = hoistMetaDescription(htmlToMarkdown(stripLlmsTxtDirectiveHtml(html), options))
   const context: MarkdownContext = {
     html,
-    markdown: hoistMetaDescription(htmlToMarkdown(stripLlmsTxtDirectiveHtml(html), options)),
+    markdown: [convertedMarkdown, ...meta.jsonLd.blocks].join('\n\n'),
     route: opts.hooks.route,
     title: meta.title,
     description: meta.description,

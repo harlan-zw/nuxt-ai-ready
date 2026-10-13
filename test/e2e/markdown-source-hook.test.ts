@@ -32,9 +32,15 @@ describe('markdown source hook', async () => {
       description: 'Markdown the site already held',
       canonical_url: 'https://test.example.com/about',
       last_updated: '2026-01-01T00:00:00.000Z',
+      meta: { 'og:image': 'https://test.example.com/source-cover.png' },
     })
     expect(body).toContain('Supplied by the host application')
     expect(body).not.toContain('name: supplied-source')
+    expect(JSON.parse(body.match(/```json\n([\s\S]*?)\n```/)![1]!)).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      'headline': 'Source metadata',
+    })
     // The rendered page's own heading proves conversion did not run.
     expect(body).not.toContain('About this fixture')
   })

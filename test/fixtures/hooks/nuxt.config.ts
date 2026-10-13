@@ -13,6 +13,15 @@ export default defineNuxtConfig({
   site: {
     url: 'https://test.example.com',
   },
+  app: {
+    head: {
+      meta: [{ property: 'og:image', content: 'https://test.example.com/cover.png' }],
+      script: [{
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article', 'headline': 'Metadata in every conversion path' }),
+      }],
+    },
+  },
   aiReady: {
     llmsTxt: {
       markdownLinks: true,
