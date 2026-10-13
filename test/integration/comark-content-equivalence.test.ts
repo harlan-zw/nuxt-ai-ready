@@ -19,10 +19,13 @@ import { fileURLToPath } from 'node:url'
 import { execa } from 'execa'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createPrerenderDatabase } from '../../src/prerender'
+import { absoluteMarkdownLinks } from '../../src/runtime/markdown-links'
 import { decompressFromBase64, importDbDump, initSchema } from '../../src/runtime/server/db/shared'
 import { appendSitemapSection, SITEMAP_MD_ROUTE } from '../../src/runtime/server/utils/sitemap-md'
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '../fixtures/comark-content')
+// The fixture's `site.url`.
+const SITE_URL = 'https://test.example.com'
 
 /**
  * `queryCollectionManifest` and `renderPageMarkdown` ship from comark 0.1.2.
@@ -148,8 +151,9 @@ describe.skipIf(!comarkSupportsContentSource())('comark content source equivalen
     for (const route of ROUTES) {
       const source = await readFile(join(fixtureDir, `content${route}.md`), 'utf-8')
       const body = normalise(source.slice(source.indexOf('---', 3) + 4))
-      // Every served markdown page ends with the sitemap footer (`sitemapMd`).
-      const expectedTail = normalise(appendSitemapSection(body, SITEMAP_MD_ROUTE))
+      // Every served markdown page ends with the sitemap footer (`sitemapMd`),
+      // and resolves root-relative links against the site origin.
+      const expectedTail = normalise(absoluteMarkdownLinks(appendSitemapSection(body, `${SITE_URL}${SITEMAP_MD_ROUTE}`), SITE_URL))
       expect(normalise(fromCollection.markdown[route]!).endsWith(expectedTail), route).toBe(true)
     }
   })
