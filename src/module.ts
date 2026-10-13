@@ -27,7 +27,7 @@ import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSk
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
-import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
+import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
@@ -1270,15 +1270,16 @@ export function trackDrizzleWork(event, work) { return work }
           const assets = wrangler.assets ||= {}
           const fileRouting = await readCloudflareAssetRouting(nitro.options.rootDir)
           const routing = defu({ value: assets.run_worker_first }, { value: fileRouting.root }).value
-          cloudflareNegotiationPatterns(routing, pages)
+          // Exact page paths while they fit the 100-entry limit, directory
+          // globs past it. The fallback list below stays exact either way.
+          const additions = cloudflareWorkerFirstAdditions(routing, pages)
           const environmentConfig = wrangler as typeof wrangler & { env?: Record<string, { assets?: { run_worker_first?: boolean | string[] } }> }
           const configuredEnvironments = Object.values(environmentConfig.env || {}).flatMap(env => env.assets?.run_worker_first === undefined ? [] : [env.assets.run_worker_first])
           const fallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [...fileRouting.environments, ...configuredEnvironments])
-          const addedPaths = cloudflareStaticFallbackPaths(routing, pages)
           // Nitro merges the file again when writing wrangler.json. Add only
-          // new paths here, or every file-backed pattern would be duplicated.
-          if (addedPaths.length > 0)
-            assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...addedPaths]
+          // new patterns here, or every file-backed pattern would be duplicated.
+          if (additions.length > 0)
+            assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...additions]
           ;(nitro.options.runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig).cloudflarePrerenderedPages = fallbackPaths
         }
         const plan = planStaticMarkdownHeaderRules(

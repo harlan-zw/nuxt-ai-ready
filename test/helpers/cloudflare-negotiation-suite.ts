@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
 import { setup, useTestContext } from '@nuxt/test-utils'
@@ -6,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
-export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false, routingSource: 'config' | 'file' = 'config', negotiation: 'explicit' | 'default' = 'explicit') {
+export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false, routingSource: 'config' | 'file' = 'config', negotiation: 'explicit' | 'default' = 'explicit', nestedPages = 0) {
+  const nestedRoutes = Array.from({ length: nestedPages }, (_, index) => `/guides/page-${index}`)
   describe(`cloudflare prerendered page negotiation at ${baseURL}`, async () => {
     await setup({
       rootDir: resolve(routingSource === 'file' ? '../fixtures/cloudflare-external-routing' : '../fixtures/cloudflare'),
@@ -14,12 +16,14 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
       server: false,
       nuxtConfig: {
         app: { baseURL },
-        ...(negotiation === 'default'
+        ...(negotiation === 'default' || nestedPages > 0
           ? {
               hooks: {
                 'pages:extend': (pages) => {
                   const about = pages.find(page => page.path === '/about')!
-                  pages.push(...Array.from({ length: 60 }, (_, index) => ({ name: `static-page-${index}`, path: `/page-${index}`, file: about.file })))
+                  if (negotiation === 'default')
+                    pages.push(...Array.from({ length: 60 }, (_, index) => ({ name: `static-page-${index}`, path: `/page-${index}`, file: about.file })))
+                  pages.push(...nestedRoutes.map(path => ({ name: path.slice(1).replace('/', '-'), path, file: about.file })))
                 },
               },
             }
@@ -31,7 +35,9 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
         aiReady: { database: false, ...(negotiation === 'explicit' ? { contentNegotiation: true } : {}) },
         nitro: {
           compatibilityDate: '2026-10-08',
-          ...(negotiation === 'default' ? { prerender: { routes: Array.from({ length: 60 }, (_, index) => `/page-${index}`) } } : {}),
+          ...(negotiation === 'default' || nestedPages > 0
+            ? { prerender: { routes: [...negotiation === 'default' ? Array.from({ length: 60 }, (_, index) => `/page-${index}`) : [], ...nestedRoutes] } }
+            : {}),
           cloudflare: {
             deployConfig: true,
             wrangler: {
@@ -123,6 +129,35 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
         const response = await fetch(`${origin}${baseURL}about.md`)
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toContain('text/markdown')
+        expect(await response.text()).toContain('#')
+      })
+    }
+
+    if (nestedPages > 0) {
+      it('routes the nested pages through one directory glob within the platform limit', async () => {
+        const output = join(useTestContext().nuxt!.options.buildDir, 'output')
+        const wrangler = JSON.parse(await readFile(join(output, 'server/wrangler.json'), 'utf8')) as { assets: { run_worker_first: string[] } }
+        expect(wrangler.assets.run_worker_first).toContain(`${baseURL}guides/*`)
+        expect(wrangler.assets.run_worker_first.length).toBeLessThanOrEqual(100)
+      })
+
+      it.each(['guides/page-7', 'guides/page-7/'])('negotiates the globbed static page %s', async (path) => {
+        const markdown = await fetch(`${origin}${baseURL}${path}`, { headers: { Accept: 'text/markdown' } })
+        expect(markdown.status).toBe(200)
+        expect(markdown.headers.get('content-type')).toContain('text/markdown')
+        expect(await markdown.text()).toContain('#')
+
+        const html = await fetch(`${origin}${baseURL}${path}`, { headers: { Accept: 'text/html' } })
+        expect(html.status).toBe(200)
+        expect(html.headers.get('content-type')).toContain('text/html')
+        expect(html.headers.get('etag')).toBeTruthy()
+        expect(html.headers.get('vary')).toContain('Accept')
+      })
+
+      it('serves a Markdown twin under the glob with its static headers', async () => {
+        const response = await fetch(`${origin}${baseURL}guides/page-7.md`)
+        expect(response.status).toBe(200)
+        expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
         expect(await response.text()).toContain('#')
       })
     }
