@@ -30,7 +30,7 @@ import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig 
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflareNegotiationPatterns, cloudflarePrerenderedPages, cloudflareStaticFallbackPaths } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
-import { formatMissingDrizzleMessage, resolveDatabaseConfig } from './utils/database'
+import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
@@ -261,11 +261,16 @@ export default defineNuxtModule<ModuleOptions>({
     const databaseEnabled = database._tag === 'Enabled'
     // drizzle-orm is an optional peer, so only an enabled database resolves it.
     // Nuxt's own modulesDir can reach a package manager's hoisted copy that
-    // the app never installed, so resolve from the app root only.
+    // the app never installed, so resolve from the app root only. A copy
+    // outside the peer range resolves too, then fails inside the database layer.
     if (databaseEnabled) {
       const drizzle = await tryResolveModule('drizzle-orm', directoryToURL(nuxt.options.rootDir))
-      if (!drizzle)
-        throw new Error(`[nuxt-ai-ready] ${formatMissingDrizzleMessage({ requested: databaseRequested, peerRange: peerDependencies['drizzle-orm'] })}`)
+      const peerRange = peerDependencies['drizzle-orm']
+      const problem = checkDrizzleInstall(drizzle
+        ? { _tag: 'Installed', version: (await readPackageMetadata(drizzle)).version }
+        : { _tag: 'Missing' }, peerRange)
+      if (problem)
+        throw new Error(`[nuxt-ai-ready] ${formatDrizzleMessage({ problem, requested: databaseRequested, peerRange })}`)
     }
     if (!databaseEnabled)
       logger.debug('Database disabled. Page storage, runtime indexing and site tools are off.')

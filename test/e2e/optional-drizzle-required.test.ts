@@ -45,3 +45,21 @@ describe('runtime indexing without drizzle-orm', async () => {
     expect((error as Error).message).toContain('npx nypm add drizzle-orm@1.0.0-rc.4')
   })
 })
+
+// Also fails setup, so it runs after the working build above.
+describe('runtime indexing with drizzle-orm outside the peer range', async () => {
+  const consumer = await createConsumer('optional-drizzle', { drizzle: { version: '0.45.2' } })
+  afterAll(consumer.remove)
+
+  it('fails setup and names the installed version and the upgrade command', async () => {
+    const error: unknown = await loadNuxt({ cwd: consumer.rootDir, overrides: runtimeIndexing })
+      .then(nuxt => nuxt.close().then(() => undefined))
+      .catch((error: unknown) => error)
+
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain('`aiReady.runtimeSync`')
+    expect((error as Error).message).toContain('0.45.2')
+    expect((error as Error).message).toContain('^1.0.0-rc.4')
+    expect((error as Error).message).toContain('npx nypm add drizzle-orm@1.0.0-rc.4')
+  })
+})
