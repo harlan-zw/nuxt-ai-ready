@@ -1,8 +1,9 @@
-import type { MarkdownSourceContext } from '../../types'
+import type { LlmsTxtConfig, MarkdownSourceContext } from '../../types'
 import type { NegotiationContext } from '../utils/negotiation-response'
 import { createError, defineEventHandler, getRequestURL, setHeader, setResponseStatus } from '#nuxtseo/h3'
 import { useNitroApp, useRuntimeConfig } from '#nuxtseo/nitro'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
+import { insertLlmsTxtDirective } from '../../llms-txt-directive'
 import { absoluteMarkdownLinks } from '../../markdown-links'
 import { logger } from '../logger'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
@@ -65,9 +66,16 @@ export default defineEventHandler(async (event) => {
   const canonicalUrl = resolveUrl(path)
   // Source Markdown keeps its root-relative links. Read on its own, such a
   // link has no page URL to resolve against, so every one gets the origin.
-  const finalizeMarkdown = (markdown: string) => absoluteMarkdownLinks(config.sitemapMd === false
-    ? markdown
-    : appendSitemapSection(markdown, resolvePath(SITEMAP_MD_ROUTE)), canonicalUrl)
+  const finalizeMarkdown = (markdown: string) => {
+    const withSitemap = config.sitemapMd === false
+      ? markdown
+      : appendSitemapSection(markdown, resolvePath(SITEMAP_MD_ROUTE))
+    const llmsTxt = (config as { llmsTxt?: LlmsTxtConfig }).llmsTxt
+    const withDirective = llmsTxt?.directive?.markdown === false
+      ? withSitemap
+      : insertLlmsTxtDirective(withSitemap, resolveUrl('/llms.txt'))
+    return absoluteMarkdownLinks(withDirective, canonicalUrl)
+  }
 
   const [
     { tryGetContentMarkdown },

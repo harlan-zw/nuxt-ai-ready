@@ -125,6 +125,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 
 ## Config
 
+- `llmsTxt.directive` (`{ markdown: true, html: false }`): a `> Index of every page on this site: [llms.txt](...)` line after the frontmatter of each page's `.md`; `html: true` adds a visually hidden `/llms.txt` link at the top of each HTML body.
 - `llmsTxt.markdownLinks` (`true`): link page entries in `llms.txt` to their `.md` twins. `false` links canonical URLs. With `site.url` set, page links in `llms.txt`, `sitemap.md`, and `.md` bodies are absolute.
 - `describedby` (`true`): the `describedby` link tag and header.
 - `tools.<listPages|searchPages|getPageMarkdown>.<mcp|webmcp>.enabled`: attach a built in tool to one transport only.

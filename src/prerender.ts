@@ -15,6 +15,7 @@ import { collectSitemap } from 'sitemapd/parse'
 import { joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { insertLlmsTxtDirective } from './runtime/llms-txt-directive'
 import { absoluteSiteUrl } from './runtime/markdown-links'
 import { normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
@@ -575,9 +576,12 @@ export function setupPrerenderHandler(
 
       // The prerender middleware already wrote frontmatter via mdream's
       // additionalFields, so write the markdown straight to disk.
-      route.contents = options.sitemapMd === false
+      const withSitemap = options.sitemapMd === false
         ? parsed.markdown
         : appendSitemapSection(parsed.markdown, absoluteSiteUrl(toDeployedRoute(SITEMAP_MD_ROUTE, nitro.options.baseURL), siteInfo?.url))
+      route.contents = llmsTxtConfig?.directive?.markdown === false
+        ? withSitemap
+        : insertLlmsTxtDirective(withSitemap, absoluteSiteUrl(toDeployedRoute('/llms.txt', nitro.options.baseURL), siteInfo?.url))
       route.contentType = 'text/markdown; charset=utf-8'
       state.totalProcessingTime += Date.now() - pageStartTime
     })

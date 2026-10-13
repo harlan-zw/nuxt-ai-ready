@@ -3,6 +3,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import type { MarkdownContext, ModuleOptions } from '../types'
 import { htmlToMarkdown } from 'mdream'
 import { useNitroApp } from '#nuxtseo/nitro'
+import { stripLlmsTxtDirectiveHtml } from '../llms-txt-directive'
 import { hoistMetaDescription } from './utils/frontmatter'
 
 const RE_NBSP = /\u00A0/g
@@ -132,7 +133,7 @@ export async function convertHtmlToMarkdown(
 
   const context: MarkdownContext = {
     html,
-    markdown: hoistMetaDescription(htmlToMarkdown(html, options)),
+    markdown: hoistMetaDescription(htmlToMarkdown(stripLlmsTxtDirectiveHtml(html), options)),
     route: opts.hooks.route,
     title: meta.title,
     description: meta.description,
