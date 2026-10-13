@@ -4,6 +4,7 @@ import type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
 import type { DatabaseAdapter } from './runtime/server/db/shared'
 import type { SiteInfo } from './runtime/server/utils/llms-full'
 import type { LlmsTxtConfig, ModuleOptions } from './runtime/types'
+import type { ResolvedDatabase } from './utils/database'
 import { appendFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { getNitroVersion, hasNuxtModule, resolveFiles, useNuxt } from '@nuxt/kit'
@@ -489,14 +490,20 @@ export interface PrerenderHandlerOptions {
    * their bytes alone.
    */
   artifactRoutes?: readonly string[]
+  /**
+   * The runtime database restores itself from `pages.dump` and checks
+   * `pages.meta.json` for a new build. Nothing else reads either file, so a
+   * build without the database leaves them out of the public output.
+   */
+  runtimeDatabase: ResolvedDatabase['_tag']
 }
 
 export function setupPrerenderHandler(
   options: ModuleOptions,
-  dbPath?: string,
-  siteInfo?: SiteInfo,
-  llmsTxtConfig?: LlmsTxtConfig,
-  extras: PrerenderHandlerOptions = {},
+  dbPath: string | undefined,
+  siteInfo: SiteInfo | undefined,
+  llmsTxtConfig: LlmsTxtConfig | undefined,
+  extras: PrerenderHandlerOptions,
 ) {
   const nuxt = useNuxt()
 
@@ -621,23 +628,25 @@ export function setupPrerenderHandler(
         await writeFile(publicJsonPath, jsonContent, 'utf-8')
         logger.debug(`Wrote ${pages.length} pages to __ai-ready/pages.json`)
 
-        // Export database dump for serverless restore (streams in batches internally)
-        const dumpData = await exportDbDump(state.db)
-        const dumpPath = join(publicDataDir, 'pages.dump')
-        logger.debug(`Writing pages.dump: ${dumpPath} (${(dumpData.length / 1024).toFixed(1)}kb)`)
-        await writeFile(dumpPath, dumpData, 'utf-8')
-        logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
+        if (extras.runtimeDatabase === 'Enabled') {
+          // Export database dump for serverless restore (streams in batches internally)
+          const dumpData = await exportDbDump(state.db)
+          const dumpPath = join(publicDataDir, 'pages.dump')
+          logger.debug(`Writing pages.dump: ${dumpPath} (${(dumpData.length / 1024).toFixed(1)}kb)`)
+          await writeFile(dumpPath, dumpData, 'utf-8')
+          logger.debug(`Created database dump at __ai-ready/pages.dump (${(dumpData.length / 1024).toFixed(1)}kb compressed)`)
 
-        // Write build metadata for runtime stale detection.
-        const buildId = Date.now().toString(36)
-        const metaContent = JSON.stringify({
-          buildId,
-          pageCount: pages.length,
-          createdAt: new Date().toISOString(),
-        })
-        logger.debug(`Writing pages.meta.json (${(metaContent.length / 1024).toFixed(1)}kb)`)
-        await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
-        logger.debug(`Wrote build metadata: buildId=${buildId}`)
+          // Write build metadata for runtime stale detection.
+          const buildId = Date.now().toString(36)
+          const metaContent = JSON.stringify({
+            buildId,
+            pageCount: pages.length,
+            createdAt: new Date().toISOString(),
+          })
+          logger.debug(`Writing pages.meta.json (${(metaContent.length / 1024).toFixed(1)}kb)`)
+          await writeFile(join(publicDataDir, 'pages.meta.json'), metaContent, 'utf-8')
+          logger.debug(`Wrote build metadata: buildId=${buildId}`)
+        }
       }
 
       // Record only Markdown URLs that will actually be available after
