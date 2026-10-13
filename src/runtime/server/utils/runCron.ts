@@ -290,7 +290,7 @@ async function pingSitemap(
   })
   // Thread each entry's URL so seeded locales derive from the page's own host
   // on multi-domain i18n sites, never from the cron request host.
-  const routes = [...mapSitemapRoutes(result.urls).entries()].map(([route, url]) => ({ route, url: url.loc }))
+  const routes = [...mapSitemapRoutes(result.urls).entries()].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
   if (routes.length > 0)
     await seedRoutes(event, routes, { refreshWindowMs })
 

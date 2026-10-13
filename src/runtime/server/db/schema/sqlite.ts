@@ -12,6 +12,7 @@ export const pages = sqliteTable('ai_ready_pages', {
   keywords: text('keywords').notNull().default('[]'),
   contentHash: text('content_hash'),
   updatedAt: text('updated_at').notNull(),
+  sourceLastmod: text('source_lastmod'),
   indexedAt: integer('indexed_at').notNull(),
   isError: integer('is_error').notNull().default(0),
   indexed: integer('indexed').notNull().default(0),

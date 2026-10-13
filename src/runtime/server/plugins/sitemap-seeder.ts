@@ -5,6 +5,7 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { trackDrizzleWork } from '../db/drizzle/client'
 import { getPageLastmods, getSitemapLastCrawledAt, markSitemapSeeded, resolveSeedRefreshWindowMs, seedRoutes } from '../db/queries'
 import { logger } from '../logger'
+import { markIndexedSitemapLastmods } from '../utils/sitemap-lastmod'
 import { mapSitemapRoutes } from '../utils/sitemap-routes'
 
 type NitroApp = ReturnType<typeof useNitroApp>
@@ -30,6 +31,7 @@ interface SitemapOutputCtx {
 // diagnostics field of its own to surface, so we render these into the sitemap
 // XML ourselves via the output hook.
 const DIAGNOSTICS_KEY = '_aiReadySitemapDiagnostics'
+const INDEXED_LASTMODS_KEY = '_aiReadyIndexedSitemapLastmods'
 
 function isDebug(_event: AiReadyDatabaseEvent): boolean {
   return !!(useRuntimeConfig() as { 'nuxt-ai-ready'?: { debug?: boolean } })['nuxt-ai-ready']?.debug
@@ -126,6 +128,10 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     if (routeToUrl.size === 0)
       return
 
+    // Capture source dates before enriching the public sitemap from our index.
+    // Each URL also carries the host used for multi-domain locale resolution.
+    const routes = [...routeToUrl.entries()].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
+
     logger.debug(`[sitemap-seeder] Processing ${routeToUrl.size} routes from ${sitemapName}`)
 
     // Surface diagnostics into the served sitemap XML only under debug, so
@@ -143,6 +149,9 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
       const lastmod = lastmods.get(route)
       if (lastmod && !url.lastmod) {
         url.lastmod = lastmod
+        const context = event.context as Record<string, unknown>
+        const enrichedUrls = (context[INDEXED_LASTMODS_KEY] ??= new Set<string>()) as Set<string>
+        enrichedUrls.add(url.loc)
         enriched++
       }
     }
@@ -169,9 +178,6 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
       return
     lastSeedAt.set(sitemapName, Date.now())
 
-    // Thread each entry's URL so seeded locales derive from the page's own
-    // host on multi-domain i18n sites, never from the requesting host.
-    const routes = [...routeToUrl.entries()].map(([route, url]) => ({ route, url: url.loc }))
     const urlCount = urls.length
 
     // Defer the writes off the response path. On Cloudflare, waitUntil keeps the
@@ -208,6 +214,9 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
   // sitemap XML, so they can be inspected with a plain request to the sitemap
   // when nuxt-ai-ready debug is enabled.
   nitroApp.hooks.hook('sitemap:output', (ctx: SitemapOutputCtx) => {
+    const enrichedUrls = (ctx.event.context as Record<string, unknown>)[INDEXED_LASTMODS_KEY] as Set<string> | undefined
+    if (enrichedUrls?.size)
+      ctx.sitemap = markIndexedSitemapLastmods(ctx.sitemap, enrichedUrls)
     const diagnostics = (ctx.event.context as Record<string, unknown>)[DIAGNOSTICS_KEY] as string[] | undefined
     if (!diagnostics?.length)
       return

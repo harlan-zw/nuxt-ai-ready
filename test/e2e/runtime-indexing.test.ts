@@ -21,7 +21,7 @@ describe('runtime indexing', async () => {
       tables: string[]
     }
 
-    expect(result.schemaVersion).toBe('v2.3.0-drizzle-postgres-bigint')
+    expect(result.schemaVersion).toBe('v2.4.0-drizzle-postgres-source-lastmod')
     expect(result.tables).toEqual([
       '_ai_ready_info',
       'ai_ready_cron_runs',
@@ -474,6 +474,7 @@ describe('runtime indexing', async () => {
   }, 30000)
 
   it('sitemap: dates a page from detected content drift', async () => {
+    await fetch('/api/__db-test?action=reset-drift-page')
     const reindex = () => fetch('/__ai-ready/reindex?route=/drift-page', { method: 'POST', headers: authHeaders })
     const lastmod = async () => ((await fetch('/api/__db-test?action=lastmods')) as { lastmods: Record<string, string> }).lastmods['/drift-page']
 
@@ -507,5 +508,30 @@ describe('runtime indexing', async () => {
     if (lastmods['/sitemap-lastmod-test']) {
       expect(lastmods['/sitemap-lastmod-test']).toContain('2024-06-15')
     }
+  })
+
+  it('cron refreshes CMS edits when source sitemap dates change without repeating on indexed dates', async () => {
+    await fetch('/api/__db-test?action=prepare-source-refresh')
+    await fetch('/api/__drift?version=cms-one&lastmod=2026-08-01')
+    await fetch('/api/__db-test?action=crawl-next-sitemap')
+    await fetch('/__ai-ready/cron', { headers: authHeaders })
+    let state = await fetch('/api/__db-test?action=source-refresh-state') as { indexed: number, markdown: string, source_lastmod: string | null }
+    expect(state.markdown).toContain('Content version cms-one')
+    expect(state.source_lastmod).toBe('2026-08-01T00:00:00.000Z')
+
+    await fetch('/api/__drift?version=cms-two&lastmod=2026-08-02')
+    await fetch('/api/__db-test?action=crawl-next-sitemap')
+    await fetch('/__ai-ready/cron', { headers: authHeaders })
+    state = await fetch('/api/__db-test?action=source-refresh-state') as typeof state
+    expect(state.markdown).toContain('Content version cms-two')
+    expect(state.source_lastmod).toBe('2026-08-02T00:00:00.000Z')
+    expect(state.indexed).toBe(1)
+
+    await fetch('/api/__drift?version=cms-three')
+    await fetch('/api/__db-test?action=crawl-next-sitemap')
+    const run = await fetch('/__ai-ready/cron', { headers: authHeaders }) as { index: { indexed: number } }
+    expect(run.index.indexed).toBe(0)
+    state = await fetch('/api/__db-test?action=source-refresh-state') as typeof state
+    expect(state.markdown).toContain('Content version cms-two')
   })
 })

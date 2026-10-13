@@ -1,6 +1,9 @@
 import { defineEventHandler, getQuery } from 'h3'
 
 export default defineEventHandler((event) => {
-  (globalThis as { __driftVersion?: string }).__driftVersion = String(getQuery(event).version)
+  const query = getQuery(event)
+  const state = globalThis as { __driftVersion?: string, __driftLastmod?: string }
+  state.__driftVersion = String(query.version)
+  state.__driftLastmod = typeof query.lastmod === 'string' ? query.lastmod : undefined
   return { ok: true }
 })

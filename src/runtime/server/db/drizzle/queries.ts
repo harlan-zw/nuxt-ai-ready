@@ -1,14 +1,14 @@
 import type { SitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import type { AiReadyDatabaseEvent } from '../context'
 import type { FtsTokenizer } from '../schema-sql'
-import type { SeedRoutesOptions } from '../seed'
+import type { SeedRoute, SeedRoutesOptions } from '../seed'
 import type { DrizzleDatabase } from './client'
 import { and, count, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { cronRuns, info, pages, sitemaps } from '#ai-ready-virtual/db-schema.mjs'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../utils/sitemap-crawl-state'
 import { resolveFtsTokenizer as validateFtsTokenizer } from '../schema-sql'
-import { deriveLocale, SEED_REFRESH_WINDOW_MS } from '../seed'
+import { deriveLocale, parseSourceLastmod, SEED_REFRESH_WINDOW_MS } from '../seed'
 import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, toFtsMatchQuery } from '../shared'
 import { useDrizzle } from './client'
 import { getRawExecutor, useRawDb } from './raw'
@@ -448,9 +448,11 @@ export async function deleteInfoValue(event: AiReadyDatabaseEvent | undefined, k
 // Schema Management
 // ============================================================================
 
-const SQLITE_SCHEMA_VERSION = 'v2.3.0-drizzle'
+const LEGACY_SQLITE_SCHEMA_VERSION = 'v2.3.0-drizzle'
+const SQLITE_SCHEMA_VERSION = 'v2.4.0-drizzle-source-lastmod'
 const LEGACY_POSTGRES_INTEGER_SCHEMA_VERSION = 'v2.3.0-drizzle'
-const POSTGRES_SCHEMA_VERSION = 'v2.3.0-drizzle-postgres-bigint'
+const LEGACY_POSTGRES_SCHEMA_VERSION = 'v2.3.0-drizzle-postgres-bigint'
+const POSTGRES_SCHEMA_VERSION = 'v2.4.0-drizzle-postgres-source-lastmod'
 
 /**
  * Initialize database schema. Rebuilds on a schema version change or when the
@@ -473,6 +475,14 @@ export async function initSchema(event?: AiReadyDatabaseEvent): Promise<void> {
 
   if (client.dialect === 'postgres' && currentVersion === LEGACY_POSTGRES_INTEGER_SCHEMA_VERSION) {
     await migratePostgresIntegerTimestamps(client)
+    await migrateSourceLastmod(client, schemaVersion)
+    return
+  }
+
+  if (tokenizerMatches && (client.dialect === 'postgres'
+    ? currentVersion === LEGACY_POSTGRES_SCHEMA_VERSION
+    : currentVersion === LEGACY_SQLITE_SCHEMA_VERSION)) {
+    await migrateSourceLastmod(client, schemaVersion)
     return
   }
 
@@ -602,8 +612,15 @@ async function migratePostgresIntegerTimestamps(client: DrizzleDatabase): Promis
     { sql: 'ALTER TABLE ai_ready_sitemaps ALTER COLUMN last_crawled_at TYPE BIGINT USING last_crawled_at::BIGINT' },
     {
       sql: 'UPDATE _ai_ready_info SET version = ? WHERE id = \'schema\'',
-      params: [POSTGRES_SCHEMA_VERSION],
+      params: [LEGACY_POSTGRES_SCHEMA_VERSION],
     },
+  ])
+}
+
+async function migrateSourceLastmod(client: DrizzleDatabase, schemaVersion: string): Promise<void> {
+  await getRawExecutor(client).batch([
+    { sql: 'ALTER TABLE ai_ready_pages ADD COLUMN source_lastmod TEXT' },
+    { sql: 'UPDATE _ai_ready_info SET version = ? WHERE id = \'schema\'', params: [schemaVersion] },
   ])
 }
 
@@ -620,6 +637,7 @@ async function createSQLiteTables(client: DrizzleDatabase, ftsTokenizer: string)
       keywords TEXT NOT NULL DEFAULT '[]',
       content_hash TEXT,
       updated_at TEXT NOT NULL,
+      source_lastmod TEXT,
       indexed_at INTEGER NOT NULL,
       is_error INTEGER NOT NULL DEFAULT 0,
       indexed INTEGER NOT NULL DEFAULT 0,
@@ -709,6 +727,7 @@ async function createPostgresTables(client: DrizzleDatabase): Promise<void> {
       content_hash TEXT,
       updated_at TEXT NOT NULL,
       indexed_at BIGINT NOT NULL,
+      source_lastmod TEXT,
       is_error INTEGER NOT NULL DEFAULT 0,
       indexed INTEGER NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'prerender',
@@ -1163,7 +1182,7 @@ export async function resetSitemapErrors(event: AiReadyDatabaseEvent | undefined
  */
 export async function seedRoutes(
   event: AiReadyDatabaseEvent | undefined,
-  routes: Array<string | { route: string, locale?: string, url?: string }>,
+  routes: SeedRoute[],
   options: SeedRoutesOptions = {},
 ): Promise<number> {
   if (routes.length === 0)
@@ -1177,7 +1196,7 @@ export async function seedRoutes(
   // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
   // SQLite's "ON CONFLICT cannot affect row a second time" error when a
   // multi-row INSERT contains the same route twice.
-  const byRoute = new Map<string, { route: string, routeKey: string, locale: string }>()
+  const byRoute = new Map<string, { route: string, routeKey: string, locale: string, sourceLastmod: string | null }>()
   for (const entry of routes) {
     // Canonicalise before keying the map: '' and '/' are one page, so leaving
     // them distinct here defeats the dedupe and collides on route_key instead.
@@ -1188,34 +1207,39 @@ export async function seedRoutes(
       route,
       routeKey: normalizeRouteKey(route),
       locale: deriveLocale(event, route, explicitLocale, entryUrl),
+      sourceLastmod: parseSourceLastmod(typeof entry === 'string' ? undefined : entry.lastmod),
     })
   }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. The chunk
-  // size is derived from the 4 bind params per row so each statement stays
+  // size is derived from the 5 bind params per row so each statement stays
   // within D1's 100-parameter cap even if a column is added. All statements
   // then go through `db.batch` so round-trips collapse into one.
-  const rowsPerInsert = maxRowsPerInsert(4)
+  const rowsPerInsert = maxRowsPerInsert(5)
   const db = await useRawDb(event)
   const entries = [...byRoute.values()]
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < entries.length; i += rowsPerInsert) {
     const batch = entries.slice(i, i + rowsPerInsert)
-    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', 0, 0, 0, 'runtime', ?, ?)`).join(', ')
-    const params = batch.flatMap(r => [r.route, r.routeKey, nowMs, r.locale])
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
+    const params = batch.flatMap(r => [r.route, r.routeKey, r.sourceLastmod, nowMs, r.locale])
     stmts.push({
       sql: `
-        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, source_lastmod, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
         ON CONFLICT(route) DO UPDATE SET
           last_seen_at = excluded.last_seen_at,
           locale = excluded.locale,
+          source_lastmod = COALESCE(excluded.source_lastmod, ai_ready_pages.source_lastmod),
           is_error = 0,
-          indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
+          indexed = CASE WHEN ai_ready_pages.is_error = 1
+            OR (excluded.source_lastmod IS NOT NULL AND ai_ready_pages.source_lastmod IS DISTINCT FROM excluded.source_lastmod)
+            THEN 0 ELSE ai_ready_pages.indexed END
         WHERE ai_ready_pages.last_seen_at IS NULL
           OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
           OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
+          OR (excluded.source_lastmod IS NOT NULL AND ai_ready_pages.source_lastmod IS DISTINCT FROM excluded.source_lastmod)
       `,
       params,
     })

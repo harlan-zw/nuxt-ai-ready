@@ -19,6 +19,7 @@ import { logger } from '../logger'
 import { getCfEnv, hasAssets } from './cloudflare'
 import { createUniversalContext } from './context'
 import { fetchRawWithEvent } from './fetch'
+import { stripIndexedSitemapLastmods } from './sitemap-lastmod'
 
 export interface SitemapUrl {
   loc: string
@@ -340,11 +341,12 @@ function createLocalSitemapLoader(
         bytesRead: read.result.bytesRead,
       }
     }
-    loadedBodies.set(request.url, read.result.body)
+    const sourceBody = stripIndexedSitemapLastmods(read.result.body)
+    loadedBodies.set(request.url, sourceBody)
     return {
       _tag: 'body',
       url: request.url,
-      body: read.result.body,
+      body: sourceBody,
     }
   }
 }

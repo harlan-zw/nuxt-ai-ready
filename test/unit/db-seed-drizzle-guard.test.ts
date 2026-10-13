@@ -67,12 +67,31 @@ describe('seedRoutes refresh window (drizzle layer)', () => {
     return sqlite.prepare('SELECT is_error, indexed, locale FROM ai_ready_pages WHERE route = ?').get(route) as { is_error: number, indexed: number, locale: string }
   }
 
-  async function seed(routes: Array<string | { route: string, locale?: string }>, refreshWindowMs?: number) {
+  async function seed(routes: Array<string | { route: string, locale?: string, lastmod?: string }>, refreshWindowMs?: number) {
     const { seedRoutes } = await import('../../src/runtime/server/db/drizzle/queries')
     rowsWritten = 0
     const seen = await seedRoutes(event, routes, refreshWindowMs === undefined ? undefined : { refreshWindowMs })
     return { seen, rowsWritten }
   }
+
+  it('requeues indexed content when its source lastmod changes inside the write window', async () => {
+    await seed([{ route: '/a', lastmod: '2026-08-01' }])
+    sqlite.prepare('UPDATE ai_ready_pages SET indexed = 1 WHERE route = ?').run('/a')
+
+    vi.setSystemTime(T0 + HOUR)
+    expect(await seed([{ route: '/a', lastmod: '2026-08-02' }])).toEqual({ seen: 1, rowsWritten: 1 })
+    expect(row('/a')).toEqual({ indexed: 0, is_error: 0, locale: '' })
+  })
+
+  it('writes nothing for equivalent source dates and ignores invalid source dates', async () => {
+    await seed([{ route: '/a', lastmod: '2026-08-01' }])
+    sqlite.prepare('UPDATE ai_ready_pages SET indexed = 1 WHERE route = ?').run('/a')
+
+    vi.setSystemTime(T0 + HOUR)
+    expect(await seed([{ route: '/a', lastmod: '2026-08-01T00:00:00Z' }])).toEqual({ seen: 1, rowsWritten: 0 })
+    expect(await seed([{ route: '/a', lastmod: 'invalid' }])).toEqual({ seen: 1, rowsWritten: 0 })
+    expect(row('/a').indexed).toBe(1)
+  })
 
   it('writes zero rows when unchanged routes are re-seeded an hour later', async () => {
     expect(await seed(['/a', '/b'])).toEqual({ seen: 2, rowsWritten: 2 })
