@@ -54,7 +54,7 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
   if (resources) {
     resources.links ||= []
     for (const sitemap of getSitemapsFromConfig(event).filter(sitemap => config.sitemaps === undefined || config.sitemaps.includes(sitemap.name))) {
-      resources.links.push({ title: `${sitemap.name}.xml`, href: resolveUrl(toLogicalRoute(sitemap.route, baseURL)), description: 'XML sitemap for search engines and crawlers.' })
+      resources.links.push({ title: sitemap.route.split('/').pop() || `${sitemap.name}.xml`, href: resolveUrl(toLogicalRoute(sitemap.route, baseURL)), description: 'XML sitemap for search engines and crawlers.' })
     }
     if (!getSitemapsFromConfig(event).length && (config.sitemaps === undefined || config.sitemaps.includes('sitemap')))
       resources.links.push({ title: 'sitemap.xml', href: resolveUrl('/sitemap.xml'), description: 'XML sitemap for search engines and crawlers.' })

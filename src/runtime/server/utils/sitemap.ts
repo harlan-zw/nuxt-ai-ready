@@ -75,8 +75,8 @@ export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
     // Skip 'index' entry (sitemap index, not actual sitemap)
     if (key === 'index')
       continue
-    // Only include sitemaps with routes
-    const route = sitemap._route || sitemap.route
+    // Automatic chunks have no route. Their index is the discovery root.
+    const route = sitemap._route || sitemap.route || (key === 'chunks' ? sitemapConfig.sitemaps.index?._route || sitemapConfig.sitemaps.index?.route : undefined)
     if (route) {
       sitemaps.push({
         name: (sitemap.sitemapName || key).replace(/\.xml$/, ''),
