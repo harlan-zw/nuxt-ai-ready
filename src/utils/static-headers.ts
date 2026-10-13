@@ -179,7 +179,7 @@ export function normalizeStaticContentSignalHeaders(contents: string): string {
   })
   const policyOnly = (block: HeaderBlock) => hasPolicy(block)
     && block.text.split(/\r?\n/).slice(1).every(line => !line.trim() || line.trimStart().startsWith('#') || policyLine.test(line))
-  const policyValue = (block: HeaderBlock) => block.text.match(/^[\t ]+content-signal\s*:\s*(.*)$/im)?.[1]?.trim() ?? null
+  const policyValue = (block: HeaderBlock) => block.text.match(/^[\t ]+content-signal[\t ]*:(.*)$/im)?.[1]?.trim() ?? null
   const edges = blocks.map(() => new Set<number>())
   const incoming = blocks.map(() => 0)
   const connect = (before: number, after: number) => {
@@ -203,8 +203,9 @@ export function normalizeStaticContentSignalHeaders(contents: string): string {
     for (let narrow = 0; narrow < blocks.length; narrow++) {
       const target = blocks[narrow]!
       if (broad !== narrow && hasPolicy(target) && target.route !== null
-        && policyValue(source) !== policyValue(target) && coversPattern(source.route, target.route))
+        && policyValue(source) !== policyValue(target) && coversContentSignalPattern(source.route, target.route)) {
         connect(broad, narrow)
+      }
     }
   }
   const ordered: HeaderBlock[] = []
@@ -238,6 +239,19 @@ function coversPattern(broad: string, narrow: string): boolean {
   return broad.indexOf('*') === broad.length - 1
     && !broad.includes(':')
     && narrow.startsWith(broad.slice(0, -1))
+}
+
+function coversContentSignalPattern(broad: string, narrow: string): boolean {
+  if (coversPattern(broad, narrow))
+    return true
+  if (broad === narrow || !broad.startsWith('/') || !narrow.startsWith('/')
+    || broad.indexOf('*') !== broad.length - 1 || !broad.includes(':')) {
+    return false
+  }
+  // A fixed prefix already matching the broad terminal splat proves coverage
+  // for every suffix. Variable prefixes cannot establish that relationship.
+  const prefix = narrow.split('*')[0]!
+  return !prefix.includes(':') && patternToRegExp(broad).test(prefix)
 }
 
 /** Split a Link value into entries, ignoring commas inside `<...>` and quotes. */

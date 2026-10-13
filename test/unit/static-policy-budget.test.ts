@@ -3,6 +3,11 @@ import { enforceStaticHeaderBudget, normalizeStaticContentSignalHeaders } from '
 import { resolveCloudflareStaticHeaders } from '../helpers/cloudflare-headers'
 
 describe('static usage policy budget', () => {
+  it('orders a proven parameterized broad policy before a fixed-prefix policy', () => {
+    const source = '/foo/bar/*\n  Content-Signal: ai-train=no\n/foo/:slug/*\n  Content-Signal: ai-train=yes\n'
+    const result = resolveCloudflareStaticHeaders(normalizeStaticContentSignalHeaders(source), '/foo/bar/article')
+    expect(result['content-signal']).toBe('ai-train=no')
+  })
   it('rejects mixed policy ordering that changes security headers', () => {
     const source = '/private\n  Content-Signal: ai-train=no\n  ! X-Frame-Options\n/*\n  Content-Signal: ai-train=yes\n  X-Frame-Options: DENY\n'
     expect(() => normalizeStaticContentSignalHeaders(source)).toThrow('Place broader mixed policy rules before narrower rules.')
@@ -39,7 +44,7 @@ describe('static usage policy budget', () => {
     ['overlapping security rules', '/private\n  ! X-Frame-Options\n/*\n  X-Frame-Options: DENY\n', '/private'],
   ])('preserves global-policy consumers with %s', (_name, existing, path) => {
     const policy = '  Content-Signal: search=yes, ai-input=yes, ai-train=yes\n'
-    const source = /^\/\*\n/m.test(existing) ? existing.replace(/^\/\*\n/m, `/*\n${policy}`) : existing + `/*\n${policy}`
+    const source = /^\/\*\n/m.test(existing) ? existing.replace(/^\/\*\n/m, `/*\n${policy}`) : `${existing}/*\n${policy}`
     const expected = resolveCloudflareStaticHeaders(source, path)
     const result = resolveCloudflareStaticHeaders(normalizeStaticContentSignalHeaders(source), path)
     expect(result).toEqual(expected)
