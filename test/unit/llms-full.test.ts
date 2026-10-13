@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from '../../src/runtime/server/utils/llms-full'
 
 describe('llms-full.txt formatter', () => {
+  it('keeps metadata literal and leaves the source body intact', () => {
+    const body = '<details>Authored body</details>'
+    const page = formatPageForLlmsFullTxt('/docs', '<head> API', 'Use <head>', body)
+    expect(page).toContain('- **Page:** &lt;head&gt; API')
+    expect(page).toContain('- **Description:** Use &lt;head&gt;')
+    expect(page).toContain(body)
+    expect(buildLlmsFullTxtHeader({ name: '<Site>', description: 'Use <head>' }))
+      .toContain('# &lt;Site&gt;\n\n> Use &lt;head&gt;')
+  })
+
   it('preserves source heading levels and fenced code', () => {
     const markdown = `---
 title: Example

@@ -1,4 +1,5 @@
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './types'
+import { escapeMarkdownHtml } from './markdown-text'
 
 const RE_INLINE_WHITESPACE = /\s+/g
 const RE_LINK_TITLE_BRACKET = /[[\]]/g
@@ -10,7 +11,7 @@ function normalizeInlineText(value: string): string {
 }
 
 function normalizeLinkTitle(value: string): string {
-  return normalizeInlineText(value).replace(RE_LINK_TITLE_BRACKET, bracket => bracket === '[' ? '&#91;' : '&#93;')
+  return escapeMarkdownHtml(normalizeInlineText(value)).replace(RE_LINK_TITLE_BRACKET, bracket => bracket === '[' ? '&#91;' : '&#93;')
 }
 
 function normalizeLinkHref(value: string): string {
@@ -44,7 +45,7 @@ function normalizeLink(link: LlmsTxtLink, descriptionPrefixes: string[] = []): s
 }
 
 function normalizeSection(section: LlmsTxtSection): string {
-  const parts: string[] = [`## ${normalizeInlineText(section.title)}`]
+  const parts: string[] = [`## ${escapeMarkdownHtml(normalizeInlineText(section.title))}`]
   if (section.links?.length)
     parts.push('', ...section.links.map(link => normalizeLink(link)))
   return parts.join('\n')
@@ -64,7 +65,7 @@ function normalizePreamble(config: LlmsTxtConfig): string[] {
       continue
     const descriptions = normalizePreambleBlocks(section.description)
     if (descriptions.length)
-      parts.push([`**${normalizeInlineText(section.title)}:**`, ...descriptions].join('\n\n'))
+      parts.push([`**${escapeMarkdownHtml(normalizeInlineText(section.title))}:**`, ...descriptions].join('\n\n'))
   }
 
   return parts

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLlmsTxtFiles, parseLlmsTxtConfig } from '../../src/runtime/llms-txt-files'
-import { normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt-format'
+import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from '../../src/runtime/llms-txt-format'
 
 const header = '# Example\n\n> Example site\n\n'
 const resolveUrl = (path: string) => `https://example.com${path}`
@@ -17,6 +17,13 @@ function build(pages: number, maxLength = 1024) {
 }
 
 describe('llms.txt files', () => {
+  it('keeps HTML-like page titles literal without changing Markdown notes', () => {
+    expect(formatLlmsTxtPageLink({ pathname: '/', href: '/index.md', title: 'Full stack <head> package' }))
+      .toBe('- [Full stack &lt;head&gt; package](/index.md)')
+    expect(normalizeLlmsTxtConfig({ notes: '<details>Authored Markdown</details>' }))
+      .toContain('<details>Authored Markdown</details>')
+  })
+
   it('keeps a small site inline', () => {
     const files = build(2)
     expect([...files.keys()]).toEqual(['/llms.txt'])
