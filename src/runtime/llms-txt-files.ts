@@ -9,7 +9,7 @@ export interface LlmsTxtPage {
   locale?: string
 }
 
-const FILE_PATH = /^\/llms\/[a-z0-9][a-z0-9-]*\.txt$/i
+const FILE_PATH = /^\/llms\/[a-z0-9][a-z0-9_-]*\.txt$/i
 const SITEMAP_NAME = /^[a-z0-9][\w-]*$/i
 
 export function llmsTxtSectionPath(section: LlmsTxtSection): string {

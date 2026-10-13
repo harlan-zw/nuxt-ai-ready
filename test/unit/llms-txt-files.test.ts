@@ -57,6 +57,14 @@ describe('llms.txt files', () => {
     expect(files.get('/llms.txt')).not.toContain('Empty')
   })
 
+  it('accepts underscore-containing sitemap names with their default file path', () => {
+    const config = { sections: [{ title: 'Agent Skills', sitemap: 'agent_skills' }] }
+    expect(parseLlmsTxtConfig(config)._tag).toBe('Valid')
+    const files = createLlmsTxtFiles({ header, config, sections: config.sections, pages: [], sitemapPages: new Map([['agent_skills', [{ pathname: '/skill' }]]]), resolveUrl })
+    expect(files.get('/llms.txt')).toContain('https://example.com/llms/agent_skills.txt')
+    expect(files.get('/llms/agent_skills.txt')).toContain('](/skill)')
+  })
+
   it('uses multiple index levels when the root cannot hold every chunk link', () => {
     const files = build(2500)
     for (const text of files.values())
@@ -77,6 +85,7 @@ describe('llms.txt files', () => {
     { maxLength: 0 },
     { maxLength: 1024.5 },
     { sections: [{ title: 'Bad', sitemap: 'skills', path: '/api/private' }] },
+    { sections: [{ title: 'Bad', sitemap: 'skills', path: '/llms/_pages.txt' }] },
     { sections: [{ title: 'Bad', sitemap: [], path: '/llms/skills.txt' }] },
     { sections: [{ title: 'A', sitemap: 'skills' }, { title: 'B', sitemap: 'skills' }] },
   ])('rejects invalid configuration before serving files: %j', (config) => {

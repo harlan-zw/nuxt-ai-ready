@@ -445,6 +445,7 @@ async function crawlSitemapContent(
   sitemapContent: string,
   seen = new Set<string>(),
   depth = 0,
+  documents = new Map<string, () => string>(),
 ): Promise<number> {
   logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
   const result = await collectSitemap(sitemapContent)
@@ -469,7 +470,7 @@ async function crawlSitemapContent(
         break
       }
       seen.add(url.href)
-      const content = await crawlerFetch(state)(`${url.pathname}${url.search}`, {
+      const content = documents.get(toLogicalRoute(url.pathname, nitro.options.baseURL))?.() ?? await crawlerFetch(state)(`${url.pathname}${url.search}`, {
         headers: { 'x-nitro-prerender': url.pathname },
         retry: 0,
         signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
@@ -478,13 +479,37 @@ async function crawlSitemapContent(
         return null
       }) as string | null
       if (content)
-        crawled += await crawlSitemapContent(state, nuxt, nitro, content, seen, depth + 1)
+        crawled += await crawlSitemapContent(state, nuxt, nitro, content, seen, depth + 1, documents)
     }
     return crawled
   }
   const urls = result.document.entries
   logger.debug(`Found ${urls.length} URLs in sitemap`)
   return crawlSitemapEntries(state, nuxt, nitro, urls)
+}
+
+async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, documents = new Map<string, () => string>()): Promise<void> {
+  const sitemap = nuxt.options.sitemap as { sitemaps?: boolean | Record<string, unknown>, sitemapName?: string, sitemapsPathPrefix?: string }
+  const names = state.llmsTxtConfig?.sitemaps
+  const singleName = (sitemap.sitemapName || 'sitemap.xml').replace(/\.xml$/, '')
+  const roots = sitemap.sitemaps && typeof sitemap.sitemaps === 'object'
+    ? Object.keys(sitemap.sitemaps).filter(name => name !== 'index' && (names === undefined || names.includes(name))).map(name => joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`))
+    : names !== undefined && !names.includes(sitemap.sitemaps ? 'chunks' : singleName)
+      ? []
+      : [sitemap.sitemaps ? '/sitemap_index.xml' : `/${sitemap.sitemapName || 'sitemap.xml'}`]
+  for (const root of roots) {
+    const content = documents.get(root)?.() ?? await crawlerFetch(state)(toDeployedRoute(root, nitro.options.baseURL), {
+      headers: { 'x-nitro-prerender': root },
+      retry: 0,
+      signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
+    }).catch((error) => {
+      // A missing sitemap leaves the explicit prerender route list as the source.
+      logger.warn(`Sitemap crawl failed for ${root}: ${String(error)}`)
+      return null
+    }) as string | null
+    if (content)
+      await crawlSitemapContent(state, nuxt, nitro, content, new Set(), 0, documents)
+  }
 }
 
 function isNuxtGenerate(): boolean {
@@ -795,12 +820,14 @@ export function setupPrerenderHandler(
 
     if (useSitemapHook) {
       // sitemap:prerender:done fires after sitemap.xml is written
-      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ content: string }> }) => (async () => {
+      nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { sitemaps: Array<{ name: string, content: string }> }) => (async () => {
         if (!state.initialized)
           return
 
-        for (const sitemap of ctx.sitemaps)
-          await crawlSitemapContent(state, nuxt, nitro, sitemap.content)
+        // Follow selected roots, not every generated document or the global index.
+        // A chunk inherits admission through its selected parent sitemap.
+        const documents = new Map(ctx.sitemaps.map(sitemap => [toLogicalRoute(sitemap.name, nitro.options.baseURL), () => sitemap.content]))
+        await crawlConfiguredSitemaps(state, nuxt, nitro, documents)
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
@@ -813,24 +840,7 @@ export function setupPrerenderHandler(
         if (!state.initialized)
           return
 
-        const sitemap = nuxt.options.sitemap as { sitemaps?: boolean | Record<string, unknown>, sitemapName?: string, sitemapsPathPrefix?: string }
-        const names = state.llmsTxtConfig?.sitemaps
-        const roots = sitemap.sitemaps && typeof sitemap.sitemaps === 'object'
-          ? Object.keys(sitemap.sitemaps).filter(name => name !== 'index' && (names === undefined || names.includes(name))).map(name => joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`))
-          : [sitemap.sitemaps ? '/sitemap_index.xml' : `/${sitemap.sitemapName || 'sitemap.xml'}`]
-        for (const root of roots) {
-          const sitemapContent = await crawlerFetch(state)(toDeployedRoute(root, nitro.options.baseURL), {
-            headers: { 'x-nitro-prerender': root },
-            signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
-          }).catch((error) => {
-          // A missing sitemap leaves the explicit prerender route list as the source.
-            logger.warn(`Sitemap crawl failed for ${root}: ${String(error)}`)
-            return null
-          }) as string | null
-
-          if (sitemapContent)
-            await crawlSitemapContent(state, nuxt, nitro, sitemapContent)
-        }
+        await crawlConfiguredSitemaps(state, nuxt, nitro)
 
         await writeLlmsFiles()
         state.prerenderedRoutes.clear()
