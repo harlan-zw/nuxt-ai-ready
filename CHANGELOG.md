@@ -1,3 +1,19 @@
+## v3.2.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.1.0...v3.2.0)
+
+> llms.txt now links absolute `.md` URLs by default; set `llmsTxt.markdownLinks: false` to keep HTML links.
+
+### 🚀 Enhancements
+
+- **cloudflare:** Glob worker-first routes past the 100-entry limit ([#196](https://github.com/harlan-zw/nuxt-ai-ready/pull/196))
+- Link llms.txt pages to absolute Markdown URLs by default ([#197](https://github.com/harlan-zw/nuxt-ai-ready/pull/197))
+- Point every Markdown page at llms.txt ([#200](https://github.com/harlan-zw/nuxt-ai-ready/pull/200))
+
+### 🩹 Fixes
+
+- Serve local agent skills with the bytes their digest covers ([#194](https://github.com/harlan-zw/nuxt-ai-ready/pull/194))
+
 ## v3.1.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.0.4...v3.1.0)
