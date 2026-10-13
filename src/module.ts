@@ -46,6 +46,10 @@ import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStatic
 import { applyStaticMarkdownHeaderPlan, buildStaticMarkdownLinkHeader, isStaticMarkdownSourceRoute, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
 import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
 
+const MODULE_PACKAGE_NAME = 'nuxt-ai-ready'
+// The sitemap parser's own files, not any path that contains its name.
+const RE_SITEMAPD_PACKAGE = /[/\\]node_modules[/\\]sitemapd[/\\]/
+
 export interface ModuleHooks {
   /**
    * Hook called when page markdown is generated during prerendering.
@@ -755,9 +759,19 @@ export default defineNuxtModule<ModuleOptions>({
     // Virtual module for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
       if (getNitroVersion(nuxt) === 3) {
+        // Nitro 3 matches a string entry anywhere in a module path. Nuxt adds
+        // the bare name of a module installed by name, which also matched
+        // every dependency of a project or monorepo directory called
+        // `nuxt-ai-ready`. mdream's native loader was then bundled away from
+        // its binding, and prerendering failed. The runtime directory matches
+        // only this module's runtime files.
         const nativeConfig = nitroConfig as unknown as { noExternals?: boolean | (string | RegExp)[] }
-        if (nativeConfig.noExternals !== true)
-          nativeConfig.noExternals = [...nativeConfig.noExternals || [], 'nuxt-ai-ready']
+        if (nativeConfig.noExternals !== true) {
+          nativeConfig.noExternals = [
+            ...(nativeConfig.noExternals || []).filter(entry => entry !== MODULE_PACKAGE_NAME),
+            resolve('./runtime'),
+          ]
+        }
       }
       else {
         const externals = nitroConfig.externals ||= {}
@@ -782,7 +796,7 @@ export default defineNuxtModule<ModuleOptions>({
           traceDeps?: Array<string | RegExp>
         }
         if (nitro3Config.noExternals !== true)
-          nitro3Config.noExternals = [...nitro3Config.noExternals || [], 'sitemapd']
+          nitro3Config.noExternals = [...nitro3Config.noExternals || [], RE_SITEMAPD_PACKAGE]
         if (!isEdgePreset) {
           nitro3Config.traceDeps ||= []
           nitro3Config.traceDeps.push('mdream*')
