@@ -446,6 +446,11 @@ export default defineNuxtModule<ModuleOptions>({
       })
     }
 
+    const directiveConfig = config.llmsTxt === false ? undefined : config.llmsTxt?.directive
+    const llmsTxtDirective = {
+      markdown: directiveConfig?.markdown !== false,
+      html: directiveConfig?.html === true,
+    }
     // Merge default sections with user config
     const parsedLlmsTxt = parseLlmsTxtConfig(config.llmsTxt || {})
     if (parsedLlmsTxt._tag === 'Invalid')
@@ -462,13 +467,14 @@ export default defineNuxtModule<ModuleOptions>({
       ? {
           ...parsedLlmsTxt.config,
           markdownLinks: config.llmsTxt.markdownLinks ?? true,
+          directive: llmsTxtDirective,
           sections: [
             ...defaultLlmsTxtSections,
             ...(config.llmsTxt.sections || []),
           ],
           notes: config.llmsTxt.notes,
         }
-      : { markdownLinks: true, sections: defaultLlmsTxtSections }
+      : { markdownLinks: true, directive: llmsTxtDirective, sections: defaultLlmsTxtSections }
 
     // Allow other modules to extend llms.txt content via hook
     const llmsTxtPayload = {
@@ -1082,6 +1088,9 @@ export function trackDrizzleWork(event, work) { return work }
     // Runs Accept negotiation ahead of Nitro's static asset handler, which is
     // unshifted in front of every middleware when serveStatic is on (#82).
     addNitroPlugin(resolve('./runtime/server/plugins/markdown-negotiation'))
+
+    if (llmsTxtDirective.html)
+      addNitroPlugin(resolve('./runtime/server/plugins/llms-txt-directive-html'))
 
     // Inject <link rel="alternate" type="text/markdown"> into HTML pages
     addPlugin({

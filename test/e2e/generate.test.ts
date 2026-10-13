@@ -186,6 +186,12 @@ describe('nuxt generate (static build)', async () => {
       expect(aboutMd).toContain('Technology Stack')
     })
 
+    it('points each prerendered Markdown page at llms.txt right after its frontmatter', async () => {
+      const aboutMd = await $fetch<string>('/about.md', { responseType: 'text' })
+      expect(aboutMd).toMatch(/^---\n[\s\S]*?\n---\n\n> Index of every page on this site: \[llms\.txt\]\(https:\/\/test\.example\.com\/llms\.txt\)\n\n/)
+      expect(aboutMd.match(/llms\.txt\)/g)).toHaveLength(1)
+    })
+
     it('.md files have proper heading structure', async () => {
       const indexMd = await $fetch('/index.md', { responseType: 'text' })
 
