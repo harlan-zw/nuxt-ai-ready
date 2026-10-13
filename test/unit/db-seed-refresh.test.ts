@@ -63,12 +63,33 @@ describe('seedRoutes refresh window', () => {
     return (sqlite.prepare('SELECT last_seen_at FROM ai_ready_pages WHERE route = ?').get(route) as { last_seen_at: number }).last_seen_at
   }
 
-  async function seed(routes: string[], refreshWindowMs?: number) {
+  async function seed(routes: Array<string | { route: string, lastmod?: string }>, refreshWindowMs?: number) {
     const { seedRoutes } = await import('../../src/runtime/server/db/queries')
     rowsWritten = 0
     const seen = await seedRoutes(event, routes, refreshWindowMs === undefined ? undefined : { refreshWindowMs })
     return { seen, rowsWritten }
   }
+
+  it('requeues indexed content when its source lastmod changes inside the write window', async () => {
+    await seed([{ route: '/a', lastmod: '2026-08-01' }])
+    sqlite.prepare('UPDATE ai_ready_pages SET indexed = 1, markdown = ?, updated_at = ?, content_hash = ? WHERE route = ?')
+      .run('Original content', '2026-08-01', 'original-hash', '/a')
+
+    vi.setSystemTime(T0 + HOUR)
+    expect(await seed([{ route: '/a', lastmod: '2026-08-02' }])).toEqual({ seen: 1, rowsWritten: 1 })
+    expect(sqlite.prepare('SELECT indexed, markdown, updated_at, content_hash FROM ai_ready_pages WHERE route = ?').get('/a'))
+      .toEqual({ indexed: 0, markdown: 'Original content', updated_at: '2026-08-01', content_hash: 'original-hash' })
+  })
+
+  it('writes nothing for equivalent source dates and does not requeue when the source date disappears', async () => {
+    await seed([{ route: '/a', lastmod: '2026-08-01' }])
+    sqlite.prepare('UPDATE ai_ready_pages SET indexed = 1 WHERE route = ?').run('/a')
+
+    vi.setSystemTime(T0 + HOUR)
+    expect(await seed([{ route: '/a', lastmod: '2026-08-01T00:00:00Z' }])).toEqual({ seen: 1, rowsWritten: 0 })
+    expect(await seed(['/a'])).toEqual({ seen: 1, rowsWritten: 0 })
+    expect(sqlite.prepare('SELECT indexed FROM ai_ready_pages WHERE route = ?').get('/a')).toEqual({ indexed: 1 })
+  })
 
   it('writes zero rows when an unchanged route is seeded again inside the window', async () => {
     expect(await seed(['/a', '/b'])).toEqual({ seen: 2, rowsWritten: 2 })

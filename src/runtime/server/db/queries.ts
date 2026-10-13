@@ -1,13 +1,13 @@
 import type { SitemapCrawlState } from '../utils/sitemap-crawl-state'
 import type { AiReadyDatabaseEvent } from './context'
 import type { RawExecutor } from './drizzle/raw'
-import type { SeedRoutesOptions } from './seed'
+import type { SeedRoute, SeedRoutesOptions } from './seed'
 import { initSchema, useRawDb } from '#ai-ready-virtual/database-runtime.mjs'
 import { useEvent, useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { checkAndHandleStale } from '../utils/checkStale'
 import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../utils/sitemap-crawl-state'
-import { deriveLocale, SEED_REFRESH_WINDOW_MS } from './seed'
+import { deriveLocale, parseSourceLastmod, SEED_REFRESH_WINDOW_MS } from './seed'
 import { LIKE_ESCAPE, likeSubstring, maxRowsPerInsert, normalizeRoute, normalizeRouteKey, toFtsMatchQuery } from './shared'
 
 export type { SeedRoutesOptions }
@@ -701,7 +701,7 @@ function chunk<T>(items: T[], size: number): T[][] {
  */
 export async function seedRoutes(
   event: AiReadyDatabaseEvent | undefined,
-  routes: Array<string | { route: string, locale?: string, url?: string }>,
+  routes: SeedRoute[],
   options: SeedRoutesOptions = {},
 ): Promise<number> {
   const db = await getDb(event)
@@ -716,7 +716,7 @@ export async function seedRoutes(
   // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
   // SQLite's "ON CONFLICT cannot affect row a second time" error when a
   // multi-row INSERT contains the same route twice.
-  const byRoute = new Map<string, { route: string, routeKey: string, locale: string }>()
+  const byRoute = new Map<string, { route: string, routeKey: string, locale: string, sourceLastmod: string | null }>()
   for (const entry of routes) {
     // Canonicalise before keying the map: '' and '/' are one page, so leaving
     // them distinct here defeats the dedupe and collides on route_key instead.
@@ -727,12 +727,13 @@ export async function seedRoutes(
       route,
       routeKey: normalizeRouteKey(route),
       locale: deriveLocale(event, route, explicitLocale, entryUrl),
+      sourceLastmod: parseSourceLastmod(typeof entry === 'string' ? undefined : entry.lastmod),
     })
   }
 
   // Batch into multi-row INSERTs. Each statement is a DB round-trip (a network
   // call on D1), so one INSERT per route times out large sitemaps. The chunk
-  // size is derived from the 4 bind params per row so each statement stays
+  // size is derived from the 5 bind params per row so each statement stays
   // within D1's 100-parameter cap even if a column is added. The statements
   // then go through `db.batch` so all round-trips collapse into one
   // driver-level batch request.
@@ -740,23 +741,27 @@ export async function seedRoutes(
   // The DO UPDATE is guarded so an unchanged row is not rewritten on every
   // crawl. Without the guard each run bumped last_seen_at on every row and
   // its index entries, which cost millions of D1 row writes a month.
-  const rowsPerInsert = maxRowsPerInsert(4)
+  const rowsPerInsert = maxRowsPerInsert(5)
   const stmts: { sql: string, params: unknown[] }[] = []
   for (const batch of chunk([...byRoute.values()], rowsPerInsert)) {
-    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', 0, 0, 0, 'runtime', ?, ?)`).join(', ')
-    const params = batch.flatMap(r => [r.route, r.routeKey, nowMs, r.locale])
+    const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
+    const params = batch.flatMap(r => [r.route, r.routeKey, r.sourceLastmod, nowMs, r.locale])
     stmts.push({
       sql: `
-        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
+        INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, source_lastmod, indexed_at, is_error, indexed, source, last_seen_at, locale)
         VALUES ${valuesSql}
         ON CONFLICT(route) DO UPDATE SET
           last_seen_at = excluded.last_seen_at,
           locale = excluded.locale,
+          source_lastmod = COALESCE(excluded.source_lastmod, ai_ready_pages.source_lastmod),
           is_error = 0,
-          indexed = CASE WHEN ai_ready_pages.is_error = 1 THEN 0 ELSE ai_ready_pages.indexed END
+          indexed = CASE WHEN ai_ready_pages.is_error = 1
+            OR (excluded.source_lastmod IS NOT NULL AND ai_ready_pages.source_lastmod IS DISTINCT FROM excluded.source_lastmod)
+            THEN 0 ELSE ai_ready_pages.indexed END
         WHERE ai_ready_pages.last_seen_at IS NULL
           OR ai_ready_pages.last_seen_at < excluded.last_seen_at - ${refreshWindowMs}
           OR ai_ready_pages.locale IS DISTINCT FROM excluded.locale
+          OR (excluded.source_lastmod IS NOT NULL AND ai_ready_pages.source_lastmod IS DISTINCT FROM excluded.source_lastmod)
       `,
       params,
     })

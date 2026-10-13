@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { appendSitemapSection, buildSitemapMd, isSitemapMdRequest, SITEMAP_MD_ROUTE } from '../../src/runtime/server/utils/sitemap-md'
 
 describe('buildSitemapMd', () => {
+  it('keeps metadata angle brackets literal', () => {
+    expect(buildSitemapMd([{ route: '/', title: 'Full stack <head> package' }], { siteName: '<Site>' }))
+      .toContain('- [Full stack &lt;head&gt; package](/index.md)')
+    expect(buildSitemapMd([], { siteName: '<Site>' })).toContain('# &lt;Site&gt; Sitemap')
+  })
+
   it('groups pages by top-level path segment with .md links', () => {
     const md = buildSitemapMd([
       { route: '/docs/getting-started', title: 'Getting Started' },

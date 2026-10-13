@@ -9,6 +9,11 @@ export default defineNuxtConfig({
     description: 'Test site for runtime indexing',
   },
 
+  sitemap: {
+    cacheMaxAgeSeconds: 0,
+    sources: ['/api/__cms-sitemap'],
+  },
+
   aiReady: {
     ...(postgresUrl
       ? { database: { type: 'postgres' as const, url: postgresUrl } }

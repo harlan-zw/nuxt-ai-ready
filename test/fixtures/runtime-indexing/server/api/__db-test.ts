@@ -235,6 +235,33 @@ export default defineEventHandler(async (event) => {
       return { lastmods: Object.fromEntries(map) }
     }
 
+    case 'prepare-source-refresh': {
+      const db = await useRawDb(event)
+      await db.exec('UPDATE ai_ready_pages SET indexed = 1')
+      await db.exec("DELETE FROM ai_ready_pages WHERE route = '/drift-page'")
+      await db.exec("DELETE FROM ai_ready_sitemaps WHERE name = 'sitemap.xml'")
+      return { success: true }
+    }
+
+    case 'reset-drift-page': {
+      const db = await useRawDb(event)
+      await db.exec('DELETE FROM ai_ready_pages WHERE route = ?', ['/drift-page'])
+      return { success: true }
+    }
+
+    case 'source-refresh-state': {
+      const db = await useRawDb(event)
+      return await db.first<{ indexed: number, markdown: string, source_lastmod: string | null }>(
+        "SELECT indexed, markdown, source_lastmod FROM ai_ready_pages WHERE route = '/drift-page'",
+      )
+    }
+
+    case 'crawl-next-sitemap': {
+      const db = await useRawDb(event)
+      await db.exec('UPDATE ai_ready_sitemaps SET last_crawled_at = 0')
+      return { success: true }
+    }
+
     case 'prepare-sitemap-seed': {
       const db = await useRawDb(event)
       await db.exec(`
