@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { consumePrerenderedHtml, storePrerenderedHtml } from '../../src/runtime/server/utils/prerender-html'
+import { consumePrerenderedContentSignal, consumePrerenderedHtml, storePrerenderedContentSignal, storePrerenderedHtml } from '../../src/runtime/server/utils/prerender-html'
 
 describe('prerender html cache', () => {
+  it('hands a final source policy to one twin using the normalized page path', () => {
+    storePrerenderedHtml('/policy/', '<html>policy</html>')
+    storePrerenderedContentSignal('/policy', 'ai-train=no')
+    expect(consumePrerenderedContentSignal('/policy/')).toBe('ai-train=no')
+    expect(consumePrerenderedContentSignal('/policy')).toBeUndefined()
+    expect(consumePrerenderedHtml('/policy')).toBe('<html>policy</html>')
+  })
+
+  it('does not retain policies for responses without a rendered page', () => {
+    storePrerenderedContentSignal('/asset.css', 'ai-train=no')
+    expect(consumePrerenderedContentSignal('/asset.css')).toBeUndefined()
+  })
   it('stores and consumes by page path', () => {
     storePrerenderedHtml('/about', '<html>about</html>')
     expect(consumePrerenderedHtml('/about')).toBe('<html>about</html>')

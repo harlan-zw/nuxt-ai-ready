@@ -141,6 +141,52 @@ function patternToRegExp(pattern: string): RegExp {
   return new RegExp(`^${source}$`)
 }
 
+/** Content-Signal route policies that also apply to an exact generated asset. */
+export function matchingStaticContentSignals(routeRules: Record<string, object | undefined>, route: string): string[] {
+  return Object.entries(routeRules).flatMap(([pattern, rule]) => {
+    if (!patternToRegExp(pattern).test(route))
+      return []
+    const headers = (rule as { headers?: Record<string, string> } | undefined)?.headers
+    return Object.entries(headers || {}).filter(([name]) => name.toLowerCase() === 'content-signal').map(([, value]) => value)
+  })
+}
+
+/** Specific usage policies replace broader policies instead of joining their values. */
+export function normalizeStaticContentSignalHeaders(contents: string): string {
+  let blocks = splitHeaderBlocks(contents)
+  if (!blocks.some(block => /^\s+content-signal\s*:/im.test(block.text)))
+    return contents
+  const specificity = (route: string | null) => route === null ? -1 : route.replace(/\*|:\w+/g, '').length * 10 - (route.match(/\*|:\w+/g)?.length || 0)
+  const hasPolicy = (block: HeaderBlock) => /^\s+(?:content-signal\s*:|!\s*content-signal\s*$)/im.test(block.text)
+  const repeated = new Map<string, HeaderBlock[]>()
+  blocks.forEach((block) => {
+    if (block.route !== null)
+      repeated.set(block.route, [...repeated.get(block.route) || [], block])
+  })
+  const combined = new Set<string>()
+  // A repeated pattern keeps its first position in Cloudflare's rule map.
+  // One block lets its final policy move after broader policies.
+  blocks = blocks.flatMap((block) => {
+    const group = block.route === null ? [] : repeated.get(block.route)!
+    if (group.length < 2 || !group.some(hasPolicy))
+      return [block]
+    if (combined.has(block.route!))
+      return []
+    combined.add(block.route!)
+    const policyLine = /^\s+(?:content-signal\s*:.*|!\s*content-signal\s*)$/i
+    const lines = group.flatMap(entry => entry.text.split(/\r?\n/).slice(1))
+    const lastPolicy = group.filter(hasPolicy).at(-1)!.text.split(/\r?\n/).slice(1).filter(line => policyLine.test(line))
+    return [{ route: block.route, text: `${block.route}\n${[...lines.filter(line => !policyLine.test(line)), ...lastPolicy].join('\n')}\n` }]
+  })
+  const policies = blocks.filter(hasPolicy).sort((a, b) => specificity(a.route) - specificity(b.route))
+  return blocks.map(original => hasPolicy(original) ? policies.shift()! : original).map((block) => {
+    const text = block.text.trimEnd()
+    if (!/^\s+content-signal\s*:/im.test(text) || /^\s+!\s*content-signal\s*$/im.test(text))
+      return `${text}\n`
+    return `${text.replace(/^(\s+)(content-signal\s*:)/im, '$1! Content-Signal\n$1$2')}\n`
+  }).join('\n')
+}
+
 /**
  * Whether every path `narrow` matches is also matched by `broad`. Only path
  * patterns are compared; anything this cannot prove returns false.
@@ -321,9 +367,9 @@ function splitHeaderBlocks(contents: string): HeaderBlock[] {
  *
  * Exact `.md` rules are the ones this module multiplies, one per prerendered
  * page, so a site with more pages than the limit fails its whole deploy on the
- * upload. When the file is over budget those rules go first. The `/*.md` glob
+ * upload. When the file is over budget discovery-only rules go first. The `/*.md` glob
  * still sets the charset and describedby entries for every markdown twin;
- * only the per-page canonical and alternate entries are lost.
+ * policy rules remain, while per-page canonical and alternate entries can go.
  */
 export function enforceStaticHeaderBudget(contents: string, limit: number): StaticHeaderBudgetResult {
   const blocks = splitHeaderBlocks(contents)
@@ -331,7 +377,7 @@ export function enforceStaticHeaderBudget(contents: string, limit: number): Stat
   if (ruleCount <= limit)
     return { contents, total: ruleCount, dropped: 0 }
 
-  const kept = blocks.filter(block => block.route === null || !RE_EXACT_MARKDOWN_ROUTE.test(block.route))
+  const kept = blocks.filter(block => block.route === null || !RE_EXACT_MARKDOWN_ROUTE.test(block.route) || /^\s+(?:content-signal\s*:|!\s*content-signal\s*$)/im.test(block.text))
   return {
     contents: kept.map(block => block.text).join(''),
     total: kept.filter(block => block.route !== null).length,

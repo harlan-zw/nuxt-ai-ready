@@ -1,6 +1,7 @@
 interface HeaderRule {
   pattern: string
   headers: Array<[name: string, value: string]>
+  removals: string[]
 }
 
 function parseHeaderRules(contents: string): HeaderRule[] {
@@ -9,10 +10,13 @@ function parseHeaderRules(contents: string): HeaderRule[] {
     if (!line.trim() || line.trimStart().startsWith('#'))
       continue
     if (!/^\s/.test(line)) {
-      rules.push({ pattern: line.trim(), headers: [] })
+      rules.push({ pattern: line.trim(), headers: [], removals: [] })
       continue
     }
     const colon = line.indexOf(':')
+    const removal = line.match(/^\s+!\s*([^\s:]+)\s*$/)
+    if (removal && rules.length)
+      rules.at(-1)!.removals.push(removal[1]!.toLowerCase())
     const name = line.slice(0, colon).trim()
     if (colon > 0 && !name.startsWith('!') && rules.length)
       rules.at(-1)!.headers.push([name.toLowerCase(), line.slice(colon + 1).trim()])
@@ -37,9 +41,12 @@ function matchesPattern(pattern: string, path: string): boolean {
  */
 export function resolveCloudflareStaticHeaders(contents: string, path: string): Record<string, string> {
   const merged: Record<string, string[]> = {}
-  for (const rule of parseHeaderRules(contents)) {
+  // Local Cloudflare assets keep the last value at the first position for a repeated pattern.
+  for (const rule of new Map(parseHeaderRules(contents).map(rule => [rule.pattern, rule])).values()) {
     if (!matchesPattern(rule.pattern, path))
       continue
+    for (const name of rule.removals)
+      delete merged[name]
     for (const [name, value] of rule.headers)
       (merged[name] ||= []).push(value)
   }

@@ -3,6 +3,7 @@ import { mergeVaryHeader } from '../runtime/cache-control'
 import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
 import { toDeployedRoute } from '../runtime/route-path'
 import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
+import { matchingStaticContentSignals } from './static-headers'
 
 const RE_MD_EXT = /\.md$/
 
@@ -64,7 +65,7 @@ export interface StaticMarkdownHeaderRule {
  * are excluded.
  */
 export function prerenderedMarkdownHeaderRules(
-  prerenderedRoutes: ReadonlyArray<{ route?: string, fileName?: string }>,
+  prerenderedRoutes: ReadonlyArray<{ route?: string, fileName?: string, contentSignal?: string }>,
   baseURL: string,
   describedby: boolean,
   artifactRoutes: ReadonlyArray<string>,
@@ -87,6 +88,7 @@ export function prerenderedMarkdownHeaderRules(
           'Content-Type': 'text/markdown; charset=utf-8',
           'Vary': 'Accept',
           'Link': buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby),
+          ...(entry.contentSignal !== undefined && { 'Content-Signal': entry.contentSignal }),
         },
       })
     }
@@ -111,7 +113,14 @@ export type StaticMarkdownHeaderPlan
       total: number
       /** Twins that lose their per-page rule. */
       dropped: number
+      /** Policy rules survive the discovery fallback. */
+      rules: StaticMarkdownHeaderRule[]
     }
+    | { _tag: 'blocked', total: number, limit: number }
+
+function hasContentSignal(headers: Record<string, string> | undefined): boolean {
+  return Object.keys(headers || {}).some(name => name.toLowerCase() === 'content-signal')
+}
 
 /**
  * Whether the per-page `.md` rules fit the host's `_headers` budget.
@@ -120,15 +129,19 @@ export type StaticMarkdownHeaderPlan
  * Cloudflare rejects the file past its limit, which fails the deploy. The
  * decision happens here, on the route rules, so the file is never over budget
  * at any point in the build; a module auditing `_headers` earlier in the
- * `compiled` hook order sees it already trimmed. Over budget, every exact
- * `.md` rule goes, including the ones registered at config time, and the
- * `/*.md` glob keeps the charset and describedby entries.
+ * `compiled` hook order sees it already trimmed. Over budget, optional exact
+ * discovery rules go. Policy rules remain. If those cannot fit, the plan blocks.
  */
 export function planStaticMarkdownHeaderRules(
   routeRules: Record<string, object | undefined>,
   rules: StaticMarkdownHeaderRule[],
   limit: number | null,
 ): StaticMarkdownHeaderPlan {
+  rules = rules.map((rule) => {
+    if (!hasContentSignal(rule.headers) || matchingStaticContentSignals(routeRules, rule.route).length === 0)
+      return rule
+    return { ...rule, headers: Object.fromEntries(Object.entries(rule.headers).filter(([name]) => name.toLowerCase() !== 'content-signal')) }
+  })
   if (limit === null)
     return { _tag: 'apply', rules }
   const entries = Object.entries(routeRules).filter(isStaticHeaderRouteRule)
@@ -138,7 +151,14 @@ export function planStaticMarkdownHeaderRules(
   const total = other + markdown.size
   if (total <= limit)
     return { _tag: 'apply', rules }
-  return { _tag: 'skip', drop: registeredMarkdown, total, dropped: markdown.size }
+  const policyRules = rules.filter(rule => hasContentSignal(rule.headers))
+  const policyRoutes = new Set([
+    ...policyRules.map(rule => rule.route),
+    ...registeredMarkdown.filter(route => hasContentSignal((routeRules[route] as { headers?: Record<string, string> }).headers)),
+  ])
+  if (other + policyRoutes.size > limit)
+    return { _tag: 'blocked', total: other + policyRoutes.size, limit }
+  return { _tag: 'skip', drop: registeredMarkdown.filter(route => !policyRoutes.has(route)), total, dropped: markdown.size - policyRoutes.size, rules: policyRules }
 }
 
 /**
@@ -151,17 +171,28 @@ export function applyStaticMarkdownHeaderPlan(
   routeRules: Record<string, object | undefined>,
   plan: StaticMarkdownHeaderPlan,
 ): void {
+  if (plan._tag === 'blocked')
+    throw new Error(`Content-Signal policy rules exceed the static header limit (${plan.total}/${plan.limit}). Reduce per-page policies or use a shared policy.`)
   if (plan._tag === 'skip') {
     for (const route of plan.drop) {
       const rule = routeRules[route] as { headers?: unknown } | undefined
       if (rule)
         rule.headers = undefined
     }
-    return
   }
   for (const { route, headers } of plan.rules) {
     const existing = routeRules[route] as { headers?: Record<string, string> } | undefined
     const merged = defu({ headers: { ...headers } }, existing)
+    if (hasContentSignal(existing?.headers)) {
+      for (const name of Object.keys(merged.headers)) {
+        if (name.toLowerCase() === 'content-signal')
+          delete merged.headers[name]
+      }
+      for (const [name, value] of Object.entries(existing!.headers!)) {
+        if (name.toLowerCase() === 'content-signal')
+          merged.headers[name] = value
+      }
+    }
     const vary = Object.entries(existing?.headers || {})
       .filter(([name]) => name.toLowerCase() === 'vary')
       .map(([, value]) => value)

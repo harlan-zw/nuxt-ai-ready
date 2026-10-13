@@ -49,6 +49,8 @@ try {
     throw new Error('The app alias did not render its value')
 
   const markdownResponse = await fetch(`${origin}/index.md`)
+  if (markdownResponse.headers.get('content-signal') !== 'ai-train=no')
+    throw new Error('Prerendered Markdown must preserve its source Content-Signal policy')
   if (!markdownResponse.ok)
     throw new Error(`Markdown endpoint returned ${markdownResponse.status}`)
   const markdown = await markdownResponse.text()

@@ -14,6 +14,7 @@ import type { NuxtRenderHTMLContext } from 'nuxt/app'
  * pages get no `.md` twin) live only for the prerender process lifetime.
  */
 const htmlByPath = new Map<string, string | NuxtRenderHTMLContext>()
+const contentSignalByPath = new Map<string, string>()
 
 // Match the key derivation of getMarkdownRenderInfo/toMarkdownPath: `/about/`
 // renders `/about.md`, whose page path resolves to `/about`.
@@ -23,6 +24,20 @@ function normalizeHtmlCachePath(path: string): string {
 
 export function storePrerenderedHtml(path: string, html: string | NuxtRenderHTMLContext): void {
   htmlByPath.set(normalizeHtmlCachePath(path), html)
+}
+
+/** Only rendered pages can hand a policy to a Markdown twin. */
+export function storePrerenderedContentSignal(path: string, policy: string): void {
+  const key = normalizeHtmlCachePath(path)
+  if (htmlByPath.has(key))
+    contentSignalByPath.set(key, policy)
+}
+
+export function consumePrerenderedContentSignal(path: string): string | undefined {
+  const key = normalizeHtmlCachePath(path)
+  const policy = contentSignalByPath.get(key)
+  contentSignalByPath.delete(key)
+  return policy
 }
 
 export function consumePrerenderedHtml(path: string): string | undefined {
