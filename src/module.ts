@@ -1230,6 +1230,18 @@ export function trackDrizzleWork(event, work) { return work }
       })
     }
 
+    // Falling back to the shared rule is expected on a large site, and the
+    // site owner has nothing to change, so this is information, not a warning.
+    // Both budget checks below can reach it, so it prints once.
+    let sharedMarkdownRuleNoted = false
+    const noteSharedMarkdownRule = (total: number, dropped: number) => {
+      if (sharedMarkdownRuleNoted)
+        return
+      sharedMarkdownRuleNoted = true
+      logger.info(`Cloudflare allows ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT} _headers rules. One rule per Markdown page would make ${total}. `
+        + `The ${dropped} Markdown pages share the /*.md rule, which sends no per-page canonical Link header.`)
+    }
+
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
@@ -1275,7 +1287,7 @@ export function trackDrizzleWork(event, work) { return work }
           // audits the file earlier in the `compiled` order never sees it
           // over budget.
           applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
-          logger.warn(`_headers would hold ${plan.total} rules and Cloudflare allows ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}. Skipped the ${plan.dropped} per-page .md rules; the /*.md glob still sets the charset and describedby entries, but static markdown does not send a per-page canonical Link.`)
+          noteSharedMarkdownRule(plan.total, plan.dropped)
           return
         }
         applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
@@ -1357,7 +1369,7 @@ export function trackDrizzleWork(event, work) { return work }
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
-              logger.warn(`_headers had ${budget.total + budget.dropped} rules and Cloudflare allows ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}. Dropped the ${budget.dropped} per-page .md rules; the /*.md glob still sets the charset and describedby entries, but static markdown no longer sends a per-page canonical Link.`)
+              noteSharedMarkdownRule(budget.total + budget.dropped, budget.dropped)
             }
             if (budget.total > CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
               logger.warn(`_headers still has ${budget.total} rules after dropping the .md rules. Cloudflare will reject the deploy until the other rules fit under ${CLOUDFLARE_STATIC_HEADER_RULE_LIMIT}.`)
