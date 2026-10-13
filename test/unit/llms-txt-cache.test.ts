@@ -5,20 +5,27 @@ interface CachedFunctionOptions { name?: string, group?: string, maxAge?: number
 
 const config = { llmsTxtCacheSeconds: 600 }
 
-const { defineCachedFunction, buildLlmsTxt } = vi.hoisted(() => ({
+const { defineCachedFunction, buildLlmsTxtFiles } = vi.hoisted(() => ({
   defineCachedFunction: vi.fn(
-    (fn: (...args: unknown[]) => unknown, _options?: { name?: string, group?: string, maxAge?: number, swr?: boolean }) =>
-      async (...args: unknown[]) => fn(...args),
+    (fn: (...args: unknown[]) => unknown, options?: { name?: string, group?: string, maxAge?: number, swr?: boolean, getKey?: (event: unknown) => string }) => {
+      const snapshots = new Map<string, unknown>()
+      return async (...args: unknown[]) => {
+        const key = options?.getKey?.(args[0]) || ''
+        if (!snapshots.has(key))
+          snapshots.set(key, await fn(...args))
+        return snapshots.get(key)
+      }
+    },
   ),
-  buildLlmsTxt: vi.fn(async () => '# llms.txt content'),
+  buildLlmsTxtFiles: vi.fn(async (): Promise<Record<string, string>> => ({ '/llms.txt': '# llms.txt content' })),
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
   defineCachedFunction,
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
+  useRuntimeConfig: () => ({ 'app': { baseURL: '/' }, 'nuxt-ai-ready': config }),
 }))
 
-vi.mock('../../src/runtime/llms-txt-utils', () => ({ buildLlmsTxt }))
+vi.mock('../../src/runtime/llms-txt-utils', () => ({ buildLlmsTxtFiles }))
 
 const { default: llmsTxtHandler } = await import('../../src/runtime/server/routes/llms.txt.get')
 
@@ -53,7 +60,7 @@ describe('gET /llms.txt internal cache', () => {
     expect(status).toBe(200)
     expect(body).toBe('# llms.txt content')
     expect(defineCachedFunction).toHaveBeenCalledOnce()
-    expect(cachedOptions()[0]).toMatchObject({ name: 'llms-txt', group: 'ai-ready', maxAge: 1200, swr: true })
+    expect(cachedOptions()[0]).toMatchObject({ name: 'llms-txt-files', group: 'ai-ready', maxAge: 1200, swr: true })
     expect(cacheControl).toContain('max-age=1200')
     expect(cacheControl).not.toContain('s-maxage')
   })
@@ -78,5 +85,19 @@ describe('gET /llms.txt internal cache', () => {
     expect(status).toBe(200)
     expect(defineCachedFunction).not.toHaveBeenCalled()
     expect(cacheControl).toBeNull()
+  })
+
+  it('shares root and child snapshots while isolating forwarded origins', async () => {
+    config.llmsTxtCacheSeconds = 47
+    buildLlmsTxtFiles.mockResolvedValueOnce({ '/llms.txt': 'First root', '/llms/skills.txt': 'First skills' })
+    buildLlmsTxtFiles.mockResolvedValueOnce({ '/llms.txt': 'Second root', '/llms/skills.txt': 'Second skills' })
+    async function read(path: string, host: string) {
+      return (await request(new Request(`http://localhost${path}`, { headers: { 'x-forwarded-host': host, 'x-forwarded-proto': 'https' } }))).text()
+    }
+    expect(await read('/llms.txt', 'first.example.com')).toBe('First root')
+    expect(await read('/llms/skills.txt', 'first.example.com')).toBe('First skills')
+    expect(await read('/llms/skills.txt', 'second.example.com')).toBe('Second skills')
+    expect(await read('/llms.txt', 'second.example.com')).toBe('Second root')
+    expect(buildLlmsTxtFiles).toHaveBeenCalledTimes(2)
   })
 })

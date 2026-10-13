@@ -1,6 +1,6 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { PageEntry } from '../db/queries'
-import { eventHandler, setHeader } from '#nuxtseo/h3'
+import { assertMethod, eventHandler, setHeader } from '#nuxtseo/h3'
 import { defineCachedFunction, useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables'
 import { publicCacheControl } from '../../cache-control'
@@ -51,6 +51,7 @@ function getBuildSitemapMdCached(maxAge: number) {
 }
 
 export default eventHandler(async (event) => {
+  assertMethod(event, 'GET', true)
   const fullRuntimeConfig = useRuntimeConfig(event)
   const runtimeConfig = fullRuntimeConfig['nuxt-ai-ready'] as {
     llmsTxtCacheSeconds?: number

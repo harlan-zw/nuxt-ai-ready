@@ -1,0 +1,7 @@
+# Manual site
+
+> Read these instructions first.
+
+## Pages
+
+- [About](https://test.example.com/about.md): A curated page.
