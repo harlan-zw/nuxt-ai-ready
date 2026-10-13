@@ -1,3 +1,20 @@
+## v3.4.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.3.1...v3.4.0)
+
+This minor release covers the metadata and CLI features included in v3.3.1.
+It retains the same parsing fixes and mdream 2.0.3 dependency floors.
+
+### 🚀 Enhancements
+
+- **markdown:** Preserve Open Graph and Twitter image metadata, plus bounded JSON-LD blocks ([#213](https://github.com/harlan-zw/nuxt-ai-ready/pull/213)).
+- **cli:** Audit public Markdown negotiation and discovery with `nuxt-ai-ready audit` ([#210](https://github.com/harlan-zw/nuxt-ai-ready/pull/210)).
+
+### 📝 Migration
+
+Update the lockfile, rebuild generated Markdown, and refresh stored converted bodies.
+Raw Markdown source hooks preserve their supplied metadata without extracting rendered HTML metadata.
+
 ## v3.3.1
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.3.0...v3.3.1)
