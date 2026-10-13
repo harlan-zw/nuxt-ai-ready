@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from '../../src/utils/static-headers'
+import { dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders } from '../../src/utils/static-headers'
+import { resolveCloudflareStaticHeaders } from '../helpers/cloudflare-headers'
 
 describe('static headers', () => {
   it('consolidates shared rules while preserving user and generated headers', () => {
@@ -112,5 +113,86 @@ describe('static headers', () => {
     expect(ensureStaticHeader(headers, '/*.md', 'Content-Type', 'text/markdown')).toBe(
       '/*.md\r\n  Content-Type: text/markdown\r\n  X-Robots-Tag: noindex\r\n',
     )
+  })
+})
+
+describe('dedupeStaticHeaders', () => {
+  const owned = ['Content-Type', 'Link', 'Vary']
+  const describedby = '</base/llms.txt>; rel="describedby"'
+
+  it('sends each value once on a path several rules match', () => {
+    const contents = [
+      '/base/*',
+      `  Link: </catalog>; rel="api-catalog", ${describedby}`,
+      '  Vary: Accept-Encoding',
+      '/base/index.md',
+      '  Content-Type: text/markdown; charset=utf-8',
+      `  Link: </base/>; rel="canonical", ${describedby}`,
+      '  Vary: Accept',
+      '/base/sitemap.md',
+      '  Content-Type: text/markdown; charset=utf-8',
+      '/base/*.md',
+      `  Link: ${describedby}`,
+      '  vary: accept',
+      '  Content-Type: text/markdown; charset=utf-8',
+      '',
+    ].join('\n')
+    const result = dedupeStaticHeaders(contents, owned)
+    expect(resolveCloudflareStaticHeaders(result, '/base/index.md')).toEqual({
+      'content-type': 'text/markdown; charset=utf-8',
+      'link': `</catalog>; rel="api-catalog", ${describedby}, </base/>; rel="canonical"`,
+      'vary': 'Accept-Encoding, accept',
+    })
+    expect(resolveCloudflareStaticHeaders(result, '/base/sitemap.md')['content-type']).toBe('text/markdown; charset=utf-8')
+    expect(resolveCloudflareStaticHeaders(result, '/base/')).toEqual(resolveCloudflareStaticHeaders(contents, '/base/'))
+    expect(result).not.toMatch(/^\/base\/sitemap\.md$/m)
+  })
+
+  it('compares Link entries without splitting quoted commas', () => {
+    const entry = '</a.css>; rel="preload"; title="First,Second"'
+    const contents = `/*\n  Link: ${entry}\n/page.md\n  Link: ${entry}, </page>; rel="canonical"\n`
+    expect(resolveCloudflareStaticHeaders(dedupeStaticHeaders(contents, owned), '/page.md').link)
+      .toBe(`${entry}, </page>; rel="canonical"`)
+  })
+
+  it('keeps rules a broader rule cannot be proven to cover', () => {
+    const contents = [
+      '/docs/*',
+      '  Content-Type: text/markdown',
+      '/*.md',
+      '  Content-Type: text/markdown',
+      '/:lang/*',
+      '  Content-Type: text/markdown',
+      '/en/*.md',
+      '  Content-Type: text/markdown',
+      '',
+    ].join('\n')
+    expect(dedupeStaticHeaders(contents, owned)).toBe(contents)
+  })
+
+  it('treats placeholders as one path segment for exact rules', () => {
+    const contents = '/:lang/index.md\n  Content-Type: text/markdown\n/:lang/*\n  Content-Type: text/markdown\n/en/index.md\n  Content-Type: text/markdown\n'
+    const result = dedupeStaticHeaders(contents, owned)
+    expect(result).toBe('/:lang/index.md\n  Content-Type: text/markdown\n/:lang/*\n  Content-Type: text/markdown\n')
+  })
+
+  it('leaves rules with a repeated pattern alone', () => {
+    const contents = '/*\n  Link: </a>; rel="describedby"\n/*\n  Link: </b>; rel="api-catalog"\n'
+    expect(dedupeStaticHeaders(contents, owned)).toBe(contents)
+  })
+
+  it('leaves a header alone when any rule detaches it', () => {
+    const contents = '/*\n  Vary: Accept\n/*.md\n  ! Vary\n/index.md\n  Vary: Accept\n'
+    expect(dedupeStaticHeaders(contents, owned)).toBe(contents)
+  })
+
+  it('leaves headers it does not own alone', () => {
+    const contents = '/_nuxt/*\n  cache-control: public, immutable\n/_nuxt/builds/meta/*\n  cache-control: public, immutable\n'
+    expect(dedupeStaticHeaders(contents, owned)).toBe(contents)
+  })
+
+  it('keeps comments and CRLF line endings', () => {
+    const contents = '/*\r\n  Vary: Accept\r\n# exact page\r\n/index.md\r\n  Vary: Accept\r\n  X-Test: kept\r\n'
+    expect(dedupeStaticHeaders(contents, owned)).toBe('/*\r\n  Vary: Accept\r\n# exact page\r\n/index.md\r\n  X-Test: kept\r\n')
   })
 })

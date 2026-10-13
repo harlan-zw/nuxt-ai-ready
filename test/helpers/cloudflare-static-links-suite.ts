@@ -1,10 +1,19 @@
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
 import { setup, useTestContext } from '@nuxt/test-utils'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { headerTokens, resolveCloudflareStaticHeaders } from './cloudflare-headers'
 
 const { resolve } = createResolver(import.meta.url)
+
+function expectEachValueOnce(headers: Record<string, string | null | undefined>) {
+  for (const [name, value] of Object.entries(headers)) {
+    const tokens = headerTokens(value).map(token => name === 'vary' ? token.toLowerCase() : token)
+    expect(tokens, name).toEqual([...new Set(tokens)])
+  }
+}
 
 export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
   describe(`static Cloudflare discovery at ${baseURL}`, async () => {
@@ -71,6 +80,36 @@ export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
       expect(response.headers.get('link')).toContain('</styles.css>; rel="preload"; as="style"')
       expect(response.headers.get('x-discovery-test')).toBe('preserved')
       expect(response.headers.get('x-frame-options')).toBe('DENY')
+    })
+
+    it.each(['', 'index.md', 'about.md', 'docs/api.md', 'sitemap.md', 'llms.txt', '.well-known/api-catalog'])('merges the _headers rules for %s into one value per header', async (file) => {
+      const wranglerPath = join(useTestContext().nuxt!.options.buildDir, 'output/server/wrangler.json')
+      const wrangler = JSON.parse(await readFile(wranglerPath, 'utf8')) as { assets: { directory: string } }
+      const contents = await readFile(join(dirname(wranglerPath), wrangler.assets.directory, '_headers'), 'utf8')
+      const headers = resolveCloudflareStaticHeaders(contents, `${baseURL}${file}`)
+      expectEachValueOnce(headers)
+      if (!file.endsWith('.md'))
+        return
+      expect(headers['content-type']).toBe('text/markdown; charset=utf-8')
+      expect(headerTokens(headers.vary)).toContain('Accept')
+      if (file !== 'sitemap.md')
+        expect(headers.link).toContain(`rel="canonical"`)
+      if (discovery)
+        expect(headers.link).toContain(`<${baseURL}llms.txt>; rel="describedby"`)
+    })
+
+    it.each(['index.md', 'about.md'])('sends each header value once on asset-served Markdown %s', async (file) => {
+      const response = await fetch(`http://127.0.0.1:${port}${baseURL}${file}`)
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
+      expectEachValueOnce({
+        'link': response.headers.get('link'),
+        'vary': response.headers.get('vary'),
+        'x-frame-options': response.headers.get('x-frame-options'),
+      })
+      expect(headerTokens(response.headers.get('vary'))).toContain('Accept')
+      if (discovery)
+        expect(response.headers.get('link')).toContain(`<${baseURL}llms.txt>; rel="describedby"`)
     })
   })
 }
