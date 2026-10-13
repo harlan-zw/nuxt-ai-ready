@@ -36,6 +36,7 @@ import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
 import {
   createMcpServerCardEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
+  MCP_SERVER_CARD_WELL_KNOWN_PATHS,
   parseMcpServerCardConfig,
   resolveInstalledMcpProtocolVersions,
   resolveMcpServerCard,
@@ -551,21 +552,26 @@ export default defineNuxtModule<ModuleOptions>({
         return
       }
 
-      const mcpLink = {
-        title: 'MCP',
-        href: withSiteUrl(finalMcpToolkitState.route, { withBase: true }),
-        description: config.mcp?.tools !== false && hasMcpSiteTools
-          ? 'Use this MCP endpoint when you need information from this site\'s indexed pages.'
-          : 'Model Context Protocol server endpoint for AI agent integration.',
-      }
-      const firstSection = mergedLlmsTxt.sections?.[0]
-      if (firstSection) {
-        firstSection.links ||= []
-        if (!firstSection.links.some(link => link.title === mcpLink.title))
-          firstSection.links.push(mcpLink)
-      }
-      else {
-        mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+      // The endpoint answers GET with 405 or 406, so llms.txt link checkers
+      // count it as broken. The card is a readable document that names it.
+      if (mcpServerCardResult._tag === 'Enabled') {
+        const endpoint = withSiteUrl(finalMcpToolkitState.route, { withBase: true })
+        const mcpLink = {
+          title: 'MCP server card',
+          href: withSiteUrl(MCP_SERVER_CARD_WELL_KNOWN_PATHS[0].slice(1), { withBase: true }),
+          description: config.mcp?.tools !== false && hasMcpSiteTools
+            ? `Connect an MCP client to ${endpoint} when you need information from this site's indexed pages.`
+            : `Connect an MCP client to ${endpoint} to use this site's Model Context Protocol server.`,
+        }
+        const firstSection = mergedLlmsTxt.sections?.[0]
+        if (firstSection) {
+          firstSection.links ||= []
+          if (!firstSection.links.some(link => link.title === mcpLink.title))
+            firstSection.links.push(mcpLink)
+        }
+        else {
+          mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+        }
       }
 
       const mcpServerCardRoute = resolveMcpServerCardRoute(finalMcpToolkitState.route)
@@ -665,21 +671,23 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       const handler = resolve('./runtime/server/routes/mcp-server-card')
-      addServerHandler({ route: mcpServerCardRoute, method: 'get', handler, lazy: true })
-      addServerHandler({ route: mcpServerCardRoute, method: 'head', handler, lazy: true })
-      addServerHandler({ route: mcpServerCardRoute, method: 'options', handler, lazy: true })
-      extendRouteRules(mcpServerCardRoute, {
-        sitemap: false,
-        headers: {
-          'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-          'Access-Control-Allow-Methods': 'GET, HEAD',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Expose-Headers': 'ETag',
-          'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
-          'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
-          'ETag': etag,
-        },
-      })
+      for (const route of [mcpServerCardRoute, ...MCP_SERVER_CARD_WELL_KNOWN_PATHS]) {
+        addServerHandler({ route, method: 'get', handler, lazy: true })
+        addServerHandler({ route, method: 'head', handler, lazy: true })
+        addServerHandler({ route, method: 'options', handler, lazy: true })
+        extendRouteRules(route, {
+          sitemap: false,
+          headers: {
+            'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+            'Access-Control-Allow-Methods': 'GET, HEAD',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'ETag',
+            'Cache-Control': `public, max-age=${mcpServerCardResult.config.cacheMaxAge}`,
+            'Content-Type': MCP_SERVER_CARD_MEDIA_TYPE,
+            'ETag': etag,
+          },
+        })
+      }
 
       if (siteConfig.url) {
         const document = resolveAiCatalog({

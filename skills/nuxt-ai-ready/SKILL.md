@@ -84,7 +84,7 @@ export default defineNuxtConfig({ aiReady: { contentSignal: { search: true, aiIn
 // robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=yes
 ```
 
-MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it.
+MCP: install `@nuxtjs/mcp-toolkit` and add it to `modules`. The module then registers `list_pages`, `search_pages`, and `get_page_markdown` at `/mcp`. These tools need the database, so also run `npx nypm add drizzle-orm@1.0.0-rc.4`. MCP needs a running server; `nuxt generate` output cannot host it. The server card is served at `/mcp/server-card`, `/.well-known/mcp/server-card.json`, and `/.well-known/mcp.json`. llms.txt links the card, never the endpoint, because the endpoint answers GET with 405 or 406. `mcpServerCard: false` removes the card routes and the llms.txt entry.
 
 WebMCP: set `webmcp: true`. This registers the same three tools in the browser and auto-imports `useWebMcpTool()` and `useWebMcpSupported()`. The tools need the database and `drizzle-orm`. Without `webmcp`, those composables are not defined.
 
