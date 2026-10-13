@@ -1,3 +1,29 @@
+## v3.3.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.2.0...v3.3.0)
+
+Generated discovery files now follow the selected sitemap and split large lists into linked files.
+
+### 🚀 Enhancements
+
+- **llms.txt:** Add sitemap admission, named sitemap sections, and bounded discovery files ([#198](https://github.com/harlan-zw/nuxt-ai-ready/pull/198)).
+- **llms.txt:** Preserve curated `public/llms.txt` files and allow disabling the generated full export ([#198](https://github.com/harlan-zw/nuxt-ai-ready/pull/198)).
+
+### 🩹 Fixes
+
+- **markdown:** Negotiate dotted numeric page paths such as `/v1.2` ([#203](https://github.com/harlan-zw/nuxt-ai-ready/pull/203)).
+- **prerender:** Respect excluded source pages and Markdown twins during sitemap crawling ([#204](https://github.com/harlan-zw/nuxt-ai-ready/pull/204)).
+- **llms.txt:** Avoid baking cached page titles and links into prerendered output ([#205](https://github.com/harlan-zw/nuxt-ai-ready/pull/205)).
+
+### 📝 Migration
+
+Automatic discovery now excludes stored pages outside the selected sitemap.
+Set `aiReady.llmsTxt.pages: 'all'` if those pages must remain discoverable.
+Lists exceeding 80,000 characters now link to smaller files under `/llms/`.
+If you copy static output, include that directory.
+Set `aiReady.llmsTxt.maxLength` to change the per-file limit.
+Set `aiReady.llmsFullTxt: false` to omit the full export and its generated link.
+
 ## v3.2.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.1.0...v3.2.0)
