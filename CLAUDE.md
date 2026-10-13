@@ -135,7 +135,7 @@ aiReady: {
 ### Key Dependencies
 
 - **mdream**, **@mdream/js**: HTML → markdown conversion and negotiation
-- **drizzle-orm**: Database layer (SQLite, D1, LibSQL, Neon, Postgres). Optional peer dependency: setup throws when the database is on and the app root cannot resolve it
+- **drizzle-orm**: Database layer (SQLite, D1, LibSQL, Neon, Postgres). Optional peer dependency: setup throws when the database is on and the app root cannot resolve it, or resolves a version outside the peer range
 - **@nuxtjs/mcp-toolkit**: MCP server (optional, enables MCP features)
 - **nuxt-site-config**: Site metadata
 - **@nuxtjs/robots**, **@nuxtjs/sitemap**: Required module dependencies

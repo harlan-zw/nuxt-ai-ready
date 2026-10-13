@@ -50,12 +50,121 @@ const DATABASE_CONSUMER_LABELS: Record<DatabaseConsumer, string> = {
   webmcp: 'WebMCP site tools (`aiReady.webmcp`)',
 }
 
+interface SemVer {
+  core: [number, number, number]
+  prerelease: string[]
+}
+
+const RE_SEMVER = /^v?(\d+)\.(\d+)\.(\d+)(?:-([\da-z-]+(?:\.[\da-z-]+)*))?(?:\+[\da-z-]+(?:\.[\da-z-]+)*)?$/i
+const RE_NUMERIC = /^\d+$/
+
+function parseSemVer(input: string): SemVer | undefined {
+  const match = RE_SEMVER.exec(input.trim())
+  if (!match)
+    return undefined
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4]?.split('.') ?? [],
+  }
+}
+
+function compareCore(a: SemVer['core'], b: SemVer['core']): number {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i])
+      return a[i]! < b[i]! ? -1 : 1
+  }
+  return 0
+}
+
+// A release ranks above its prereleases. Numeric identifiers compare as numbers.
+function comparePrerelease(a: string[], b: string[]): number {
+  if (a.length === 0 && b.length === 0)
+    return 0
+  if (a.length === 0)
+    return 1
+  if (b.length === 0)
+    return -1
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const left = a[i]
+    const right = b[i]
+    if (left === undefined)
+      return -1
+    if (right === undefined)
+      return 1
+    if (left === right)
+      continue
+    const leftNumeric = RE_NUMERIC.test(left)
+    const rightNumeric = RE_NUMERIC.test(right)
+    if (leftNumeric && rightNumeric)
+      return Number(left) < Number(right) ? -1 : 1
+    if (leftNumeric !== rightNumeric)
+      return leftNumeric ? -1 : 1
+    return left < right ? -1 : 1
+  }
+  return 0
+}
+
+export type PeerRangeMatch
+  = | { _tag: 'Satisfied' }
+    | { _tag: 'Unsatisfied' }
+    | { _tag: 'Unparsed' }
+
+/**
+ * Check a version against a caret range such as `^1.0.0-rc.4`, with npm's
+ * prerelease rule: a prerelease matches only on the range's own
+ * `major.minor.patch`. Any other range shape is `Unparsed`.
+ */
+export function matchCaretRange(version: string, range: string): PeerRangeMatch {
+  const installed = parseSemVer(version)
+  const minimum = range.trim().startsWith('^') ? parseSemVer(range.trim().slice(1)) : undefined
+  if (!installed || !minimum)
+    return { _tag: 'Unparsed' }
+
+  const [major, minor, patch] = minimum.core
+  const ceiling: SemVer['core'] = major > 0
+    ? [major + 1, 0, 0]
+    : minor > 0
+      ? [0, minor + 1, 0]
+      : [0, 0, patch + 1]
+  const sameCore = compareCore(installed.core, minimum.core) === 0
+  const satisfied = (compareCore(installed.core, minimum.core) > 0
+    || (sameCore && comparePrerelease(installed.prerelease, minimum.prerelease) >= 0))
+  && compareCore(installed.core, ceiling) < 0
+  && (installed.prerelease.length === 0 || (sameCore && minimum.prerelease.length > 0))
+  return satisfied ? { _tag: 'Satisfied' } : { _tag: 'Unsatisfied' }
+}
+
+/** The `drizzle-orm` the app root resolves, if any. */
+export type DrizzleInstall
+  = | { _tag: 'Missing' }
+    | { _tag: 'Installed', version: string | undefined }
+
+export type DrizzleProblem
+  = | { _tag: 'Missing' }
+    | { _tag: 'OutOfRange', version: string }
+
+/**
+ * Decide whether the installed `drizzle-orm` can run the database. A version
+ * that cannot be read or a range that cannot be parsed passes, so an unusual
+ * install never blocks setup on a guess.
+ */
+export function checkDrizzleInstall(install: DrizzleInstall, peerRange: string | undefined): DrizzleProblem | undefined {
+  if (install._tag === 'Missing')
+    return { _tag: 'Missing' }
+  if (!install.version || !peerRange)
+    return undefined
+  return matchCaretRange(install.version, peerRange)._tag === 'Unsatisfied'
+    ? { _tag: 'OutOfRange', version: install.version }
+    : undefined
+}
+
 /**
  * Explain why setup needs `drizzle-orm` and how to install it. `peerRange` is
  * the package's caret range, so its version is the lowest one it accepts.
  * The highest match for a caret prerelease range can be an untested preview build.
  */
-export function formatMissingDrizzleMessage(input: {
+export function formatDrizzleMessage(input: {
+  problem: DrizzleProblem
   requested: Record<DatabaseConsumer, boolean>
   peerRange: string | undefined
 }): string {
@@ -65,11 +174,18 @@ export function formatMissingDrizzleMessage(input: {
     ? 'The `aiReady.database` option turns on the database.'
     : `These features need the database: ${consumers.map(consumer => DATABASE_CONSUMER_LABELS[consumer]).join(', ')}.`
   const version = input.peerRange?.replace(/^\^/, '')
-  const lines = [
-    subject,
-    'The database needs `drizzle-orm`. This app does not install it.',
-    `Install it: npx nypm add drizzle-orm${version ? `@${version}` : ''}`,
-  ]
+  const command = `npx nypm add drizzle-orm${version ? `@${version}` : ''}`
+  const lines = input.problem._tag === 'Missing'
+    ? [
+        subject,
+        'The database needs `drizzle-orm`. This app does not install it.',
+        `Install it: ${command}`,
+      ]
+    : [
+        subject,
+        `The database needs \`drizzle-orm\` ${input.peerRange}. This app installs ${input.problem.version}.`,
+        `Upgrade it: ${command}`,
+      ]
   if (consumers.length > 0 && consumers.every(consumer => consumer === 'mcp' || consumer === 'webmcp'))
     lines.push('If you do not need the site tools, set `aiReady.database: false`.')
   return lines.join('\n')

@@ -99,7 +99,7 @@ Runtime indexing, database drivers, Cloudflare D1, and the server query helpers:
 - **Root `skills/` folders require explicit publication.** Automatic discovery scans public directories only. Set `agentSkills.dir: 'skills'` to publish root skills intentionally.
 - **The same hook name exists twice.** `ai-ready:page:markdown` is a Nuxt hook (`nuxt.config` `hooks`, prerender only) and a Nitro hook (`nitroApp.hooks`, every HTML conversion). They receive different context. The Nitro `ctx.event` is undefined when indexing runs outside a request.
 - **`database: false` conflicts with `runtimeSync` and `cron`.** The build fails and names the option.
-- **A database feature without `drizzle-orm` fails the build.** `runtimeSync`, `cron`, MCP site tools, WebMCP site tools, and an explicit `database` option turn on the database. The error names the feature and the install command. If MCP Toolkit serves only your own tools, set `database: false` instead.
+- **A database feature without `drizzle-orm` 1.x fails the build.** `runtimeSync`, `cron`, MCP site tools, WebMCP site tools, and an explicit `database` option turn on the database. A `drizzle-orm` 0.x install fails too. The error names the feature and the install command. If MCP Toolkit serves only your own tools, set `database: false` instead.
 
 ## Version limits
 
