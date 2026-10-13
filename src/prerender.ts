@@ -460,7 +460,7 @@ async function crawlSitemapEntries(
   return crawled
 }
 
-async function crawlSitemapContent(
+export async function crawlSitemapContent(
   state: CrawlerState,
   nuxt: Nuxt,
   nitro: Nitro,
@@ -468,6 +468,7 @@ async function crawlSitemapContent(
   seen = new Set<string>(),
   depth = 0,
   documents = new Map<string, () => string>(),
+  budget = { fetched: 0, warned: false },
 ): Promise<number> {
   logger.debug(`Parsing sitemap XML (${sitemapContent.length} bytes)`)
   const result = await collectSitemap(sitemapContent)
@@ -477,24 +478,32 @@ async function crawlSitemapContent(
     return 0
   }
   if (result.document._tag === 'index') {
-    if (depth >= 3 || seen.size >= 100) {
-      logger.warn('Sitemap crawl reached its document limit.')
-      return 0
-    }
     let crawled = 0
     const origin = new URL(state.siteInfo?.url || 'http://localhost').origin
     for (const entry of result.document.entries) {
       if (parsePrerenderRoute(entry.loc, nitro.options.baseURL)._tag === 'Invalid')
         continue
       const url = new URL(entry.loc, origin)
-      if (url.origin !== origin || seen.has(url.href))
+      if (url.origin !== origin)
         continue
-      if (seen.size >= 100) {
-        logger.warn('Sitemap crawl reached its document limit.')
-        break
+      const documentKey = toLogicalRoute(url.pathname, nitro.options.baseURL)
+      const localDocument = documents.get(documentKey)
+      const identity = localDocument ? `local:${documentKey}` : url.href
+      if (seen.has(identity))
+        continue
+      // Generated documents are already bounded by the configured sitemap.
+      // Only fetched documents consume the untrusted traversal budget.
+      if (!localDocument && (depth >= 3 || budget.fetched >= 100)) {
+        if (!budget.warned) {
+          logger.warn('Sitemap crawl reached its document limit.')
+          budget.warned = true
+        }
+        continue
       }
-      seen.add(url.href)
-      const content = documents.get(toLogicalRoute(url.pathname, nitro.options.baseURL))?.() ?? await crawlerFetch(state)(`${url.pathname}${url.search}`, {
+      seen.add(identity)
+      if (!localDocument)
+        budget.fetched++
+      const content = localDocument?.() ?? await crawlerFetch(state)(`${url.pathname}${url.search}`, {
         headers: { 'x-nitro-prerender': url.pathname },
         retry: 0,
         signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
@@ -503,7 +512,7 @@ async function crawlSitemapContent(
         return null
       }) as string | null
       if (content)
-        crawled += await crawlSitemapContent(state, nuxt, nitro, content, seen, depth + 1, documents)
+        crawled += await crawlSitemapContent(state, nuxt, nitro, content, seen, depth + Number(!localDocument), documents, budget)
     }
     return crawled
   }
@@ -518,15 +527,16 @@ interface PrerenderSitemapConfig {
   sitemapsPathPrefix?: string
 }
 
-async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, sitemap: PrerenderSitemapConfig, documents = new Map<string, () => string>()): Promise<void> {
+export async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, sitemap: PrerenderSitemapConfig, documents = new Map<string, () => string>()): Promise<void> {
   const names = state.llmsTxtConfig?.sitemaps
   const singleName = (sitemap.sitemapName || 'sitemap.xml').replace(/\.xml$/, '')
-  const roots = sitemap.sitemaps && typeof sitemap.sitemaps === 'object'
-    ? Object.entries(sitemap.sitemaps).flatMap(([key, definition]) => {
+  const configured = sitemap.sitemaps && typeof sitemap.sitemaps === 'object' ? sitemap.sitemaps : undefined
+  const roots = configured
+    ? Object.entries(configured).flatMap(([key, definition]) => {
         const name = (definition.sitemapName || key).replace(/\.xml$/, '')
         if (key === 'index' || (names !== undefined && !names.includes(name)))
           return []
-        const route = definition._route || definition.route
+        const route = definition._route || definition.route || (key === 'chunks' ? configured.index?._route || configured.index?.route : undefined)
         return [route ? toLogicalRoute(route, nitro.options.baseURL) : joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`)]
       })
     : names !== undefined && !names.includes(sitemap.sitemaps ? 'chunks' : singleName)
@@ -835,7 +845,7 @@ export function setupPrerenderHandler(
             if (target.origin !== origin)
               continue
             const path = parsedTarget.route
-            if (path.startsWith('/llms/') && path.endsWith('.txt'))
+            if (/^\/llms\/[^/]+\.txt$/i.test(path))
               pending.push(path)
           }
         }

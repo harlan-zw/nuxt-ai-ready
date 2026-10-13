@@ -1099,11 +1099,9 @@ export function trackDrizzleWork(event, work) { return work }
     })
     // gets replaced with a static file
     if (generateLlmsTxt) {
-      // Child files use one path segment. A recursive wildcard lets Nitro's
-      // cache-overlap expansion claim neighboring paths such as /llms-txt/guide.
-      for (const route of ['/llms.txt', '/llms/:file'])
-        // Override filename method inference so HEAD reaches the same handler.
-        addServerHandler({ route, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
+      // Nitro strips a route prefix from middleware paths. The handler needs
+      // the full path to distinguish generated files from application routes.
+      addServerHandler({ middleware: true, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
     }
     if (config.llmsFullTxt !== false)
       addServerHandler({ route: '/llms-full.txt', method: undefined, handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
