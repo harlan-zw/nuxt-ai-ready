@@ -35,6 +35,10 @@ export default defineNitroPlugin((nitro) => {
   })
 
   nitro.hooks.hook('beforeResponse', (event) => {
+    // Nitro also calls this hook after a handler has sent the response, such
+    // as `proxyRequest` or a 304 from a cached route. Headers are final then.
+    if (event.node.res.headersSent)
+      return
     const header = (event as LinkHeaderEvent).context[STATUS_AWARE_LINK_HEADER]
     if (!header)
       return
