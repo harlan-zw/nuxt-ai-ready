@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import { hkdfSync } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -16,8 +17,18 @@ afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true })))
 })
 
-async function startReindexStub(status: number, body: unknown): Promise<string> {
-  const server = createServer((_req, res) => {
+async function startReindexStub(status: number, body: unknown, expectedToken?: string): Promise<string> {
+  const server = createServer((req, res) => {
+    if (!req.url?.startsWith('/__ai-ready/reindex')) {
+      res.writeHead(404)
+      res.end()
+      return
+    }
+    if (expectedToken && req.headers.authorization !== `Bearer ${expectedToken}`) {
+      res.writeHead(401, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ message: 'Unauthorized' }))
+      return
+    }
     res.writeHead(status, { 'content-type': 'application/json' })
     res.end(JSON.stringify(body))
   })
@@ -41,6 +52,67 @@ function runReindex(url: string, cwd: string, route = '/about', env: Record<stri
 }
 
 describe('cli reindex error handling', () => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy environment key %s and warns', async (key) => {
+    const url = await startReindexStub(200, { route: '/about', indexed: true }, 'legacy-token')
+    const result = await runReindex(url, await writeSecret(), '/about', {
+      [key]: 'legacy-token',
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.stderr).toContain('deprecated')
+  })
+
+  it('prefers the shared root over the legacy environment token', async () => {
+    const root = 'cli-application-secret-with-at-least-32-characters'
+    const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
+    const url = await startReindexStub(200, { route: '/about', indexed: true }, token)
+    const result = await runReindex(url, await writeSecret(), '/about', {
+      NUXT_APP_SECRET: root,
+      NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token',
+    })
+    expect(result.exitCode).toBe(0)
+  })
+
+  it('accepts a site URL with a trailing slash', async () => {
+    const url = await startReindexStub(200, { route: '/about', indexed: true })
+    const result = await runReindex(`${url}/`, await writeSecret())
+    expect(result.exitCode).toBe(0)
+  })
+
+  it('uses the application secret from the environment instead of a stale cache', async () => {
+    const root = 'cli-application-secret-with-at-least-32-characters'
+    const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
+    const url = await startReindexStub(200, { route: '/about', indexed: true }, token)
+    const cwd = await writeSecret()
+
+    const result = await runReindex(url, cwd, '/about', { NUXT_APP_SECRET: root, CONSOLA_LEVEL: '3' })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('Indexed')
+  })
+
+  it('prints only the derived bearer token for external schedulers', async () => {
+    const root = 'cli-application-secret-with-at-least-32-characters'
+    const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
+
+    const result = await execa(process.execPath, [cliPath, 'token'], { reject: false, env: { NUXT_APP_SECRET: root } })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBe(token)
+  })
+
+  it('rejects an invalid environment secret instead of using a stale cache', async () => {
+    const url = await startReindexStub(200, { route: '/about', indexed: true })
+    const cwd = await writeSecret()
+
+    const result = await runReindex(url, cwd, '/about', {
+      NUXT_APP_SECRET: 'short',
+      NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token',
+    })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('NUXT_APP_SECRET')
+  })
+
   it('prints the removed route and exits 0 after HTTP 410 cleanup', async () => {
     const url = await startReindexStub(200, { route: '/removed', indexed: false, gone: true })
     const cwd = await writeSecret()

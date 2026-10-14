@@ -369,8 +369,8 @@ export interface ModuleOptions {
   cron?: boolean
 
   /**
-   * Secret token for authenticating runtime sync endpoints
-   * When set, requires `Authorization: Bearer <token>` header for runtime sync endpoints
+   * Legacy bearer token for runtime sync endpoints.
+   * @deprecated Set NUXT_APP_SECRET instead. A configured application secret takes precedence.
    */
   runtimeSyncSecret?: string
 

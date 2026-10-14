@@ -5,13 +5,14 @@ import { createApp, toWebHandler } from 'h3'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const config = {
-  runtimeSyncSecret: 'test-secret',
   runtimeSync: { enabled: true, ttl: 3600, batchSize: 10 },
   mdreamOptions: {},
   database: { filename: '' },
 }
 
 const { fetchWithEvent, convertHtmlToMarkdown } = vi.hoisted(() => ({ fetchWithEvent: vi.fn(), convertHtmlToMarkdown: vi.fn() }))
+
+vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
 
 vi.mock('../../src/runtime/server/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/runtime/server/utils')>()
@@ -25,7 +26,7 @@ vi.mock('#nuxtseo/nitro', () => ({
     throw new Error('No active event')
   },
   useNitroApp: () => ({ hooks: { callHook: vi.fn() } }),
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
+  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({

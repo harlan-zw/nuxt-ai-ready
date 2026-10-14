@@ -7,7 +7,7 @@ export default eventHandler(async (event) => {
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
 
   const { requireAuth } = await import('../../utils/auth')
-  requireAuth(event)
+  await requireAuth(event)
 
   const [total, pending, recentlyIndexed24h, recentlyIndexed1h, recentPages] = await Promise.all([
     countPages(event),

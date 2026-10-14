@@ -6,7 +6,7 @@ import { runCron } from '../../utils/runCron'
  */
 export default eventHandler(async (event) => {
   const { requireAuth } = await import('../../utils/auth')
-  requireAuth(event)
+  await requireAuth(event)
 
   const result = await runCron(event)
 

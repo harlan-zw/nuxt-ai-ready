@@ -14,6 +14,9 @@ function unavailablePublicAsset(_error: unknown): null {
 
 export interface CloudflareEnv {
   ASSETS?: { fetch: (req: Request | string) => Promise<Response> }
+  NUXT_APP_SECRET?: unknown
+  NUXT_AI_READY_RUNTIME_SYNC_SECRET?: unknown
+  NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET?: unknown
 }
 
 /**

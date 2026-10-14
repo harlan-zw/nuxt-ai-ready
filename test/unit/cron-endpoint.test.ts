@@ -19,8 +19,10 @@ const { tryAcquireCronLock, releaseCronLock, getCronFastPathStatus } = vi.hoiste
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
+  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config }),
 }))
+
+vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
 
 vi.mock('../../src/runtime/server/db/queries', () => ({
   tryAcquireCronLock,
@@ -49,7 +51,9 @@ app.use(cronEndpoint)
 const request = toWebHandler(app)
 
 async function getCron() {
-  const response = await request(new Request('http://localhost/__ai-ready/cron'))
+  const response = await request(new Request('http://localhost/__ai-ready/cron', {
+    headers: { authorization: 'Bearer test-secret' },
+  }))
   return { status: response.status, body: await response.json() }
 }
 

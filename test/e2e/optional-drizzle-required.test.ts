@@ -1,12 +1,13 @@
+import { hkdfSync } from 'node:crypto'
 import { loadNuxt } from '@nuxt/kit'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createConsumer } from '../helpers/consumer'
 
 const runtimeIndexing = {
+  runtimeConfig: { appSecret: 'optional-drizzle-application-secret-32-characters' },
   aiReady: {
     runtimeSync: true,
-    runtimeSyncSecret: 'optional-drizzle-secret',
   },
 }
 
@@ -23,7 +24,7 @@ describe('runtime indexing with drizzle-orm installed', async () => {
 
   it('reads the page index', async () => {
     const status = await $fetch<{ total: number, pending: number }>('/__ai-ready/status', {
-      headers: { authorization: `Bearer ${runtimeIndexing.aiReady.runtimeSyncSecret}` },
+      headers: { authorization: `Bearer ${Buffer.from(hkdfSync('sha256', runtimeIndexing.runtimeConfig.appSecret, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')}` },
     })
 
     expect(status).toMatchObject({ total: expect.any(Number), pending: expect.any(Number) })

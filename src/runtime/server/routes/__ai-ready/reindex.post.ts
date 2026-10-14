@@ -3,7 +3,7 @@ import { indexPageByRoute } from '../../utils/indexPage'
 
 export default eventHandler(async (event) => {
   const { requireAuth } = await import('../../utils/auth')
-  requireAuth(event)
+  await requireAuth(event)
 
   const query = getQuery(event)
   const route = typeof query.route === 'string' ? query.route.trim() : ''

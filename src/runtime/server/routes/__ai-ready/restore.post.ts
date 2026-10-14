@@ -7,7 +7,7 @@ import { requireAuth } from '../../utils/auth'
 import { fetchPublicAsset } from '../../utils/cloudflare'
 
 export default eventHandler(async (event) => {
-  requireAuth(event)
+  await requireAuth(event)
 
   const query = getQuery(event)
 
