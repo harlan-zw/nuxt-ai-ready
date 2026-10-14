@@ -36,7 +36,7 @@ export function resolveMarkdownRedirect(location: string, { pageUrl, origins = [
   if (!markdownPath)
     return { _tag: 'redirect', location }
 
-  if (markdownPath === toMarkdownPath(page.pathname))
+  if (markdownPath === toMarkdownPath(page.pathname) && target.search === page.search)
     return { _tag: 'follow', path: `${target.pathname}${target.search}` }
 
   const markdownLocation = `${markdownPath}${target.search}${target.hash}`

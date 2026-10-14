@@ -1,4 +1,5 @@
 import type { RuntimeI18nConfig, RuntimeRouteContext } from './i18n'
+import { parseURL } from 'ufo'
 import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { toMarkdownPath } from '../../markdown-path'
 import { computeLocaleAlternates } from './i18n'
@@ -11,7 +12,7 @@ import { computeLocaleAlternates } from './i18n'
  * `encodeURI` preserves `/` separators and other reserved URL characters.
  */
 export function encodePathForHeader(path: string): string {
-  return encodeURI(path)
+  return encodeURI(path).replace(/%25(?=[\dA-F]{2})/gi, '%')
 }
 
 type LinkUrlResolver = (path: string) => string
@@ -70,9 +71,10 @@ function appendLocaleParts(
   routeContext: RuntimeRouteContext,
 ) {
   if (config.i18n) {
-    const alternates = computeLocaleAlternates(path, config.i18n, routeContext)
+    const { pathname, search = '' } = parseURL(path)
+    const alternates = computeLocaleAlternates(pathname, config.i18n, routeContext)
     for (const alt of alternates) {
-      const alternatePath = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
+      const alternatePath = variant === 'markdown' ? toMarkdownPath(`${alt.path}${search}`) : `${alt.path}${search}`
       const href = resolveLocaleAlternateUrl(
         { ...alt, path: alternatePath },
         candidate => resolveHeaderUrl(candidate, resolveUrl),

@@ -62,8 +62,8 @@ export default defineEventHandler(async (event) => {
 
   await ensureSiteConfig(event)
   const ctx = buildNegotiationContext(event, decision.path)
-  const { path, config, resolvePath, resolveUrl, routeContext } = ctx
-  const canonicalUrl = resolveUrl(path)
+  const { path, requestPath, config, resolvePath, resolveUrl, routeContext } = ctx
+  const canonicalUrl = resolveUrl(requestPath)
   // Source Markdown keeps its root-relative links. Read on its own, such a
   // link has no page URL to resolve against, so every one gets the origin.
   const finalizeMarkdown = (markdown: string) => {
@@ -131,10 +131,10 @@ export default defineEventHandler(async (event) => {
   const origin = getRequestURL(event).origin
   const siteUrl = resolveUrl('/')
   const redirectOptions = {
-    pageUrl: `${origin}${resolvePath(path)}`,
+    pageUrl: `${origin}${resolvePath(requestPath)}`,
     origins: URL.canParse(siteUrl) ? [new URL(siteUrl).origin] : [],
   }
-  let htmlPath = resolvePath(path)
+  let htmlPath = resolvePath(requestPath)
   let response: Response | null = null
   // Two fetches at most: a redirect back onto this same markdown document, such
   // as a trailing-slash redirect, is followed once instead of looping.
@@ -204,7 +204,7 @@ export default defineEventHandler(async (event) => {
 
   // Resolve last_updated: DB (authoritative, set at index time) → page meta tags.
   // No source means no field: the request time would claim the page just changed.
-  const dbPage = await queryPages(event, { route: path }).catch((err) => {
+  const dbPage = await queryPages(event, { route: requestPath }).catch((err) => {
     logger.debug(`[markdown] DB lookup failed for ${path}:`, err)
     return undefined
   }) as { updatedAt?: string } | undefined

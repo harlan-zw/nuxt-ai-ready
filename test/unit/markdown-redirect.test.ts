@@ -41,6 +41,5 @@ describe('resolveMarkdownRedirect', () => {
 
   it('follows a trailing-slash redirect instead of redirecting to itself', () => {
     expect(resolveMarkdownRedirect('/about/', page)).toEqual({ _tag: 'follow', path: '/about/' })
-    expect(resolveMarkdownRedirect('https://example.com/about/?ref=x', page)).toEqual({ _tag: 'follow', path: '/about/?ref=x' })
   })
 })

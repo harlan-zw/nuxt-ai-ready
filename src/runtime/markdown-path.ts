@@ -24,10 +24,11 @@ export function normalizePagePath(path: string): string {
 }
 
 export function toMarkdownPath(path: string): string {
-  const normalizedPath = normalizePagePath(path)
-  if (normalizedPath === '/')
-    return '/index.md'
-  return `${normalizedPath}.md`
+  const index = path.indexOf('?')
+  const pathname = index === -1 ? path : path.slice(0, index)
+  const search = index === -1 ? '' : path.slice(index)
+  const normalizedPath = normalizePagePath(pathname)
+  return `${normalizedPath === '/' ? '/index.md' : `${normalizedPath}.md`}${search}`
 }
 
 /**

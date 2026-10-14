@@ -34,6 +34,8 @@ export type LinkUrlResolver = (path: string) => string
 export interface NegotiationContext {
   config: ModulePublicRuntimeConfig
   path: string
+  /** Page path and query for rendering and representation links. */
+  requestPath: string
   resolvePath: LinkUrlResolver
   resolveUrl: LinkUrlResolver
   routeContext: RuntimeRouteContext
@@ -58,7 +60,7 @@ function createHeaderUrlResolver(event: H3Event, ctx: NegotiationContext): LinkU
 }
 
 export function setLinkHeader(event: H3Event, ctx: NegotiationContext, variant: 'html' | 'markdown') {
-  setHeader(event, 'link', buildLinkHeader(ctx.path, variant, ctx.config, createHeaderUrlResolver(event, ctx), ctx.routeContext))
+  setHeader(event, 'link', buildLinkHeader(ctx.requestPath, variant, ctx.config, createHeaderUrlResolver(event, ctx), ctx.routeContext))
 }
 
 export function setStatusAwareHeader(event: H3Event, ctx: NegotiationContext, variant: 'html' | 'markdown') {
@@ -67,7 +69,7 @@ export function setStatusAwareHeader(event: H3Event, ctx: NegotiationContext, va
     return
   }
 
-  const headers = buildStatusAwareLinkHeaders(ctx.path, variant, ctx.config, createHeaderUrlResolver(event, ctx), ctx.routeContext)
+  const headers = buildStatusAwareLinkHeaders(ctx.requestPath, variant, ctx.config, createHeaderUrlResolver(event, ctx), ctx.routeContext)
   setStatusAwareLinkHeader(event, headers.error, headers.success)
 }
 
@@ -138,6 +140,7 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
   return {
     config: runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig,
     path,
+    requestPath: `${path}${getRequestURL(event).search}`,
     resolvePath,
     resolveUrl: (target: string) => siteConfigUtils.withSiteUrl(event, resolvePath(target), { withBase: true }),
     routeContext: { host: getRequestHost(event, { xForwardedHost: true }) },
@@ -240,5 +243,5 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   appendHeader(event, 'vary', decision.vary)
   setLinkHeader(event, ctx, 'html')
   setUncacheableHeaders(event)
-  return sendRedirect(event, ctx.resolvePath(toMarkdownPath(decision.path)), 307)
+  return sendRedirect(event, ctx.resolvePath(toMarkdownPath(ctx.requestPath)), 307)
 }
