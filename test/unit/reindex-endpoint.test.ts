@@ -26,7 +26,7 @@ vi.mock('#nuxtseo/nitro', () => ({
     throw new Error('No active event')
   },
   useNitroApp: () => ({ hooks: { callHook: vi.fn() } }),
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
+  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({

@@ -52,6 +52,26 @@ function runReindex(url: string, cwd: string, route = '/about', env: Record<stri
 }
 
 describe('cli reindex error handling', () => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy environment key %s and warns', async (key) => {
+    const url = await startReindexStub(200, { route: '/about', indexed: true }, 'legacy-token')
+    const result = await runReindex(url, await writeSecret(), '/about', {
+      [key]: 'legacy-token',
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.stderr).toContain('deprecated')
+  })
+
+  it('prefers the shared root over the legacy environment token', async () => {
+    const root = 'cli-application-secret-with-at-least-32-characters'
+    const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
+    const url = await startReindexStub(200, { route: '/about', indexed: true }, token)
+    const result = await runReindex(url, await writeSecret(), '/about', {
+      NUXT_APP_SECRET: root,
+      NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token',
+    })
+    expect(result.exitCode).toBe(0)
+  })
+
   it('accepts a site URL with a trailing slash', async () => {
     const url = await startReindexStub(200, { route: '/about', indexed: true })
     const result = await runReindex(`${url}/`, await writeSecret())
@@ -84,7 +104,10 @@ describe('cli reindex error handling', () => {
     const url = await startReindexStub(200, { route: '/about', indexed: true })
     const cwd = await writeSecret()
 
-    const result = await runReindex(url, cwd, '/about', { NUXT_APP_SECRET: 'short' })
+    const result = await runReindex(url, cwd, '/about', {
+      NUXT_APP_SECRET: 'short',
+      NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token',
+    })
 
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain('NUXT_APP_SECRET')

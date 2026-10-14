@@ -19,7 +19,7 @@ const { tryAcquireCronLock, releaseCronLock, getCronFastPathStatus } = vi.hoiste
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
+  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config }),
 }))
 
 vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))

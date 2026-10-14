@@ -29,9 +29,9 @@ describe('cloudflare runtime-only application secret', async () => {
   const origin = `http://127.0.0.1:${port}`
   let worker: ReturnType<typeof spawn>
 
-  beforeAll(async () => {
+  async function startWorker(bindings: Record<string, string>) {
     const output = join(useTestContext().nuxt!.options.buildDir, 'output')
-    await writeFile(join(output, 'server/.dev.vars'), `NUXT_APP_SECRET=${root}\n`, { mode: 0o600 })
+    await writeFile(join(output, 'server/.dev.vars'), Object.entries(bindings).map(([key, value]) => `${key}=${value}`).join('\n'), { mode: 0o600 })
     worker = spawn('pnpm', [
       'exec',
       'wrangler',
@@ -62,15 +62,18 @@ describe('cloudflare runtime-only application secret', async () => {
         reject(new Error(`Wrangler exited ${code}: ${logs}`))
       })
     })
-  }, 70000)
+  }
 
-  afterAll(async () => {
+  async function stopWorker() {
     if (!worker?.pid || worker.exitCode !== null)
       return
     const exited = new Promise<void>(resolve => worker.once('exit', () => resolve()))
     process.kill(-worker.pid, 'SIGTERM')
     await exited
-  })
+  }
+
+  beforeAll(() => startWorker({ NUXT_APP_SECRET: root, NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token' }), 70000)
+  afterAll(stopWorker)
 
   it('authenticates using the request binding without a build secret', async () => {
     // An authenticated request reaches route validation before any D1 query.
@@ -79,11 +82,21 @@ describe('cloudflare runtime-only application secret', async () => {
     expect(await response.json()).toMatchObject({ message: expect.stringContaining('Invalid route') })
   })
 
-  it.each([undefined, root])('rejects an invalid bearer token: %s', async (bearer) => {
+  it.each([undefined, root, 'legacy-token'])('rejects an invalid bearer token: %s', async (bearer) => {
     const response = await fetch(`${origin}/__ai-ready/reindex`, {
       method: 'POST',
       headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
     })
     expect(response.status).toBe(401)
   })
+
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy runtime binding %s', async (key) => {
+    await stopWorker()
+    await startWorker({ [key]: 'legacy-runtime-token' })
+    const response = await fetch(`${origin}/__ai-ready/reindex`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer legacy-runtime-token' },
+    })
+    expect(response.status).toBe(400)
+  }, 70000)
 })

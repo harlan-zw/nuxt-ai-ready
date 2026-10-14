@@ -1,4 +1,5 @@
 export const RUNTIME_SYNC_SECRET_PURPOSE = 'nuxt-ai-ready:runtime-sync'
+export const LEGACY_RUNTIME_SYNC_SECRET_WARNING = 'runtimeSyncSecret and NUXT_AI_READY_RUNTIME_SYNC_SECRET are deprecated. Set NUXT_APP_SECRET. Refresh scheduler tokens with `nuxt-ai-ready token`.'
 
 /** Nuxt deriveSecret's HKDF, for the CLI and event-bound Worker secrets. */
 export async function deriveRuntimeSyncSecret(root: unknown): Promise<string> {

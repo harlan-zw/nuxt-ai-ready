@@ -8,12 +8,17 @@ import { join, resolve } from 'pathe'
 import { joinURL } from 'ufo'
 import { readPackageMetadata } from './package-metadata'
 import { auditSite, parseAuditOptions } from './readiness-audit'
-import { deriveRuntimeSyncSecret } from './runtime/sync-secret'
+import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const root = process.env.NITRO_APP_SECRET ?? process.env.NUXT_APP_SECRET
-  if (root !== undefined)
+  if (root !== undefined && root !== '')
     return deriveRuntimeSyncSecret(root)
+  const legacy = process.env.NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET ?? process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
+  if (legacy) {
+    console.warn(`[nuxt-ai-ready] ${LEGACY_RUNTIME_SYNC_SECRET_WARNING}`)
+    return legacy
+  }
   const secretPath = join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret')
   if (!existsSync(secretPath)) {
     return null
@@ -70,7 +75,7 @@ const main = defineCommand({
   },
   subCommands: {
     token: () => defineCommand({
-      meta: { name: 'token', description: 'Print the runtime sync bearer token derived from NUXT_APP_SECRET' },
+      meta: { name: 'token', description: 'Print the runtime sync bearer token' },
       args: { cwd: { type: 'string', description: 'Working directory', default: '.' } },
       async run({ args }) {
         const secret = await requireSecret(resolve(args.cwd))

@@ -20,7 +20,7 @@ vi.mock('#nuxtseo/nitro', () => ({
   useEvent: () => {
     throw new Error('No active event')
   },
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': mocks.config }),
+  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': mocks.config }),
 }))
 
 vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
