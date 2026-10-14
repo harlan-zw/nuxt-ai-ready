@@ -28,11 +28,13 @@ vi.mock('../../src/runtime/server/db', () => ({
 vi.mock('#nuxtseo/nitro', () => ({
   fetchWithEvent: mocks.fetch,
   useEvent: () => { throw new Error('No active event') },
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': { debug: false, runtimeSyncSecret: 'test-secret' } }),
+  useRuntimeConfig: () => ({ 'nuxt-ai-ready': { debug: false } }),
   useNitroApp: () => ({ hooks: { callHook: vi.fn() } }),
 }))
+vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
 vi.mock('../../src/runtime/server/logger', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() } }))
 vi.mock('../../src/runtime/server/utils/cloudflare', () => ({
+  getCfEnv: () => undefined,
   fetchPublicAsset: async (_event: unknown, path: string) => mocks.assets[path] ?? null,
 }))
 

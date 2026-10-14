@@ -369,12 +369,6 @@ export interface ModuleOptions {
   cron?: boolean
 
   /**
-   * Secret token for authenticating runtime sync endpoints
-   * When set, requires `Authorization: Bearer <token>` header for runtime sync endpoints
-   */
-  runtimeSyncSecret?: string
-
-  /**
    * Prerender configuration
    */
   prerender?: {

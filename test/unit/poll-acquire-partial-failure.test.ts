@@ -23,6 +23,8 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': mocks.config }),
 }))
 
+vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
+
 vi.mock('../../src/runtime/server/db/drizzle/queries', () => ({
   initSchema: mocks.initSchema,
 }))
@@ -71,7 +73,10 @@ function getLockValue(): string | undefined {
 }
 
 async function postPoll() {
-  const response = await request(new Request('http://localhost/__ai-ready/poll', { method: 'POST' }))
+  const response = await request(new Request('http://localhost/__ai-ready/poll', {
+    method: 'POST',
+    headers: { authorization: 'Bearer test-secret' },
+  }))
   return { status: response.status, body: await response.json() }
 }
 
@@ -94,7 +99,6 @@ describe('pOST /__ai-ready/poll with a failing lock verify read', () => {
       duration: 1,
       complete: true,
     })
-    delete mocks.config.runtimeSyncSecret
   })
 
   it('best-effort releases the lock so a retry is not answered 409', async () => {

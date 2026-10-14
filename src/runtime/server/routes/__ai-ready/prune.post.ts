@@ -12,7 +12,7 @@ export default eventHandler(async (event) => {
   // Require auth for non-dry runs
   if (!dry) {
     const { requireAuth } = await import('../../utils/auth')
-    requireAuth(event)
+    await requireAuth(event)
   }
 
   const ttl = query.ttl ? Math.max(0, Math.trunc(Number(query.ttl)) || config.runtimeSync.pruneTtl) : config.runtimeSync.pruneTtl

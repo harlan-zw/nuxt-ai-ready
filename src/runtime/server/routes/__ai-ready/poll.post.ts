@@ -6,7 +6,7 @@ import { batchIndexPages } from '../../utils/batchIndex'
 
 export default eventHandler(async (event) => {
   const { requireAuth } = await import('../../utils/auth')
-  requireAuth(event)
+  await requireAuth(event)
 
   const lock = await tryAcquireCronLock(event)
   if (lock._tag === 'held') {

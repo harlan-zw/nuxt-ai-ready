@@ -29,13 +29,16 @@ For D1, set `database: { type: 'd1', bindingName: 'AI_READY_DB' }` and create th
 export default defineNuxtConfig({
   aiReady: {
     runtimeSync: { ttl: 3600, batchSize: 50, pruneTtl: 0 },
-    runtimeSyncSecret: process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET,
     cron: true, // every 5 minutes, also enables runtimeSync
   },
 })
 ```
 
-Set `runtimeSyncSecret`. Without it, each build generates a new random secret, and external schedulers lose access after the next deployment.
+Set `NUXT_APP_SECRET` in production to a string with at least 32 characters.
+AI Ready and OG Image derive separate tokens from this shared Nuxt root secret.
+Run `pnpm exec nuxt-ai-ready token` with the root secret in your environment to obtain the runtime sync bearer token.
+Cloudflare can supply the root through its encrypted `NUXT_APP_SECRET` binding at runtime.
+Protected requests return `500` when the root secret is missing or invalid.
 
 Every control endpoint needs `Authorization: Bearer <secret>`, including `GET /__ai-ready/status`. Only `POST /__ai-ready/prune?dry=true` works without it.
 

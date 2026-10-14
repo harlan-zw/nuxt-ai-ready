@@ -5,10 +5,15 @@ import { defineCommand, runMain } from 'citty'
 import { consola } from 'consola'
 import { colors } from 'consola/utils'
 import { join, resolve } from 'pathe'
+import { joinURL } from 'ufo'
 import { readPackageMetadata } from './package-metadata'
 import { auditSite, parseAuditOptions } from './readiness-audit'
+import { deriveRuntimeSyncSecret } from './runtime/sync-secret'
 
 async function getSecret(cwd: string): Promise<string | null> {
+  const root = process.env.NITRO_APP_SECRET ?? process.env.NUXT_APP_SECRET
+  if (root !== undefined)
+    return deriveRuntimeSyncSecret(root)
   const secretPath = join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret')
   if (!existsSync(secretPath)) {
     return null
@@ -23,10 +28,10 @@ function authHeaders(secret: string): Record<string, string> {
   return { Authorization: `Bearer ${secret}` }
 }
 
-async function requireSecret(cwd: string, hint = ''): Promise<string | null> {
+async function requireSecret(cwd: string): Promise<string> {
   const secret = await getSecret(cwd)
   if (!secret) {
-    consola.error(`No secret found. Run \`nuxi dev\` or \`nuxi build\` first${hint}.`)
+    throw new Error('No secret found. Set NUXT_APP_SECRET, or run `nuxt dev` to cache its development token.')
   }
   return secret
 }
@@ -64,6 +69,14 @@ const main = defineCommand({
     version: await readPackageMetadata(import.meta.url).then(p => p.version || '0.0.0'),
   },
   subCommands: {
+    token: () => defineCommand({
+      meta: { name: 'token', description: 'Print the runtime sync bearer token derived from NUXT_APP_SECRET' },
+      args: { cwd: { type: 'string', description: 'Working directory', default: '.' } },
+      async run({ args }) {
+        const secret = await requireSecret(resolve(args.cwd))
+        process.stdout.write(`${secret}\n`)
+      },
+    }),
     audit: () => defineCommand({
       meta: { name: 'audit', description: 'Check a public page and its agent discovery documents' },
       args: {
@@ -110,11 +123,11 @@ const main = defineCommand({
       },
       async run({ args }) {
         const cwd = resolve(args.cwd || '.')
-        const secret = await requireSecret(cwd, ' to generate one')
+        const secret = await requireSecret(cwd)
         if (!secret)
           return
 
-        const url = `${args.url}/__ai-ready/status`
+        const url = joinURL(args.url, '/__ai-ready/status')
         consola.info(`Fetching status from ${args.url}...`)
 
         const res = await fetchJson(url, { headers: authHeaders(secret) }, 'Failed to connect')
@@ -208,7 +221,7 @@ const main = defineCommand({
           params.set('limit', args.limit || '10')
         }
 
-        const url = `${args.url}/__ai-ready/poll?${params}`
+        const url = joinURL(args.url, `/__ai-ready/poll?${params}`)
         consola.info(`Triggering poll at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
@@ -259,7 +272,7 @@ const main = defineCommand({
           params.set('clear', 'false')
         }
 
-        const url = `${args.url}/__ai-ready/restore?${params}`
+        const url = joinURL(args.url, `/__ai-ready/restore?${params}`)
         consola.info(`Restoring database at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
@@ -303,8 +316,7 @@ const main = defineCommand({
         const secret = await getSecret(cwd)
 
         if (!secret && !args.dry) {
-          consola.error('No secret found. Run `nuxi dev` or `nuxi build` first.')
-          return
+          throw new Error('No secret found. Set NUXT_APP_SECRET, or run `nuxt dev` to cache its development token.')
         }
 
         const params = new URLSearchParams()
@@ -313,7 +325,7 @@ const main = defineCommand({
         if (args.ttl)
           params.set('ttl', args.ttl)
 
-        const url = `${args.url}/__ai-ready/prune?${params}`
+        const url = joinURL(args.url, `/__ai-ready/prune?${params}`)
         consola.info(`${args.dry ? 'Previewing' : 'Pruning'} stale routes at ${args.url}...`)
 
         const res = await fetchJson(url, {
@@ -378,7 +390,7 @@ const main = defineCommand({
         if (!args.force)
           params.set('force', 'false')
 
-        const url = `${args.url}/__ai-ready/reindex?${params}`
+        const url = joinURL(args.url, `/__ai-ready/reindex?${params}`)
         consola.info(`Reindexing ${args.route} at ${args.url}...`)
 
         const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })

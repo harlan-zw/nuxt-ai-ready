@@ -1,3 +1,4 @@
+import { hkdfSync } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import postgres from 'postgres'
@@ -5,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 
 // Helper to bypass Nuxt's typed route inference which causes TS2321 stack depth errors
 const fetch = (url: string, opts?: Parameters<typeof $fetch>[1]) => $fetch(url as '/', opts)
-const authHeaders = { authorization: 'Bearer test-secret-123' }
+const secret = Buffer.from(hkdfSync('sha256', 'runtime-indexing-application-secret-32-characters', 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
+const authHeaders = { authorization: `Bearer ${secret}` }
 const postgresUrl = process.env.NUXT_AI_READY_TEST_POSTGRES_URL
 
 describe('runtime indexing', async () => {

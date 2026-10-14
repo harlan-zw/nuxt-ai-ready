@@ -21,6 +21,8 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
 }))
 
+vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'secret-token' }))
+
 vi.mock('../../src/runtime/server/db/queries', () => ({
   tryAcquireCronLock,
   releaseCronLock,
@@ -40,15 +42,17 @@ const app = createApp()
 app.use(pollEndpoint)
 const request = toWebHandler(app)
 
-async function postPoll(url = 'http://localhost/__ai-ready/poll') {
-  const response = await request(new Request(url, { method: 'POST' }))
+async function postPoll(url = 'http://localhost/__ai-ready/poll', authenticated = true) {
+  const response = await request(new Request(url, {
+    method: 'POST',
+    headers: authenticated ? { authorization: 'Bearer secret-token' } : {},
+  }))
   return { status: response.status, body: await response.json() }
 }
 
 describe('pOST /__ai-ready/poll', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    delete config.runtimeSyncSecret
     tryAcquireCronLock.mockResolvedValue({ _tag: 'acquired', token: 'lock-token' })
     releaseCronLock.mockResolvedValue(undefined)
     batchIndexPages.mockResolvedValue({
@@ -95,9 +99,7 @@ describe('pOST /__ai-ready/poll', () => {
   })
 
   it('checks auth before touching the lock', async () => {
-    config.runtimeSyncSecret = 'secret-token'
-
-    const denied = await postPoll()
+    const denied = await postPoll(undefined, false)
 
     expect(denied.status).toBe(401)
     expect(tryAcquireCronLock).not.toHaveBeenCalled()

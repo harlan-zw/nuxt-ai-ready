@@ -1,34 +1,26 @@
 import type { H3Event } from '#nuxtseo/h3'
-import type { ModulePublicRuntimeConfig } from '../../../module'
-import { logger } from '#ai-ready-virtual/logger.mjs'
-import { createError, getHeader, getQuery } from '#nuxtseo/h3'
-import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { deriveSecret } from 'nuxt/server'
+import { createError, getHeader } from '#nuxtseo/h3'
+import { deriveRuntimeSyncSecret, RUNTIME_SYNC_SECRET_PURPOSE } from '../../sync-secret'
+import { getCfEnv } from './cloudflare'
 
 /**
  * Verify the request has a valid Authorization: Bearer token.
  * Throws 401 if the token is missing or invalid.
- * No-op if runtimeSyncSecret is not configured.
- *
- * Also accepts the deprecated `?secret=` query param with a warning.
+ * Missing or invalid application secrets fail closed with 500.
  */
-export function requireAuth(event: H3Event): void {
-  const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-  if (!config.runtimeSyncSecret)
-    return
-
+export async function requireAuth(event: H3Event): Promise<void> {
+  const root = getCfEnv(event)?.NUXT_APP_SECRET
+  // Nuxt 4.6 deriveSecret has no event argument. Nitro 2 cannot read Worker
+  // bindings through its shared runtime config, so derive from that binding.
+  const secret = await (root === undefined
+    ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE)
+    : deriveRuntimeSyncSecret(root)).catch((cause: unknown) => {
+    throw createError({ statusCode: 500, message: 'Set NUXT_APP_SECRET to a string with at least 32 characters.', cause })
+  })
   const authHeader = getHeader(event, 'authorization')
-  let token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
-
-  // Backward compat: accept ?secret= query param (deprecated in v1)
-  if (!token) {
-    const query = getQuery(event)
-    if (query.secret) {
-      token = String(query.secret)
-      logger.warn('Using `?secret=` query parameter is deprecated. Use `Authorization: Bearer <token>` header instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
-    }
-  }
-
-  if (!token || token !== config.runtimeSyncSecret) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
+  if (!token || token !== secret) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 }
