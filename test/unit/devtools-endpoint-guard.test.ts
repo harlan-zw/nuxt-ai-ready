@@ -1,3 +1,4 @@
+/* eslint-disable harlanzw/no-test-file-reads -- The dev-or-debug guard is build-time wiring; only the module source shows the handler sits inside the guard. */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import ts from 'typescript'
