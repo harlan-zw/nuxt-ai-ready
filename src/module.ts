@@ -31,6 +31,7 @@ import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation'
 import { resolveConfigurationWarnings } from './utils/config-warnings'
 import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal'
+import { AI_READY_CRON_SCHEDULE } from './utils/cron'
 import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
 import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
 import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
@@ -842,12 +843,18 @@ export default defineNuxtModule<ModuleOptions>({
         const externals = nitroConfig.externals ||= {}
         externals.external ||= []
         ;(externals.external as string[]).push('mdream')
+        // The sqlite provider imports the node:sqlite builtin. The bundler's
+        // builtin list predates it, so rollup must be told directly that the
+        // import is external. `externals.external` cannot do this: it only
+        // re-routes resolvable packages.
+        const rollupExternal = (nitroConfig.rollupConfig ||= {}).external ||= []
+        if (Array.isArray(rollupExternal))
+          rollupExternal.push('node:sqlite')
       }
 
       // Register scheduled task if cron is enabled (runs every 5 minutes)
       // Disabled in dev mode - context isn't fully available
       if (config.cron && !nuxt.options.dev) {
-        const cronSchedule = '*/5 * * * *'
         const preset = String(nitroConfig.preset || '')
         const isVercel = preset === 'vercel' || preset === 'vercel-edge'
         const isCloudflarePages = preset === 'cloudflare-pages' || preset === 'cloudflare_pages'
@@ -864,7 +871,7 @@ export default defineNuxtModule<ModuleOptions>({
           nitroConfig.vercel.config = nitroConfig.vercel.config || {}
           nitroConfig.vercel.config.crons = nitroConfig.vercel.config.crons || []
           nitroConfig.vercel.config.crons.push({
-            schedule: cronSchedule,
+            schedule: AI_READY_CRON_SCHEDULE,
             path: '/__ai-ready/cron',
           })
         }
@@ -878,8 +885,8 @@ export default defineNuxtModule<ModuleOptions>({
           }
 
           nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
-          nitroConfig.scheduledTasks[cronSchedule] = nitroConfig.scheduledTasks[cronSchedule] || []
-          ; (nitroConfig.scheduledTasks[cronSchedule] as string[]).push('ai-ready:cron')
+          nitroConfig.scheduledTasks[AI_READY_CRON_SCHEDULE] = nitroConfig.scheduledTasks[AI_READY_CRON_SCHEDULE] || []
+          ; (nitroConfig.scheduledTasks[AI_READY_CRON_SCHEDULE] as string[]).push('ai-ready:cron')
 
           // Auto-configure Cloudflare wrangler cron triggers (Workers only)
           const isCloudflareWorkers = preset.startsWith('cloudflare')
@@ -889,8 +896,8 @@ export default defineNuxtModule<ModuleOptions>({
             nitroConfig.cloudflare.wrangler = nitroConfig.cloudflare.wrangler || {}
             nitroConfig.cloudflare.wrangler.triggers = nitroConfig.cloudflare.wrangler.triggers || {}
             nitroConfig.cloudflare.wrangler.triggers.crons = nitroConfig.cloudflare.wrangler.triggers.crons || []
-            if (!nitroConfig.cloudflare.wrangler.triggers.crons.includes(cronSchedule)) {
-              nitroConfig.cloudflare.wrangler.triggers.crons.push(cronSchedule)
+            if (!nitroConfig.cloudflare.wrangler.triggers.crons.includes(AI_READY_CRON_SCHEDULE)) {
+              nitroConfig.cloudflare.wrangler.triggers.crons.push(AI_READY_CRON_SCHEDULE)
             }
           }
         }
