@@ -23,8 +23,10 @@ describe('llms.txt directive in HTML', async () => {
   it('keeps the link visually hidden and outside keyboard navigation', async () => {
     const html = await $fetch<string>('/about')
     const window = new Window()
-    window.document.body.innerHTML = html
-    const link = window.document.querySelector<HTMLAnchorElement>('a[data-llms-txt-directive]')!
+    // Keep parsed HTML disconnected so resource links cannot start loads.
+    const template = window.document.createElement('template')
+    template.innerHTML = html
+    const link = template.content.querySelector<HTMLAnchorElement>('a[data-llms-txt-directive]')!
     expect(link.getAttribute('href')).toBe('/llms.txt')
     expect(link.style.position).toBe('absolute')
     expect(link.style.width).toBe('1px')
