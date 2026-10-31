@@ -8,15 +8,14 @@ minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - nuxtseo-layer-devtools
   - nuxtseo-shared
-  - sitemapd@0.2.2
-  - '@nuxt/cli@4.0.0'
-  - '@nuxt/kit@4.6.0'
-  - '@nuxt/nitro-server@4.6.0'
-  - '@nuxt/schema@4.6.0'
-  - '@nuxt/vite-builder@4.6.0'
-  - '@nuxt/vite-server@4.6.0'
-  - nuxt@4.6.0
-  - '@harlan-zw/comark-content@0.2.0'
+  - sitemapd@0.2.3
+  - '@nuxt/kit@4.6.2'
+  - '@nuxt/nitro-server@4.6.2'
+  - '@nuxt/schema@4.6.2'
+  - '@nuxt/vite-builder@4.6.2'
+  - '@nuxt/vite-server@4.6.2'
+  - nuxt@4.6.2
+  - '@harlan-zw/comark-content@0.2.2'
   - '@mdream/js@2.0.3'
   - '@mdream/rust-android-arm-eabi@2.0.3'
   - '@mdream/rust-android-arm64@2.0.3'
@@ -86,7 +85,7 @@ overrides:
   nuxtseo-shared: https://pkg.pr.new/harlan-zw/nuxt-seo/nuxtseo-shared@113287e3fb44472264dd56fc90fb695ff8a9f6dd
   site-config-stack: https://pkg.pr.new/harlan-zw/nuxt-site-config/site-config-stack@40698727ca424460013f3534af9005e36728d669
 
-  vue: ^3.5.43
+  vue: ^3.5.44
 
 allowBuilds:
   '@firebase/util': false
@@ -113,7 +112,7 @@ onlyBuiltDependencies:
   - vue-demi
 
 catalog:
-  '@harlan-zw/comark-content': ^0.2.0
+  '@harlan-zw/comark-content': ^0.2.2
   '@libsql/client': ^0.18.0
   '@mdream/js': ^2.0.3
   '@types/better-sqlite3': ^9.6.0
@@ -125,51 +124,51 @@ catalog:
   defu: ^6.1.7
   drizzle-orm: 1.0.0-rc.4
   eslint-plugin-harlanzw: ^0.23.0
-  execa: ^10.0.1
-  h3: ^2.0.1
+  execa: ^10.2.0
+  h3: ^2.0.5
   mdream: ^2.0.3
   nitropack: ^2.13.4
-  nuxtseo-layer-devtools: ^5.3.16
+  nuxtseo-layer-devtools: ^6.0.2
   nuxtseo-shared: ^6.0.0
   ohash: ^2.0.12
   pathe: ^2.0.3
   postgres: ^3.4.9
   site-config-stack: ^5.0.0
-  sitemapd: ^0.2.2
+  sitemapd: ^0.2.3
   ufo: ^1.6.4
   unbuild: ^3.6.1
-  vue: ^3.5.43
-  wrangler: ^4.147.0
+  vue: ^3.5.44
+  wrangler: ^4.151.1
   yaml: ^2.9.1
-  zod: ^4.6.5
+  zod: ^4.6.7
 
 catalogs:
   dev-build:
     '@arethetypeswrong/cli': ^0.18.5
     typescript: 6.0.3
-    vue-tsc: ^3.3.12
+    vue-tsc: ^3.3.13
   dev-lint:
     '@antfu/eslint-config': ^9.5.1
     '@nuxtjs/eslint-config-typescript': ^12.1.0
-    eslint: ^10.12.0
+    eslint: ^10.13.0
   dev-test:
-    '@nuxt/test-utils': ^4.3.3
-    '@vitest/coverage-v8': ^5.0.3
+    '@nuxt/test-utils': ^4.3.4
+    '@vitest/coverage-v8': ^5.0.5
     '@vue/test-utils': ^2.5.1
-    happy-dom: ^20.14.5
-    playwright: ^1.63.0
-    playwright-core: ^1.63.0
-    vitest: ^5.0.3
+    happy-dom: ^21.0.3
+    playwright: ^1.64.1
+    playwright-core: ^1.64.1
+    vitest: ^5.0.5
   nuxt:
-    '@nuxt/content': ^3.16.1
-    '@nuxt/kit': ^4.6.0
+    '@nuxt/content': ^3.16.2
+    '@nuxt/kit': ^4.6.2
     '@nuxt/module-builder': ^1.0.3
-    '@nuxt/ui': ^4.11.3
-    '@nuxtjs/mcp-toolkit': ^0.23.0
+    '@nuxt/ui': ^4.12.0
+    '@nuxtjs/mcp-toolkit': ^0.24.2
     '@nuxtjs/robots': ^7.0.0
     '@nuxtjs/sitemap': ^9.0.0
     '@vueuse/nuxt': ^15.0.0
-    nuxt: 4.6.0
+    nuxt: 4.6.2
     nuxt-site-config: ^5.0.0
   vue:
-    vue-router: ^5.3.1
+    vue-router: ^5.4.0
