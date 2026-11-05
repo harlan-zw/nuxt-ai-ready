@@ -239,9 +239,10 @@ export interface ModuleOptions {
      */
     aiTrain?: boolean
     /**
-     * Emit the draft Content-Usage robots.txt directive.
-     * Set to false to avoid robots.txt validators that do not support it yet.
-     * @default true
+     * Emit the draft IETF AI Preferences Content-Usage robots.txt directive.
+     * The Lighthouse robots-txt audit fails it as an unknown directive, so it is opt-in.
+     * Content-Signal already states the ai-train preference.
+     * @default false
      */
     contentUsage?: boolean
     /**

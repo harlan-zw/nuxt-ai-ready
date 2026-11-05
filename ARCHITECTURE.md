@@ -492,7 +492,7 @@ The `contentSignal` option configures robots.txt directives for AI crawlers:
 ```typescript
 contentSignal: {
   aiTrain: true,   // Allow AI model training
-  contentUsage: true, // Emit Content-Usage directive
+  contentUsage: false, // Opt-in: emit the draft Content-Usage directive
   search: true,    // Allow search indexing
   aiInput: true,   // Allow RAG/grounding
 }
@@ -501,11 +501,10 @@ contentSignal: {
 Generates robots.txt entries:
 ```
 User-agent: *
-Content-Usage: train-ai=y
 Content-Signal: ai-train=yes, search=yes, ai-input=yes
 ```
 
-Set `contentUsage: false` to omit the draft `Content-Usage` directive.
+Set `contentUsage: true` to also emit the draft `Content-Usage` directive. It is opt-in because the Lighthouse `robots-txt` audit fails it as an unknown directive.
 
 ## MCP Integration
 

@@ -20,7 +20,7 @@ describe('robots.txt content signals without explicit robots config', async () =
     expect(robotsTxt).toBeTruthy()
     expect(robotsTxt).toMatch(/^Content-Signal: ai-train=yes, search=yes, ai-input=no$/m)
     expect(robotsTxt.match(/^Content-Signal:/gm)).toHaveLength(1)
-    expect(robotsTxt).toMatch(/^Content-Usage: train-ai=y$/m)
+    expect(robotsTxt).not.toMatch(/^Content-Usage\s*:/im)
     expect(robotsTxt).toMatch(/^Disallow:\s*$/m)
   })
 })
