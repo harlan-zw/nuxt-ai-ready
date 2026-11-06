@@ -26,7 +26,8 @@ export function resolveContentSignalPolicy(option: ModuleOptions['contentSignal'
     _tag: 'Configured',
     // One comma-separated line: validators reject one line per signal.
     contentSignal: `ai-train=${value(option.aiTrain)}, search=${value(option.search)}, ai-input=${value(option.aiInput)}`,
-    ...(option.contentUsage !== false && { contentUsage: `train-ai=${option.aiTrain ? 'y' : 'n'}` }),
+    // Opt-in: Lighthouse's robots-txt audit fails Content-Usage as an unknown directive.
+    ...(option.contentUsage === true && { contentUsage: `train-ai=${option.aiTrain ? 'y' : 'n'}` }),
   }
 }
 

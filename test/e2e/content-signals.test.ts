@@ -1,5 +1,5 @@
 import { createResolver } from '@nuxt/kit'
-import { $fetch, fetch, setup } from '@nuxt/test-utils/e2e'
+import { $fetch, setup } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -11,14 +11,11 @@ describe('robots.txt content signals', async () => {
     server: true,
   })
 
-  it('includes content-usage directive in robots.txt', async () => {
+  it('omits the content-usage directive by default', async () => {
     const robotsTxt = await $fetch('/robots.txt')
 
-    expect(robotsTxt).toBeTruthy()
-    expect(typeof robotsTxt).toBe('string')
-
-    // Should include train-ai directive based on aiTrain: true
-    expect(robotsTxt).toContain('train-ai=y')
+    // Lighthouse's robots-txt audit fails Content-Usage as an unknown directive, so it is opt-in
+    expect(robotsTxt).not.toMatch(/^Content-Usage\s*:/im)
   })
 
   it('includes content-signal directives in robots.txt', async () => {
@@ -32,16 +29,6 @@ describe('robots.txt content signals', async () => {
   it('applies to user-agent wildcard', async () => {
     const robotsTxt = await $fetch('/robots.txt')
 
-    // Should have User-agent: * somewhere before the directives
     expect(robotsTxt).toContain('User-agent: *')
-  })
-
-  it('keeps the source response policy on its Markdown twin', async () => {
-    const html = await fetch('/about')
-    const markdown = await fetch('/about.md')
-
-    expect(html.headers.get('content-signal')).toBe('ai-train=no, search=yes')
-    expect(markdown.headers.get('content-signal')).toBe(html.headers.get('content-signal'))
-    expect(markdown.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
   })
 })

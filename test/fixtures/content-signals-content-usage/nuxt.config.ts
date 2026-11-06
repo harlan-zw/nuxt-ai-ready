@@ -13,7 +13,7 @@ export default defineNuxtConfig({
   site: {
     url: 'https://test.example.com',
     name: 'Test Site',
-    description: 'Test site for content signals without Content-Usage',
+    description: 'Test site for content signals with Content-Usage',
     indexable: true,
   },
   robots: {
@@ -22,7 +22,7 @@ export default defineNuxtConfig({
   aiReady: {
     contentSignal: {
       aiTrain: true,
-      contentUsage: false,
+      contentUsage: true,
       search: true,
       aiInput: false,
     },
