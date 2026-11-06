@@ -1,3 +1,23 @@
+## v3.5.0
+
+[compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.4.0...v3.5.0)
+
+`robots.txt` no longer sends the draft `Content-Usage` line by default, so the Lighthouse `robots-txt` audit passes again.
+
+### 🩹 Fixes
+
+- **robots:** Send `Content-Usage` only when `contentSignal.contentUsage: true` is set ([#232](https://github.com/harlan-zw/nuxt-ai-ready/pull/232)).
+- **auth:** Derive runtime sync tokens from the Nuxt `appSecret` ([#219](https://github.com/harlan-zw/nuxt-ai-ready/pull/219)).
+- **module:** Treat `node:sqlite` as external in Nitro builds ([#228](https://github.com/harlan-zw/nuxt-ai-ready/pull/228)).
+
+### 📝 Migration
+
+If you rely on the `Content-Usage` line, set `aiReady.contentSignal.contentUsage: true`.
+The Lighthouse `robots-txt` audit then fails again. If you set `contentUsage: false`, you can remove that key.
+Production builds no longer generate a random runtime sync token.
+Set `NUXT_APP_SECRET` with at least 32 characters on every server instance or Worker.
+Existing `runtimeSyncSecret` values and legacy environment keys keep working while `appSecret` is unset.
+
 ## v3.4.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.3.1...v3.4.0)
