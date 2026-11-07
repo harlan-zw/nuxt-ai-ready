@@ -6,6 +6,10 @@ import { resolveLocaleAlternateUrl } from '../../i18n-url'
 import { insertLlmsTxtDirective } from '../../llms-txt-directive'
 import { absoluteMarkdownLinks } from '../../markdown-links'
 import { logger } from '../logger'
+import { convertHtmlToMarkdown, extractLastUpdated } from '../utils'
+import { tryGetContentMarkdown } from '../utils/content'
+import { fetchRawWithEvent } from '../utils/fetch'
+import { buildFrontmatter, layerFrontmatter } from '../utils/frontmatter'
 import { computeLocaleAlternates, resolveLocaleFromRoute } from '../utils/i18n'
 import { resolveMarkdownRedirect } from '../utils/markdown-redirect'
 import { INTERNAL_HEADER } from '../utils/negotiation-decision'
@@ -15,7 +19,7 @@ import { appendSitemapSection, isSitemapMdRequest, SITEMAP_MD_ROUTE } from '../u
 function notFoundMarkdown(
   ctx: NegotiationContext,
   canonicalUrl: string,
-  build: typeof import('../utils/frontmatter').buildFrontmatter,
+  build: typeof buildFrontmatter,
 ): string {
   const { path, config, resolveUrl, routeContext } = ctx
   const body = [
@@ -76,16 +80,6 @@ export default defineEventHandler(async (event) => {
       : insertLlmsTxtDirective(withSitemap, resolveUrl('/llms.txt'))
     return absoluteMarkdownLinks(withDirective, canonicalUrl)
   }
-
-  const [
-    { tryGetContentMarkdown },
-    { fetchRawWithEvent },
-    { buildFrontmatter, layerFrontmatter },
-  ] = await Promise.all([
-    import('../utils/content'),
-    import('../utils/fetch'),
-    import('../utils/frontmatter'),
-  ])
 
   // A site that already holds the markdown a page was rendered from can serve
   // it verbatim. That is better than converting the rendering back, and it
@@ -194,13 +188,7 @@ export default defineEventHandler(async (event) => {
   const html = await response.text()
   logger.debug(`[markdown] Fetched HTML for ${path} (${html.length} bytes)`)
 
-  const [
-    { queryPages },
-    { convertHtmlToMarkdown, extractLastUpdated },
-  ] = await Promise.all([
-    import('../db/queries'),
-    import('../utils'),
-  ])
+  const { queryPages } = await import('../db/queries')
 
   // Resolve last_updated: DB (authoritative, set at index time) → page meta tags.
   // No source means no field: the request time would claim the page just changed.
