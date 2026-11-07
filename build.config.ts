@@ -19,6 +19,13 @@ export default defineBuildConfig({
       }))
       await Promise.all(dtsFiles.filter(file => file.isFile()).map(file => unlink(resolve(file.parentPath, file.name))))
     },
+    'rollup:dts:options': (_ctx, options) => {
+      // The CLI entry exports no types, so the declaration pass emits an empty
+      // `cli.d.mts` chunk and rollup warns "Generated an empty chunk: cli".
+      // Keep the CLI out of that pass; `bin` only runs the compiled `cli.mjs`.
+      if (options.input && typeof options.input === 'object' && !Array.isArray(options.input))
+        delete options.input.cli
+    },
   },
   externals: [
     'node:sqlite',
