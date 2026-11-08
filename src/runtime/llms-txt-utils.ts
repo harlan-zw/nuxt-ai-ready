@@ -1,6 +1,5 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { LlmsTxtPage } from './llms-txt-files'
-import type { PageMetadata } from './server/db/queries'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { decodePath } from 'ufo'
@@ -81,17 +80,15 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
     sitemapPaths.set(name, paths)
   }
   const admitted = new Set([...sitemapPaths.values()].flatMap(paths => [...paths]))
-  let stored: PageMetadata[] = []
-  if (aiReadyConfig.database?._tag !== 'Disabled') {
-    const read = config.pages === 'all'
-      ? Promise.all([queryPages(event), queryPages(event, { where: { hasError: true } })]).then(results => results.flat())
-      // Include legacy deployed routes without scanning every retired database row.
-      : queryPageMetadata(event, [...admitted].flatMap(path => [path, toDeployedRoute(path, baseURL)]))
-    stored = await read.catch((error) => {
-      logger.warn(`[ai-ready] Database unavailable for llms.txt. Using sitemap metadata: ${error instanceof Error ? error.message : String(error)}`)
-      return []
-    })
-  }
+  // The query layer selects build storage during prerender and runtime storage otherwise.
+  const read = config.pages === 'all'
+    ? Promise.all([queryPages(event), queryPages(event, { where: { hasError: true } })]).then(results => results.flat())
+    // Include legacy deployed routes without scanning every retired database row.
+    : queryPageMetadata(event, [...admitted].flatMap(path => [path, toDeployedRoute(path, baseURL)]))
+  const stored = await read.catch((error) => {
+    logger.warn(`[ai-ready] Database unavailable for llms.txt. Using sitemap metadata: ${error instanceof Error ? error.message : String(error)}`)
+    return []
+  })
   const errorPaths = new Set(stored.filter(page => page.isError).map(page => normalizePersistedRoute(page.route, admitted, baseURL)))
   const metadata = new Map(stored.map(page => [normalizePersistedRoute(page.route, admitted, baseURL), page]))
   const availability = config.markdownLinks ? await findMarkdownLinkAvailability() : undefined

@@ -45,6 +45,20 @@ export default defineConfig({
         },
       }),
       defineProject({
+        resolve: {
+          alias: {
+            ...aliases,
+            '#ai-ready-virtual/read-page-data.mjs': resolve('./test/unit/shims/prerender-page-data.ts'),
+          },
+        },
+        define: { 'import.meta.prerender': 'true' },
+        test: {
+          name: 'prerender',
+          environment: 'node',
+          include: ['./test/unit/llms-txt-prerender.test.ts'],
+        },
+      }),
+      defineProject({
         test: {
           name: 'e2e',
           include: ['./test/e2e/**/*.test.ts'],
