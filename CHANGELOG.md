@@ -1,3 +1,10 @@
+## 3.5.1
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.5.0...v3.5.1)
+
+- chore(deps): update all catalogs incl. happy-dom 21, devtools 6 Apply the full outdated set from the dependency-updates routine: patch and minor bumps across nuxt, vue, test and build tooling, plus the happy-dom 21 and nuxtseo-layer-devtool (#224) ([828da08](https://github.com/harlan-zw/nuxt-ai-ready/commit/828da08af9808a6ceb9556b06374e16f24db5f8c))
+- fix(llms): preserve prerender metadata without a runtime database (#235) ([4be7ec1](https://github.com/harlan-zw/nuxt-ai-ready/commit/4be7ec1c66e1ea1dd0786262583bcdd5dc4a3d77))
+
 ## v3.5.0
 
 [compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.4.0...v3.5.0)
