@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { findPackageJSON } from 'node:module'
 import { isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { findPackageJSON } from './find-package-json'
 
 export function resolvePackageMetadataPath(specifier: string, base?: string, options?: { searchDirectory: string }): string {
   if (options) {
