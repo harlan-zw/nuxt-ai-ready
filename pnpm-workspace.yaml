@@ -138,7 +138,7 @@ catalogs:
     typescript: 6.0.3
     vue-tsc: ^3.3.14
   dev-lint:
-    '@antfu/eslint-config': ^10.0.0
+    '@antfu/eslint-config': ^9.5.1
     '@nuxtjs/eslint-config-typescript': ^12.1.0
     eslint: ^10.15.0
   dev-test:
