@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { findPackageJSON } from './find-package-json'
+import { findPackageJSON } from 'nuxtseo-shared/kit'
 
 export function resolvePackageMetadataPath(specifier: string, base?: string, options?: { searchDirectory: string }): string {
   if (options) {
