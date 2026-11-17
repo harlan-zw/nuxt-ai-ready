@@ -13,13 +13,13 @@ export async function serveCloudflarePrerenderedPage(event: H3Event): Promise<Re
   if (event.method !== 'GET' && event.method !== 'HEAD')
     return
 
+  const assets = event.context.cloudflare?.env?.ASSETS as AssetsBinding | undefined
+  if (!assets)
+    return
+
   const config = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const url = getRequestURL(event)
   if (!config.cloudflarePrerenderedPages?.includes(url.pathname))
-    return
-
-  const assets = event.context.cloudflare?.env?.ASSETS as AssetsBinding | undefined
-  if (!assets)
     return
 
   const response = await assets.fetch(new Request(url, { method: event.method, headers: getRequestHeaders(event) as HeadersInit }))

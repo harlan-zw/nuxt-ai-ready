@@ -1,8 +1,10 @@
 import type { H3Event } from 'h3'
 import type { RuntimeI18nConfig } from '../../src/runtime/server/utils/i18n'
+import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { createSiteConfigStack } from 'site-config-stack'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHeaders, getResponseHeader, setHeader } from '#nuxtseo/h3'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { buildNegotiationContext, decideNegotiation, setLinkHeader, setMarkdownHeaders, setStatusAwareHeader } from '../../src/runtime/server/utils/negotiation-response'
 
 const { match, config } = vi.hoisted(() => ({
@@ -13,12 +15,12 @@ vi.mock('#nuxtseo/h3', async (original) => {
   const h3 = await original<typeof import('#nuxtseo/h3')>()
   return { ...h3, getHeaders: vi.fn(h3.getHeaders) }
 })
-vi.mock('nuxtseo-shared/server', () => ({ createNitroRouteRuleMatcher: () => match }))
+vi.mock('nuxtseo-shared/server', () => ({ createNitroRouteRuleMatcher: vi.fn(() => match) }))
 
 vi.mock('#ai-ready-virtual/agent-skills.mjs', () => ({ localAgentSkillArtifacts: {} }))
 vi.mock('#nuxtseo/nitro', () => ({
   defineNitroPlugin: (plugin: unknown) => plugin,
-  useRuntimeConfig: () => config,
+  useRuntimeConfig: vi.fn(() => structuredClone(config)),
 }))
 vi.mock('nuxt/server', () => ({ useRuntimeConfig: () => config }))
 // Simulate the supported Site Config API without the newer path resolver.
@@ -188,5 +190,31 @@ describe('request-scoped negotiation', () => {
 
     expect(decideNegotiation(first, 'early')).toMatchObject({ _tag: 'html' })
     expect(decideNegotiation(second, 'middleware')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
+  })
+})
+
+describe('negotiation config access', () => {
+  it.each([
+    ['/api/data', { accept: 'application/json' }],
+    ['/events', { accept: 'text/event-stream' }],
+    ['/asset.js', {}],
+    ['/.well-known/api-catalog', {}],
+    ['/about', { 'x-ai-ready-internal': '1' }],
+  ])('skips %s without reading event config', (path, headers) => {
+    vi.mocked(useRuntimeConfig).mockClear()
+    const event = { req: new Request(`https://example.com${path}`, { headers }), path, context: {} } as unknown as H3Event
+    expect(decideNegotiation(event, 'early')._tag).toBe('skip')
+    expect(decideNegotiation(event, 'middleware')._tag).toBe('skip')
+    expect(useRuntimeConfig).not.toHaveBeenCalled()
+  })
+
+  it('reuses a matcher across request config copies', () => {
+    config.app.baseURL = '/cache-check/'
+    vi.mocked(createNitroRouteRuleMatcher).mockClear()
+    for (let i = 0; i < 3; i++) {
+      const event = { req: new Request('https://example.com/about.md'), path: '/about.md', context: {} } as unknown as H3Event
+      expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
+    }
+    expect(createNitroRouteRuleMatcher).toHaveBeenCalledTimes(1)
   })
 })

@@ -10,27 +10,17 @@ minimumReleaseAgeExclude:
   - nuxtseo-shared
   - sitemapd@0.2.3
   - '@nuxt/kit@4.6.2'
-  - '@nuxt/nitro-server@4.6.2'
   - '@nuxt/schema@4.6.2'
-  - '@nuxt/vite-builder@4.6.2'
-  - '@nuxt/vite-server@4.6.2'
-  - nuxt@4.6.2
   - '@harlan-zw/comark-content@0.2.2'
-  - '@mdream/js@2.0.3'
-  - '@mdream/rust-android-arm-eabi@2.0.3'
-  - '@mdream/rust-android-arm64@2.0.3'
-  - '@mdream/rust-darwin-arm64@2.0.3'
-  - '@mdream/rust-darwin-x64@2.0.3'
-  - '@mdream/rust-freebsd-x64@2.0.3'
-  - '@mdream/rust-linux-arm-gnueabihf@2.0.3'
-  - '@mdream/rust-linux-arm64-gnu@2.0.3'
-  - '@mdream/rust-linux-arm64-musl@2.0.3'
-  - '@mdream/rust-linux-x64-gnu@2.0.3'
-  - '@mdream/rust-linux-x64-musl@2.0.3'
-  - '@mdream/rust-wasm32-wasi@2.0.3'
-  - '@mdream/rust-win32-arm64-msvc@2.0.3'
-  - '@mdream/rust-win32-x64-msvc@2.0.3'
-  - mdream@2.0.3
+  - '@cloudflare/workerd-darwin-64@1.20261116.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20261116.1'
+  - '@cloudflare/workerd-linux-64@1.20261116.1'
+  - '@cloudflare/workerd-linux-arm64@1.20261116.1'
+  - '@cloudflare/workerd-windows-64@1.20261116.1'
+  - '@nuxt/ui@4.12.2'
+  - miniflare@5.20261116.0-beta
+  - workerd@1.20261116.1
+  - wrangler@4.163.0
 
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 262800
@@ -85,7 +75,7 @@ overrides:
   nuxtseo-shared: ^6.0.4
   site-config-stack: https://pkg.pr.new/harlan-zw/nuxt-site-config/site-config-stack@40698727ca424460013f3534af9005e36728d669
 
-  vue: ^3.5.44
+  vue: ^3.5.45
 
 allowBuilds:
   '@firebase/util': false
@@ -114,20 +104,20 @@ onlyBuiltDependencies:
 catalog:
   '@harlan-zw/comark-content': ^0.2.2
   '@libsql/client': ^0.18.0
-  '@mdream/js': ^2.0.3
+  '@mdream/js': ^2.1.0
   '@types/better-sqlite3': ^9.6.0
-  better-sqlite3: ^13.0.3
+  better-sqlite3: ^13.2.0
   bumpp: ^12.3.0
   citty: ^0.2.2
-  confbox: ^0.3.1
+  confbox: ^0.3.2
   consola: ^3.4.2
   defu: ^6.1.7
-  drizzle-orm: 1.0.0-rc.4
+  drizzle-orm: 1.0.0-rc.5
   eslint-plugin-harlanzw: ^0.23.0
-  execa: ^10.2.0
-  h3: ^2.0.5
-  mdream: ^2.0.3
-  nitropack: ^2.13.4
+  execa: ^10.2.1
+  h3: ^2.0.8
+  mdream: ^2.1.0
+  nitropack: ^2.13.6
   nuxtseo-layer-devtools: ^6.0.2
   nuxtseo-shared: ^6.0.4
   ohash: ^2.0.12
@@ -137,8 +127,8 @@ catalog:
   sitemapd: ^0.2.3
   ufo: ^1.6.4
   unbuild: ^3.6.1
-  vue: ^3.5.44
-  wrangler: ^4.151.1
+  vue: ^3.5.45
+  wrangler: ^4.163.0
   yaml: ^2.9.1
   zod: ^4.6.7
 
@@ -146,29 +136,29 @@ catalogs:
   dev-build:
     '@arethetypeswrong/cli': ^0.18.5
     typescript: 6.0.3
-    vue-tsc: ^3.3.13
+    vue-tsc: ^3.3.14
   dev-lint:
     '@antfu/eslint-config': ^9.5.1
     '@nuxtjs/eslint-config-typescript': ^12.1.0
-    eslint: ^10.13.0
+    eslint: ^10.15.0
   dev-test:
-    '@nuxt/test-utils': ^4.3.4
-    '@vitest/coverage-v8': ^5.0.5
-    '@vue/test-utils': ^2.5.1
-    happy-dom: ^21.0.3
-    playwright: ^1.64.1
-    playwright-core: ^1.64.1
-    vitest: ^5.0.5
+    '@nuxt/test-utils': ^4.4.0
+    '@vitest/coverage-v8': ^5.1.0
+    '@vue/test-utils': ^2.6.0
+    happy-dom: ^21.0.4
+    playwright: ^1.65.1
+    playwright-core: ^1.65.1
+    vitest: ^5.1.0
   nuxt:
     '@nuxt/content': ^3.16.2
-    '@nuxt/kit': ^4.6.2
-    '@nuxt/module-builder': ^1.0.3
-    '@nuxt/ui': ^4.12.0
-    '@nuxtjs/mcp-toolkit': ^0.24.2
+    '@nuxt/kit': ^4.6.4
+    '@nuxt/module-builder': ^1.0.4
+    '@nuxt/ui': ^4.12.2
+    '@nuxtjs/mcp-toolkit': ^0.24.3
     '@nuxtjs/robots': ^7.0.0
     '@nuxtjs/sitemap': ^9.0.0
     '@vueuse/nuxt': ^15.0.0
-    nuxt: 4.6.2
+    nuxt: 4.6.4
     nuxt-site-config: ^5.0.0
   vue:
-    vue-router: ^5.4.0
+    vue-router: ^5.5.1

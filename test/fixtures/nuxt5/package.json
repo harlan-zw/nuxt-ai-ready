@@ -8,10 +8,10 @@
   },
   "dependencies": {
     "nuxtseo-shared": "^6.0.4",
-    "nitro": "3.0.260903-beta",
-    "nuxt": "npm:nuxt-nightly@5.0.0-2610061032-c7ad8cd",
-    "vue": "^3.5.43",
-    "vue-router": "^5.3.1",
+    "nitro": "3.0.261103-rc",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2611161935-c3e4cc4",
+    "vue": "^3.5.45",
+    "vue-router": "^5.5.1",
     "@nuxtjs/robots": "https://pkg.pr.new/nuxt-modules/robots/@nuxtjs/robots@fbe3d89828df93711f5aa7fc4d5794545bd8014e",
     "@nuxtjs/sitemap": "https://pkg.pr.new/nuxt-modules/sitemap/@nuxtjs/sitemap@abbf91b087b3839a745ad077cfc303882a0e84aa",
     "nuxt-site-config": "https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@40698727ca424460013f3534af9005e36728d669",
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "typescript": "6.0.3",
-    "vue-tsc": "^3.3.12",
-    "@nuxt/kit": "^4.6.0"
+    "vue-tsc": "^3.3.14",
+    "@nuxt/kit": "^4.6.4"
   }
 }

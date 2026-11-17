@@ -23,6 +23,10 @@ function getBuildLlmsTxtCached(maxAge: number) {
 }
 
 export default eventHandler(async (event) => {
+  // Check the suffix before resolving a request-time base URL.
+  const requestPath = event.path.split('?')[0]!
+  if (!requestPath.endsWith('/llms.txt') && !/\/llms\/[^/]+\.txt$/i.test(requestPath))
+    return
   const runtimeConfig = useRuntimeConfig(event)
   const path = toLogicalRoute(event.path.split('?')[0]!, runtimeConfig.app.baseURL)
   if (path !== '/llms.txt' && !/^\/llms\/[^/]+\.txt$/i.test(path))
