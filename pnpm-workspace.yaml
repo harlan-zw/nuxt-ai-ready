@@ -72,7 +72,7 @@ overrides:
   '@nuxtjs/sitemap': https://pkg.pr.new/nuxt-modules/sitemap/@nuxtjs/sitemap@abbf91b087b3839a745ad077cfc303882a0e84aa
   nuxt-site-config: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@40698727ca424460013f3534af9005e36728d669
   nuxt-site-config-kit: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config-kit@40698727ca424460013f3534af9005e36728d669
-  nuxtseo-shared: https://pkg.pr.new/harlan-zw/nuxt-seo/nuxtseo-shared@113287e3fb44472264dd56fc90fb695ff8a9f6dd
+  nuxtseo-shared: ^6.0.4
   site-config-stack: https://pkg.pr.new/harlan-zw/nuxt-site-config/site-config-stack@40698727ca424460013f3534af9005e36728d669
 
   vue: ^3.5.45
@@ -119,7 +119,7 @@ catalog:
   mdream: ^2.1.0
   nitropack: ^2.13.6
   nuxtseo-layer-devtools: ^6.0.2
-  nuxtseo-shared: ^6.0.0
+  nuxtseo-shared: ^6.0.4
   ohash: ^2.0.12
   pathe: ^2.0.3
   postgres: ^3.4.9
