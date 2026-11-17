@@ -1273,7 +1273,8 @@ export function trackDrizzleWork(event, work) { return work }
     }
     nuxt.hook('nitro:init', (nitro) => {
       warnConfiguration(nitro)
-      nitro.hooks.hook('rollup:reload', () => warnConfiguration(nitro))
+      // @ts-expect-error Nitro 2 types do not include Nitro 3's build:reload hook.
+      nitro.hooks.hook(getNitroVersion(nuxt) === 3 ? 'build:reload' : 'rollup:reload', () => warnConfiguration(nitro))
     })
     // Inline page rules and later modules can update rules after Nitro initializes.
     nuxt.hook('nitro:build:before', warnConfiguration)
