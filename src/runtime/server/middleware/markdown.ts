@@ -55,9 +55,11 @@ function notFoundMarkdown(
 }
 
 export default defineEventHandler(async (event) => {
-  const runtimeConfig = useRuntimeConfig(event)
-  if (isSitemapMdRequest(event.path, runtimeConfig.app.baseURL, (runtimeConfig['nuxt-ai-ready'] as any)?.sitemapMd !== false))
-    return
+  if (event.path.split('?')[0]?.endsWith('/sitemap.md')) {
+    const runtimeConfig = useRuntimeConfig(event)
+    if (isSitemapMdRequest(event.path, runtimeConfig.app.baseURL, (runtimeConfig['nuxt-ai-ready'] as any)?.sitemapMd !== false))
+      return
+  }
 
   const decision = decideNegotiation(event, 'middleware')
   const negotiationResponse = await applyNegotiation(event, decision)
