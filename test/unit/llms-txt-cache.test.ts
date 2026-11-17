@@ -1,9 +1,11 @@
 import { createApp, toWebHandler } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useRuntimeConfig } from '#nuxtseo/nitro'
 
 interface CachedFunctionOptions { name?: string, group?: string, maxAge?: number, swr?: boolean }
 
 const config = { llmsTxtCacheSeconds: 600 }
+const appConfig = { baseURL: '/' }
 
 const { defineCachedFunction, buildLlmsTxtFiles } = vi.hoisted(() => ({
   defineCachedFunction: vi.fn(
@@ -22,7 +24,7 @@ const { defineCachedFunction, buildLlmsTxtFiles } = vi.hoisted(() => ({
 
 vi.mock('#nuxtseo/nitro', () => ({
   defineCachedFunction,
-  useRuntimeConfig: () => ({ 'app': { baseURL: '/' }, 'nuxt-ai-ready': config }),
+  useRuntimeConfig: vi.fn(() => ({ 'app': appConfig, 'nuxt-ai-ready': config })),
 }))
 
 vi.mock('../../src/runtime/llms-txt-utils', () => ({ buildLlmsTxtFiles }))
@@ -60,6 +62,7 @@ describe('gET /llms.txt internal cache', () => {
     if (method !== 'HEAD')
       expect(await response.text()).toBe('Application guide')
     expect(buildLlmsTxtFiles).not.toHaveBeenCalled()
+    expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 
   it.each(['/llms/Skills.TXT', '/LLMS/Skills.TXT'])('serves accepted configured path %s with its exact file key', async (path) => {
@@ -118,4 +121,12 @@ describe('gET /llms.txt internal cache', () => {
     expect(await read('/llms.txt', 'second.example.com')).toBe('Second root')
     expect(buildLlmsTxtFiles).toHaveBeenCalledTimes(2)
   })
+})
+
+it('uses the request base URL for discovery files', async () => {
+  config.llmsTxtCacheSeconds = 0
+  appConfig.baseURL = '/docs/'
+  const response = await request(new Request('http://localhost/docs/llms.txt?source=agent'))
+  expect(response.status).toBe(200)
+  expect(await response.text()).toBe('# llms.txt content')
 })

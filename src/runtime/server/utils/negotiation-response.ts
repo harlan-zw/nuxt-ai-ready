@@ -1,7 +1,6 @@
 import type { AppRouteRules } from 'nuxt/server'
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import type { NegotiationRouteRule } from './content-negotiation'
 import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
@@ -128,7 +127,7 @@ export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sour
  */
 export async function ensureSiteConfig(event: H3Event): Promise<void> {
   if (!(event.context as { _initedSiteConfig?: boolean })._initedSiteConfig)
-    await initRequestSiteConfig(event, getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin, createNitroRouteRuleMatcher<AppRouteRules>(useRuntimeConfig(event))(event.path))
+    await initRequestSiteConfig(event, getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin, getRouteRuleMatcher(useRuntimeConfig(event))(event.path))
 }
 
 export function buildNegotiationContext(event: H3Event, path: string): NegotiationContext {
@@ -144,7 +143,7 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
   }
 }
 
-type RouteRuleMatcher = (path: string) => NegotiationRouteRule
+type RouteRuleMatcher = (path: string) => AppRouteRules
 
 const REQUEST_DECISION = Symbol('nuxt-ai-ready:negotiation')
 
@@ -156,22 +155,37 @@ interface RequestDecision {
   decision: NegotiationDecision
 }
 
-// The matcher compiles a radix router from the route rules. Route rules never
-// change while the server runs, so reuse the matcher per runtime config.
-let matcherCache: { config: object, match: RouteRuleMatcher } | undefined
+// Reuse the compiled radix router when request config copies have equal inputs.
+let matcherCache: { key: string, match: RouteRuleMatcher } | undefined
 
-function getRouteRuleMatcher(runtimeConfig: object): RouteRuleMatcher {
-  if (matcherCache?.config !== runtimeConfig)
-    matcherCache = { config: runtimeConfig, match: createNitroRouteRuleMatcher(runtimeConfig) as RouteRuleMatcher }
+function getRouteRuleMatcher(runtimeConfig: ReturnType<typeof useRuntimeConfig>): RouteRuleMatcher {
+  const key = JSON.stringify([runtimeConfig.app?.baseURL, runtimeConfig.nitro?.routeRules])
+  if (matcherCache?.key !== key)
+    matcherCache = { key, match: createNitroRouteRuleMatcher<AppRouteRules>(runtimeConfig) }
   return matcherCache.match
 }
 
 export function decideNegotiation(event: H3Event, stage: NegotiationStage): NegotiationDecision {
-  const runtimeConfig = useRuntimeConfig(event)
-  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   const context = event.context as typeof event.context & { [REQUEST_DECISION]?: RequestDecision }
   const owner = event.node?.req ?? event.req ?? event
   let cached = context[REQUEST_DECISION]
+  let request: ReturnType<typeof toMarkdownRequest> | undefined
+  if (!cached || cached.owner !== owner || cached.path !== event.path) {
+    request = toMarkdownRequest(event)
+    // A disabled policy still identifies every config-independent skip. Pages
+    // continue below with event config, including request-time env overrides.
+    const eligibility = resolveNegotiationDecision({
+      stage: 'middleware',
+      request,
+      routeRule: {},
+      policy: 'disabled',
+      artifactPaths: agentSkillArtifactPaths(),
+    })
+    if (eligibility._tag === 'skip')
+      return eligibility
+  }
+  const runtimeConfig = useRuntimeConfig(event)
+  const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation || cached.botNegotiation !== config.botNegotiation) {
     cached = {
       owner,
@@ -180,7 +194,7 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
       botNegotiation: config.botNegotiation,
       decision: resolveNegotiationDecision({
         stage: 'middleware',
-        request: toMarkdownRequest(event),
+        request: request ?? toMarkdownRequest(event),
         routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
         policy: config.contentNegotiation,
         botNegotiation: config.botNegotiation,
