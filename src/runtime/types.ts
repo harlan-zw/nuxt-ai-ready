@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import type { MdreamOptions } from 'mdream'
+import type { AiTermsConfig } from './ai-terms'
 import type { SiteToolsConfig } from './site-tool-config'
 
 export type ContentNegotiationPolicy = 'auto' | 'enabled' | 'disabled'
@@ -167,6 +168,13 @@ export interface ModuleOptions {
    * @default undefined
    */
   apiCatalog?: false | ApiCatalogConfig
+
+  /**
+   * Publish an explicit AI Terms 0.1 policy at `/.well-known/ai-terms`.
+   * Requires site.url. Publishing does not enforce access or collect payments.
+   * @default false
+   */
+  aiTerms?: false | AiTermsConfig
 
   /**
    * Read a page's Markdown from the installed content module instead of
