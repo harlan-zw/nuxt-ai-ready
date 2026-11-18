@@ -5,7 +5,7 @@ import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
 import type { ResolvedDatabase } from './utils/database'
 import type { RuntimeI18nConfig } from './utils/i18n'
 import type { ResolvedWebMcpConfig } from './utils/webmcp'
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +22,7 @@ import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { parseLlmsTxtConfig } from './runtime/llms-txt-files'
 import { toDeployedRoute } from './runtime/route-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
-import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
+import { deriveRuntimeSyncSecret } from './runtime/sync-secret'
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
@@ -105,7 +105,6 @@ export interface ModulePublicRuntimeConfig {
     batchSize: number
     pruneTtl: number
   }
-  runtimeSyncSecret?: string
   sitemapPrerendered: boolean
   i18n?: RuntimeI18nConfig | null
   ftsTokenizer?: string
@@ -493,7 +492,7 @@ export default defineNuxtModule<ModuleOptions>({
     // Build-time database path (separate from runtime DB which may be D1/LibSQL)
     const buildDbPath = join(nuxt.options.buildDir, '.data/ai-ready/build.db')
 
-    // Resolve runtimeSync config early (needed for secret generation before nitro:config)
+    // Resolve runtimeSync before registering runtime endpoints and its CLI token.
     const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
@@ -765,20 +764,16 @@ export default defineNuxtModule<ModuleOptions>({
       || process.env.NUXT_GENERATE === 'true'
     )
 
-    // Production may supply either secret at runtime. Never cache the root.
+    // Production may supply the application secret at runtime. Never cache the root.
     const secretPath = join(nuxt.options.rootDir, 'node_modules/.cache/nuxt/ai-ready/secret')
     const appSecret = process.env.NITRO_APP_SECRET ?? process.env.NUXT_APP_SECRET ?? nuxt.options.runtimeConfig.appSecret
-    const legacySecret = process.env.NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? process.env.NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? config.runtimeSyncSecret
-    if (legacySecret)
-      logger.warn(LEGACY_RUNTIME_SYNC_SECRET_WARNING)
     const syncSecret = typeof appSecret === 'string' && appSecret.length >= 32
       ? await deriveRuntimeSyncSecret(appSecret)
-      : appSecret === undefined || appSecret === '' ? legacySecret : undefined
+      : undefined
     if (runtimeSyncEnabled && syncSecret) {
       await mkdir(dirname(secretPath), { recursive: true })
       await writeFile(secretPath, syncSecret, { mode: 0o600 })
+      await chmod(secretPath, 0o600)
     }
     else {
       await rm(secretPath, { force: true })
@@ -1052,7 +1047,6 @@ export function trackDrizzleWork(event, work) { return work }
         batchSize: runtimeSyncConfig.batchSize ?? 50,
         pruneTtl: runtimeSyncConfig.pruneTtl ?? 0,
       },
-      runtimeSyncSecret: legacySecret || '',
       sitemapPrerendered,
       i18n: i18nConfig,
       ftsTokenizer,

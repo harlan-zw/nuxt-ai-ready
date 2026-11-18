@@ -1,59 +1,63 @@
 import type { H3Event } from '#nuxtseo/h3'
-import type { ModulePublicRuntimeConfig } from '../../../module'
+import { timingSafeEqual } from 'node:crypto'
 import { deriveSecret } from 'nuxt/server'
-import { logger } from '#ai-ready-virtual/logger.mjs'
-import { createError, getHeader, getQuery } from '#nuxtseo/h3'
+import { createError, getHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
-import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING, RUNTIME_SYNC_SECRET_PURPOSE } from '../../sync-secret'
+import { APPLICATION_SECRET_ERROR, deriveRuntimeSyncSecret, RUNTIME_SYNC_SECRET_PURPOSE } from '../../sync-secret'
 import { getCfEnv } from './cloudflare'
 
-let warnedLegacy = false
+type DerivationMode = 'nuxt' | 'binding'
+interface DerivedToken {
+  root: string
+  mode: DerivationMode
+  promise: Promise<Uint8Array>
+}
+
+// Keep one successful or pending derivation. Rotation replaces the entry.
+let derivedToken: DerivedToken | undefined
+
+function resolveToken(root: string, mode: DerivationMode): Promise<Uint8Array> {
+  if (derivedToken?.root === root && derivedToken.mode === mode)
+    return derivedToken.promise
+
+  // Nuxt reads its root synchronously, before the first crypto await.
+  const promise = mode === 'nuxt' ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE) : deriveRuntimeSyncSecret(root)
+  const entry: DerivedToken = {
+    root,
+    mode,
+    promise: promise.then(secret => new TextEncoder().encode(secret)),
+  }
+  derivedToken = entry
+  entry.promise = entry.promise.catch((cause: unknown) => {
+    if (derivedToken === entry)
+      derivedToken = undefined
+    throw cause
+  })
+  return entry.promise
+}
 
 /**
  * Verify the request has a valid Authorization: Bearer token.
  * Throws 401 if the token is missing or invalid.
- * Legacy tokens remain valid when no application secret is configured.
+ * The token derives from Nuxt's application secret for this module only.
  */
 export async function requireAuth(event: H3Event): Promise<void> {
   const bindings = getCfEnv(event)
-  const config = useRuntimeConfig(event)
+  const config = useRuntimeConfig()
   const root = bindings?.NUXT_APP_SECRET === undefined ? config.appSecret : bindings.NUXT_APP_SECRET
-  let secret: string
+  if (typeof root !== 'string' || root.length < 32)
+    throw createError({ statusCode: 500, message: APPLICATION_SECRET_ERROR })
+
   // Nuxt 4.6 deriveSecret has no event argument. Nitro 2 cannot read Worker
   // bindings through its shared runtime config, so derive from that binding.
-  if (root !== undefined && root !== '') {
-    secret = await (bindings?.NUXT_APP_SECRET === undefined
-      ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE)
-      : deriveRuntimeSyncSecret(root)).catch((cause: unknown) => {
-      throw createError({ statusCode: 500, message: 'Set NUXT_APP_SECRET to a string with at least 32 characters.', cause })
+  const secret = await resolveToken(root, bindings?.NUXT_APP_SECRET === undefined ? 'nuxt' : 'binding')
+    .catch((cause: unknown) => {
+      throw createError({ statusCode: 500, message: APPLICATION_SECRET_ERROR, cause })
     })
-  }
-  else {
-    const moduleConfig = config['nuxt-ai-ready'] as ModulePublicRuntimeConfig
-    const legacy = bindings?.NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? bindings?.NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? globalThis.process?.env?.NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? globalThis.process?.env?.NUXT_AI_READY_RUNTIME_SYNC_SECRET
-      ?? moduleConfig.runtimeSyncSecret
-    if (typeof legacy !== 'string' || !legacy) {
-      throw createError({ statusCode: 500, message: 'Set NUXT_APP_SECRET to a string with at least 32 characters.' })
-    }
-    if (!warnedLegacy) {
-      warnedLegacy = true
-      logger.warn(LEGACY_RUNTIME_SYNC_SECRET_WARNING)
-    }
-    secret = legacy
-  }
   const authHeader = getHeader(event, 'authorization')
-  let token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
-  if (!token) {
-    const query = getQuery(event)
-    if (query.secret) {
-      token = String(query.secret)
-      logger.warn('Using `?secret=` query parameter is deprecated. Use `Authorization: Bearer <token>` header instead. See https://github.com/harlan-zw/nuxt-ai-ready/releases/tag/v1.0.0')
-    }
-  }
-  if (!token || token !== secret) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
+  const received = new TextEncoder().encode(token || '')
+  if (received.length !== secret.length || !timingSafeEqual(received, secret)) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
 }

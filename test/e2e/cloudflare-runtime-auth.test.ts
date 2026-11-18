@@ -90,13 +90,13 @@ describe('cloudflare runtime-only application secret', async () => {
     expect(response.status).toBe(401)
   })
 
-  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy runtime binding %s', async (key) => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('rejects the removed runtime binding %s', async (key) => {
     await stopWorker()
     await startWorker({ [key]: 'legacy-runtime-token' })
     const response = await fetch(`${origin}/__ai-ready/reindex`, {
       method: 'POST',
       headers: { authorization: 'Bearer legacy-runtime-token' },
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(500)
   }, 70000)
 })

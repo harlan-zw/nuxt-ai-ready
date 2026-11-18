@@ -39,9 +39,14 @@ async function startReindexStub(status: number, body: unknown, expectedToken?: s
   return `http://127.0.0.1:${port}`
 }
 
-async function writeSecret(): Promise<string> {
+async function temporaryDirectory(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'nuxt-ai-ready-cli-'))
   temporaryDirectories.push(cwd)
+  return cwd
+}
+
+async function writeSecret(): Promise<string> {
+  const cwd = await temporaryDirectory()
   await mkdir(join(cwd, 'node_modules/.cache/nuxt/ai-ready'), { recursive: true })
   await writeFile(join(cwd, 'node_modules/.cache/nuxt/ai-ready/secret'), 'cli-test-secret\n')
   return cwd
@@ -52,13 +57,13 @@ function runReindex(url: string, cwd: string, route = '/about', env: Record<stri
 }
 
 describe('cli reindex error handling', () => {
-  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy environment key %s and warns', async (key) => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('ignores the removed environment key %s', async (key) => {
     const url = await startReindexStub(200, { route: '/about', indexed: true }, 'legacy-token')
-    const result = await runReindex(url, await writeSecret(), '/about', {
+    const result = await runReindex(url, await temporaryDirectory(), '/about', {
       [key]: 'legacy-token',
     })
-    expect(result.exitCode).toBe(0)
-    expect(result.stderr).toContain('deprecated')
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('NUXT_APP_SECRET')
   })
 
   it('prefers the shared root over the legacy environment token', async () => {
@@ -100,12 +105,12 @@ describe('cli reindex error handling', () => {
     expect(result.stdout.trim()).toBe(token)
   })
 
-  it('rejects an invalid environment secret instead of using a stale cache', async () => {
+  it.each(['', 'short'])('rejects an invalid environment secret instead of using a stale cache: %s', async (root) => {
     const url = await startReindexStub(200, { route: '/about', indexed: true })
     const cwd = await writeSecret()
 
     const result = await runReindex(url, cwd, '/about', {
-      NUXT_APP_SECRET: 'short',
+      NUXT_APP_SECRET: root,
       NUXT_AI_READY_RUNTIME_SYNC_SECRET: 'legacy-token',
     })
 

@@ -370,12 +370,6 @@ export interface ModuleOptions {
   cron?: boolean
 
   /**
-   * Legacy bearer token for runtime sync endpoints.
-   * @deprecated Set NUXT_APP_SECRET instead. A configured application secret takes precedence.
-   */
-  runtimeSyncSecret?: string
-
-  /**
    * Prerender configuration
    */
   prerender?: {

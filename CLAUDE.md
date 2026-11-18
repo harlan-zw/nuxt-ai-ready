@@ -95,13 +95,13 @@ This ensures only public pages (those in sitemap) are indexed, avoiding auth-gat
 - `GET /__ai-ready/status` - Returns `{ total, indexed, pending }`
 - `POST /__ai-ready/restore` - Force restore from prerendered dump:
   - `?clear=false` - Don't clear existing pages first (default: true)
-  - Requires a Nuxt-derived bearer token, or the deprecated `runtimeSyncSecret` when no application secret is configured
+  - Requires the Nuxt-derived bearer token from `NUXT_APP_SECRET`
   - Returns: `{ restored, cleared }`
 - `POST /__ai-ready/poll` - Process pending pages:
   - `?limit=N` - Max pages per batch (default: 10, max: 50)
   - `?all=true` - Process until complete
   - `?timeout=30000` - Max ms for `all` mode (default: 30s)
-  - Requires a Nuxt-derived bearer token, or the deprecated `runtimeSyncSecret` when no application secret is configured
+  - Requires the Nuxt-derived bearer token from `NUXT_APP_SECRET`
   - Returns: `{ indexed, remaining, errors, duration, complete }`
 - `POST /__ai-ready/prune` - Remove stale routes:
   - `?dry=true` - Preview without deleting
