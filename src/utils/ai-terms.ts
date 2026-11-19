@@ -1,4 +1,4 @@
-import type { AiTermsConfig, ResolvedAiTermsConfig } from '../runtime/ai-terms'
+import type { AiTermsConfig, AiTermsDocument, AiTermsPayment, AiTermsPurpose, AiTermsUse, ResolvedAiTermsConfig } from '../runtime/ai-terms'
 import { AI_TERMS_PATH } from '../runtime/ai-terms'
 
 type AiTermsResult
@@ -20,9 +20,9 @@ function checkPayment(value: unknown, field: string, errors: string[]): void {
   }
   if (value.protocol !== 'x402')
     errors.push(`${field}.protocol: use x402.`)
-  const endpoint = value.endpoint
-  if (typeof endpoint !== 'string' || !/^https:\/\/[^/?#\\\s][^?#\\\s]*$/.test(endpoint) || !URL.canParse(endpoint))
-    errors.push(`${field}.endpoint must be an absolute HTTPS URL without a query or fragment.`)
+  const endpoint = typeof value.endpoint === 'string' && /^https:\/\/[^/?#\\\s][^?#\\\s]*$/.test(value.endpoint) ? URL.parse(value.endpoint) : null
+  if (!endpoint || endpoint.username || endpoint.password)
+    errors.push(`${field}.endpoint: use an absolute HTTPS URL without credentials, query parameters, or a fragment.`)
   if (value.version !== undefined && !Number.isInteger(value.version))
     errors.push(`${field}.version: use an integer.`)
   for (const key of ['network', 'asset']) {
@@ -78,6 +78,56 @@ function checkUses(value: unknown, field: string, payment: unknown, partial: boo
   }
 }
 
+function publicPayment({ protocol, endpoint, version, network, asset }: AiTermsPayment): AiTermsPayment {
+  return { protocol, endpoint, version, network, asset }
+}
+
+function publicUse(use: AiTermsUse): AiTermsUse {
+  const { access, attribution, free } = use
+  if (access === 'allow')
+    return { access, attribution }
+
+  const allowance = free && { requests: free.requests, per: free.per }
+  if (access === 'deny')
+    return { access, attribution, free: allowance }
+
+  const { amount, currency, per } = use.price
+  return { access, attribution, free: allowance, price: { amount, currency, per } }
+}
+
+function publicDocument(policy: AiTermsConfig, site: string): AiTermsDocument {
+  const { updated, uses, paths, payment, identity, receipts, report_only, contact, preview } = policy
+  return {
+    ai_terms: '0.1',
+    site,
+    updated,
+    default: policy.default,
+    uses: {
+      search: publicUse(uses.search),
+      answer: publicUse(uses.answer),
+      training: publicUse(uses.training),
+      agent: publicUse(uses.agent),
+    },
+    paths: paths?.map(({ match, uses, payment }) => {
+      const overrides: Partial<Record<AiTermsPurpose, AiTermsUse>> = {}
+      for (const purpose of purposes) {
+        const rule = uses[purpose]
+        if (rule)
+          overrides[purpose] = publicUse(rule)
+      }
+      return { match, uses: overrides, payment: payment && publicPayment(payment) }
+    }),
+    payment: payment && publicPayment(payment),
+    identity: identity && { verify: identity.verify && [...identity.verify], unverified: identity.unverified },
+    receipts,
+    report_only,
+    contact: contact && { licensing: contact.licensing },
+    preview: preview && { shows: preview.shows && [...preview.shows], delivery: preview.delivery, described_quote: preview.described_quote },
+    purpose_header: 'AI-Purpose',
+    spec: 'https://aipaygen.com/ai-terms',
+  }
+}
+
 /** Parse once during Nuxt setup. Never infer permissions or the policy date. */
 export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTermsResult {
   if (input === undefined || input === false)
@@ -105,18 +155,18 @@ export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTe
       errors.push('paths: use an array of path overrides.')
     }
     else {
-      input.paths.forEach((entry: unknown, index: number) => {
+      for (const [index, entry] of input.paths.entries()) {
         const field = `paths[${index}]`
         if (!isRecord(entry)) {
           errors.push(`${field}: set a path match and AI use rules.`)
-          return
+          continue
         }
-        if (typeof entry.match !== 'string' || !entry.match.startsWith('/'))
-          errors.push(`${field}.match: start the path pattern with /.`)
+        if (typeof entry.match !== 'string' || !/^\/[^?#]*$/.test(entry.match))
+          errors.push(`${field}.match: start the path pattern with / and omit any query or fragment.`)
         if (entry.payment !== undefined)
           checkPayment(entry.payment, `${field}.payment`, errors)
         checkUses(entry.uses, `${field}.uses`, entry.payment ?? input.payment, true, errors)
-      })
+      }
     }
   }
   if (input.identity !== undefined) {
@@ -124,7 +174,7 @@ export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTe
       errors.push('identity: configure the identity checks used by your server.')
     }
     else {
-      if (input.identity.verify !== undefined && (!Array.isArray(input.identity.verify) || input.identity.verify.some(value => typeof value !== 'string')))
+      if (input.identity.verify !== undefined && (!Array.isArray(input.identity.verify) || [...input.identity.verify].some(value => typeof value !== 'string')))
         errors.push('identity.verify: use an array of verification methods.')
       if (input.identity.unverified !== undefined && typeof input.identity.unverified !== 'string')
         errors.push('identity.unverified: use a string.')
@@ -141,7 +191,7 @@ export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTe
       errors.push('preview.delivery: use must-match, per-quote, or not-checked.')
     }
     else {
-      if (input.preview.shows !== undefined && (!Array.isArray(input.preview.shows) || input.preview.shows.some(value => !['title', 'description', 'excerpt', 'words'].includes(value))))
+      if (input.preview.shows !== undefined && (!Array.isArray(input.preview.shows) || [...input.preview.shows].some(value => !['title', 'description', 'excerpt', 'words'].includes(value))))
         errors.push('preview.shows: use title, description, excerpt, or words.')
       if (input.preview.described_quote !== undefined && typeof input.preview.described_quote !== 'string')
         errors.push('preview.described_quote: use a string.')
@@ -150,18 +200,13 @@ export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTe
   if (errors.length || !site)
     return { _tag: 'Invalid', errors }
 
-  const policy = input as unknown as AiTermsConfig
+  const href = new URL(site.origin)
+  href.pathname = `${site.pathname.replace(/\/$/, '')}${AI_TERMS_PATH}`
   return {
     _tag: 'Enabled',
     config: {
-      href: new URL(`${site.pathname.replace(/\/$/, '')}${AI_TERMS_PATH}`, site.origin).href,
-      document: {
-        ...policy,
-        ai_terms: '0.1',
-        site: site.origin,
-        purpose_header: 'AI-Purpose',
-        spec: 'https://aipaygen.com/ai-terms',
-      },
+      href: href.href,
+      document: publicDocument(input as unknown as AiTermsConfig, site.origin),
     },
   }
 }

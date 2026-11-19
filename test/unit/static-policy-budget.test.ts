@@ -16,6 +16,11 @@ describe('static usage policy budget', () => {
     const source = '/private\n  Content-Signal: ai-train=no\n  Cache-Control: private, no-store\n/*\n  Content-Signal: ai-train=yes\n  ! Cache-Control\n'
     expect(() => normalizeStaticContentSignalHeaders(source)).toThrow('Place broader mixed policy rules before narrower rules.')
   })
+  it('still protects user Link headers when a block also carries generated discovery', () => {
+    const discovery = '<https://example.com/.well-known/ai-terms>; rel="ai-terms"'
+    const source = `/private\n  Content-Signal: ai-train=no\n  ! Link\n/*\n  Content-Signal: ai-train=yes\n  Link: </css/main.css>; rel="preload", ${discovery}\n`
+    expect(() => normalizeStaticContentSignalHeaders(source, [discovery])).toThrow('Place broader mixed policy rules before narrower rules.')
+  })
   it('moves policy-only rules without changing mixed header precedence', () => {
     const source = '/private\n  Content-Signal: ai-train=no\n/*\n  Content-Signal: ai-train=yes\n  X-Frame-Options: DENY\n/another\n  Cache-Control: no-store\n'
     const result = resolveCloudflareStaticHeaders(normalizeStaticContentSignalHeaders(source), '/private')

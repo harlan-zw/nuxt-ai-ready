@@ -55,4 +55,12 @@ describe('publishing AI Terms on opt-in', async () => {
     const document = JSON.parse(await readFile(join(buildDir, 'output/public/.well-known/ai-terms'), 'utf8'))
     expect(document).toEqual(await (await fetch(url('/.well-known/ai-terms'))).json())
   })
+
+  it('advertises the policy on a file-backed Markdown response', async () => {
+    const publicDir = join(useTestContext().nuxt!.options.buildDir, 'output/public')
+    expect(await readFile(join(publicDir, 'index.md'), 'utf8')).toBeTruthy()
+    const response = await fetch(url('/index.md'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('link')).toContain('<https://test.example.com/.well-known/ai-terms>; rel="ai-terms"')
+  })
 })

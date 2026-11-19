@@ -60,7 +60,7 @@ function buildBaseParts(
   }
 
   if (config.aiTerms)
-    parts.push(`<${encodePathForHeader(config.aiTerms.href)}>; rel="ai-terms"`)
+    parts.push(`<${config.aiTerms.href}>; rel="ai-terms"`)
 
   return parts
 }

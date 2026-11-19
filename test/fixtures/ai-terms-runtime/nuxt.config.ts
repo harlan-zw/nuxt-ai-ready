@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   extends: ['../.pages-layer'],
   site: { url: 'https://test.example.com' },
   app: { baseURL: '/docs/' },
+  routeRules: { '/': { prerender: true } },
   robots: { robotsTxt: false },
   aiReady: {
     database: false,

@@ -1230,11 +1230,10 @@ export function trackDrizzleWork(event, work) { return work }
           'Cache-Control': 'public, max-age=3600',
         },
       })
-      if (prerenderEnabled) {
-        nuxt.options.nitro.prerender ||= {}
-        nuxt.options.nitro.prerender.routes ||= []
-        nuxt.options.nitro.prerender.routes.push(AI_TERMS_PATH)
-      }
+      nuxt.hook('prerender:routes', ({ routes }) => {
+        if (prerenderEnabled || routes.size > 0)
+          routes.add(AI_TERMS_PATH)
+      })
     }
     if (apiCatalogConfig)
       registerApiCatalog(apiCatalogConfig)
@@ -1368,6 +1367,7 @@ export function trackDrizzleWork(event, work) { return work }
             staticBaseURL,
             config.describedby !== false,
             agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+            isCloudflarePreset ? undefined : aiTermsLink,
           ),
           isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
         )
@@ -1454,13 +1454,13 @@ export function trackDrizzleWork(event, work) { return work }
               discovery.push(staticDescribedbyEntry(staticBaseURL))
             if (staticDiscoverySupported && apiCatalogConfig && await hasArtifact(API_CATALOG_PATH))
               discovery.push(`<${encodeURI(apiCatalogConfig.href)}>; rel="api-catalog"`)
-            if (staticDiscoverySupported && aiTermsConfig && await hasArtifact(AI_TERMS_PATH))
-              discovery.push(`<${encodeURI(aiTermsConfig.href)}>; rel="ai-terms"`)
+            if (staticDiscoverySupported && aiTermsLink && await hasArtifact(AI_TERMS_PATH))
+              discovery.push(aiTermsLink)
             mergedHeaders = mergeStaticDiscoveryHeaders(mergedHeaders, staticBaseURL, discovery)
             // Cloudflare joins a header every matching rule sets, so the exact
             // `.md` rules, the `/*.md` glob and `/*` must not repeat a value.
             mergedHeaders = dedupeStaticHeaders(mergedHeaders, ['Content-Type', 'Link', 'Vary'])
-            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders)
+            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders, aiTermsLink ? [...discovery, aiTermsLink] : discovery)
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
