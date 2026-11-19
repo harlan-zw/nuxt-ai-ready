@@ -1,5 +1,5 @@
 import { hkdfSync } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { loadNuxt } from '@nuxt/kit'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -20,6 +20,7 @@ it('replaces a readable CLI cache with a private derived token', async () => {
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, 'previous-token')
     await chmod(path, 0o644)
+    await using previousFile = await open(path)
     const nuxt = await loadNuxt({
       cwd: rootDir,
       dev: true,
@@ -33,6 +34,7 @@ it('replaces a readable CLI cache with a private derived token', async () => {
     try {
       expect(await readFile(path, 'utf8')).toBe(expected)
       expect((await stat(path)).mode & 0o777).toBe(0o600)
+      expect(await previousFile.readFile('utf8')).toBe('previous-token')
     }
     finally {
       await nuxt.close()

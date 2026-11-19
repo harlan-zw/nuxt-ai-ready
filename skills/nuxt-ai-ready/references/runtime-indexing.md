@@ -38,11 +38,12 @@ Set `NUXT_APP_SECRET` in production to a string with at least 32 characters.
 AI Ready and OG Image derive separate tokens from this shared Nuxt root secret.
 Run `pnpm exec nuxt-ai-ready token` with the root secret in your environment to obtain the runtime sync bearer token.
 Cloudflare can supply the root through its encrypted `NUXT_APP_SECRET` binding at runtime.
-Keep an existing application secret. If your app has none, generate one with `openssl rand -base64 32`.
-Without a valid application secret, protected requests return `500`.
-Query-string tokens are not accepted.
+The legacy `runtimeSyncSecret` option and `NUXT_AI_READY_RUNTIME_SYNC_SECRET` remain supported with a deprecation warning.
+They use the original bearer token unchanged when `appSecret` is unset or empty.
+A non-empty application secret takes precedence. An invalid application secret fails without using the legacy token.
+Without a root or legacy token, protected requests return `500`.
 
-Every control endpoint needs `Authorization: Bearer <token>`, including `GET /__ai-ready/status`. Only `POST /__ai-ready/prune?dry=true` works without it.
+Every control endpoint needs `Authorization: Bearer <secret>`, including `GET /__ai-ready/status`. Only `POST /__ai-ready/prune?dry=true` works without it.
 
 | Request | Effect |
 |---------|--------|

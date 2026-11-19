@@ -5,10 +5,11 @@ import { requireAuth } from '../../src/runtime/server/utils/auth'
 
 const state = vi.hoisted(() => ({
   root: undefined as unknown,
-  eventConfig: undefined as { appSecret: unknown } | undefined,
+  eventConfig: undefined as { 'appSecret': unknown, 'nuxt-ai-ready'?: { runtimeSyncSecret: unknown } } | undefined,
   legacy: undefined as unknown,
   bindings: undefined as Record<string, unknown> | undefined,
   derive: vi.fn<(usage: string) => Promise<string>>(),
+  warn: vi.fn(),
 }))
 let root: string
 let sequence = 0
@@ -20,6 +21,7 @@ vi.mock('#nuxtseo/nitro', () => ({
     ? state.eventConfig
     : { 'appSecret': state.root, 'nuxt-ai-ready': { runtimeSyncSecret: state.legacy } },
 }))
+vi.mock('#ai-ready-virtual/logger.mjs', () => ({ logger: { warn: state.warn } }))
 vi.mock('nuxt/server', () => ({
   deriveSecret: state.derive,
 }))
@@ -45,6 +47,7 @@ describe('runtime sync authentication', () => {
     state.eventConfig = undefined
     state.legacy = undefined
     state.bindings = undefined
+    state.warn.mockClear()
     state.derive.mockReset().mockImplementation(async (usage) => {
       if (typeof state.root !== 'string' || state.root.length < 32)
         throw new Error('Invalid application secret.')
@@ -60,10 +63,10 @@ describe('runtime sync authentication', () => {
     expect((await authorize(token(root))).status).toBe(200)
   })
 
-  it('rejects the removed configured token without an application secret', async () => {
-    state.root = ''
+  it.each([undefined, ''])('accepts the configured legacy token when the application secret is %s', async (value) => {
+    state.root = value
     state.legacy = 'legacy-token'
-    expect((await authorize('legacy-token')).status).toBe(500)
+    expect((await authorize('legacy-token')).status).toBe(200)
   })
 
   it('prefers the shared root when a legacy token also exists', async () => {
@@ -72,11 +75,12 @@ describe('runtime sync authentication', () => {
     expect((await authorize('legacy-token')).status).toBe(401)
   })
 
-  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('ignores the removed Worker binding %s', async (key) => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('uses the Worker binding %s over the configured legacy token', async (key) => {
     state.root = ''
     state.legacy = 'build-token'
     state.bindings = { [key]: 'runtime-token' }
-    expect((await authorize('runtime-token')).status).toBe(500)
+    expect((await authorize('runtime-token')).status).toBe(200)
+    expect((await authorize('build-token')).status).toBe(401)
   })
 
   it('rejects an invalid shared root instead of falling back to the legacy token', async () => {
@@ -85,11 +89,12 @@ describe('runtime sync authentication', () => {
     expect((await authorize('legacy-token')).status).toBe(500)
   })
 
-  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('ignores the removed environment override %s', async (key) => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('uses the environment override %s over the configured legacy token', async (key) => {
     state.root = ''
     state.legacy = 'build-token'
     vi.stubEnv(key, 'runtime-token')
-    expect((await authorize('runtime-token')).status).toBe(500)
+    expect((await authorize('runtime-token')).status).toBe(200)
+    expect((await authorize('build-token')).status).toBe(401)
   })
 
   it.each([undefined, 'incorrect'])('rejects an invalid bearer token: %s', async (bearer) => {
@@ -101,8 +106,29 @@ describe('runtime sync authentication', () => {
     expect((await authorize(token(root, 'nuxt-og-image:url-signing'))).status).toBe(401)
   })
 
-  it('rejects query-string tokens', async () => {
-    expect((await authorize(undefined, `?secret=${token(root)}`)).status).toBe(401)
+  it('accepts the purpose-derived token from the deprecated query parameter', async () => {
+    expect((await authorize(undefined, `?secret=${token(root)}`)).status).toBe(200)
+    expect((await authorize(undefined, `?secret=${root}`)).status).toBe(401)
+    expect(state.warn).toHaveBeenCalledWith(expect.stringContaining('deprecated'))
+  })
+
+  it('accepts the configured legacy token from the deprecated query parameter', async () => {
+    state.root = ''
+    state.legacy = 'legacy-token'
+    expect((await authorize(undefined, '?secret=legacy-token')).status).toBe(200)
+    expect((await authorize('incorrect', '?secret=legacy-token')).status).toBe(401)
+  })
+
+  it('uses the request configuration when checking whether to use legacy authentication', async () => {
+    state.eventConfig = { 'appSecret': '', 'nuxt-ai-ready': { runtimeSyncSecret: 'legacy-token' } }
+    expect((await authorize('legacy-token')).status).toBe(200)
+    expect((await authorize(token(root))).status).toBe(401)
+  })
+
+  it('rejects a query token with a different UTF-16 code unit', async () => {
+    state.root = ''
+    state.legacy = 'test-\uD800'
+    expect((await authorize(undefined, '?secret=test-%EF%BF%BD')).status).toBe(401)
   })
 
   it.each([undefined, '', 'too-short', 1234, false, [], {}])('fails closed after a warm key for an invalid root: %s', async (value) => {
@@ -122,7 +148,7 @@ describe('runtime sync authentication', () => {
     expect((await authorize(token(rotated))).status).toBe(200)
   })
 
-  it.each(['', 'short', 1234, null])('rejects an invalid Worker override after a warm key: %s', async (value) => {
+  it.each(['', 'short', 1234, null])('rejects an unusable Worker override after a warm key: %s', async (value) => {
     state.bindings = { NUXT_APP_SECRET: root }
     expect((await authorize(token(root))).status).toBe(200)
     state.bindings = { NUXT_APP_SECRET: value }
@@ -220,7 +246,7 @@ describe('runtime sync authentication', () => {
     expect(state.derive).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects a bearer token with a different byte length', async () => {
-    expect((await authorize('é'.repeat(64))).status).toBe(401)
+  it('rejects a bearer token with a different length', async () => {
+    expect((await authorize('é'.repeat(63))).status).toBe(401)
   })
 })
