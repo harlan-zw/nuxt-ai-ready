@@ -1352,6 +1352,23 @@ export function trackDrizzleWork(event, work) { return work }
       // Use the Markdown files Nitro actually wrote. The pre-static handler
       // and the deployment preset both need the same per-file headers.
       const isCloudflarePreset = String(nitro.options.preset || '').startsWith('cloudflare')
+      const applyMarkdownHeaders = () => {
+        const plan = planStaticMarkdownHeaderRules(
+          nitro.options.routeRules,
+          prerenderedMarkdownHeaderRules(
+            nitro._prerenderedRoutes || [],
+            staticBaseURL,
+            config.describedby !== false,
+            agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+            isCloudflarePreset ? undefined : aiTermsLink,
+          ),
+          isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
+        )
+        const headers = applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
+        if (plan._tag === 'skip')
+          noteSharedMarkdownRule(plan.total, plan.dropped)
+        return headers
+      }
       let prerenderFinished = false
       nitro.hooks.hook('prerender:done', async () => {
         // Adding Worker-first routes makes ordinary static HTML requests invoke
@@ -1380,39 +1397,38 @@ export function trackDrizzleWork(event, work) { return work }
         ? ['rollup:before']
         : ['build:config', 'vite:compile:before'])
       nitro.hooks.afterEach(({ name }) => {
+        if (nitro.options.static) {
+          if (name === 'prerender:done')
+            applyMarkdownHeaders()
+          return
+        }
         if (!prerenderFinished || !bundlerHooks.has(name))
           return
         prerenderFinished = false
 
-        const plan = planStaticMarkdownHeaderRules(
-          nitro.options.routeRules,
-          prerenderedMarkdownHeaderRules(
-            nitro._prerenderedRoutes || [],
-            staticBaseURL,
-            config.describedby !== false,
-            agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
-            isCloudflarePreset ? undefined : aiTermsLink,
-          ),
-          isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
-        )
         // Split after the bundler configuration hooks have finished editing
-        // the live rule table. Presets still read the exact deployment rules.
-        const deploymentRouteRules = nitro.options.routeRules
-        const runtimeRouteRules = { ...deploymentRouteRules }
-        const headers = applyStaticMarkdownHeaderPlan(deploymentRouteRules, plan)
+        // the tables. Presets still read the exact deployment rules.
+        const runtimeRouteRules = { ...nitro.options.runtimeConfig.nitro.routeRules }
+        const headers = applyMarkdownHeaders()
         const matchRouteRules = createNitroRouteRuleMatcher({ nitro: { routeRules: runtimeRouteRules } })
         prerenderedMarkdownHeaders = []
         for (const [path, values] of headers) {
           const rule = matchRouteRules(path)
           // Nitro can answer these requests before the pre-static handler.
-          if (rule.redirect || rule.proxy)
-            runtimeRouteRules[path] = deploymentRouteRules[path]!
-          else
+          if (rule.redirect || rule.proxy) {
+            const deploymentRule = nitro.options.routeRules[path]!
+            const runtimeRule = runtimeRouteRules[path]
+            runtimeRouteRules[path] = {
+              ...deploymentRule,
+              ...runtimeRule,
+              headers: defu(values, runtimeRule?.headers),
+            }
+          }
+          else {
             prerenderedMarkdownHeaders.push([decodePath(path), values])
+          }
         }
         nitro.options.runtimeConfig.nitro.routeRules = runtimeRouteRules
-        if (plan._tag === 'skip')
-          noteSharedMarkdownRule(plan.total, plan.dropped)
       })
       nitro.hooks.hook('compiled', async () => {
         const generatedHeadersPath = join(nitro.options.output.publicDir, '_headers')

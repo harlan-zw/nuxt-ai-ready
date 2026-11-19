@@ -25,6 +25,10 @@ describe('accept header negotiation for prerendered routes', async () => {
               return
             nitro.options.routeRules['/render-count'] = { headers: { 'x-added-at-bundle': 'html' } }
             nitro.options.routeRules['/about.md']!.headers!['x-added-at-bundle'] = 'markdown'
+            nitro.options.runtimeConfig.nitro.routeRules = {
+              ...nitro.options.routeRules,
+              '/render-count': { headers: { ...nitro.options.routeRules['/render-count']!.headers, 'x-runtime-only': 'kept' } },
+            }
           },
         },
         prerender: {
@@ -89,6 +93,7 @@ describe('accept header negotiation for prerendered routes', async () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('x-added-at-bundle')).toBe('html')
+    expect(response.headers.get('x-runtime-only')).toBe('kept')
   })
 
   it('keeps Markdown headers on conditional requests', async () => {

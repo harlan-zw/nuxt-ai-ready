@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@12.8.1",
   "scripts": {
-    "test": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json && nuxt build && node test.mjs && nuxt generate && node generate.mjs"
+    "test": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json && nuxt build && node test.mjs && nuxt generate --preset=cloudflare-pages-static && node generate.mjs"
   },
   "dependencies": {
     "nuxtseo-shared": "^6.0.4",
