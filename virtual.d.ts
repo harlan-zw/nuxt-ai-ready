@@ -24,3 +24,8 @@ declare module '#ai-ready-virtual/cloudflare-fallback-paths.mjs' {
   const paths: ReadonlySet<string>
   export default paths
 }
+
+declare module '#ai-ready-virtual/prerendered-markdown-headers.mjs' {
+  const headers: ReadonlyMap<string, Readonly<Record<string, string>>>
+  export default headers
+}

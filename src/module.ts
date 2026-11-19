@@ -14,6 +14,8 @@ import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImpor
 import defu from 'defu'
 import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
+import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
+import { decodePath } from 'ufo'
 import { createBuildPageDataVirtual } from './build-page-data-virtual'
 import { contentLookupModule, resolveContentSource } from './content-source'
 import { logger } from './logger'
@@ -809,6 +811,7 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     let cloudflareFallbackPaths: string[] = []
+    let prerenderedMarkdownHeaders: [path: string, headers: Record<string, string>][] = []
 
     // Virtual modules for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
@@ -959,6 +962,8 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
       // Read the final paths after prerendering, when Nitro bundles the Worker.
       nitroConfig.virtual['#ai-ready-virtual/cloudflare-fallback-paths.mjs'] = () =>
         `export default new Set(${JSON.stringify(cloudflareFallbackPaths)})`
+      nitroConfig.virtual['#ai-ready-virtual/prerendered-markdown-headers.mjs'] = () =>
+        `export default new Map(${JSON.stringify(prerenderedMarkdownHeaders)})`
 
       // Logger with debug level configured from module options
       nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
@@ -1344,14 +1349,8 @@ export function trackDrizzleWork(event, work) { return work }
     // Merge the charset header into _headers because Nitro route rules do not support suffix globs
     // The splat (*) greedily matches all characters including slashes, so /*.md matches all depths
     nuxt.hooks.hook('nitro:build:before', (nitro) => {
-      // Nitro's static handler answers prerendered `.md` files before any
-      // middleware (#82), so route rules are the only header mechanism server
-      // presets apply to them. Only a page that prerendered as HTML gets a
-      // twin, and a config route can be JSON or XML, so the rules come from
-      // the twins Nitro wrote, not from the configured routes. Once Nitro
-      // finishes, every twin it actually wrote gets the exact same headers via
-      // route rules. Presets bake those into `_headers` at `compiled`, and
-      // static handlers apply them at runtime.
+      // Use the Markdown files Nitro actually wrote. The pre-static handler
+      // and the deployment preset both need the same per-file headers.
       const isCloudflarePreset = String(nitro.options.preset || '').startsWith('cloudflare')
       nitro.hooks.hook('prerender:done', async () => {
         // Adding Worker-first routes makes ordinary static HTML requests invoke
@@ -1385,15 +1384,25 @@ export function trackDrizzleWork(event, work) { return work }
           ),
           isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
         )
-        if (plan._tag === 'skip') {
-          // Decided here, before Nitro writes `_headers`, so a module that
-          // audits the file earlier in the `compiled` order never sees it
-          // over budget.
-          applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
-          noteSharedMarkdownRule(plan.total, plan.dropped)
-          return
+        // Nitro's runtime config references the original rule table. Give the
+        // deployment preset a separate table so it can emit the exact headers
+        // without adding them to the config Nitro walks on every request.
+        const runtimeRouteRules = nitro.options.routeRules
+        const deploymentRouteRules = { ...runtimeRouteRules }
+        const headers = applyStaticMarkdownHeaderPlan(deploymentRouteRules, plan)
+        const matchRouteRules = createNitroRouteRuleMatcher({ nitro: { routeRules: runtimeRouteRules } })
+        prerenderedMarkdownHeaders = []
+        for (const [path, values] of headers) {
+          const rule = matchRouteRules(path)
+          // Nitro can answer these requests before the pre-static handler.
+          if (rule.redirect || rule.proxy)
+            runtimeRouteRules[path] = deploymentRouteRules[path]!
+          else
+            prerenderedMarkdownHeaders.push([decodePath(path), values])
         }
-        applyStaticMarkdownHeaderPlan(nitro.options.routeRules, plan)
+        nitro.options.routeRules = deploymentRouteRules
+        if (plan._tag === 'skip')
+          noteSharedMarkdownRule(plan.total, plan.dropped)
       })
       nitro.hooks.hook('compiled', async () => {
         const generatedHeadersPath = join(nitro.options.output.publicDir, '_headers')

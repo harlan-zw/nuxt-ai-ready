@@ -171,7 +171,7 @@ export function planStaticMarkdownHeaderRules(
 export function applyStaticMarkdownHeaderPlan(
   routeRules: Record<string, object | undefined>,
   plan: StaticMarkdownHeaderPlan,
-): void {
+): [path: string, headers: Record<string, string>][] {
   if (plan._tag === 'blocked')
     throw new Error(`Content-Signal policy rules exceed the static header limit (${plan.total}/${plan.limit}). Reduce per-page policies or use a shared policy.`)
   if (plan._tag === 'skip') {
@@ -181,6 +181,7 @@ export function applyStaticMarkdownHeaderPlan(
         rule.headers = undefined
     }
   }
+  const applied: [path: string, headers: Record<string, string>][] = []
   for (const { route, headers } of plan.rules) {
     const existing = routeRules[route] as { headers?: Record<string, string> } | undefined
     const merged = defu({ headers: { ...headers } }, existing)
@@ -206,5 +207,7 @@ export function applyStaticMarkdownHeaderPlan(
       merged.headers.Vary = mergeVaryHeader(vary, headers.Vary)
     }
     routeRules[route] = merged
+    applied.push([route, merged.headers])
   }
+  return applied
 }

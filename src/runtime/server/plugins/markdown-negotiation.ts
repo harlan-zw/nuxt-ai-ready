@@ -1,4 +1,6 @@
-import { defineEventHandler } from '#nuxtseo/h3'
+import { decodePath, withoutBase, withoutTrailingSlash } from 'ufo'
+import prerenderedMarkdownHeaders from '#ai-ready-virtual/prerendered-markdown-headers.mjs'
+import { defineEventHandler, getRequestURL, setHeader } from '#nuxtseo/h3'
 import { defineNitroPlugin, useRuntimeConfig } from '#nuxtseo/nitro'
 import { logger } from '../logger'
 import { serveCloudflarePrerenderedPage } from '../utils/cloudflare-prerendered'
@@ -49,6 +51,14 @@ function resolveH3Runtime(candidate: unknown): H3Runtime {
 }
 
 const negotiationHandler = defineEventHandler(async (event) => {
+  if (prerenderedMarkdownHeaders.size && (event.path.includes('.md') || event.path.includes('%'))) {
+    const path = decodePath(withoutTrailingSlash(withoutBase(getRequestURL(event).pathname, useRuntimeConfig().app.baseURL)))
+    const headers = prerenderedMarkdownHeaders.get(path)
+    if (headers) {
+      for (const [name, value] of Object.entries(headers))
+        setHeader(event, name, value)
+    }
+  }
   const decision = decideNegotiation(event, 'early')
   const response = await applyNegotiation(event, decision)
   if (response !== undefined || decision._tag !== 'html')
