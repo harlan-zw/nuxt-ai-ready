@@ -19,13 +19,18 @@ export default defineEventHandler((event) => {
   }
   if (!['GET', 'HEAD'].includes(event.req.method))
     throw createError({ status: 405, statusText: 'Method Not Allowed' })
-  const config = (useRuntimeConfig()['nuxt-ai-ready'] as unknown as {
+  const runtimeConfig = useRuntimeConfig()['nuxt-ai-ready'] as unknown as {
     apiCatalog?: ApiCatalogRuntimeConfig
-  }).apiCatalog
+    aiTerms?: { href: string }
+  }
+  const config = runtimeConfig.apiCatalog
   if (!config)
     throw createError({ status: 404, message: 'API catalog is not configured' })
   event.res.headers.set('content-type', config.mediaType)
-  event.res.headers.set('link', `<${config.href}>; rel="api-catalog"`)
+  event.res.headers.set('link', [
+    `<${config.href}>; rel="api-catalog"`,
+    runtimeConfig.aiTerms && `<${runtimeConfig.aiTerms.href}>; rel="ai-terms"`,
+  ].filter(Boolean).join(', '))
   if (event.req.method === 'HEAD')
     return
   return config.document

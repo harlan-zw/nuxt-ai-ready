@@ -1,0 +1,6 @@
+/private
+  Content-Signal: ai-train=no
+  Cache-Control: private
+
+/*
+  Content-Signal: ai-train=yes

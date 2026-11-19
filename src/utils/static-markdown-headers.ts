@@ -69,6 +69,7 @@ export function prerenderedMarkdownHeaderRules(
   baseURL: string,
   describedby: boolean,
   artifactRoutes: ReadonlyArray<string>,
+  aiTermsLink?: string,
 ): StaticMarkdownHeaderRule[] {
   const artifacts = new Set(artifactRoutes)
   const rules = new Map<string, StaticMarkdownHeaderRule>()
@@ -87,7 +88,7 @@ export function prerenderedMarkdownHeaderRules(
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
           'Vary': 'Accept',
-          'Link': buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby),
+          'Link': [buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby), aiTermsLink].filter(Boolean).join(', '),
           ...(entry.contentSignal !== undefined && { 'Content-Signal': entry.contentSignal }),
         },
       })

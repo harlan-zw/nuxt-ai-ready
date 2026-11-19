@@ -14,6 +14,12 @@ function isAscii(s: string): boolean {
 }
 
 describe('buildLinkHeader', () => {
+  it('preserves encoding in the AI Terms discovery URL', () => {
+    const href = 'https://example.com/caf%C3%A9/.well-known/ai-terms'
+    const header = buildLinkHeader('/about', 'markdown', { ...baseConfig, aiTerms: { href } })
+    expect(header).toContain(`<${href}>; rel="ai-terms"`)
+  })
+
   const resolveExampleUrl = (path: string) => new URL(path, 'https://example.com').href
 
   it('emits ASCII-only Link header for paths with non-Latin characters (html variant)', () => {

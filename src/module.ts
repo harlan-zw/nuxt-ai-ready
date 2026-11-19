@@ -1,4 +1,5 @@
 import type { ParsedMarkdownResult } from './prerender'
+import type { ResolvedAiTermsConfig } from './runtime/ai-terms'
 import type { AgentSkillConfig, AgentSkillsConfig, ContentNegotiationPolicy, LlmsTxtConfig, ModuleOptions } from './runtime/types'
 import type { AgentSkillsConfigIssue, ResolvedAgentSkillsConfig } from './utils/agent-skills-config'
 import type { ResolvedApiCatalogConfig } from './utils/api-catalog'
@@ -19,6 +20,7 @@ import { logger } from './logger'
 import { resolveModuleEntryUrl } from './module-resolver'
 import { readPackageMetadata } from './package-metadata'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
+import { AI_TERMS_PATH } from './runtime/ai-terms'
 import { parseLlmsTxtConfig } from './runtime/llms-txt-files'
 import { toDeployedRoute } from './runtime/route-path'
 import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
@@ -26,6 +28,7 @@ import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './r
 import { registerTypeTemplates } from './templates'
 import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
 import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
+import { resolveAiTermsConfig } from './utils/ai-terms'
 import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
 import { readCloudflareAssetRouting } from './utils/cloudflare-config'
 import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation'
@@ -115,6 +118,7 @@ export interface ModulePublicRuntimeConfig {
     etag: string
   }
   apiCatalog?: ResolvedApiCatalogConfig
+  aiTerms?: ResolvedAiTermsConfig
 }
 
 /** Runtime config exposed to the browser, only set when WebMCP is enabled. */
@@ -295,6 +299,15 @@ export default defineNuxtModule<ModuleOptions>({
     const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
 
     const siteConfig = useSiteConfig()
+    const aiTermsResult = resolveAiTermsConfig(config.aiTerms, siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined)
+    if (aiTermsResult._tag === 'Invalid') {
+      throw new Error([
+        '[nuxt-ai-ready] Invalid AI Terms configuration:',
+        ...aiTermsResult.errors.map(error => `- ${error}`),
+      ].join('\n'))
+    }
+    const aiTermsConfig = aiTermsResult._tag === 'Enabled' ? aiTermsResult.config : undefined
+    const aiTermsLink = aiTermsConfig ? `<${aiTermsConfig.href}>; rel="ai-terms"` : undefined
     const apiCatalogResult = resolveApiCatalogConfig(config.apiCatalog, {
       siteBaseURL: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
       generatedEntries: [],
@@ -520,12 +533,12 @@ export default defineNuxtModule<ModuleOptions>({
       addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog'), lazy: true })
       const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
       extendRouteRules('/**', {
-        headers: { Link: apiCatalogLink },
+        headers: { Link: [apiCatalogLink, aiTermsLink].filter(Boolean).join(', ') },
       })
       extendRouteRules(API_CATALOG_PATH, {
         headers: {
           'Content-Type': catalog.mediaType,
-          'Link': apiCatalogLink,
+          'Link': [apiCatalogLink, aiTermsLink].filter(Boolean).join(', '),
         },
       })
       if (prerenderEnabled) {
@@ -547,6 +560,7 @@ export default defineNuxtModule<ModuleOptions>({
           runtimeSync: runtimeSyncEnabled,
           cron: !!config.cron,
           apiCatalog: !!apiCatalogConfig,
+          aiTerms: !!aiTermsConfig,
           database: databaseEnabled ? database.type : false,
         }
       }
@@ -1066,6 +1080,7 @@ export function trackDrizzleWork(event, work) { return work }
       i18n: i18nConfig,
       ftsTokenizer,
       apiCatalog: apiCatalogConfig,
+      aiTerms: aiTermsConfig,
     } as any
 
     if (prerenderEnabled) {
@@ -1209,6 +1224,26 @@ export function trackDrizzleWork(event, work) { return work }
     }
 
     // Setup prerendering hooks for static generation
+    if (aiTermsConfig) {
+      addServerHandler({ route: AI_TERMS_PATH, handler: resolve('./runtime/server/routes/ai-terms'), lazy: true })
+      addNitroPlugin(resolve('./runtime/server/plugins/ai-terms'))
+      extendRouteRules('/**', {
+        headers: {
+          Link: [apiCatalogConfig && `<${apiCatalogConfig.href}>; rel="api-catalog"`, aiTermsLink].filter(Boolean).join(', '),
+        },
+      })
+      extendRouteRules(AI_TERMS_PATH, {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      })
+      nuxt.hook('prerender:routes', ({ routes }) => {
+        if (prerenderEnabled || routes.size > 0)
+          routes.add(AI_TERMS_PATH)
+      })
+    }
     if (apiCatalogConfig)
       registerApiCatalog(apiCatalogConfig)
 
@@ -1341,6 +1376,7 @@ export function trackDrizzleWork(event, work) { return work }
             staticBaseURL,
             config.describedby !== false,
             agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+            isCloudflarePreset ? undefined : aiTermsLink,
           ),
           isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
         )
@@ -1427,11 +1463,13 @@ export function trackDrizzleWork(event, work) { return work }
               discovery.push(staticDescribedbyEntry(staticBaseURL))
             if (staticDiscoverySupported && apiCatalogConfig && await hasArtifact(API_CATALOG_PATH))
               discovery.push(`<${encodeURI(apiCatalogConfig.href)}>; rel="api-catalog"`)
+            if (staticDiscoverySupported && aiTermsLink && await hasArtifact(AI_TERMS_PATH))
+              discovery.push(aiTermsLink)
             mergedHeaders = mergeStaticDiscoveryHeaders(mergedHeaders, staticBaseURL, discovery)
             // Cloudflare joins a header every matching rule sets, so the exact
             // `.md` rules, the `/*.md` glob and `/*` must not repeat a value.
             mergedHeaders = dedupeStaticHeaders(mergedHeaders, ['Content-Type', 'Link', 'Vary'])
-            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders)
+            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders, aiTermsLink ? [...discovery, aiTermsLink] : discovery)
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents
@@ -1452,6 +1490,17 @@ export function trackDrizzleWork(event, work) { return work }
   },
 })
 
+export type {
+  AiTermsAccess,
+  AiTermsConfig,
+  AiTermsDocument,
+  AiTermsFreeAllowance,
+  AiTermsPath,
+  AiTermsPayment,
+  AiTermsPrice,
+  AiTermsPurpose,
+  AiTermsUse,
+} from './runtime/ai-terms'
 export type {
   GetPageMarkdownToolOptions,
   ListPagesToolOptions,

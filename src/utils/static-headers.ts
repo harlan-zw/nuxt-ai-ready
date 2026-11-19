@@ -152,7 +152,7 @@ export function matchingStaticContentSignals(routeRules: Record<string, object |
 }
 
 /** Normalize usage policy precedence without changing other header precedence. */
-export function normalizeStaticContentSignalHeaders(contents: string): string {
+export function normalizeStaticContentSignalHeaders(contents: string, generatedDiscovery: readonly string[] = []): string {
   const parsed = splitHeaderBlocks(contents)
   if (!parsed.some(block => /^\s+content-signal\s*:/im.test(block.text)))
     return contents
@@ -177,8 +177,20 @@ export function normalizeStaticContentSignalHeaders(contents: string): string {
     const policy = group.filter(hasPolicy).at(-1)!.text.split(/\r?\n/).slice(1).filter(line => policyLine.test(line))
     return [{ route: block.route, text: `${block.route}\n${[...lines, ...policy].join('\n')}\n` }]
   })
+  const discoveryLinks = new Set(generatedDiscovery)
+  const isGeneratedDiscovery = (line: string) => {
+    if (discoveryLinks.size === 0)
+      return false
+    const header = parseHeaderLine(line)
+    if (header?.name.toLowerCase() !== 'link')
+      return false
+    const links = splitLinkEntries(header.value)
+    return links.length > 0 && links.every(link => discoveryLinks.has(link))
+  }
+  // Generated discovery must not prevent a shared policy from moving before
+  // its overrides. Preserve the order of blocks carrying user headers.
   const policyOnly = (block: HeaderBlock) => hasPolicy(block)
-    && block.text.split(/\r?\n/).slice(1).every(line => !line.trim() || line.trimStart().startsWith('#') || policyLine.test(line))
+    && block.text.split(/\r?\n/).slice(1).every(line => !line.trim() || line.trimStart().startsWith('#') || policyLine.test(line) || isGeneratedDiscovery(line))
   const policyValue = (block: HeaderBlock) => block.text.match(/^[\t ]+content-signal[\t ]*:(.*)$/im)?.[1]?.trim() ?? null
   const edges = blocks.map(() => new Set<number>())
   const incoming = blocks.map(() => 0)

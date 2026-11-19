@@ -20,6 +20,7 @@ export const LLMS_TXT_PATH = '/llms.txt'
 
 interface LinkHeaderConfig {
   apiCatalog?: { href: string }
+  aiTerms?: { href: string }
   describedby?: boolean
   i18n?: RuntimeI18nConfig | null
 }
@@ -57,6 +58,9 @@ function buildBaseParts(
     const href = resolveHeaderUrl(LLMS_TXT_PATH, resolveUrl)
     parts.push(`<${encodePathForHeader(href)}>; rel="describedby"`)
   }
+
+  if (config.aiTerms)
+    parts.push(`<${config.aiTerms.href}>; rel="ai-terms"`)
 
   return parts
 }
