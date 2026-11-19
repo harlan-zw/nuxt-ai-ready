@@ -1352,6 +1352,7 @@ export function trackDrizzleWork(event, work) { return work }
       // Use the Markdown files Nitro actually wrote. The pre-static handler
       // and the deployment preset both need the same per-file headers.
       const isCloudflarePreset = String(nitro.options.preset || '').startsWith('cloudflare')
+      let prerenderFinished = false
       nitro.hooks.hook('prerender:done', async () => {
         // Adding Worker-first routes makes ordinary static HTML requests invoke
         // the Worker too. Keep asset routing user-owned unless explicitly enabled.
@@ -1373,6 +1374,16 @@ export function trackDrizzleWork(event, work) { return work }
           if (additions.length > 0)
             assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...additions]
         }
+        prerenderFinished = true
+      })
+      const bundlerHooks = new Set<string>(nitroCompatibility._tag === 'nitro-v2'
+        ? ['rollup:before']
+        : ['build:config', 'vite:compile:before'])
+      nitro.hooks.afterEach(({ name }) => {
+        if (!prerenderFinished || !bundlerHooks.has(name))
+          return
+        prerenderFinished = false
+
         const plan = planStaticMarkdownHeaderRules(
           nitro.options.routeRules,
           prerenderedMarkdownHeaderRules(
@@ -1384,11 +1395,10 @@ export function trackDrizzleWork(event, work) { return work }
           ),
           isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
         )
-        // Nitro's runtime config references the original rule table. Give the
-        // deployment preset a separate table so it can emit the exact headers
-        // without adding them to the config Nitro walks on every request.
-        const runtimeRouteRules = nitro.options.routeRules
-        const deploymentRouteRules = { ...runtimeRouteRules }
+        // Split after the bundler configuration hooks have finished editing
+        // the live rule table. Presets still read the exact deployment rules.
+        const deploymentRouteRules = nitro.options.routeRules
+        const runtimeRouteRules = { ...deploymentRouteRules }
         const headers = applyStaticMarkdownHeaderPlan(deploymentRouteRules, plan)
         const matchRouteRules = createNitroRouteRuleMatcher({ nitro: { routeRules: runtimeRouteRules } })
         prerenderedMarkdownHeaders = []
@@ -1400,7 +1410,7 @@ export function trackDrizzleWork(event, work) { return work }
           else
             prerenderedMarkdownHeaders.push([decodePath(path), values])
         }
-        nitro.options.routeRules = deploymentRouteRules
+        nitro.options.runtimeConfig.nitro.routeRules = runtimeRouteRules
         if (plan._tag === 'skip')
           noteSharedMarkdownRule(plan.total, plan.dropped)
       })

@@ -19,6 +19,14 @@ describe('accept header negotiation for prerendered routes', async () => {
       },
       nitro: {
         preset: 'node-server',
+        hooks: {
+          'rollup:before': (nitro) => {
+            if (nitro.options.preset === 'nitro-prerender')
+              return
+            nitro.options.routeRules['/render-count'] = { headers: { 'x-added-at-bundle': 'html' } }
+            nitro.options.routeRules['/about.md']!.headers!['x-added-at-bundle'] = 'markdown'
+          },
+        },
         prerender: {
           crawlLinks: false,
           routes: ['/', '/about', '/docs/getting-started.md'],
@@ -72,7 +80,15 @@ describe('accept header negotiation for prerendered routes', async () => {
     expect(response.headers.get('link')).toContain('</about>; rel="canonical"')
     expect(response.headers.get('content-signal')).toBe('search=no')
     expect(response.headers.get('x-markdown-rule')).toBe('about')
+    expect(response.headers.get('x-added-at-bundle')).toBe('markdown')
     expect(await response.text()).toContain('#')
+  })
+
+  it('applies a late route rule to a live page', async () => {
+    const response = await fetch(url('/render-count'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-added-at-bundle')).toBe('html')
   })
 
   it('keeps Markdown headers on conditional requests', async () => {
