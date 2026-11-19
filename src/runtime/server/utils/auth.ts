@@ -1,7 +1,5 @@
 import type { H3Event } from '#nuxtseo/h3'
 import type { ModulePublicRuntimeConfig } from '../../../module'
-import { Buffer } from 'node:buffer'
-import { timingSafeEqual } from 'node:crypto'
 import { deriveSecret } from 'nuxt/server'
 import { logger } from '#ai-ready-virtual/logger.mjs'
 import { createError, getHeader, getQuery } from '#nuxtseo/h3'
@@ -9,52 +7,58 @@ import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { APPLICATION_SECRET_ERROR, deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING, RUNTIME_SYNC_SECRET_PURPOSE } from '../../sync-secret'
 import { getCfEnv } from './cloudflare'
 
-type DerivationMode = 'nuxt' | 'binding'
-interface DerivedToken {
-  root: string
-  mode: DerivationMode
-  promise: Promise<Uint8Array>
+type TokenMode = 'nuxt' | 'binding' | 'legacy'
+interface TokenVerifier {
+  length: number
+  key: CryptoKey
+  signature: ArrayBuffer
+}
+interface TokenCacheEntry {
+  source: string
+  mode: TokenMode
+  promise: Promise<TokenVerifier>
 }
 
-// Keep one successful or pending derivation. Rotation replaces the entry.
-let derivedToken: DerivedToken | undefined
+const HMAC: HmacKeyGenParams = { name: 'HMAC', hash: 'SHA-256' }
+// Keep one successful or pending verifier. Rotation replaces the entry.
+let tokenVerifier: TokenCacheEntry | undefined
 let warnedLegacy = false
 
-function encodeToken(token: string): Uint8Array {
+function encodeToken(token: string): Uint16Array<ArrayBuffer> {
   // UTF-8 replaces unpaired surrogates and can collapse distinct legacy tokens.
-  return Buffer.from(token, 'utf16le')
+  return Uint16Array.from({ length: token.length }, (_, index) => token.charCodeAt(index))
 }
 
-function tokensMatch(received: Uint8Array, secret: Uint8Array): boolean {
-  if (received.length !== secret.length)
-    return false
-
-  // Workers expose this native comparison even without Node compatibility.
-  const subtle = globalThis.crypto.subtle as SubtleCrypto & { timingSafeEqual?: typeof timingSafeEqual }
-  return subtle.timingSafeEqual?.(received, secret) ?? timingSafeEqual(received, secret)
+async function createTokenVerifier(token: string): Promise<TokenVerifier> {
+  const { subtle } = globalThis.crypto
+  const key = await subtle.generateKey(HMAC, false, ['sign', 'verify'])
+  const signature = await subtle.sign(HMAC, key, encodeToken(token))
+  return { length: token.length, key, signature }
 }
 
-function resolveToken(root: string, mode: DerivationMode): Promise<Uint8Array> {
-  if (derivedToken?.root === root && derivedToken.mode === mode)
-    return derivedToken.promise
+function resolveToken(source: string, mode: TokenMode): Promise<TokenVerifier> {
+  if (tokenVerifier?.source === source && tokenVerifier.mode === mode)
+    return tokenVerifier.promise
 
   // Nuxt reads its root synchronously, before the first crypto await.
-  const promise = mode === 'nuxt' ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE) : deriveRuntimeSyncSecret(root)
-  const entry: DerivedToken = {
-    root,
+  const token = mode === 'nuxt'
+    ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE)
+    : mode === 'binding' ? deriveRuntimeSyncSecret(source) : Promise.resolve(source)
+  const entry: TokenCacheEntry = {
+    source,
     mode,
-    promise: promise.then(encodeToken),
+    promise: token.then(createTokenVerifier),
   }
-  derivedToken = entry
+  tokenVerifier = entry
   entry.promise = entry.promise.catch((cause: unknown) => {
-    if (derivedToken === entry)
-      derivedToken = undefined
+    if (tokenVerifier === entry)
+      tokenVerifier = undefined
     throw cause
   })
   return entry.promise
 }
 
-async function resolveExpectedToken(event: H3Event): Promise<Uint8Array> {
+async function resolveExpectedToken(event: H3Event): Promise<TokenVerifier> {
   const bindings = getCfEnv(event)
   const bindingRoot = bindings?.NUXT_APP_SECRET
   const configuredRoot = bindingRoot === undefined ? useRuntimeConfig(event).appSecret : bindingRoot
@@ -71,7 +75,7 @@ async function resolveExpectedToken(event: H3Event): Promise<Uint8Array> {
       warnedLegacy = true
       logger.warn(LEGACY_RUNTIME_SYNC_SECRET_WARNING)
     }
-    return encodeToken(legacy)
+    return resolveToken(legacy, 'legacy')
   }
 
   // Nuxt derives with no event argument. Nitro 2 bindings require direct derivation.
@@ -93,8 +97,8 @@ export async function requireAuth(event: H3Event): Promise<void> {
   const authHeader = getHeader(event, 'authorization')
   const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
   const querySecret = bearer ? undefined : getQuery(event).secret
-  const received = encodeToken(bearer || (querySecret ? String(querySecret) : ''))
-  if (!tokensMatch(received, secret)) {
+  const received = bearer || (querySecret ? String(querySecret) : '')
+  if (received.length !== secret.length || !await globalThis.crypto.subtle.verify(HMAC, secret.key, secret.signature, encodeToken(received))) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
   if (querySecret) {

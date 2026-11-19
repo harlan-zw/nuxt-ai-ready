@@ -16,6 +16,13 @@ let sequence = 0
 const purpose = 'nuxt-ai-ready:runtime-sync'
 const token = (secret: string, usage = purpose) => Buffer.from(hkdfSync('sha256', secret, 'nuxt', usage, 32)).toString('hex')
 
+vi.mock('node:crypto', async importOriginal => ({
+  ...await importOriginal<typeof import('node:crypto')>(),
+  timingSafeEqual: () => {
+    throw new Error('Node crypto comparison is unavailable on this edge runtime.')
+  },
+}))
+
 vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: (event?: unknown) => event && state.eventConfig
     ? state.eventConfig
@@ -67,6 +74,12 @@ describe('runtime sync authentication', () => {
     state.root = value
     state.legacy = 'legacy-token'
     expect((await authorize('legacy-token')).status).toBe(200)
+  })
+
+  it('rejects a same-length legacy token using standard WebCrypto', async () => {
+    state.root = ''
+    state.legacy = 'legacy-token'
+    expect((await authorize('legacy-tokem')).status).toBe(401)
   })
 
   it('prefers the shared root when a legacy token also exists', async () => {
@@ -211,6 +224,12 @@ describe('runtime sync authentication', () => {
     expect((await authorize(token(root))).status).toBe(500)
     expect((await authorize(token(root))).status).toBe(200)
     expect(state.derive).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries after failing to prepare the token verifier', async () => {
+    vi.spyOn(globalThis.crypto.subtle, 'generateKey').mockRejectedValueOnce(new Error('Crypto service unavailable'))
+    expect((await authorize(token(root))).status).toBe(500)
+    expect((await authorize(token(root))).status).toBe(200)
   })
 
   it('keeps a newer key when an earlier derivation rejects', async () => {
