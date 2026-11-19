@@ -25,6 +25,15 @@ function encodeToken(token: string): Uint8Array {
   return Buffer.from(token, 'utf16le')
 }
 
+function tokensMatch(received: Uint8Array, secret: Uint8Array): boolean {
+  if (received.length !== secret.length)
+    return false
+
+  // Workers expose this native comparison even without Node compatibility.
+  const subtle = globalThis.crypto.subtle as SubtleCrypto & { timingSafeEqual?: typeof timingSafeEqual }
+  return subtle.timingSafeEqual?.(received, secret) ?? timingSafeEqual(received, secret)
+}
+
 function resolveToken(root: string, mode: DerivationMode): Promise<Uint8Array> {
   if (derivedToken?.root === root && derivedToken.mode === mode)
     return derivedToken.promise
@@ -85,7 +94,7 @@ export async function requireAuth(event: H3Event): Promise<void> {
   const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
   const querySecret = bearer ? undefined : getQuery(event).secret
   const received = encodeToken(bearer || (querySecret ? String(querySecret) : ''))
-  if (received.length !== secret.length || !timingSafeEqual(received, secret)) {
+  if (!tokensMatch(received, secret)) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }
   if (querySecret) {
