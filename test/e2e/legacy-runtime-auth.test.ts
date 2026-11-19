@@ -25,6 +25,10 @@ describe('legacy runtime sync secret', async () => {
     expect((await fetch('/__ai-ready/status')).status).toBe(401)
   })
 
+  it('accepts the configured legacy token from the deprecated query parameter', async () => {
+    expect((await fetch(`/__ai-ready/status?secret=${legacy}`)).status).toBe(200)
+  })
+
   it('keeps the configured legacy token available through the CLI cache', async () => {
     const result = await execa(process.execPath, [fileURLToPath(new URL('../../dist/cli.mjs', import.meta.url)), 'token', '--cwd', rootDir])
     expect(result.stdout.trim()).toBe(legacy)

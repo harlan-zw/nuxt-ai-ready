@@ -34,8 +34,12 @@ describe('runtime-only application secret', async () => {
     expect((await fetch(`/__ai-ready/${route}`, { method })).status).toBe(401)
   })
 
-  it('rejects the root secret and preserves deprecated query tokens', async () => {
+  it('rejects the root secret', async () => {
     expect((await fetch('/__ai-ready/status', { headers: { authorization: `Bearer ${root}` } })).status).toBe(401)
+    expect((await fetch(`/__ai-ready/status?secret=${root}`)).status).toBe(401)
+  })
+
+  it('accepts the derived token from the deprecated query parameter', async () => {
     expect((await fetch(`/__ai-ready/status?secret=${token}`)).status).toBe(200)
   })
 

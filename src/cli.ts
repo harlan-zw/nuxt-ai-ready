@@ -8,7 +8,7 @@ import { join, resolve } from 'pathe'
 import { joinURL } from 'ufo'
 import { readPackageMetadata } from './package-metadata'
 import { auditSite, parseAuditOptions } from './readiness-audit'
-import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
+import { APPLICATION_SECRET_ERROR, deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const root = process.env.NITRO_APP_SECRET ?? process.env.NUXT_APP_SECRET
@@ -36,7 +36,7 @@ function authHeaders(secret: string): Record<string, string> {
 async function requireSecret(cwd: string): Promise<string> {
   const secret = await getSecret(cwd)
   if (!secret) {
-    throw new Error('No secret found. Set NUXT_APP_SECRET, or run `nuxt dev` to cache its development token.')
+    throw new Error(`${APPLICATION_SECRET_ERROR} For development, run nuxt dev to cache the runtime sync token.`)
   }
   return secret
 }
@@ -321,7 +321,7 @@ const main = defineCommand({
         const secret = await getSecret(cwd)
 
         if (!secret && !args.dry) {
-          throw new Error('No secret found. Set NUXT_APP_SECRET, or run `nuxt dev` to cache its development token.')
+          throw new Error(`${APPLICATION_SECRET_ERROR} For development, run nuxt dev to cache the runtime sync token.`)
         }
 
         const params = new URLSearchParams()

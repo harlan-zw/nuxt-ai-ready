@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { hkdfSync } from 'node:crypto'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setup, useTestContext } from '@nuxt/test-utils/e2e'
@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 const root = 'cloudflare-runtime-only-secret-32-characters'
 const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
 
-describe('cloudflare runtime-only application secret', async () => {
+describe('cloudflare runtime auth without Node compatibility', async () => {
   await setup({
     rootDir: fileURLToPath(new URL('../fixtures/cloudflare', import.meta.url)),
     build: true,
@@ -19,8 +19,8 @@ describe('cloudflare runtime-only application secret', async () => {
       aiReady: { runtimeSync: true },
       nitro: {
         preset: 'cloudflare-module',
-        compatibilityDate: '2026-10-08',
-        cloudflare: { deployConfig: true, wrangler: { name: 'ai-ready-runtime-auth-test' } },
+        compatibilityDate: '2024-12-01',
+        cloudflare: { nodeCompat: false, deployConfig: true, wrangler: { name: 'ai-ready-runtime-auth-test' } },
       },
     },
   })
@@ -31,6 +31,11 @@ describe('cloudflare runtime-only application secret', async () => {
 
   async function startWorker(bindings: Record<string, string>) {
     const output = join(useTestContext().nuxt!.options.buildDir, 'output')
+    const configPath = join(output, 'server/wrangler.json')
+    const config = JSON.parse(await readFile(configPath, 'utf8'))
+    // The shared fixture enables Node compatibility for other tests.
+    config.compatibility_flags = []
+    await writeFile(configPath, JSON.stringify(config))
     await writeFile(join(output, 'server/.dev.vars'), Object.entries(bindings).map(([key, value]) => `${key}=${value}`).join('\n'), { mode: 0o600 })
     worker = spawn('pnpm', [
       'exec',
@@ -38,7 +43,7 @@ describe('cloudflare runtime-only application secret', async () => {
       'dev',
       '--local',
       '--config',
-      join(output, 'server/wrangler.json'),
+      configPath,
       '--port',
       String(port),
       '--show-interactive-dev-session',
@@ -82,7 +87,7 @@ describe('cloudflare runtime-only application secret', async () => {
     expect(await response.json()).toMatchObject({ message: expect.stringContaining('Invalid route') })
   })
 
-  it.each([undefined, root, 'legacy-token'])('rejects an invalid bearer token: %s', async (bearer) => {
+  it.each([undefined, root, 'legacy-token', '0'.repeat(token.length)])('rejects an invalid bearer token: %s', async (bearer) => {
     const response = await fetch(`${origin}/__ai-ready/reindex`, {
       method: 'POST',
       headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
@@ -90,7 +95,7 @@ describe('cloudflare runtime-only application secret', async () => {
     expect(response.status).toBe(401)
   })
 
-  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('accepts the legacy runtime binding %s', async (key) => {
+  it.each(['NUXT_AI_READY_RUNTIME_SYNC_SECRET', 'NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET'])('authenticates using the runtime binding %s without an application secret', async (key) => {
     await stopWorker()
     await startWorker({ [key]: 'legacy-runtime-token' })
     const response = await fetch(`${origin}/__ai-ready/reindex`, {
@@ -98,5 +103,6 @@ describe('cloudflare runtime-only application secret', async () => {
       headers: { authorization: 'Bearer legacy-runtime-token' },
     })
     expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ message: expect.stringContaining('Invalid route') })
   }, 70000)
 })
