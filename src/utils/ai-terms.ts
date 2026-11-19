@@ -20,8 +20,9 @@ function checkPayment(value: unknown, field: string, errors: string[]): void {
   }
   if (value.protocol !== 'x402')
     errors.push(`${field}.protocol: use x402.`)
-  if (typeof value.endpoint !== 'string' || !value.endpoint.trim())
-    errors.push(`${field}.endpoint: set the payment endpoint.`)
+  const endpoint = value.endpoint
+  if (typeof endpoint !== 'string' || !/^https:\/\/[^/?#\\\s][^?#\\\s]*$/.test(endpoint) || !URL.canParse(endpoint))
+    errors.push(`${field}.endpoint must be an absolute HTTPS URL without a query or fragment.`)
   if (value.version !== undefined && !Number.isInteger(value.version))
     errors.push(`${field}.version: use an integer.`)
   for (const key of ['network', 'asset']) {

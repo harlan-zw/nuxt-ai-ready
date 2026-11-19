@@ -24,6 +24,7 @@ export interface AiTermsFreeAllowance {
 
 export interface AiTermsPayment {
   protocol: 'x402'
+  /** Absolute HTTPS URL without a query or fragment. */
   endpoint: string
   version?: number
   network?: string
