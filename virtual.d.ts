@@ -19,3 +19,8 @@ declare module '#ai-ready-virtual/page-data.mjs' {
   export const pages: PageDataEntry[]
   export const errorRoutes: string[]
 }
+
+declare module '#ai-ready-virtual/cloudflare-fallback-paths.mjs' {
+  const paths: ReadonlySet<string>
+  export default paths
+}

@@ -90,6 +90,7 @@ declare module '@nuxt/schema' {
 }
 
 export interface ModulePublicRuntimeConfig {
+  /** @deprecated The generated fallback paths are bundled with the Worker. */
   cloudflarePrerenderedPages?: string[]
   debug: boolean
   debugCron: boolean
@@ -807,7 +808,9 @@ export default defineNuxtModule<ModuleOptions>({
       await rm(secretPath, { force: true })
     }
 
-    // Virtual module for page data
+    let cloudflareFallbackPaths: string[] = []
+
+    // Virtual modules for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
       if (getNitroVersion(nuxt) === 3) {
         // Nitro 3 matches a string entry anywhere in a module path. Nuxt adds
@@ -953,6 +956,9 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
       })
       // Runtime module exports empty arrays (pages read from database at runtime)
       nitroConfig.virtual['#ai-ready-virtual/page-data.mjs'] = `export const pages = []\nexport const errorRoutes = []`
+      // Read the final paths after prerendering, when Nitro bundles the Worker.
+      nitroConfig.virtual['#ai-ready-virtual/cloudflare-fallback-paths.mjs'] = () =>
+        `export default new Set(${JSON.stringify(cloudflareFallbackPaths)})`
 
       // Logger with debug level configured from module options
       nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
@@ -1362,12 +1368,11 @@ export function trackDrizzleWork(event, work) { return work }
           const additions = cloudflareWorkerFirstAdditions(routing, pages)
           const environmentConfig = wrangler as typeof wrangler & { env?: Record<string, { assets?: { run_worker_first?: boolean | string[] } }> }
           const configuredEnvironments = Object.values(environmentConfig.env || {}).flatMap(env => env.assets?.run_worker_first === undefined ? [] : [env.assets.run_worker_first])
-          const fallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [...fileRouting.environments, ...configuredEnvironments])
+          cloudflareFallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [...fileRouting.environments, ...configuredEnvironments])
           // Nitro merges the file again when writing wrangler.json. Add only
           // new patterns here, or every file-backed pattern would be duplicated.
           if (additions.length > 0)
             assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...additions]
-          ;(nitro.options.runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig).cloudflarePrerenderedPages = fallbackPaths
         }
         const plan = planStaticMarkdownHeaderRules(
           nitro.options.routeRules,

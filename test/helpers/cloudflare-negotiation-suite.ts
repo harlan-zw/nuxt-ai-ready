@@ -24,6 +24,8 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
                   if (negotiation === 'default')
                     pages.push(...Array.from({ length: 60 }, (_, index) => ({ name: `static-page-${index}`, path: `/page-${index}`, file: about.file })))
                   pages.push(...nestedRoutes.map(path => ({ name: path.slice(1).replace('/', '-'), path, file: about.file })))
+                  if (nestedRoutes.length > 0)
+                    pages.push({ name: 'live-guide', path: '/guides/live', file: about.file })
                 },
               },
             }
@@ -159,6 +161,13 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
         expect(await response.text()).toContain('#')
+      })
+
+      it('renders an unprerendered page under the same Worker-first glob', async () => {
+        const response = await fetch(`${origin}${baseURL}guides/live`, { headers: { Accept: 'text/html' } })
+        expect(response.status).toBe(200)
+        expect(response.headers.get('vary')).toContain('Accept')
+        expect(await response.text()).toContain('<h1>About')
       })
     }
 

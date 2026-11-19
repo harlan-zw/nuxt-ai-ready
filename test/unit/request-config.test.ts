@@ -9,7 +9,7 @@ const { runtimeConfig, createMatcher, initSiteConfig } = vi.hoisted(() => ({
   runtimeConfig: {
     'app': { baseURL: '/docs/' },
     'nitro': { routeRules: {} as Record<string, object> },
-    'nuxt-ai-ready': { contentNegotiation: 'auto', botNegotiation: false, cloudflarePrerenderedPages: ['/docs/about'] },
+    'nuxt-ai-ready': { contentNegotiation: 'auto', botNegotiation: false },
   },
   createMatcher: vi.fn(),
   initSiteConfig: vi.fn(),
@@ -26,6 +26,7 @@ vi.mock('#nuxtseo/nitro', () => ({
 vi.mock('#site-config/server/composables/utils', () => ({ withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}` }))
 vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: initSiteConfig }))
 vi.mock('#ai-ready-virtual/agent-skills.mjs', () => ({ localAgentSkillArtifacts: { '/skills/example.md': {} } }))
+vi.mock('#ai-ready-virtual/cloudflare-fallback-paths.mjs', () => ({ default: new Set(['/docs/about']) }))
 
 function event(path = '/docs/about', accept = 'text/markdown') {
   return {
@@ -71,18 +72,27 @@ describe('request-time configuration', () => {
     expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 
-  it('skips static fallback config without an assets binding', async () => {
-    expect(await serveCloudflarePrerenderedPage(event())).toBeUndefined()
+  it('skips static fallback without an assets binding', () => {
+    expect(serveCloudflarePrerenderedPage(event())).toBeUndefined()
     expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 
-  it('uses event config for Cloudflare static fallback', async () => {
+  it('serves a prerendered asset without reading runtime config', async () => {
     const request = event('/docs/about', 'text/html')
     const fetch = vi.fn(async () => new Response('<h1>About</h1>'))
     request.context.cloudflare = { env: { ASSETS: { fetch } } }
     expect(await (await serveCloudflarePrerenderedPage(request))?.text()).toBe('<h1>About</h1>')
-    expect(useRuntimeConfig).toHaveBeenCalledWith(request)
+    expect(useRuntimeConfig).not.toHaveBeenCalled()
     expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('falls through synchronously for a live HTML page', () => {
+    const request = event('/docs/live', 'text/html')
+    const fetch = vi.fn()
+    request.context.cloudflare = { env: { ASSETS: { fetch } } }
+    expect(serveCloudflarePrerenderedPage(request)).toBeUndefined()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 })
 
