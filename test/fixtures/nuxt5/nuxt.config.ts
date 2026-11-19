@@ -35,7 +35,10 @@ export default defineNuxtConfig({
     '/': { headers: { 'CONTENT-SIGNAL': 'ai-train=no' } },
     '/cache/**': { cache: { maxAge: 3600, varies: ['accept'] } },
   },
-  nitro: { prerender: { routes: ['/'] } },
+  nitro: {
+    output: { dir: '.output', publicDir: '.output/public' },
+    prerender: { routes: ['/'] },
+  },
   vite: {
     resolve: {
       dedupe: ['nuxt', 'vue', 'vue-router'],

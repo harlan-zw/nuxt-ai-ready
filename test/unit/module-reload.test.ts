@@ -30,6 +30,7 @@ describe('configuration warnings on Nitro reload', () => {
       const nitro = {
         options: { static: false, routeRules: {} },
         hooks: {
+          afterEach: vi.fn(),
           hook(name: string, callback: () => void) {
             if (major === 3 && name === 'rollup:reload')
               deprecated('rollup:reload hook has been deprecated, please use build:reload')
