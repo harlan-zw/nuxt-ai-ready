@@ -113,6 +113,18 @@ describe('resolveConfigurationWarnings', () => {
     ])
   })
 
+  it('keeps negotiation warnings when Nuxt SEO reports the production site URL', () => {
+    const input = {
+      ...defaults,
+      siteUrl: 'http://localhost:3000',
+      reportSiteUrl: false,
+      routeRules: { '/docs/**': { cache: true } },
+    }
+    expect(resolveConfigurationWarnings(input)).toEqual([
+      expect.stringContaining('response caching disables automatic Markdown negotiation'),
+    ])
+  })
+
   it('warns that static output needs deployment negotiation', () => {
     expect(resolveConfigurationWarnings({ ...defaults, static: true })).toEqual([
       expect.stringContaining('Static output cannot run Markdown negotiation middleware'),

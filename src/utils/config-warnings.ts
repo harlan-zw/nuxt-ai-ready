@@ -27,6 +27,7 @@ export interface ConfigurationWarningInput {
   botNegotiation?: boolean
   static: boolean
   siteUrl: string | undefined
+  reportSiteUrl?: boolean
   routeRules: Record<string, NegotiationRouteRule & { redirect?: unknown, proxy?: unknown }>
 }
 
@@ -34,7 +35,7 @@ export interface ConfigurationWarningInput {
 export function resolveConfigurationWarnings(input: ConfigurationWarningInput): string[] {
   const warnings: string[] = []
   const hostname = input.siteUrl && URL.canParse(input.siteUrl) ? new URL(input.siteUrl).hostname : ''
-  if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1' || hostname === '[::1]') {
+  if (input.reportSiteUrl !== false && (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1' || hostname === '[::1]')) {
     warnings.push('Set site.url to the public production URL. Discovery catalogs and canonical Markdown links need a public origin.\n  In nuxt.config.ts, set site: { url: "https://your-domain.com" }. Replace the example with your production origin.')
   }
   if (input.policy === 'disabled') {
