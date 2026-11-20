@@ -22,6 +22,7 @@ interface LinkHeaderConfig {
   apiCatalog?: { href: string }
   aiTerms?: { href: string }
   describedby?: boolean
+  markdownAvailable?: false
   i18n?: RuntimeI18nConfig | null
 }
 
@@ -45,8 +46,10 @@ function buildBaseParts(
 ): string[] {
   const parts: string[] = []
   if (variant === 'html') {
-    const href = resolveHeaderUrl(toMarkdownPath(path), resolveUrl)
-    parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; type="text/markdown"`)
+    if (config.markdownAvailable !== false) {
+      const href = resolveHeaderUrl(toMarkdownPath(path), resolveUrl)
+      parts.push(`<${encodePathForHeader(href)}>; rel="alternate"; type="text/markdown"`)
+    }
   }
   else {
     const href = resolveHeaderUrl(path, resolveUrl)

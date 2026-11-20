@@ -154,6 +154,12 @@ export interface ModuleOptions {
   contentNegotiation?: boolean
 
   /**
+   * Generate page Markdown at build time and disable request-time conversion.
+   * @default false
+   */
+  zeroRuntimeMarkdown?: boolean
+
+  /**
    * Offer Markdown to AI bots even when their Accept header prefers HTML.
    * Requires cache variation on Accept, Sec-Fetch-Dest, and User-Agent.
    * Disable to avoid fragmenting caches by raw User-Agent strings.

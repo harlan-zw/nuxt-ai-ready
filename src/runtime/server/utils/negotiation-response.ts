@@ -4,7 +4,9 @@ import type { ModulePublicRuntimeConfig } from '../../../module'
 import type { RuntimeRouteContext } from './i18n'
 import type { NegotiationDecision, NegotiationStage } from './negotiation-decision'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
+import { decodePath } from 'ufo'
 import { localAgentSkillArtifacts } from '#ai-ready-virtual/agent-skills.mjs'
+import prerenderedMarkdownPaths from '#ai-ready-virtual/prerendered-markdown-paths.mjs'
 import { appendHeader, createError, getHeader, getRequestHost, getRequestURL, getResponseHeader, sendRedirect, setHeader } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import * as siteConfigUtils from '#site-config/server/composables/utils'
@@ -31,7 +33,7 @@ export function agentSkillArtifactPaths(): ReadonlySet<string> {
 export type LinkUrlResolver = (path: string) => string
 
 export interface NegotiationContext {
-  config: ModulePublicRuntimeConfig
+  config: ModulePublicRuntimeConfig & { markdownAvailable?: false }
   path: string
   resolvePath: LinkUrlResolver
   resolveUrl: LinkUrlResolver
@@ -187,6 +189,7 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
   const runtimeConfig = useRuntimeConfig(event)
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation || cached.botNegotiation !== config.botNegotiation) {
+    const markdownPaths = prerenderedMarkdownPaths
     cached = {
       owner,
       path: event.path,
@@ -199,12 +202,15 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
         policy: config.contentNegotiation,
         botNegotiation: config.botNegotiation,
         artifactPaths: agentSkillArtifactPaths(),
+        hasPrerenderedMarkdown: markdownPaths && !import.meta.prerender
+          ? path => markdownPaths.has(decodePath(toDeployedRoute(path, runtimeConfig.app.baseURL)))
+          : undefined,
       }),
     }
     context[REQUEST_DECISION] = cached
   }
   // Explicit Markdown must still wait behind static assets and auth middleware.
-  return stage === 'early' && cached.decision._tag === 'render'
+  return stage === 'early' && (cached.decision._tag === 'render' || cached.decision._tag === 'missing-markdown')
     ? { _tag: 'skip', reason: 'deferred' }
     : cached.decision
 }
@@ -216,7 +222,7 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
  * decisions return undefined because the caller owns the next step.
  */
 export async function applyNegotiation(event: H3Event, decision: NegotiationDecision): Promise<NegotiationResponse> {
-  if (decision._tag === 'skip' || decision._tag === 'render')
+  if (decision._tag === 'skip' || decision._tag === 'render' || decision._tag === 'missing-markdown')
     return
 
   // The early handler and the middleware both run for a pass-through request.
@@ -244,6 +250,10 @@ export async function applyNegotiation(event: H3Event, decision: NegotiationDeci
   if (decision._tag === 'html') {
     if (decision.negotiation._tag === 'enabled')
       appendHeader(event, 'vary', decision.negotiation.vary)
+    if (decision.markdownAvailable === false) {
+      event.context.aiReadyMarkdownAvailable = false
+      ctx.config = { ...ctx.config, markdownAvailable: false }
+    }
     setStatusAwareHeader(event, ctx, 'html')
     return
   }
