@@ -1,4 +1,4 @@
-import { defineNuxtPlugin, useHead, useRequestURL, useRuntimeConfig } from 'nuxt/app'
+import { defineNuxtPlugin, useHead, useRequestEvent, useRequestURL, useRuntimeConfig } from 'nuxt/app'
 import { joinURL } from 'ufo'
 import { markdownAlternatePath } from '../../markdown-path'
 
@@ -15,10 +15,11 @@ export default defineNuxtPlugin({
 
     const runtimeConfig = useRuntimeConfig()
     const describedby = (runtimeConfig['nuxt-ai-ready'] as { describedby?: boolean } | undefined)?.describedby !== false
+    const markdownAvailable = useRequestEvent()?.context.aiReadyMarkdownAvailable !== false
 
     useHead({
       link: [
-        { rel: 'alternate', type: 'text/markdown', href: markdownPath },
+        ...(markdownAvailable ? [{ rel: 'alternate' as const, type: 'text/markdown', href: markdownPath }] : []),
         ...(describedby
           ? [{ rel: 'describedby', href: joinURL(runtimeConfig.app.baseURL, 'llms.txt') } as unknown as { rel: 'alternate', href: string }]
           : []),

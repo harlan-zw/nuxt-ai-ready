@@ -647,6 +647,7 @@ export interface PrerenderHandlerOptions {
    * build without the database leaves them out of the public output.
    */
   runtimeDatabase: ResolvedDatabase['_tag']
+  onMarkdownPaths?: (paths: string[]) => void
 }
 
 export function setupPrerenderHandler(
@@ -816,10 +817,8 @@ export function setupPrerenderHandler(
         }
       }
 
-      // Record only Markdown URLs that will actually be available after
-      // deployment. The prerendered llms.txt route reads this build-only file.
-      if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
-        const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
+      // Record the Markdown URLs that will be available after deployment.
+      if (extras.onMarkdownPaths || (state.dbPath && state.llmsTxtConfig?.markdownLinks)) {
         // Nitro 3 deprecates `srcDir` and leaves it unset; its ignore
         // patterns resolve from `serverDir`, which may be `false`.
         const options = nitro.options as typeof nitro.options & { serverDir?: string | false }
@@ -831,10 +830,14 @@ export function setupPrerenderHandler(
           nitro.options.ignore,
           nitro.options.publicAssets,
         )
-        await writeFile(availabilityFile, JSON.stringify({
-          runtimeMarkdownAvailable: !nitro.options.static,
-          paths,
-        }), 'utf-8')
+        extras.onMarkdownPaths?.(paths)
+        if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
+          const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
+          await writeFile(availabilityFile, JSON.stringify({
+            runtimeMarkdownAvailable: !nitro.options.static && !extras.onMarkdownPaths,
+            paths,
+          }), 'utf-8')
+        }
       }
 
       // Traverse the generated file tree so static output contains every linked child.
@@ -905,7 +908,7 @@ export function setupPrerenderHandler(
           await state.db.close?.()
       })().finally(() => prerenderClient?.close()))
     }
-    else if (usePrerenderHook) {
+    else if (usePrerenderHook || extras.onMarkdownPaths) {
       nitro.hooks.hook('prerender:done', async () => (async () => {
         if (!state.initialized)
           return

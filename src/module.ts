@@ -519,7 +519,12 @@ export default defineNuxtModule<ModuleOptions>({
 
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
-    const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
+    const zeroRuntimeMarkdown = config.zeroRuntimeMarkdown === true && !nuxt.options.dev
+    const hasPrerenderRules = zeroRuntimeMarkdown && [
+      ...Object.values(nuxt.options.routeRules || {}),
+      ...Object.values(nuxt.options.nitro.routeRules || {}),
+    ].some(rule => rule.prerender === true)
+    const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks || hasPrerenderRules)
     const preparing = (nuxt.options as typeof nuxt.options & { _prepare?: boolean })._prepare === true
     const prerenderEnabled = !preparing && !!(isStatic || hasPrerenderedRoutes)
 
@@ -812,6 +817,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     let cloudflareFallbackPaths: string[] = []
     let prerenderedMarkdownHeaders: [path: string, headers: Record<string, string>][] = []
+    let prerenderedMarkdownPaths: string[] = []
 
     // Virtual modules for page data
     nuxt.hooks.hook('nitro:config', (nitroConfig) => {
@@ -964,6 +970,12 @@ export { unavailable as computeLocaleAlternates, unavailable as localePath, unav
         `export default new Set(${JSON.stringify(cloudflareFallbackPaths)})`
       nitroConfig.virtual['#ai-ready-virtual/prerendered-markdown-headers.mjs'] = () =>
         `export default new Map(${JSON.stringify(prerenderedMarkdownHeaders)})`
+      nitroConfig.virtual['#ai-ready-virtual/prerendered-markdown-paths.mjs'] = () => zeroRuntimeMarkdown
+        ? `export default new Set(${JSON.stringify(prerenderedMarkdownPaths.map(decodePath))})`
+        : 'export default null'
+      nitroConfig.virtual['#ai-ready-virtual/render-markdown.mjs'] = zeroRuntimeMarkdown
+        ? 'export const renderMarkdown = undefined'
+        : `export { renderMarkdown } from '#ai-ready/server/middleware/render-markdown'`
 
       // Logger with debug level configured from module options
       nitroConfig.virtual['#ai-ready-virtual/logger.mjs'] = `
@@ -1264,7 +1276,9 @@ export function trackDrizzleWork(event, work) { return work }
         logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
       }
       else if (!isStatic && !hasPrerenderedRoutes) {
-        logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
+        logger.info(zeroRuntimeMarkdown
+          ? 'Prerender pages to generate Markdown with `aiReady.zeroRuntimeMarkdown`.'
+          : 'SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
       }
     }
 
@@ -1279,6 +1293,7 @@ export function trackDrizzleWork(event, work) { return work }
         i18n: i18nConfig,
         artifactRoutes: agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
         runtimeDatabase: database._tag,
+        onMarkdownPaths: zeroRuntimeMarkdown ? (paths) => { prerenderedMarkdownPaths = paths } : undefined,
       })
     }
 
