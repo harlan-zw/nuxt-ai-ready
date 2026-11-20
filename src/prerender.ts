@@ -12,13 +12,13 @@ import { colorize } from 'consola/utils'
 import { resolveLocaleFromRoute } from 'nuxtseo-shared/i18n-runtime'
 import { createPrerenderFetch } from 'nuxtseo-shared/prerender'
 import { collectSitemap } from 'sitemapd/parse'
-import { joinURL, withBase, withLeadingSlash } from 'ufo'
+import { decodePath, joinURL, withBase, withLeadingSlash } from 'ufo'
 import { logger } from './logger'
 import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
 import { parsePrerenderRoute, resolvePrerenderFile } from './prerender-path'
 import { insertLlmsTxtDirective } from './runtime/llms-txt-directive'
 import { absoluteSiteUrl } from './runtime/markdown-links'
-import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
+import { hasMarkdownTwin, markdownAlternatePath, normalizePagePath, toMarkdownPath } from './runtime/markdown-path'
 import { toDeployedRoute, toLogicalRoute } from './runtime/route-path'
 import { computeContentHash, exportDbDump, initSchema, insertPage, queryAllPages } from './runtime/server/db/shared'
 import { buildLlmsFullTxtHeader, formatPageForLlmsFullTxt } from './runtime/server/utils/llms-full'
@@ -34,6 +34,7 @@ const RE_INDEX_SUFFIX = /\/index$/
 const RE_MD_EXT = /\.md$/
 const RE_NEGATED_GLOB = /^(!?)(.*)$/
 const RE_PARENT_DIR_GLOB = /!?\.\.\//
+const RE_MARKDOWN_ALTERNATE_TAG = /<link\b[^>]*\sdata-ai-ready-markdown(?:="")?(?=[\s/>])[^>]*>/g
 
 export interface ParsedMarkdownResult {
   markdown: string
@@ -749,6 +750,32 @@ export function setupPrerenderHandler(
       state.totalProcessingTime += Date.now() - pageStartTime
     })
 
+    async function snapshotMarkdownPaths(): Promise<string[]> {
+      const { baseURL, ignore, output, publicAssets, rootDir, srcDir, serverDir } = nitro.options as typeof nitro.options & { serverDir?: string | false }
+      // Nitro 3 resolves ignore patterns from serverDir, which may be false.
+      const ignoreBaseDir = srcDir || serverDir || rootDir
+      const paths = await findOutputMarkdownPaths(output.publicDir, baseURL, ignoreBaseDir, ignore, publicAssets)
+      if (!extras.onMarkdownPaths)
+        return paths
+
+      extras.onMarkdownPaths(paths)
+      const available = new Set(paths.map(decodePath))
+      for (const { route, fileName } of nitro._prerenderedRoutes || []) {
+        if (!fileName?.endsWith('.html'))
+          continue
+        const alternate = markdownAlternatePath(route)
+        if (!alternate || available.has(decodePath(toDeployedRoute(alternate, baseURL))))
+          continue
+        // Nitro has written both routes. Remove only the module's baked link.
+        const file = resolvePrerenderFile(output.publicDir, fileName)
+        const html = await readFile(file, 'utf8')
+        const updated = html.replace(RE_MARKDOWN_ALTERNATE_TAG, '')
+        if (html !== updated)
+          await writeFile(file, updated, 'utf8')
+      }
+      return paths
+    }
+
     async function writeLlmsFiles() {
       // Insert error routes into database
       if (state.db && state.errorRoutes.size > 0) {
@@ -819,18 +846,7 @@ export function setupPrerenderHandler(
 
       // Record the Markdown URLs that will be available after deployment.
       if (extras.onMarkdownPaths || (state.dbPath && state.llmsTxtConfig?.markdownLinks)) {
-        // Nitro 3 deprecates `srcDir` and leaves it unset; its ignore
-        // patterns resolve from `serverDir`, which may be `false`.
-        const options = nitro.options as typeof nitro.options & { serverDir?: string | false }
-        const ignoreBaseDir = options.srcDir || (typeof options.serverDir === 'string' ? options.serverDir : undefined) || options.rootDir
-        const paths = await findOutputMarkdownPaths(
-          nitro.options.output.publicDir,
-          nitro.options.baseURL,
-          ignoreBaseDir,
-          nitro.options.ignore,
-          nitro.options.publicAssets,
-        )
-        extras.onMarkdownPaths?.(paths)
+        const paths = await snapshotMarkdownPaths()
         if (state.dbPath && state.llmsTxtConfig?.markdownLinks) {
           const availabilityFile = join(dirname(state.dbPath), MARKDOWN_LINK_AVAILABILITY_FILE)
           await writeFile(availabilityFile, JSON.stringify({
@@ -894,8 +910,11 @@ export function setupPrerenderHandler(
     if (useSitemapHook) {
       // sitemap:prerender:done fires after sitemap.xml is written
       nuxt.hooks.hook('sitemap:prerender:done' as any, async (ctx: { options: PrerenderSitemapConfig, sitemaps: Array<{ name: string, content: string }> }) => (async () => {
-        if (!state.initialized)
+        if (!state.initialized) {
+          if (extras.onMarkdownPaths)
+            await snapshotMarkdownPaths()
           return
+        }
 
         // Follow selected roots, not every generated document or the global index.
         // A chunk inherits admission through its selected parent sitemap.
@@ -910,8 +929,11 @@ export function setupPrerenderHandler(
     }
     else if (usePrerenderHook || extras.onMarkdownPaths) {
       nitro.hooks.hook('prerender:done', async () => (async () => {
-        if (!state.initialized)
+        if (!state.initialized) {
+          if (extras.onMarkdownPaths)
+            await snapshotMarkdownPaths()
           return
+        }
 
         await crawlConfiguredSitemaps(state, nuxt, nitro, (nuxt.options.sitemap || {}) as PrerenderSitemapConfig)
 

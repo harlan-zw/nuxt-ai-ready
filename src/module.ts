@@ -520,13 +520,11 @@ export default defineNuxtModule<ModuleOptions>({
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
     const zeroRuntimeMarkdown = config.zeroRuntimeMarkdown === true && !nuxt.options.dev
-    const hasPrerenderRules = zeroRuntimeMarkdown && [
-      ...Object.values(nuxt.options.routeRules || {}),
-      ...Object.values(nuxt.options.nitro.routeRules || {}),
-    ].some(rule => rule.prerender === true)
-    const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks || hasPrerenderRules)
+    const hasPrerenderedRoutes = !!(nuxt.options.nitro.prerender?.routes?.length || nuxt.options.nitro.prerender?.crawlLinks)
     const preparing = (nuxt.options as typeof nuxt.options & { _prepare?: boolean })._prepare === true
     const prerenderEnabled = !preparing && !!(isStatic || hasPrerenderedRoutes)
+    // Inline route rules and other modules can add prerender routes after setup.
+    const prerenderMarkdown = prerenderEnabled || (zeroRuntimeMarkdown && !preparing)
 
     const isSPA = nuxt.options.ssr === false
 
@@ -1080,6 +1078,7 @@ export function trackDrizzleWork(event, work) { return work }
           ? 'enabled'
           : 'disabled',
       botNegotiation: config.botNegotiation === true,
+      zeroRuntimeMarkdown,
       mdreamOptions: config.mdreamOptions || {},
       sitemapMd: config.sitemapMd !== false,
       describedby: config.describedby !== false,
@@ -1106,7 +1105,7 @@ export function trackDrizzleWork(event, work) { return work }
       aiTerms: aiTermsConfig,
     } as any
 
-    if (prerenderEnabled) {
+    if (prerenderMarkdown) {
       // The prerenderer is a separate Nitro build. Registering the prerender
       // handler and plugin there only keeps them, and the mdream engine they
       // import, out of the deployed server bundle.
@@ -1275,14 +1274,12 @@ export function trackDrizzleWork(event, work) { return work }
       if (isSPA && !hasPrerenderedRoutes) {
         logger.warn('SPA mode detected without prerendering. llms-full.txt will not be generated.')
       }
-      else if (!isStatic && !hasPrerenderedRoutes) {
-        logger.info(zeroRuntimeMarkdown
-          ? 'Prerender pages to generate Markdown with `aiReady.zeroRuntimeMarkdown`.'
-          : 'SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
+      else if (!isStatic && !hasPrerenderedRoutes && !zeroRuntimeMarkdown) {
+        logger.info('SSR-only mode: llms-full.txt requires prerendering. Runtime markdown conversion available.')
       }
     }
 
-    if (prerenderEnabled) {
+    if (prerenderMarkdown) {
       const { setupPrerenderHandler } = await import('./prerender')
       setupPrerenderHandler({ ...config, llmsTxt: generateLlmsTxt ? config.llmsTxt : false }, buildDbPath, {
         name: siteConfig.name,

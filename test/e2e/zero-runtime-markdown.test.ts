@@ -6,21 +6,9 @@ const { resolve } = createResolver(import.meta.url)
 
 describe('zeroRuntimeMarkdown', async () => {
   await setup({
-    rootDir: resolve('../fixtures/markdown-links-runtime'),
+    rootDir: resolve('../fixtures/zero-runtime-markdown'),
     build: true,
     server: true,
-    nuxtConfig: {
-      aiReady: { zeroRuntimeMarkdown: true },
-      app: { baseURL: '/docs/' },
-      routeRules: {
-        '/': { prerender: true },
-        '/about': { prerender: true },
-        '/sitemap.xml': { prerender: true },
-      },
-      nitro: {
-        prerender: { crawlLinks: false },
-      },
-    },
   })
 
   it('redirects to and serves prerendered Markdown with its canonical link', async () => {
@@ -48,6 +36,14 @@ describe('zeroRuntimeMarkdown', async () => {
 
     const missing = await fetch(url('/docs/docs/api.md'))
     expect(missing.status).toBe(404)
+  })
+
+  it('removes the Markdown alternate when Nitro omits the twin', async () => {
+    const page = await fetch(url('/docs/without-markdown'))
+    expect(page.status).toBe(200)
+    expect(page.headers.get('last-modified')).toBeTruthy()
+    expect(await page.text()).not.toContain('type="text/markdown"')
+    expect((await fetch(url('/docs/without-markdown.md'))).status).toBe(404)
   })
 
   it('uses Markdown links in llms.txt only for available files', async () => {
