@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { addImports, addNitroPlugin, addPlugin, addServerHandler, addServerImports, createResolver, defineNuxtModule, directoryToURL, extendRouteRules, getLayerDirectories, getNitroVersion, hasNuxtModule, tryResolveModule } from '@nuxt/kit'
 import defu from 'defu'
 import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
-import { setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
+import { isAgent, isCI, setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { decodePath } from 'ufo'
 import { createBuildPageDataVirtual } from './build-page-data-virtual'
@@ -1312,11 +1312,14 @@ export function trackDrizzleWork(event, work) { return work }
     const warnConfiguration = (nitro: { options: { static?: boolean, routeRules: Parameters<typeof resolveConfigurationWarnings>[0]['routeRules'] } }) => {
       if (preparing)
         return
+      const nuxtSeoReportsSiteUrl = nuxt.options.dev && !isAgent && !isCI
+        && nuxt.options._installedModules.some(({ meta }) => meta.name === 'nuxtseo' && !meta.disabled)
       const warnings = resolveConfigurationWarnings({
         policy: (nuxt.options.runtimeConfig['nuxt-ai-ready'] as unknown as ModulePublicRuntimeConfig).contentNegotiation,
         botNegotiation: config.botNegotiation === true,
         static: nitro.options.static === true || isStatic,
         siteUrl: siteConfig.url || undefined,
+        reportSiteUrl: !nuxtSeoReportsSiteUrl,
         routeRules: nitro.options.routeRules,
       })
       for (const warning of warnings) {
