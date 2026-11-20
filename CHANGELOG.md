@@ -1,3 +1,21 @@
+## v3.6.0
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.5.1...v3.6.0)
+
+### 🚀 Enhancements
+
+- **AI Terms:** Set `aiReady.aiTerms` to publish an access policy at `/.well-known/ai-terms`. [AI Terms guide](https://github.com/harlan-zw/nuxt-ai-ready/blob/6a6cf7148d518c6b3fd6a3b200d2fc130a7442ed/docs/content/2.guides/11.ai-terms.md)
+
+### 🩹 Fixes
+
+- **Development:** When Nuxt SEO runs its development checklist, AI Ready skips its duplicate production site URL warning. [#250](https://github.com/harlan-zw/nuxt-ai-ready/pull/250)
+- **Nuxt:** Select the reload hook for Nitro 2 or Nitro 3. [#242](https://github.com/harlan-zw/nuxt-ai-ready/pull/242)
+- **Runtime:** Support runtimes where `node:module` lacks `findPackageJSON`. [#238](https://github.com/harlan-zw/nuxt-ai-ready/pull/238)
+
+### ⚡ Performance
+
+- Load the Markdown renderer on demand and reduce repeated work for route matching and Runtime Sync token verification.
+
 ## 3.5.1
 
 [Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.5.0...v3.5.1)
