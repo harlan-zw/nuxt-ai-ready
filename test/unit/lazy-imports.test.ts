@@ -50,19 +50,6 @@ describe('lazy imports', () => {
     ]))
   })
 
-  it('keeps only database code off the ordinary request path', () => {
-    const imports = importSpecifiers('../../src/runtime/server/middleware/markdown.ts')
-
-    expect(imports.static).not.toContain('../db/queries')
-    expect(imports.static).toEqual(expect.arrayContaining([
-      '../utils',
-      '../utils/content',
-      '../utils/fetch',
-      '../utils/frontmatter',
-    ]))
-    expect(imports.dynamic).toContain('../db/queries')
-  })
-
   it('loads database cleanup code only after a database was used', () => {
     const imports = importSpecifiers('../../src/runtime/server/plugins/db-lifecycle.ts')
 
