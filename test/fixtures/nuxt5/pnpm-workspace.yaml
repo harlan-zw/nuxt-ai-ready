@@ -5,6 +5,11 @@ allowBuilds:
   esbuild: true
 
 minimumReleaseAgeExclude:
+  - "nuxt-site-config@5.0.4"
+  - "nuxt-site-config-kit@5.0.4"
+  - "site-config-stack@5.0.4"
+  - "@nuxtjs/robots@7.1.0"
+  - "@nuxtjs/sitemap@9.2.0"
   - nuxtseo-shared@6.0.4
   - nuxt-nightly
   - "@nuxt/*-nightly"
@@ -51,8 +56,3 @@ trustPolicyExclude:
 blockExoticSubdeps: false
 overrides:
   nuxtseo-shared: ^6.0.4
-  "@nuxtjs/robots": https://pkg.pr.new/nuxt-modules/robots/@nuxtjs/robots@fbe3d89828df93711f5aa7fc4d5794545bd8014e
-  "@nuxtjs/sitemap": https://pkg.pr.new/nuxt-modules/sitemap/@nuxtjs/sitemap@abbf91b087b3839a745ad077cfc303882a0e84aa
-  nuxt-site-config: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@40698727ca424460013f3534af9005e36728d669
-  nuxt-site-config-kit: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config-kit@40698727ca424460013f3534af9005e36728d669
-  site-config-stack: https://pkg.pr.new/harlan-zw/nuxt-site-config/site-config-stack@40698727ca424460013f3534af9005e36728d669
