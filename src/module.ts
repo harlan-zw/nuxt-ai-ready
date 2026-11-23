@@ -1065,7 +1065,10 @@ export function trackDrizzleWork(event, work) { return work }
       // so a page's Markdown comes from the collection rather than from a
       // second SSR render. See src/content-source.ts.
       nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = contentLookupModule(contentSource)
-      nitroConfig.virtual['#ai-ready-virtual/sitemap-config.mjs'] = `export { default } from '#sitemap-virtual/static-config.mjs'`
+      nitroConfig.virtual['#ai-ready-virtual/sitemap-config.mjs'] = () =>
+        nitroConfig.virtual?.['#sitemap-virtual/static-config.mjs']
+          ? `export { default } from '#sitemap-virtual/static-config.mjs'`
+          : 'export default {}'
     })
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
