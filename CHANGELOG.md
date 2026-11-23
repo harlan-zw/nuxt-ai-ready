@@ -1,3 +1,11 @@
+## v3.6.1
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.6.0...v3.6.1)
+
+### 🩹 Fixes
+
+- **Markdown:** Require `mdream` and `@mdream/js` 2.2.0 or newer within major version 2.
+
 ## v3.6.0
 
 [Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.5.1...v3.6.0)
