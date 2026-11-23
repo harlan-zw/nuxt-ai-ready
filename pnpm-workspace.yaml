@@ -6,6 +6,11 @@ blockExoticSubdeps: false
 
 minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
+  - nuxt-site-config@5.0.4
+  - nuxt-site-config-kit@5.0.4
+  - site-config-stack@5.0.4
+  - '@nuxtjs/robots@7.1.0'
+  - '@nuxtjs/sitemap@9.2.0'
   - nuxtseo-layer-devtools
   - nuxtseo-shared
   - sitemapd@0.2.3
@@ -68,12 +73,7 @@ packages:
   - devtools
 
 overrides:
-  '@nuxtjs/robots': https://pkg.pr.new/nuxt-modules/robots/@nuxtjs/robots@fbe3d89828df93711f5aa7fc4d5794545bd8014e
-  '@nuxtjs/sitemap': https://pkg.pr.new/nuxt-modules/sitemap/@nuxtjs/sitemap@abbf91b087b3839a745ad077cfc303882a0e84aa
-  nuxt-site-config: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config@40698727ca424460013f3534af9005e36728d669
-  nuxt-site-config-kit: https://pkg.pr.new/harlan-zw/nuxt-site-config/nuxt-site-config-kit@40698727ca424460013f3534af9005e36728d669
   nuxtseo-shared: ^6.0.4
-  site-config-stack: https://pkg.pr.new/harlan-zw/nuxt-site-config/site-config-stack@40698727ca424460013f3534af9005e36728d669
 
   vue: ^3.5.45
 
@@ -123,7 +123,7 @@ catalog:
   ohash: ^2.0.12
   pathe: ^2.0.3
   postgres: ^3.4.9
-  site-config-stack: ^5.0.0
+  site-config-stack: ^5.0.4
   sitemapd: ^0.2.3
   ufo: ^1.6.4
   unbuild: ^3.6.1
@@ -155,10 +155,10 @@ catalogs:
     '@nuxt/module-builder': ^1.0.4
     '@nuxt/ui': ^4.12.2
     '@nuxtjs/mcp-toolkit': ^0.24.3
-    '@nuxtjs/robots': ^7.0.0
-    '@nuxtjs/sitemap': ^9.0.0
+    '@nuxtjs/robots': ^7.1.0
+    '@nuxtjs/sitemap': ^9.2.0
     '@vueuse/nuxt': ^15.0.0
     nuxt: 4.6.4
-    nuxt-site-config: ^5.0.0
+    nuxt-site-config: ^5.0.4
   vue:
     vue-router: ^5.5.1
