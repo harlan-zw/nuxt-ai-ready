@@ -1,3 +1,11 @@
+## v3.6.1
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.6.0...v3.6.1)
+
+### 🩹 Fixes
+
+- **Markdown:** Pin `mdream` and `@mdream/js` to 2.1.0. This avoids a 128 KiB increase in the Linux ARM64 native binary. [#252](https://github.com/harlan-zw/nuxt-ai-ready/pull/252)
+
 ## v3.6.0
 
 [Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.5.1...v3.6.0)
