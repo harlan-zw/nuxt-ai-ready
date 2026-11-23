@@ -13,7 +13,10 @@ export function publicCacheControl(maxAgeSeconds: number, staleSeconds: number):
 
 /** Merge Vary tokens without removing cache dimensions or duplicating names. */
 export function mergeVaryHeader(current: string | undefined, added: string): string {
-  const tokens = [...(current || '').split(','), ...added.split(',')]
+  const tokens = [
+    ...(current || '').split(','),
+    ...added.split(','),
+  ]
     .map(token => token.trim())
     .filter(Boolean)
   if (tokens.includes('*'))
@@ -23,5 +26,7 @@ export function mergeVaryHeader(current: string | undefined, added: string): str
     if (!unique.has(token.toLowerCase()))
       unique.set(token.toLowerCase(), token)
   }
-  return [...unique.values()].join(', ')
+  return [
+    ...unique.values(),
+  ].join(', ')
 }

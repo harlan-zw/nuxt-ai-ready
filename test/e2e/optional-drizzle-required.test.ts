@@ -27,7 +27,10 @@ describe('runtime indexing with drizzle-orm installed', async () => {
       headers: { authorization: `Bearer ${Buffer.from(hkdfSync('sha256', runtimeIndexing.runtimeConfig.appSecret, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')}` },
     })
 
-    expect(status).toMatchObject({ total: expect.any(Number), pending: expect.any(Number) })
+    expect(status).toMatchObject({
+      total: expect.any(Number),
+      pending: expect.any(Number),
+    })
   })
 })
 
@@ -49,7 +52,9 @@ describe('runtime indexing without drizzle-orm', async () => {
 
 // Also fails setup, so it runs after the working build above.
 describe('runtime indexing with drizzle-orm outside the peer range', async () => {
-  const consumer = await createConsumer('optional-drizzle', { drizzle: { version: '0.45.2' } })
+  const consumer = await createConsumer('optional-drizzle', {
+    drizzle: { version: '0.45.2' },
+  })
   afterAll(consumer.remove)
 
   it('fails setup and names the installed version and the upgrade command', async () => {

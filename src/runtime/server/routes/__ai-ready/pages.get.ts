@@ -26,7 +26,9 @@ export default eventHandler(async (event) => {
     ? `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`
     : `public, max-age=${maxAge}`)
 
-  const route = typeof query.route === 'string' ? query.route.trim() : ''
+  const route = typeof query.route === 'string'
+    ? query.route.trim()
+    : ''
   if (route) {
     const page = await queryPages(event, { route })
     return {
@@ -42,7 +44,9 @@ export default eventHandler(async (event) => {
 
   const search = String(query.q || '').trim()
   if (search) {
-    return { query: search, results: await searchPages(event, search, { limit: toLimit(query.limit, 10) }) }
+    return { query: search, results: await searchPages(event, search, {
+      limit: toLimit(query.limit, 10),
+    }) }
   }
 
   const limit = toLimit(query.limit, 20)

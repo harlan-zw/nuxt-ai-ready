@@ -54,7 +54,9 @@ async function fetchPublicAsset<T = unknown>(
   // Fallback to globalThis.$fetch
   return (globalThis as any).$fetch(path, {
     baseURL: '/',
-    responseType: responseType === 'arrayBuffer' ? 'arrayBuffer' : undefined,
+    responseType: responseType === 'arrayBuffer'
+      ? 'arrayBuffer'
+      : undefined,
   }).catch(() => {
     // A fixture fetch miss is the expected unavailable asset result.
     return null
@@ -215,7 +217,9 @@ describe('cron context utilities', () => {
   describe('scheduled task simulation', () => {
     it('simulates Cloudflare Workers cron context', async () => {
       // Simulate what Cloudflare Workers provides in scheduled task context
-      const mockD1 = { prepare: vi.fn() }
+      const mockD1 = {
+        prepare: vi.fn(),
+      }
       const mockAssetsFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue({ buildId: 'test-123', pageCount: 10 }),

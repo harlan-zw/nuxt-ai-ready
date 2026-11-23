@@ -10,7 +10,11 @@ export default eventHandler(async (event) => {
   // Site URL for production toggle
   const siteConfigUrl = getSiteConfig(event).url
   // Build-time metadata not available in runtime config
-  let devtoolsMeta = { contentSignal: false as any, mcp: { enabled: false, tools: false, resources: false }, cron: false }
+  let devtoolsMeta = {
+    contentSignal: false as any,
+    mcp: { enabled: false, tools: false, resources: false },
+    cron: false,
+  }
   try {
     // @ts-expect-error untyped
     const m = await import('#ai-ready-virtual/devtools-meta.mjs')
@@ -26,7 +30,11 @@ export default eventHandler(async (event) => {
     siteConfigUrl,
     isDev: import.meta.dev,
     config: {
-      database: { type: runtimeConfig.database?._tag === 'Disabled' ? 'none' : runtimeConfig.database?.type || 'sqlite' },
+      database: {
+        type: runtimeConfig.database?._tag === 'Disabled'
+          ? 'none'
+          : runtimeConfig.database?.type || 'sqlite',
+      },
       runtimeSync: runtimeConfig.runtimeSync,
       sitemapPrerendered: runtimeConfig.sitemapPrerendered,
       markdownCacheHeaders: runtimeConfig.markdownCacheHeaders,
@@ -43,10 +51,19 @@ export default eventHandler(async (event) => {
     try {
       const [total, pending, errors] = await Promise.all([
         countPages(event),
-        countPages(event, { where: { pending: true } }),
-        countPages(event, { where: { hasError: true } }),
+        countPages(event, {
+          where: { pending: true },
+        }),
+        countPages(event, {
+          where: { hasError: true },
+        }),
       ])
-      response.stats = { total, indexed: total - pending, pending, errors }
+      response.stats = {
+        total,
+        indexed: total - pending,
+        pending,
+        errors,
+      }
 
       const pages = await queryPages(event) as PageEntry[]
       response.pages = pages.map(p => ({

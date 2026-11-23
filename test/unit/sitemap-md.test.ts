@@ -3,7 +3,9 @@ import { appendSitemapSection, buildSitemapMd, isSitemapMdRequest, SITEMAP_MD_RO
 
 describe('buildSitemapMd', () => {
   it('keeps metadata angle brackets literal', () => {
-    expect(buildSitemapMd([{ route: '/', title: 'Full stack <head> package' }], { siteName: '<Site>' }))
+    expect(buildSitemapMd([
+      { route: '/', title: 'Full stack <head> package' },
+    ], { siteName: '<Site>' }))
       .toContain('- [Full stack &lt;head&gt; package](/index.md)')
     expect(buildSitemapMd([], { siteName: '<Site>' })).toContain('# &lt;Site&gt; Sitemap')
   })
@@ -56,8 +58,13 @@ describe('buildSitemapMd', () => {
 
   it('respects a custom href resolver and site name', () => {
     const md = buildSitemapMd(
-      [{ route: '/about', title: 'About' }],
-      { siteName: 'Example', resolveHref: route => `/base${route}.md` },
+      [
+        { route: '/about', title: 'About' },
+      ],
+      {
+        siteName: 'Example',
+        resolveHref: route => `/base${route}.md`,
+      },
     )
 
     expect(md).toContain('# Example Sitemap')

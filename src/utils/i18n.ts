@@ -24,7 +24,9 @@ function resolvePagePath(parentPath: string, routePath: string): string {
     return normalizedRoutePath
   if (!normalizedRoutePath)
     return parentPath || '/'
-  return `${parentPath === '/' ? '' : parentPath.replace(/\/$/, '')}/${normalizedRoutePath}`
+  return `${parentPath === '/'
+    ? ''
+    : parentPath.replace(/\/$/, '')}/${normalizedRoutePath}`
 }
 
 function collectPagePaths(routes: readonly I18nPageRoute[], parentPath = ''): Map<string, string> {
@@ -59,12 +61,21 @@ export function materializeI18nPages(
       return [pageName, pageLocales]
 
     const defaultPath = pageLocales?.[i18n.defaultLocale]
-    const fallbackPath = typeof defaultPath === 'string' ? defaultPath : pagePaths.get(pageName)
+    const fallbackPath = typeof defaultPath === 'string'
+      ? defaultPath
+      : pagePaths.get(pageName)
     const locales = Object.fromEntries(i18n.locales.flatMap((locale) => {
       const configuredPath = pageLocales?.[locale.code]
-      if (configuredPath !== undefined)
-        return [[locale.code, configuredPath]]
-      return fallbackPath === undefined ? [] : [[locale.code, fallbackPath]]
+      if (configuredPath !== undefined) {
+        return [
+          [locale.code, configuredPath],
+        ]
+      }
+      return fallbackPath === undefined
+        ? []
+        : [
+            [locale.code, fallbackPath],
+          ]
     }))
     return [pageName, locales]
   }))
@@ -75,7 +86,10 @@ export function toRuntimeI18nConfig(auto: AutoI18nConfig, routes: readonly I18nP
   if (!runtime.pages || !routes.length)
     return runtime
 
-  return { ...runtime, pages: materializeI18nPages(runtime, routes) }
+  return {
+    ...runtime,
+    pages: materializeI18nPages(runtime, routes),
+  }
 }
 
 /**
@@ -86,7 +100,9 @@ export async function detectI18n(opts: { autoI18n?: boolean } = {}): Promise<Run
   if (opts.autoI18n === false)
     return null
 
-  const auto = await resolveSharedI18nConfig({ warn: msg => logger.warn(msg) })
+  const auto = await resolveSharedI18nConfig({
+    warn: msg => logger.warn(msg),
+  })
   if (!auto)
     return null
 

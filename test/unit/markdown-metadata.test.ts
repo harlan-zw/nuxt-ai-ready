@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 import { convertHtmlToMarkdown } from '../../src/runtime/server/utils'
 
-vi.mock('#nuxtseo/nitro', () => ({ useNitroApp: () => ({ hooks: { callHook: vi.fn() } }) }))
+vi.mock('#nuxtseo/nitro', () => ({
+  useNitroApp: () => ({
+    hooks: {
+      callHook: vi.fn(),
+    },
+  }),
+}))
 
 const article = { '@context': 'https://schema.org', '@type': 'Article', 'headline': 'Metadata survives conversion' }
 
@@ -17,7 +23,9 @@ async function convert(html: string) {
 }
 
 function jsonBlocks(markdown: string) {
-  return [...markdown.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => JSON.parse(match[1]!))
+  return [
+    ...markdown.matchAll(/```json\n([\s\S]*?)\n```/g),
+  ].map(match => JSON.parse(match[1]!))
 }
 
 describe('page metadata in converted Markdown', () => {
@@ -44,8 +52,17 @@ describe('page metadata in converted Markdown', () => {
   })
 
   it('skips malformed, scalar, and oversized JSON-LD without losing later valid blocks', async () => {
-    const oversized = { '@type': 'Article', 'description': 'x'.repeat(65536) }
-    const scripts = ['{invalid', 'null', '42', JSON.stringify(oversized), JSON.stringify(article)]
+    const oversized = {
+      '@type': 'Article',
+      'description': 'x'.repeat(65536),
+    }
+    const scripts = [
+      '{invalid',
+      'null',
+      '42',
+      JSON.stringify(oversized),
+      JSON.stringify(article),
+    ]
       .map(json => `<script type="application/ld+json">${json}</script>`)
       .join('')
 
@@ -56,7 +73,10 @@ describe('page metadata in converted Markdown', () => {
   })
 
   it('preserves a JSON-LD graph array and keeps code-fence text inside JSON strings', async () => {
-    const graph = [article, { '@type': 'FAQPage', 'description': '```\n<script>unsafe()</script>' }]
+    const graph = [
+      article,
+      { '@type': 'FAQPage', 'description': '```\n<script>unsafe()</script>' },
+    ]
     const result = await convert(page(`<script type="application/ld+json">${JSON.stringify(graph).replaceAll('<', '\\u003c')}</script>`))
 
     expect(jsonBlocks(result.markdown)).toEqual([graph])
@@ -71,7 +91,10 @@ describe('page metadata in converted Markdown', () => {
   })
 
   it('bounds the total UTF-8 output and lets smaller blocks use the remaining space', async () => {
-    const large = { '@type': 'Article', 'description': '界'.repeat(10000) }
+    const large = {
+      '@type': 'Article',
+      'description': '界'.repeat(10000),
+    }
     const values = [large, large, large, article]
     const result = await convert(page(values.map(value => `<script type="application/ld+json">${JSON.stringify(value)}</script>`).join('')))
     const blocks = jsonBlocks(result.markdown)

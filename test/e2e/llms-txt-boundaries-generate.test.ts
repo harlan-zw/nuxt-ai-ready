@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('untrusted sitemap and discovery URLs during generation', async () => {
-  await setup({ rootDir: resolve('../fixtures/llms-boundaries'), build: true, server: false })
+  await setup({
+    rootDir: resolve('../fixtures/llms-boundaries'),
+    build: true,
+    server: false,
+  })
 
   it('preserves local discovery children without writing outside public output', async () => {
     const buildDir = useTestContext().nuxt!.options.buildDir

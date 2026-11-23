@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#nuxtseo/nitro', () => ({
   defineCachedFunction: mocks.defineCachedFunction,
-  useRuntimeConfig: () => ({ 'app': { baseURL: '/' }, 'nuxt-ai-ready': config }),
+  useRuntimeConfig: () => ({
+    'app': { baseURL: '/' },
+    'nuxt-ai-ready': config,
+  }),
 }))
 
 vi.mock('#site-config/server/composables', () => ({
@@ -25,7 +28,12 @@ vi.mock('../../src/runtime/server/db/queries', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+  logger: {
+    warn: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 // A real in-memory TTL cache so the cached-value semantics are exercised,
@@ -108,7 +116,12 @@ describe('gET /sitemap.md internal cache', () => {
 
     expect(status).toBe(200)
     expect(body).toContain('# Example Site Sitemap')
-    expect(cachedOptions()[0]).toMatchObject({ name: 'sitemap-md', group: 'ai-ready', maxAge: 1200, swr: true })
+    expect(cachedOptions()[0]).toMatchObject({
+      name: 'sitemap-md',
+      group: 'ai-ready',
+      maxAge: 1200,
+      swr: true,
+    })
     expect(cacheControl).toContain('max-age=1200')
     expect(cacheControl).not.toContain('s-maxage')
   })

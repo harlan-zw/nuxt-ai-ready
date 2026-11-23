@@ -13,7 +13,14 @@ describe('automatic sitemap chunks in a static build', async () => {
     server: false,
     nuxtConfig: {
       robots: { robotsTxt: false },
-      nitro: { static: true, prerender: { routes: ['/about'], crawlLinks: false, failOnError: true } },
+      nitro: {
+        static: true,
+        prerender: {
+          routes: ['/about'],
+          crawlLinks: false,
+          failOnError: true,
+        },
+      },
     },
   })
 

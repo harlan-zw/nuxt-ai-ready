@@ -17,7 +17,12 @@ describe('llms.txt runtime generation with sitemap', async () => {
     },
     nuxtConfig: {
       sitemap: {
-        urls: ['/', '/about', '/docs/getting-started', '/docs/api'],
+        urls: [
+          '/',
+          '/about',
+          '/docs/getting-started',
+          '/docs/api',
+        ],
       },
     },
   })

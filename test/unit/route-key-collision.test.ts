@@ -19,7 +19,14 @@ describe('route canonicalisation', () => {
   })
 
   it('agrees with the key it derives, so equal keys imply equal routes', () => {
-    const spellings = ['', '/', 'about', '/about', '/about/team', 'about/team']
+    const spellings = [
+      '',
+      '/',
+      'about',
+      '/about',
+      '/about/team',
+      'about/team',
+    ]
     for (const left of spellings) {
       for (const right of spellings) {
         if (normalizeRouteKey(left) !== normalizeRouteKey(right))

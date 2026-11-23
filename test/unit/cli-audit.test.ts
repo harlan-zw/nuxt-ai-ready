@@ -53,7 +53,17 @@ async function startSite(broken = false) {
 describe('audit CLI', () => {
   it('prints standalone JSON without a project or secret, including redirects and base paths', async () => {
     const site = await startSite()
-    const result = await execa(process.execPath, [cliPath, 'audit', `${site.url}/old`, '--base', '/docs/', '--json'], { cwd: tmpdir(), reject: false })
+    const result = await execa(process.execPath, [
+      cliPath,
+      'audit',
+      `${site.url}/old`,
+      '--base',
+      '/docs/',
+      '--json',
+    ], {
+      cwd: tmpdir(),
+      reject: false,
+    })
     expect(result.exitCode).toBe(0)
     const report = JSON.parse(result.stdout)
     expect(report.checks.find((check: { id: string }) => check.id === 'markdown-url')).toMatchObject({ status: 'pass', url: `${site.url}/docs/about.md` })
@@ -63,9 +73,19 @@ describe('audit CLI', () => {
 
   it('exits non-zero and retains structured failure results', async () => {
     const site = await startSite(true)
-    const result = await execa(process.execPath, [cliPath, 'audit', `${site.url}/docs/about`, '--base', '/docs/', '--json'], { reject: false })
+    const result = await execa(process.execPath, [
+      cliPath,
+      'audit',
+      `${site.url}/docs/about`,
+      '--base',
+      '/docs/',
+      '--json',
+    ], { reject: false })
     expect(result.exitCode).toBe(1)
     const report = JSON.parse(result.stdout)
-    expect(report.checks.find((check: { id: string }) => check.id === 'markdown-negotiation')).toMatchObject({ status: 'fail', detail: expect.stringContaining('500') })
+    expect(report.checks.find((check: { id: string }) => check.id === 'markdown-negotiation')).toMatchObject({
+      status: 'fail',
+      detail: expect.stringContaining('500'),
+    })
   })
 })

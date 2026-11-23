@@ -10,7 +10,11 @@ function parseHeaderRules(contents: string): HeaderRule[] {
     if (!line.trim() || line.trimStart().startsWith('#'))
       continue
     if (!/^\s/.test(line)) {
-      rules.push({ pattern: line.trim(), headers: [], removals: [] })
+      rules.push({
+        pattern: line.trim(),
+        headers: [],
+        removals: [],
+      })
       continue
     }
     const colon = line.indexOf(':')
@@ -18,8 +22,12 @@ function parseHeaderRules(contents: string): HeaderRule[] {
     if (removal && rules.length)
       rules.at(-1)!.removals.push(removal[1]!.toLowerCase())
     const name = line.slice(0, colon).trim()
-    if (colon > 0 && !name.startsWith('!') && rules.length)
-      rules.at(-1)!.headers.push([name.toLowerCase(), line.slice(colon + 1).trim()])
+    if (colon > 0 && !name.startsWith('!') && rules.length) {
+      rules.at(-1)!.headers.push([
+        name.toLowerCase(),
+        line.slice(colon + 1).trim(),
+      ])
+    }
   }
   return rules
 }
@@ -29,7 +37,11 @@ function matchesPattern(pattern: string, path: string): boolean {
     return false
   const source = pattern
     .split(/(\*|:\w+)/)
-    .map(part => part === '*' ? '.*' : part.startsWith(':') ? '[^/]+' : part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .map(part => part === '*'
+      ? '.*'
+      : part.startsWith(':')
+        ? '[^/]+'
+        : part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
     .join('')
   return new RegExp(`^${source}$`).test(path)
 }
@@ -50,7 +62,10 @@ export function resolveCloudflareStaticHeaders(contents: string, path: string): 
     for (const [name, value] of rule.headers)
       (merged[name] ||= []).push(value)
   }
-  return Object.fromEntries(Object.entries(merged).map(([name, values]) => [name, values.join(', ')]))
+  return Object.fromEntries(Object.entries(merged).map(([name, values]) => [
+    name,
+    values.join(', '),
+  ]))
 }
 
 /** Values of a comma-separated header, with duplicates kept so a test can count them. */

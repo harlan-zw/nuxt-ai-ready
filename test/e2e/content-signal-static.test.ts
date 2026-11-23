@@ -12,7 +12,12 @@ await setup({
   build: true,
   server: false,
   nuxtConfig: {
-    nitro: { prerender: { crawlLinks: false, routes: Array.from({ length: 110 }, (_, index) => `/notes/${index + 1}`) } },
+    nitro: {
+      prerender: {
+        crawlLinks: false,
+        routes: Array.from({ length: 110 }, (_, index) => `/notes/${index + 1}`),
+      },
+    },
   },
 })
 

@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('serving AI Terms with an app base URL', async () => {
-  await setup({ rootDir: resolve('../fixtures/ai-terms-runtime'), build: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/ai-terms-runtime'),
+    build: true,
+    server: true,
+  })
 
   it('serves the origin policy through Nuxt discovery redirects', async () => {
     const response = await fetch(url('/.well-known/ai-terms'))

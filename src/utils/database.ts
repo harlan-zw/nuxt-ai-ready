@@ -63,15 +63,22 @@ function parseSemVer(input: string): SemVer | undefined {
   if (!match)
     return undefined
   return {
-    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    core: [
+      Number(match[1]),
+      Number(match[2]),
+      Number(match[3]),
+    ],
     prerelease: match[4]?.split('.') ?? [],
   }
 }
 
 function compareCore(a: SemVer['core'], b: SemVer['core']): number {
   for (let i = 0; i < 3; i++) {
-    if (a[i] !== b[i])
-      return a[i]! < b[i]! ? -1 : 1
+    if (a[i] !== b[i]) {
+      return a[i]! < b[i]!
+        ? -1
+        : 1
+    }
   }
   return 0
 }
@@ -95,11 +102,19 @@ function comparePrerelease(a: string[], b: string[]): number {
       continue
     const leftNumeric = RE_NUMERIC.test(left)
     const rightNumeric = RE_NUMERIC.test(right)
-    if (leftNumeric && rightNumeric)
-      return Number(left) < Number(right) ? -1 : 1
-    if (leftNumeric !== rightNumeric)
-      return leftNumeric ? -1 : 1
-    return left < right ? -1 : 1
+    if (leftNumeric && rightNumeric) {
+      return Number(left) < Number(right)
+        ? -1
+        : 1
+    }
+    if (leftNumeric !== rightNumeric) {
+      return leftNumeric
+        ? -1
+        : 1
+    }
+    return left < right
+      ? -1
+      : 1
   }
   return 0
 }
@@ -116,7 +131,9 @@ export type PeerRangeMatch
  */
 export function matchCaretRange(version: string, range: string): PeerRangeMatch {
   const installed = parseSemVer(version)
-  const minimum = range.trim().startsWith('^') ? parseSemVer(range.trim().slice(1)) : undefined
+  const minimum = range.trim().startsWith('^')
+    ? parseSemVer(range.trim().slice(1))
+    : undefined
   if (!installed || !minimum)
     return { _tag: 'Unparsed' }
 
@@ -131,7 +148,9 @@ export function matchCaretRange(version: string, range: string): PeerRangeMatch 
     || (sameCore && comparePrerelease(installed.prerelease, minimum.prerelease) >= 0))
   && compareCore(installed.core, ceiling) < 0
   && (installed.prerelease.length === 0 || (sameCore && minimum.prerelease.length > 0))
-  return satisfied ? { _tag: 'Satisfied' } : { _tag: 'Unsatisfied' }
+  return satisfied
+    ? { _tag: 'Satisfied' }
+    : { _tag: 'Unsatisfied' }
 }
 
 /** The `drizzle-orm` the app root resolves, if any. */
@@ -174,7 +193,9 @@ export function formatDrizzleMessage(input: {
     ? 'The `aiReady.database` option turns on the database.'
     : `These features need the database: ${consumers.map(consumer => DATABASE_CONSUMER_LABELS[consumer]).join(', ')}.`
   const version = input.peerRange?.replace(/^\^/, '')
-  const command = `npx nypm add drizzle-orm${version ? `@${version}` : ''}`
+  const command = `npx nypm add drizzle-orm${version
+    ? `@${version}`
+    : ''}`
   const lines = input.problem._tag === 'Missing'
     ? [
         subject,
@@ -254,19 +275,35 @@ function resolveDatabaseType(
  * writes pages at runtime, so those combinations return an error value.
  */
 export function resolveDatabaseConfig(input: ResolveDatabaseInput): DatabaseResolution {
-  const options = input.database === false ? undefined : input.database
+  const options = input.database === false
+    ? undefined
+    : input.database
   const explicitlyDisabled = input.database === false || options?.type === DATABASE_TYPE_NONE
 
   if (explicitlyDisabled) {
     const conflicts = DATABASE_DEPENDENT_OPTIONS.filter(option => input.requested[option])
-    if (conflicts.length > 0)
-      return { _tag: 'Invalid', conflicts, message: formatConflictMessage(conflicts) }
-    return { _tag: 'Resolved', database: { _tag: 'Disabled' }, logs: [] }
+    if (conflicts.length > 0) {
+      return {
+        _tag: 'Invalid',
+        conflicts,
+        message: formatConflictMessage(conflicts),
+      }
+    }
+    return {
+      _tag: 'Resolved',
+      database: { _tag: 'Disabled' },
+      logs: [],
+    }
   }
 
   const databaseNeeded = Object.values(input.requested).some(Boolean)
-  if (input.database === undefined && !databaseNeeded)
-    return { _tag: 'Resolved', database: { _tag: 'Disabled' }, logs: [] }
+  if (input.database === undefined && !databaseNeeded) {
+    return {
+      _tag: 'Resolved',
+      database: { _tag: 'Disabled' },
+      logs: [],
+    }
+  }
 
   const logs: DatabaseLog[] = []
   const config = options || {}
@@ -280,7 +317,9 @@ export function resolveDatabaseConfig(input: ResolveDatabaseInput): DatabaseReso
       database: {
         _tag: 'Enabled',
         type,
-        filename: isAbsolute(filename) ? filename : join(input.rootDir, filename),
+        filename: isAbsolute(filename)
+          ? filename
+          : join(input.rootDir, filename),
       },
     }
   }
@@ -305,6 +344,11 @@ export function resolveDatabaseConfig(input: ResolveDatabaseInput): DatabaseReso
   return {
     _tag: 'Resolved',
     logs,
-    database: { _tag: 'Enabled', type: 'libsql', url: config.url, authToken: config.authToken },
+    database: {
+      _tag: 'Enabled',
+      type: 'libsql',
+      url: config.url,
+      authToken: config.authToken,
+    },
   }
 }

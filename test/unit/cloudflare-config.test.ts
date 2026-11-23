@@ -13,7 +13,11 @@ describe('cloudflare file routing', () => {
   it.each([
     ['wrangler.json', '{"assets":{"run_worker_first":false}}', false],
     ['wrangler.jsonc', '{/* preserve existing routing */"assets":{"run_worker_first":true}}', true],
-    ['wrangler.toml', '[assets]\nrun_worker_first = ["/private/*"]', ['/private/*']],
+    [
+      'wrangler.toml',
+      '[assets]\nrun_worker_first = ["/private/*"]',
+      ['/private/*'],
+    ],
   ])('reads existing worker routing from %s', async (name, source, expected) => {
     const directory = await mkdtemp(join(tmpdir(), 'ai-ready-cloudflare-'))
     directories.push(directory)

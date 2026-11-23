@@ -3,11 +3,15 @@ import { expect, it, vi } from 'vitest'
 
 const loadConverter = vi.hoisted(() => vi.fn())
 
-vi.mock('#ai-ready-virtual/content-lookup.mjs', () => ({ lookupContentPage: vi.fn() }))
+vi.mock('#ai-ready-virtual/content-lookup.mjs', () => ({
+  lookupContentPage: vi.fn(),
+}))
 
 vi.mock('mdream', () => {
   loadConverter()
-  return { htmlToMarkdown: vi.fn() }
+  return {
+    htmlToMarkdown: vi.fn(),
+  }
 })
 
 vi.mock('../../src/runtime/server/utils/negotiation-response', () => ({

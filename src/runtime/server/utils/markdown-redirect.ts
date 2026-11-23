@@ -28,7 +28,9 @@ export interface MarkdownRedirectOptions {
  */
 export function resolveMarkdownRedirect(location: string, { pageUrl, origins = [] }: MarkdownRedirectOptions): MarkdownRedirect {
   const page = new URL(pageUrl)
-  const target = URL.canParse(location, page) ? new URL(location, page) : null
+  const target = URL.canParse(location, page)
+    ? new URL(location, page)
+    : null
   if (!target || (target.origin !== page.origin && !origins.includes(target.origin)))
     return { _tag: 'redirect', location }
 
@@ -42,6 +44,8 @@ export function resolveMarkdownRedirect(location: string, { pageUrl, origins = [
   const markdownLocation = `${markdownPath}${target.search}${target.hash}`
   return {
     _tag: 'redirect',
-    location: RE_ABSOLUTE_URL.test(location) ? `${target.origin}${markdownLocation}` : markdownLocation,
+    location: RE_ABSOLUTE_URL.test(location)
+      ? `${target.origin}${markdownLocation}`
+      : markdownLocation,
   }
 }

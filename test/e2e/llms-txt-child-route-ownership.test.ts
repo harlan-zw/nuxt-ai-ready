@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('generated child discovery route ownership', async () => {
-  await setup({ rootDir: resolve('../fixtures/llms-child-routes'), build: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/llms-child-routes'),
+    build: true,
+    server: true,
+  })
 
   it('keeps a cached site page beside the discovery namespace', async () => {
     const html = await $fetch<string>('/llms-txt/guide')

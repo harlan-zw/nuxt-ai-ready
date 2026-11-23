@@ -24,7 +24,12 @@ describe('resolvePageUpdatedAt', () => {
 describe('resolveIndexedUpdatedAt', () => {
   const now = new Date('2026-09-24T10:00:00.000Z')
   const runtimeRow = { contentHash: 'aaa', updatedAt: '2026-01-01T00:00:00.000Z', source: 'runtime' as const }
-  const base = { declared: '', contentHash: 'bbb', now, detectDrift: true }
+  const base = {
+    declared: '',
+    contentHash: 'bbb',
+    now,
+    detectDrift: true,
+  }
 
   it('keeps a declared date over detected drift', () => {
     expect(resolveIndexedUpdatedAt({ ...base, declared: '2025-05-05T00:00:00.000Z', previous: runtimeRow })).toBe('2025-05-05T00:00:00.000Z')
@@ -40,11 +45,17 @@ describe('resolveIndexedUpdatedAt', () => {
 
   it('gives no date on first index', () => {
     expect(resolveIndexedUpdatedAt({ ...base, previous: undefined })).toBe('')
-    expect(resolveIndexedUpdatedAt({ ...base, previous: { contentHash: null, updatedAt: '', source: 'runtime' } })).toBe('')
+    expect(resolveIndexedUpdatedAt({
+      ...base,
+      previous: { contentHash: null, updatedAt: '', source: 'runtime' },
+    })).toBe('')
   })
 
   it('does not treat a prerender hash as comparable', () => {
-    expect(resolveIndexedUpdatedAt({ ...base, previous: { ...runtimeRow, source: 'prerender', updatedAt: '' } })).toBe('')
+    expect(resolveIndexedUpdatedAt({
+      ...base,
+      previous: { ...runtimeRow, source: 'prerender', updatedAt: '' },
+    })).toBe('')
   })
 
   it('detects nothing when drift detection is off', () => {

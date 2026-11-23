@@ -5,9 +5,15 @@ import { data } from '../../lib/ai-ready/state'
 const config = computed(() => data.value?.config)
 const llmsTxt = computed(() => data.value?.llmsTxt)
 
-const configJson = computed(() => config.value ? JSON.stringify(config.value, null, 2) : '')
-const llmsTxtJson = computed(() => llmsTxt.value ? JSON.stringify(llmsTxt.value, null, 2) : '')
-const fullJson = computed(() => data.value ? JSON.stringify(data.value, null, 2) : '')
+const configJson = computed(() => config.value
+  ? JSON.stringify(config.value, null, 2)
+  : '')
+const llmsTxtJson = computed(() => llmsTxt.value
+  ? JSON.stringify(llmsTxt.value, null, 2)
+  : '')
+const fullJson = computed(() => data.value
+  ? JSON.stringify(data.value, null, 2)
+  : '')
 </script>
 
 <template>

@@ -93,7 +93,10 @@ export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sour
   const sourcePolicy = sourceHeaders?.get('content-signal')
   if (sourcePolicy !== null && sourcePolicy !== undefined && getResponseHeader(event, 'content-signal') === undefined)
     setHeader(event, 'content-signal', sourcePolicy)
-  const vary = [getResponseHeader(event, 'vary'), sourceHeaders?.get('vary')].filter(Boolean).join(', ')
+  const vary = [
+    getResponseHeader(event, 'vary'),
+    sourceHeaders?.get('vary'),
+  ].filter(Boolean).join(', ')
   setHeader(event, 'vary', mergeVaryHeader(vary, 'Accept'))
   setLinkHeader(event, ctx, 'markdown')
   // A representation change must not turn a private response into public content.
@@ -141,7 +144,9 @@ export function buildNegotiationContext(event: H3Event, path: string): Negotiati
     path,
     resolvePath,
     resolveUrl: (target: string) => siteConfigUtils.withSiteUrl(event, resolvePath(target), { withBase: true }),
-    routeContext: { host: getRequestHost(event, { xForwardedHost: true }) },
+    routeContext: {
+      host: getRequestHost(event, { xForwardedHost: true }),
+    },
   }
 }
 
@@ -162,8 +167,12 @@ let matcherCache: { key: string, match: RouteRuleMatcher } | undefined
 
 function getRouteRuleMatcher(runtimeConfig: ReturnType<typeof useRuntimeConfig>): RouteRuleMatcher {
   const key = JSON.stringify([runtimeConfig.app?.baseURL, runtimeConfig.nitro?.routeRules])
-  if (matcherCache?.key !== key)
-    matcherCache = { key, match: createNitroRouteRuleMatcher<AppRouteRules>(runtimeConfig) }
+  if (matcherCache?.key !== key) {
+    matcherCache = {
+      key,
+      match: createNitroRouteRuleMatcher<AppRouteRules>(runtimeConfig),
+    }
+  }
   return matcherCache.match
 }
 

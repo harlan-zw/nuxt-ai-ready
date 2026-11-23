@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('sitemap crawling respects prerender exclusions', async () => {
-  await setup({ rootDir: resolve('../fixtures/prerender-ignored-sitemap'), build: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/prerender-ignored-sitemap'),
+    build: true,
+    server: true,
+  })
 
   it('indexes permitted pages and skips ignored source pages or Markdown twins', async () => {
     const output = join(useTestContext().nuxt!.options.buildDir, 'output/public')

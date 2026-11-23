@@ -14,7 +14,9 @@ describe('accept header negotiation for prerendered routes', async () => {
     server: true,
     nuxtConfig: {
       routeRules: {
-        '/about.md': { headers: { 'vary': 'Origin', 'content-signal': 'search=no', 'x-markdown-rule': 'about' } },
+        '/about.md': {
+          headers: { 'vary': 'Origin', 'content-signal': 'search=no', 'x-markdown-rule': 'about' },
+        },
         '/docs/getting-started.md': { proxy: '/api/prerendered-markdown-proxy' },
       },
       nitro: {
@@ -23,11 +25,15 @@ describe('accept header negotiation for prerendered routes', async () => {
           'rollup:before': (nitro) => {
             if (nitro.options.preset === 'nitro-prerender')
               return
-            nitro.options.routeRules['/render-count'] = { headers: { 'x-added-at-bundle': 'html' } }
+            nitro.options.routeRules['/render-count'] = {
+              headers: { 'x-added-at-bundle': 'html' },
+            }
             nitro.options.routeRules['/about.md']!.headers!['x-added-at-bundle'] = 'markdown'
             nitro.options.runtimeConfig.nitro.routeRules = {
               ...nitro.options.routeRules,
-              '/render-count': { headers: { ...nitro.options.routeRules['/render-count']!.headers, 'x-runtime-only': 'kept' } },
+              '/render-count': {
+                headers: { ...nitro.options.routeRules['/render-count']!.headers, 'x-runtime-only': 'kept' },
+              },
             }
           },
         },
@@ -101,7 +107,9 @@ describe('accept header negotiation for prerendered routes', async () => {
     const initial = await fetch(request, { method: 'HEAD' })
     const etag = initial.headers.get('etag')
     expect(etag).toBeTruthy()
-    const response = await fetch(request, { headers: { 'If-None-Match': etag! } })
+    const response = await fetch(request, {
+      headers: { 'If-None-Match': etag! },
+    })
 
     expect(response.status).toBe(304)
     expect(response.headers.get('vary')).toBe('Origin, Accept')
@@ -127,7 +135,9 @@ describe('accept header negotiation for prerendered routes', async () => {
   })
 
   it('returns markdown with Accept variation when following homepage negotiation', async () => {
-    const response = await fetch(url('/'), { headers: { Accept: 'text/markdown' } })
+    const response = await fetch(url('/'), {
+      headers: { Accept: 'text/markdown' },
+    })
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/markdown')
     expect(response.headers.get('vary')).toContain('Accept')

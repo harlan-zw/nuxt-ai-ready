@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
 
-await setup({ rootDir: resolve('../fixtures/private-markdown'), dev: false, server: true })
+await setup({
+  rootDir: resolve('../fixtures/private-markdown'),
+  dev: false,
+  server: true,
+})
 
 describe('private markdown', () => {
   it('keeps private HTML private after conversion', async () => {
@@ -16,7 +20,9 @@ describe('private markdown', () => {
   })
 
   it.each(['cookie', 'authorization'])('does not cache markdown requested with %s', async (header) => {
-    const res = await fetch('/about.md', { headers: { [header]: 'session=alice' } })
+    const res = await fetch('/about.md', {
+      headers: { [header]: 'session=alice' },
+    })
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('private, no-store')
   })

@@ -8,16 +8,25 @@ const mocks = vi.hoisted(() => ({
   useRawDb: vi.fn(),
 }))
 
-vi.mock('../../src/runtime/server/db/drizzle/queries', () => ({ initSchema: async () => {} }))
+vi.mock('../../src/runtime/server/db/drizzle/queries', () => ({
+  initSchema: async () => {},
+}))
 vi.mock('../../src/runtime/server/db/drizzle/raw', () => ({ useRawDb: mocks.useRawDb }))
 vi.mock('#nuxtseo/nitro', () => ({
   fetchWithEvent: mocks.fetch,
   useEvent: () => { throw new Error('No active event') },
   useRuntimeConfig: () => ({}),
-  useNitroApp: () => ({ hooks: { callHook: vi.fn() } }),
+  useNitroApp: () => ({
+    hooks: {
+      callHook: vi.fn(),
+    },
+  }),
 }))
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { warn: vi.fn(), debug: vi.fn() },
+  logger: {
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
 }))
 
 const event = {} as H3Event
@@ -53,13 +62,20 @@ describe('indexing removed routes', () => {
   it.each([
     { status: 410 },
     { statusCode: 410 },
-    { response: { status: 410 } },
+    {
+      response: { status: 410 },
+    },
   ])('prunes HTTP 410 without reporting batch errors: %j', async (failure) => {
     mocks.fetch.mockRejectedValue(Object.assign(new Error('Gone'), failure))
 
     for (let pass = 0; pass < 2; pass++) {
       await seedRoutes(event, ['/gone'])
-      expect(await batchIndexPages(event)).toMatchObject({ indexed: 0, remaining: 0, errors: [], complete: true })
+      expect(await batchIndexPages(event)).toMatchObject({
+        indexed: 0,
+        remaining: 0,
+        errors: [],
+        complete: true,
+      })
       expect(await queryPages(event)).toEqual([])
     }
   })
@@ -74,10 +90,16 @@ describe('indexing removed routes', () => {
   it.each([404, 500])('keeps HTTP %i as an error until the refresh window', async (status) => {
     mocks.fetch.mockRejectedValue(Object.assign(new Error('Fetch failed'), { status }))
     await seedRoutes(event, ['/failed'])
-    expect(await batchIndexPages(event)).toMatchObject({ errors: ['/failed'] })
+    expect(await batchIndexPages(event)).toMatchObject({
+      errors: ['/failed'],
+    })
     await seedRoutes(event, ['/failed'])
     expect(await batchIndexPages(event)).toMatchObject({ errors: [], indexed: 0 })
     expect(mocks.fetch).toHaveBeenCalledTimes(1)
-    expect(await queryPages(event, { where: { hasError: true } })).toMatchObject([{ route: '/failed', isError: true }])
+    expect(await queryPages(event, {
+      where: { hasError: true },
+    })).toMatchObject([
+      { route: '/failed', isError: true },
+    ])
   })
 })

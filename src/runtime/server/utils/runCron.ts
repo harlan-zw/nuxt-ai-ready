@@ -79,7 +79,9 @@ export async function runCron(event: H3Event | undefined, options?: { batchSize?
   return executeCron(event, options).catch((error) => {
     const message = describeFailure(error)
     logger.error(`[cron] Run failed: ${message}`)
-    return { failed: { stage: 'run' as const, message } }
+    return {
+      failed: { stage: 'run' as const, message },
+    }
   })
 }
 
@@ -99,14 +101,19 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
     return null
   })
 
-  if (lock === null)
-    return { failed: { stage: 'lock', message: 'Could not acquire the cron lock' } }
+  if (lock === null) {
+    return {
+      failed: { stage: 'lock', message: 'Could not acquire the cron lock' },
+    }
+  }
 
   if (lock._tag === 'held') {
     if (debug) {
       logger.info(`[cron] Skipping - another cron run is in progress`)
     }
-    return { stale: { action: 'none' as const, dbCount: 0, reason: 'lock_held' } }
+    return {
+      stale: { action: 'none' as const, dbCount: 0, reason: 'lock_held' },
+    }
   }
 
   if (debug) {
@@ -160,7 +167,9 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
     // The sitemap-seeder plugin handles actual route insertion
     if (config.runtimeSync.enabled) {
       const sitemapResult = await pingSitemap(event, config, sitemapIntervalMinutes, debug).catch((err): SitemapPingResult => {
-        const msg = err instanceof Error ? err.message : String(err)
+        const msg = err instanceof Error
+          ? err.message
+          : String(err)
         logger.warn('[ai-ready:cron] Sitemap ping failed:', msg)
         allErrors.push(`sitemap: ${msg}`)
         return { pinged: false, pruned: 0, error: msg }
@@ -168,7 +177,11 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
       results.sitemap = sitemapResult
       if (debug) {
         if (sitemapResult.name) {
-          logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.continuing ? ' (continuing)' : sitemapResult.error ? ` (error: ${sitemapResult.error})` : ''}`)
+          logger.info(`[cron] Sitemap: pinged ${sitemapResult.name}${sitemapResult.continuing
+            ? ' (continuing)'
+            : sitemapResult.error
+              ? ` (error: ${sitemapResult.error})`
+              : ''}`)
         }
         if (sitemapResult.pruned > 0) {
           logger.info(`[cron] Sitemap: pruned ${sitemapResult.pruned} stale routes`)
@@ -177,7 +190,9 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
     }
 
     // Start logging this cron run (only if debugCron enabled)
-    const runId = config.debugCron ? await startCronRun(event) : null
+    const runId = config.debugCron
+      ? await startCronRun(event)
+      : null
     results.runId = runId
 
     // Run runtime indexing if enabled
@@ -190,14 +205,18 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
       results.index = {
         indexed: indexResult.indexed,
         remaining: indexResult.remaining,
-        errors: indexResult.errors.length > 0 ? indexResult.errors : undefined,
+        errors: indexResult.errors.length > 0
+          ? indexResult.errors
+          : undefined,
         complete: indexResult.complete,
       }
       if (indexResult.errors.length > 0) {
         allErrors.push(...indexResult.errors)
       }
       if (debug) {
-        logger.info(`[cron] Index: ${indexResult.indexed} pages (${indexResult.remaining} remaining${indexResult.errors.length > 0 ? `, ${indexResult.errors.length} errors` : ''})`)
+        logger.info(`[cron] Index: ${indexResult.indexed} pages (${indexResult.remaining} remaining${indexResult.errors.length > 0
+          ? `, ${indexResult.errors.length} errors`
+          : ''})`)
       }
     }
 
@@ -225,7 +244,9 @@ async function executeCron(event: H3Event | undefined, options?: { batchSize?: n
         parts.push(`${results.index.indexed} indexed`)
       if (allErrors.length > 0)
         parts.push(`${allErrors.length} errors`)
-      logger.info(`[cron] Complete in ${duration}ms${parts.length > 0 ? `: ${parts.join(', ')}` : ''}`)
+      logger.info(`[cron] Complete in ${duration}ms${parts.length > 0
+        ? `: ${parts.join(', ')}`
+        : ''}`)
     }
 
     return results
@@ -290,7 +311,9 @@ async function pingSitemap(
   })
   // Thread each entry's URL so seeded locales derive from the page's own host
   // on multi-domain i18n sites, never from the cron request host.
-  const routes = [...mapSitemapRoutes(result.urls).entries()].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
+  const routes = [
+    ...mapSitemapRoutes(result.urls).entries(),
+  ].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
   if (routes.length > 0)
     await seedRoutes(event, routes, { refreshWindowMs })
 

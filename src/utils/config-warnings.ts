@@ -34,7 +34,9 @@ export interface ConfigurationWarningInput {
 /** Report configuration limits using the same cache policy as runtime negotiation. */
 export function resolveConfigurationWarnings(input: ConfigurationWarningInput): string[] {
   const warnings: string[] = []
-  const hostname = input.siteUrl && URL.canParse(input.siteUrl) ? new URL(input.siteUrl).hostname : ''
+  const hostname = input.siteUrl && URL.canParse(input.siteUrl)
+    ? new URL(input.siteUrl).hostname
+    : ''
   if (input.reportSiteUrl !== false && (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1' || hostname === '[::1]')) {
     warnings.push('Set site.url to the public production URL. Discovery catalogs and canonical Markdown links need a public origin.\n  In nuxt.config.ts, set site: { url: "https://your-domain.com" }. Replace the example with your production origin.')
   }
@@ -45,7 +47,9 @@ export function resolveConfigurationWarnings(input: ConfigurationWarningInput): 
     warnings.push(`Static output cannot run Markdown negotiation middleware.\n  Link the generated .md URLs, or use a server deployment for automatic negotiation.\n  For edge negotiation, preserve these inputs: ${getContentNegotiationVary(input.botNegotiation)}.\n  Guide: ${CACHE_GUIDE}`)
   }
 
-  const match = createNitroRouteRuleMatcher<ConfigurationWarningInput['routeRules'][string]>({ nitro: { routeRules: input.routeRules } })
+  const match = createNitroRouteRuleMatcher<ConfigurationWarningInput['routeRules'][string]>({
+    nitro: { routeRules: input.routeRules },
+  })
   for (const route of Object.keys(input.routeRules).sort()) {
     if (!hasMarkdownTwin(route) || route.startsWith('/.well-known/'))
       continue
@@ -60,12 +64,16 @@ export function resolveConfigurationWarnings(input: ConfigurationWarningInput): 
       continue
     if (input.policy === 'enabled') {
       const fix = automatic.source === 'isr'
-        ? `ISR cannot use automatic negotiation. Set isr: false on this route, or use explicit .md URLs.${rule.cache ? `\n  ${fixCache}` : ''}`
+        ? `ISR cannot use automatic negotiation. Set isr: false on this route, or use explicit .md URLs.${rule.cache
+          ? `\n  ${fixCache}`
+          : ''}`
         : fixCache
       warnings.push(`"${route}": contentNegotiation: true overrides cache protection.\n  Remove aiReady.contentNegotiation from nuxt.config.ts to restore automatic cache protection.\n  ${fix}\n  Guide: ${CACHE_GUIDE}`)
     }
     else if (automatic.source === 'isr') {
-      warnings.push(`"${route}": ISR disables automatic Markdown negotiation.\n  To keep ISR, use explicit .md URLs.\n  To use negotiation, set isr: false on this route in nuxt.config.ts.${rule.cache ? `\n  ${fixCache}` : ''}\n  Guide: ${CACHE_GUIDE}`)
+      warnings.push(`"${route}": ISR disables automatic Markdown negotiation.\n  To keep ISR, use explicit .md URLs.\n  To use negotiation, set isr: false on this route in nuxt.config.ts.${rule.cache
+        ? `\n  ${fixCache}`
+        : ''}\n  Guide: ${CACHE_GUIDE}`)
     }
     else {
       warnings.push(`"${route}": response caching disables automatic Markdown negotiation.\n  In nuxt.config.ts:\n  ${fixCache}\n  Guide: ${CACHE_GUIDE}`)

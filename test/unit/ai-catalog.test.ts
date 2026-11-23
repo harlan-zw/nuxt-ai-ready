@@ -19,13 +19,15 @@ describe('ai catalog', () => {
       serverCardUrl: 'https://skilld.dev/docs/agent/mcp/server-card',
     })).toEqual({
       specVersion: '1.0',
-      entries: [{
-        identifier: 'urn:air:skilld.dev:mcp:registry',
-        displayName: 'Skilld registry',
-        description: 'Find agent skills.',
-        type: 'application/mcp-server-card+json',
-        url: 'https://skilld.dev/docs/agent/mcp/server-card',
-      }],
+      entries: [
+        {
+          identifier: 'urn:air:skilld.dev:mcp:registry',
+          displayName: 'Skilld registry',
+          description: 'Find agent skills.',
+          type: 'application/mcp-server-card+json',
+          url: 'https://skilld.dev/docs/agent/mcp/server-card',
+        },
+      ],
     })
   })
 

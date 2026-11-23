@@ -5,7 +5,9 @@ import { fetchPublicAsset } from '../../src/runtime/server/utils/cloudflare'
 const localFetch = vi.hoisted(() => vi.fn())
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ app: { baseURL: '/docs/' } }),
+  useRuntimeConfig: () => ({
+    app: { baseURL: '/docs/' },
+  }),
   localFetch,
 }))
 
@@ -21,7 +23,9 @@ describe('fetchPublicAsset', () => {
     const body = response.body
     const text = vi.spyOn(response, 'text')
     const fetch = vi.fn(async () => response)
-    ;(globalThis as { __env__?: unknown }).__env__ = { ASSETS: { fetch } }
+    ;(globalThis as { __env__?: unknown }).__env__ = {
+      ASSETS: { fetch },
+    }
 
     const result = await fetchPublicAsset<ReadableStream<Uint8Array>>(
       undefined,
@@ -35,7 +39,9 @@ describe('fetchPublicAsset', () => {
   })
 
   it('self-fetches the asset beneath the app base URL without an ASSETS binding', async () => {
-    localFetch.mockResolvedValue(new Response(JSON.stringify({ buildId: 'b1', pageCount: 1 }), { headers: { 'content-type': 'application/json' } }))
+    localFetch.mockResolvedValue(new Response(JSON.stringify({ buildId: 'b1', pageCount: 1 }), {
+      headers: { 'content-type': 'application/json' },
+    }))
 
     await fetchPublicAsset(undefined, '/__ai-ready/pages.meta.json')
 
@@ -43,7 +49,9 @@ describe('fetchPublicAsset', () => {
   })
 
   it('retries a temporary failure and preserves request context', async () => {
-    const event = { context: { task: 'restore' } }
+    const event = {
+      context: { task: 'restore' },
+    }
     const failure = new Response('Unavailable', { status: 503 })
     const cancel = vi.spyOn(failure.body!, 'cancel')
     localFetch.mockResolvedValueOnce(failure).mockResolvedValueOnce(new Response('stored asset'))
@@ -63,13 +71,18 @@ describe('fetchPublicAsset', () => {
 
   it('keeps the parent database open when a nested asset response finishes', async () => {
     const database = { closed: false }
-    const cloudflare = { env: { D1: 'binding' } }
+    const cloudflare = {
+      env: { D1: 'binding' },
+    }
     const context = {
       cloudflare,
       task: 'restore',
       [DB_CONTEXT_KEY]: database,
       [DB_PROMISE_CONTEXT_KEY]: Promise.resolve(database),
-      [DB_WORK_CONTEXT_KEY]: { _tag: 'ResponseOpen', pending: new Set() },
+      [DB_WORK_CONTEXT_KEY]: {
+        _tag: 'ResponseOpen',
+        pending: new Set(),
+      },
     }
     localFetch.mockImplementation(async (_path, _options, nestedContext) => {
       if (nestedContext[DB_CONTEXT_KEY])

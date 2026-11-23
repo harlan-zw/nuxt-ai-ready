@@ -37,7 +37,9 @@ describe('accept header content negotiation', async () => {
 
   describe('redirect to .md', () => {
     it('negotiates the advertised Markdown twin of a numeric dotted page', async () => {
-      const html = await fetch(url('/v1.2'), { headers: { Accept: 'text/html' } })
+      const html = await fetch(url('/v1.2'), {
+        headers: { Accept: 'text/html' },
+      })
       expect(html.headers.get('link')).toContain('/v1.2.md')
 
       const negotiated = await fetch(url('/v1.2'), {

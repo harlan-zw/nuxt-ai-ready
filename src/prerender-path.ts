@@ -22,14 +22,19 @@ export function parsePrerenderRoute(input: string, baseURL: string): ParsedPrere
       break
     pathname = decoded
   }
-  return { _tag: 'Valid', route: toLogicalRoute(input, baseURL) }
+  return {
+    _tag: 'Valid',
+    route: toLogicalRoute(input, baseURL),
+  }
 }
 
 /** Resolve every filesystem read or write beneath its trusted root. */
 export function resolvePrerenderFile(root: string, route: string): string {
   if (parsePrerenderRoute(route, '/')._tag === 'Invalid')
     throw new Error(`Unsafe prerender file path: ${route}`)
-  const destination = resolve(root, `.${route.startsWith('/') ? route : `/${route}`}`)
+  const destination = resolve(root, `.${route.startsWith('/')
+    ? route
+    : `/${route}`}`)
   const child = relative(resolve(root), destination)
   if (child === '..' || child.startsWith('../') || child.startsWith('..\\'))
     throw new Error(`Prerender file path escapes its root: ${route}`)

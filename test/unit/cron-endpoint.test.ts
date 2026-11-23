@@ -22,7 +22,9 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config }),
 }))
 
-vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
+vi.mock('nuxt/server', () => ({
+  deriveSecret: async () => 'test-secret',
+}))
 
 vi.mock('../../src/runtime/server/db/queries', () => ({
   tryAcquireCronLock,
@@ -41,7 +43,11 @@ vi.mock('../../src/runtime/server/db/queries', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 const { default: cronEndpoint } = await import('../../src/runtime/server/routes/__ai-ready/cron.get')

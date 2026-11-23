@@ -9,9 +9,13 @@ const target = {
 const entry = {
   anchor: '/api',
   serviceDesc: target,
-  serviceDoc: [{ href: '/docs/api' }],
+  serviceDoc: [
+    { href: '/docs/api' },
+  ],
 } satisfies ApiCatalogEntry
 
-const config = { entries: [entry] } satisfies ApiCatalogConfig
+const config = {
+  entries: [entry],
+} satisfies ApiCatalogConfig
 
 expectTypeOf(config).toMatchTypeOf<ApiCatalogConfig>()

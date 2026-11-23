@@ -12,19 +12,35 @@ describe('optional bot negotiation', async () => {
     nuxtConfig: {
       aiReady: { botNegotiation: true },
       routeRules: {
-        '/about': { cache: { maxAge: 3600, varies: ['accept', 'sec-fetch-dest', 'user-agent'] } },
-        '/docs/**': { cache: { maxAge: 3600, varies: ['accept'] } },
+        '/about': {
+          cache: {
+            maxAge: 3600,
+            varies: ['accept', 'sec-fetch-dest', 'user-agent'],
+          },
+        },
+        '/docs/**': {
+          cache: {
+            maxAge: 3600,
+            varies: ['accept'],
+          },
+        },
       },
     },
   })
 
   it('redirects bot HTML requests only when all cache inputs are covered', async () => {
-    const response = await fetch(url('/about'), { headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' }, redirect: 'manual' })
+    const response = await fetch(url('/about'), {
+      headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' },
+      redirect: 'manual',
+    })
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toBe('/about.md')
     expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Dest, User-Agent')
     expect(response.headers.get('cache-control')).toContain('no-store')
-    const unsafe = await fetch(url('/docs/getting-started'), { headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' }, redirect: 'manual' })
+    const unsafe = await fetch(url('/docs/getting-started'), {
+      headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' },
+      redirect: 'manual',
+    })
     expect(unsafe.status).toBe(200)
     expect(unsafe.headers.get('content-type')).toContain('text/html')
   })
@@ -45,7 +61,9 @@ describe('optional bot negotiation', async () => {
   })
 
   it('returns an uncacheable 406 instead of overriding unsupported Accept with bot detection', async () => {
-    const response = await fetch(url('/about'), { headers: { 'Accept': 'application/x-probe', 'User-Agent': 'GPTBot' } })
+    const response = await fetch(url('/about'), {
+      headers: { 'Accept': 'application/x-probe', 'User-Agent': 'GPTBot' },
+    })
     expect(response.status).toBe(406)
     expect(response.headers.get('vary')).toBe('Accept, Sec-Fetch-Dest, User-Agent')
     expect(response.headers.get('cache-control')).toContain('no-store')

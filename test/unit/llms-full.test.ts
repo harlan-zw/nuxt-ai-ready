@@ -103,11 +103,13 @@ Setext heading
     const result = formatPageForLlmsFullTxt('/guide', 'Guide', '', markdown)
     const metadata = parse(result.match(/```yaml\n([\s\S]*?)\n```/)?.[1] || '')
 
-    expect(metadata).toEqual({ meta: {
-      'og:image': 'https://example.com/cover.png',
-      'og:image:alt': 'A guide: from the source',
-      'twitter:image': 'https://example.com/social.png',
-    } })
+    expect(metadata).toEqual({
+      meta: {
+        'og:image': 'https://example.com/cover.png',
+        'og:image:alt': 'A guide: from the source',
+        'twitter:image': 'https://example.com/social.png',
+      },
+    })
     expect(result).toContain('# Guide')
     expect(result).not.toContain('title: Guide')
   })
@@ -123,10 +125,14 @@ Setext heading
     const result = buildLlmsFullTxtHeader(
       { name: 'Example', url: 'https://example.com', description: 'Example site.' },
       {
-        sections: [{
-          title: 'Resources',
-          links: [{ title: 'Index', href: '/llms.txt', description: 'Site index' }],
-        }],
+        sections: [
+          {
+            title: 'Resources',
+            links: [
+              { title: 'Index', href: '/llms.txt', description: 'Site index' },
+            ],
+          },
+        ],
       },
     )
 

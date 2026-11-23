@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { checkDrizzleInstall, formatDrizzleMessage, matchCaretRange } from '../../src/utils/database'
 
-const requested = { runtimeSync: true, cron: false, mcp: false, webmcp: false }
+const requested = {
+  runtimeSync: true,
+  cron: false,
+  mcp: false,
+  webmcp: false,
+}
 
 describe('matchCaretRange', () => {
   it.each([

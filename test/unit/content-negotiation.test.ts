@@ -51,9 +51,25 @@ describe('resolveContentNegotiation', () => {
   })
 
   it('requires all bot inputs only when bot negotiation is enabled', () => {
-    expect(resolveContentNegotiation({ policy: 'auto', botNegotiation: true, routeRule: { cache: { varies: ['accept'] } } }))
+    expect(resolveContentNegotiation({
+      policy: 'auto',
+      botNegotiation: true,
+      routeRule: {
+        cache: {
+          varies: ['accept'],
+        },
+      },
+    }))
       .toEqual({ _tag: 'disabled', source: 'route-cache' })
-    expect(resolveContentNegotiation({ policy: 'auto', botNegotiation: true, routeRule: { cache: { varies: ['accept', 'sec-fetch-dest', 'user-agent'] } } }))
+    expect(resolveContentNegotiation({
+      policy: 'auto',
+      botNegotiation: true,
+      routeRule: {
+        cache: {
+          varies: ['accept', 'sec-fetch-dest', 'user-agent'],
+        },
+      },
+    }))
       .toMatchObject({ _tag: 'enabled' })
   })
 

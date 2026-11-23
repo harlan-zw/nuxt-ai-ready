@@ -72,7 +72,9 @@ describe('raw executor neon batch', () => {
     globalThis.fetch = (async (_url: unknown, opts: { body: string }) => {
       const body = JSON.parse(opts.body)
       requests.push(body)
-      const count = Array.isArray(body.queries) ? body.queries.length : 1
+      const count = Array.isArray(body.queries)
+        ? body.queries.length
+        : 1
       return new Response(JSON.stringify({
         results: Array.from({ length: count }, () => ({ fields: [], rows: [] })),
       }), { status: 200 })

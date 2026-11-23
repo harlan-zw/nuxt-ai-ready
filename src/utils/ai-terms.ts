@@ -6,7 +6,12 @@ type AiTermsResult
     | { _tag: 'Invalid', errors: string[] }
     | { _tag: 'Enabled', config: ResolvedAiTermsConfig }
 
-const purposes = ['search', 'answer', 'training', 'agent'] as const
+const purposes = [
+  'search',
+  'answer',
+  'training',
+  'agent',
+] as const
 const accesses = ['allow', 'paid', 'deny']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,7 +25,9 @@ function checkPayment(value: unknown, field: string, errors: string[]): void {
   }
   if (value.protocol !== 'x402')
     errors.push(`${field}.protocol: use x402.`)
-  const endpoint = typeof value.endpoint === 'string' && /^https:\/\/[^/?#\\\s][^?#\\\s]*$/.test(value.endpoint) ? URL.parse(value.endpoint) : null
+  const endpoint = typeof value.endpoint === 'string' && /^https:\/\/[^/?#\\\s][^?#\\\s]*$/.test(value.endpoint)
+    ? URL.parse(value.endpoint)
+    : null
   if (!endpoint || endpoint.username || endpoint.password)
     errors.push(`${field}.endpoint: use an absolute HTTPS URL without credentials, query parameters, or a fragment.`)
   if (value.version !== undefined && !Number.isInteger(value.version))
@@ -63,8 +70,11 @@ function checkUses(value: unknown, field: string, payment: unknown, partial: boo
         if (!['page', 'request'].includes(rule.price.per as string))
           errors.push(`${path}.price.per: use page or request.`)
       }
-      if (!payment)
-        errors.push(`${field === 'uses' ? 'payment' : field.replace(/\.uses$/, '.payment')}: paid uses need a payment endpoint.`)
+      if (!payment) {
+        errors.push(`${field === 'uses'
+          ? 'payment'
+          : field.replace(/\.uses$/, '.payment')}: paid uses need a payment endpoint.`)
+      }
     }
     else if (rule.price !== undefined) {
       errors.push(`${path}.price: only paid uses have a price.`)
@@ -79,7 +89,13 @@ function checkUses(value: unknown, field: string, payment: unknown, partial: boo
 }
 
 function publicPayment({ protocol, endpoint, version, network, asset }: AiTermsPayment): AiTermsPayment {
-  return { protocol, endpoint, version, network, asset }
+  return {
+    protocol,
+    endpoint,
+    version,
+    network,
+    asset,
+  }
 }
 
 function publicUse(use: AiTermsUse): AiTermsUse {
@@ -92,7 +108,12 @@ function publicUse(use: AiTermsUse): AiTermsUse {
     return { access, attribution, free: allowance }
 
   const { amount, currency, per } = use.price
-  return { access, attribution, free: allowance, price: { amount, currency, per } }
+  return {
+    access,
+    attribution,
+    free: allowance,
+    price: { amount, currency, per },
+  }
 }
 
 function publicDocument(policy: AiTermsConfig, site: string): AiTermsDocument {
@@ -132,11 +153,17 @@ function publicDocument(policy: AiTermsConfig, site: string): AiTermsDocument {
 export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTermsResult {
   if (input === undefined || input === false)
     return { _tag: 'Disabled' }
-  if (!isRecord(input))
-    return { _tag: 'Invalid', errors: ['aiTerms: configure an explicit AI Terms policy, or use false.'] }
+  if (!isRecord(input)) {
+    return {
+      _tag: 'Invalid',
+      errors: ['aiTerms: configure an explicit AI Terms policy, or use false.'],
+    }
+  }
 
   const errors: string[] = []
-  const site = siteBaseURL && URL.canParse(siteBaseURL) ? new URL(siteBaseURL) : undefined
+  const site = siteBaseURL && URL.canParse(siteBaseURL)
+    ? new URL(siteBaseURL)
+    : undefined
   if (!site || !['https:', 'http:'].includes(site.protocol) || site.username || site.password)
     errors.push('site.url: set an absolute HTTP or HTTPS URL to publish AI Terms.')
 
@@ -191,8 +218,14 @@ export function resolveAiTermsConfig(input: unknown, siteBaseURL?: string): AiTe
       errors.push('preview.delivery: use must-match, per-quote, or not-checked.')
     }
     else {
-      if (input.preview.shows !== undefined && (!Array.isArray(input.preview.shows) || [...input.preview.shows].some(value => !['title', 'description', 'excerpt', 'words'].includes(value))))
+      if (input.preview.shows !== undefined && (!Array.isArray(input.preview.shows) || [...input.preview.shows].some(value => ![
+        'title',
+        'description',
+        'excerpt',
+        'words',
+      ].includes(value)))) {
         errors.push('preview.shows: use title, description, excerpt, or words.')
+      }
       if (input.preview.described_quote !== undefined && typeof input.preview.described_quote !== 'string')
         errors.push('preview.described_quote: use a string.')
     }

@@ -128,7 +128,9 @@ export default eventHandler(async (event) => {
   try {
     const [p, e] = await Promise.all([
       queryPages(event) as Promise<PageEntry[]>,
-      queryPages(event, { where: { hasError: true } }) as Promise<PageEntry[]>,
+      queryPages(event, {
+        where: { hasError: true },
+      }) as Promise<PageEntry[]>,
     ])
     pages = p
     errorRoutes = e
@@ -159,8 +161,12 @@ export default eventHandler(async (event) => {
     const m = await import('#ai-ready-virtual/page-data.mjs') as { pages?: unknown[], errorRoutes?: unknown[] }
     pageDataModuleInfo = {
       available: true,
-      pagesCount: Array.isArray(m.pages) ? m.pages.length : 0,
-      errorRoutesCount: Array.isArray(m.errorRoutes) ? m.errorRoutes.length : 0,
+      pagesCount: Array.isArray(m.pages)
+        ? m.pages.length
+        : 0,
+      errorRoutesCount: Array.isArray(m.errorRoutes)
+        ? m.errorRoutes.length
+        : 0,
     }
   }
   catch {
@@ -216,8 +222,12 @@ export default eventHandler(async (event) => {
     try {
       const [total, pending, errors] = await Promise.all([
         countPages(event),
-        countPages(event, { where: { pending: true } }),
-        countPages(event, { where: { hasError: true } }),
+        countPages(event, {
+          where: { pending: true },
+        }),
+        countPages(event, {
+          where: { hasError: true },
+        }),
       ])
 
       runtimeSyncInfo = {
@@ -233,7 +243,9 @@ export default eventHandler(async (event) => {
         cronRunsInfo = cronRuns.map(run => ({
           id: run.id,
           startedAt: new Date(run.startedAt).toISOString(),
-          finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
+          finishedAt: run.finishedAt
+            ? new Date(run.finishedAt).toISOString()
+            : null,
           durationMs: run.durationMs,
           status: run.status,
           pagesIndexed: run.pagesIndexed,
@@ -254,7 +266,9 @@ export default eventHandler(async (event) => {
         storedBuildId,
         dumpBuildId: dumpMeta?.buildId || null,
         dumpPageCount: dumpMeta?.pageCount || null,
-        isStale: dumpMeta ? storedBuildId !== dumpMeta.buildId : false,
+        isStale: dumpMeta
+          ? storedBuildId !== dumpMeta.buildId
+          : false,
         dumpCreatedAt: dumpMeta?.createdAt || null,
       }
 
@@ -279,11 +293,19 @@ export default eventHandler(async (event) => {
     hasCloudflare: !!event.context?.cloudflare,
     hasCloudflareEnv: !!event.context?.cloudflare?.env,
     hasContextEnv: !!(event.context as any)?.env,
-    contextKeys: event.context ? Object.keys(event.context) : [],
-    cloudflareKeys: event.context?.cloudflare ? Object.keys(event.context.cloudflare) : [],
-    cloudflareEnvKeys: event.context?.cloudflare?.env ? Object.keys(event.context.cloudflare.env) : [],
+    contextKeys: event.context
+      ? Object.keys(event.context)
+      : [],
+    cloudflareKeys: event.context?.cloudflare
+      ? Object.keys(event.context.cloudflare)
+      : [],
+    cloudflareEnvKeys: event.context?.cloudflare?.env
+      ? Object.keys(event.context.cloudflare.env)
+      : [],
     databaseConfig: {
-      type: runtimeConfig.database?._tag === 'Disabled' ? 'none' : runtimeConfig.database?.type || 'unknown',
+      type: runtimeConfig.database?._tag === 'Disabled'
+        ? 'none'
+        : runtimeConfig.database?.type || 'unknown',
       bindingName: runtimeConfig.database?.bindingName,
     },
   }

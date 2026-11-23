@@ -13,7 +13,9 @@ const FILE_PATH = /^\/llms\/[a-z0-9][\w-]*\.txt$/i
 const SITEMAP_NAME = /^[a-z0-9][\w-]*$/i
 
 export function llmsTxtSectionPath(section: LlmsTxtSection): string {
-  const name = Array.isArray(section.sitemap) ? section.sitemap[0] : section.sitemap
+  const name = Array.isArray(section.sitemap)
+    ? section.sitemap[0]
+    : section.sitemap
   return section.path || `/llms/${name}.txt`
 }
 
@@ -44,7 +46,9 @@ export function parseLlmsTxtConfig(input: unknown): ParsedLlmsTxtConfig {
         return invalid('A section path requires a sitemap.')
       continue
     }
-    const names = Array.isArray(section.sitemap) ? section.sitemap : [section.sitemap]
+    const names = Array.isArray(section.sitemap)
+      ? section.sitemap
+      : [section.sitemap]
     if (!names.length || names.some(name => typeof name !== 'string' || !SITEMAP_NAME.test(name)))
       return invalid('Each section sitemap must contain a sitemap name.')
     const path = llmsTxtSectionPath(section)
@@ -71,7 +75,12 @@ interface LlmsTxtFilesInput {
 export function createLlmsTxtFiles(input: LlmsTxtFilesInput): Map<string, string> {
   const files = new Map<string, string>()
   const maxLength = input.config.maxLength ?? 80_000
-  const link = (title: string, path: string, description?: string) => formatLlmsTxtPageLink({ pathname: path, href: input.resolveUrl(path), title, description })
+  const link = (title: string, path: string, description?: string) => formatLlmsTxtPageLink({
+    pathname: path,
+    href: input.resolveUrl(path),
+    title,
+    description,
+  })
   const render = (header: string, title: string, lines: string[]) => `${header.trim()}\n\n## ${title.replace(/\s+/g, ' ').trim()}\n\n${lines.join('\n')}\n`
 
   function tree(path: string, prefix: string, header: string, title: string, lines: string[], level = 0): void {
@@ -114,7 +123,9 @@ export function createLlmsTxtFiles(input: LlmsTxtFilesInput): Map<string, string
       sections.push(section)
       continue
     }
-    const names = Array.isArray(section.sitemap) ? section.sitemap : [section.sitemap]
+    const names = Array.isArray(section.sitemap)
+      ? section.sitemap
+      : [section.sitemap]
     const pages = new Map<string, LlmsTxtPage>()
     for (const name of names) {
       for (const page of input.sitemapPages.get(name) || []) {
@@ -123,39 +134,100 @@ export function createLlmsTxtFiles(input: LlmsTxtFilesInput): Map<string, string
           pages.set(page.pathname, page)
       }
     }
-    const entries = [...(section.links || []).map(entry => formatLlmsTxtPageLink({ pathname: entry.href, ...entry })), ...[...pages.values()].map(formatLlmsTxtPageLink)]
+    const entries = [
+      ...(section.links || []).map(entry => formatLlmsTxtPageLink({ pathname: entry.href, ...entry })),
+      ...[
+        ...pages.values(),
+      ].map(formatLlmsTxtPageLink),
+    ]
     if (!entries.length)
       continue
     for (const pathname of pages.keys())
       assigned.add(pathname)
     const path = llmsTxtSectionPath(section)
-    const description = Array.isArray(section.description) ? section.description.join(' ') : section.description
+    const description = Array.isArray(section.description)
+      ? section.description.join(' ')
+      : section.description
     const preamble = normalizeLlmsTxtConfig({ notes: description })
     tree(path, `section-${index + 1}`, `${input.header.trim()}\n\n${preamble}\n\n${link('llms.txt', '/llms.txt')}`, section.title, entries)
-    sections.push({ ...section, sitemap: undefined, path: undefined, links: [{ title: section.title, href: input.resolveUrl(path), description }] })
+    sections.push({
+      ...section,
+      sitemap: undefined,
+      path: undefined,
+      links: [
+        {
+          title: section.title,
+          href: input.resolveUrl(path),
+          description,
+        },
+      ],
+    })
   }
-  const rootPreamble = `${input.header.trim()}\n\n${normalizeLlmsTxtConfig({ notes: input.config.notes })}${input.rootContent ? `\n\n${input.rootContent}` : ''}`
-  const pageIndexSpace = input.pages.some(page => !assigned.has(page.pathname)) ? render('', 'Pages', [link('Pages', '/llms/_pages.txt')]).length : 1
-  let rootHeader = `${input.header.trim()}\n\n${normalizeLlmsTxtConfig({ ...input.config, sections })}${input.rootContent ? `\n\n${input.rootContent}` : ''}`
+  const rootPreamble = `${input.header.trim()}\n\n${normalizeLlmsTxtConfig({ notes: input.config.notes })}${input.rootContent
+    ? `\n\n${input.rootContent}`
+    : ''}`
+  const pageIndexSpace = input.pages.some(page => !assigned.has(page.pathname))
+    ? render('', 'Pages', [
+      link('Pages', '/llms/_pages.txt'),
+    ]).length
+    : 1
+  let rootHeader = `${input.header.trim()}\n\n${normalizeLlmsTxtConfig({ ...input.config, sections })}${input.rootContent
+    ? `\n\n${input.rootContent}`
+    : ''}`
   if (rootHeader.length + pageIndexSpace > maxLength) {
     const references = sections.flatMap<LlmsTxtSection>((section, index) => {
       const path = `/llms/_configured-${index + 1}.txt`
       if (!section.links?.length) {
-        const context = normalizeLlmsTxtConfig({ sections: [section] })
+        const context = normalizeLlmsTxtConfig({
+          sections: [section],
+        })
         if (!context)
           return []
         const body = `${input.header.trim()}\n\n${context}\n\n${link('llms.txt', '/llms.txt')}\n`
         if (body.length > maxLength)
           throw new Error('An llms.txt entry exceeds llmsTxt.maxLength. Shorten the entry or increase the limit.')
         files.set(path, body)
-        return [{ title: section.title, links: [{ title: section.title, href: input.resolveUrl(path) }] }]
+        return [
+          {
+            title: section.title,
+            links: [
+              {
+                title: section.title,
+                href: input.resolveUrl(path),
+              },
+            ],
+          },
+        ]
       }
-      const text = normalizeLlmsTxtConfig({ sections: [{ ...section, description: section.optional ? section.description : undefined }] })
+      const text = normalizeLlmsTxtConfig({
+        sections: [
+          {
+            ...section,
+            description: section.optional ? section.description : undefined,
+          },
+        ],
+      })
       const lines = text.split('\n').slice(2)
-      const description = Array.isArray(section.description) ? section.description.join(' ') : section.description
-      const preamble = section.optional ? '' : normalizeLlmsTxtConfig({ notes: description })
+      const description = Array.isArray(section.description)
+        ? section.description.join(' ')
+        : section.description
+      const preamble = section.optional
+        ? ''
+        : normalizeLlmsTxtConfig({ notes: description })
       tree(path, `configured-${index + 1}`, `${input.header.trim()}\n\n${preamble}\n\n${link('llms.txt', '/llms.txt')}`, section.optional ? 'Optional' : section.title, lines)
-      return [{ title: section.title, optional: section.optional, links: [{ title: section.title, href: input.resolveUrl(path), description }] }]
+      return [
+        {
+          title: section.title,
+          optional: section.optional,
+          links: [
+            {
+              title: section.title,
+              href: input.resolveUrl(path),
+              description,
+            },
+          ],
+        },
+      ]
     })
     rootHeader = `${rootPreamble}\n\n${normalizeLlmsTxtConfig({ sections: references })}`
     if (rootHeader.length + pageIndexSpace > maxLength) {
@@ -166,9 +238,20 @@ export function createLlmsTxtFiles(input: LlmsTxtFilesInput): Map<string, string
           continue
         const title = optional ? 'Optional' : 'Sections'
         const path = optional ? '/llms/_optional.txt' : '/llms/_sections.txt'
-        const text = normalizeLlmsTxtConfig({ sections: selected.map(section => ({ ...section, optional: true })) })
+        const text = normalizeLlmsTxtConfig({
+          sections: selected.map(section => ({ ...section, optional: true })),
+        })
         tree(path, optional ? 'optional' : 'sections', input.header, title, text.split('\n').slice(2))
-        indexes.push({ title, optional, links: [{ title, href: input.resolveUrl(path) }] })
+        indexes.push({
+          title,
+          optional,
+          links: [
+            {
+              title,
+              href: input.resolveUrl(path),
+            },
+          ],
+        })
       }
       rootHeader = `${rootPreamble}\n\n${normalizeLlmsTxtConfig({ sections: indexes })}`
     }

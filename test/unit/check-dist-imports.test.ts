@@ -23,7 +23,9 @@ describe('published import closure', () => {
       writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({
         files: ['dist'],
         main: './dist/module.mjs',
-        dependencies: declared ? { 'nested-module': '^1.0.0' } : {},
+        dependencies: declared
+          ? { 'nested-module': '^1.0.0' }
+          : {},
       })),
       writeFile(resolve(packageRoot, 'node_modules/nested-module/package.json'), JSON.stringify({
         name: 'nested-module',
@@ -55,7 +57,9 @@ describe('published import closure', () => {
       mkdir(resolve(packageRoot, 'src'), { recursive: true }),
     ])
     await Promise.all([
-      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({ files: ['dist'] })),
+      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({
+        files: ['dist'],
+      })),
       writeFile(resolve(packageRoot, 'src/source-only.mjs'), 'export const sourceOnly = true\n'),
       writeFile(resolve(packageRoot, 'dist/index.mjs'), [
         `import '../src/source-only.mjs'`,
@@ -83,7 +87,9 @@ describe('published import closure', () => {
     temporaryDirectories.push(packageRoot)
     await mkdir(resolve(packageRoot, 'dist/runtime/server'), { recursive: true })
     await Promise.all([
-      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({ files: ['dist'] })),
+      writeFile(resolve(packageRoot, 'package.json'), JSON.stringify({
+        files: ['dist'],
+      })),
       writeFile(resolve(packageRoot, 'dist/runtime/server/index.mjs'), [
         `import { eventHandler } from 'h3'`,
         `import { useRuntimeConfig } from 'nitropack/runtime'`,

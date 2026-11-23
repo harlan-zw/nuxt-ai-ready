@@ -40,7 +40,11 @@ vi.mock('../../src/runtime/server/db/queries', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 const { runCron } = await import('../../src/runtime/server/utils/runCron')

@@ -33,8 +33,13 @@ export function resolveContentNegotiation(input: {
   botNegotiation?: boolean
   routeRule: NegotiationRouteRule
 }): ContentNegotiationResolution {
-  if (input.policy === 'enabled')
-    return { _tag: 'enabled', source: 'explicit', vary: getContentNegotiationVary(input.botNegotiation) }
+  if (input.policy === 'enabled') {
+    return {
+      _tag: 'enabled',
+      source: 'explicit',
+      vary: getContentNegotiationVary(input.botNegotiation),
+    }
+  }
   if (input.policy === 'disabled')
     return { _tag: 'disabled', source: 'explicit' }
 
@@ -44,5 +49,9 @@ export function resolveContentNegotiation(input: {
   if (cachesWithoutNegotiationVariation(input.routeRule.cache, input.botNegotiation === true))
     return { _tag: 'disabled', source: 'route-cache' }
 
-  return { _tag: 'enabled', source: 'default', vary: getContentNegotiationVary(input.botNegotiation) }
+  return {
+    _tag: 'enabled',
+    source: 'default',
+    vary: getContentNegotiationVary(input.botNegotiation),
+  }
 }

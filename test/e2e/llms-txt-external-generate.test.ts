@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('external discovery links without a site URL', async () => {
-  await setup({ rootDir: resolve('../fixtures/llms-external'), build: true, server: false })
+  await setup({
+    rootDir: resolve('../fixtures/llms-external'),
+    build: true,
+    server: false,
+  })
 
   it('retains external references without fetching them as local generated files', async () => {
     const output = join(useTestContext().nuxt!.options.buildDir, 'output/public')

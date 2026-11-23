@@ -194,7 +194,9 @@ export function parseSupportedMcpProtocolVersions(source: string): McpProtocolVe
 
   const versionEntryPattern = /(?:exports\.)?LATEST_PROTOCOL_VERSION|(['"])([^'"]+)\1/g
   const entriesSource = supportedMatch[1]
-  const protocolVersions = [...entriesSource.matchAll(versionEntryPattern)]
+  const protocolVersions = [
+    ...entriesSource.matchAll(versionEntryPattern),
+  ]
     .map(match => match[2] || latestMatch[1])
     .filter((version): version is string => isNonEmptyString(version))
   const unsupportedSyntax = entriesSource
@@ -209,17 +211,26 @@ export function parseSupportedMcpProtocolVersions(source: string): McpProtocolVe
     }
   }
 
-  return { _tag: 'Resolved', protocolVersions: [...new Set(protocolVersions)] }
+  return {
+    _tag: 'Resolved',
+    protocolVersions: [
+      ...new Set(protocolVersions),
+    ],
+  }
 }
 
 export async function resolveInstalledMcpProtocolVersions(input: {
   rootDir: string
   modulesDir: string[]
 }): Promise<McpProtocolVersionsResult> {
-  const resolutionBases = [...new Set([...input.modulesDir, input.rootDir])]
+  const resolutionBases = [
+    ...new Set([...input.modulesDir, input.rootDir]),
+  ]
   const sdkResolutionAttempts = resolutionBases.map(base =>
     Promise.resolve().then(() => {
-      const toolkitPackagePath = resolvePackageMetadataPath('@nuxtjs/mcp-toolkit', base, input.modulesDir.includes(base) ? { searchDirectory: base } : undefined)
+      const toolkitPackagePath = resolvePackageMetadataPath('@nuxtjs/mcp-toolkit', base, input.modulesDir.includes(base)
+        ? { searchDirectory: base }
+        : undefined)
       return createRequire(toolkitPackagePath).resolve('@modelcontextprotocol/sdk/types.js')
     }),
   )
@@ -228,13 +239,17 @@ export async function resolveInstalledMcpProtocolVersions(input: {
       const resolved = results.find(result => result.status === 'fulfilled')
       if (resolved)
         return resolved.value
-      throw new AggregateError(results.map(result => result.status === 'rejected' ? result.reason : undefined), 'Could not resolve the MCP Toolkit SDK.')
+      throw new AggregateError(results.map(result => result.status === 'rejected'
+        ? result.reason
+        : undefined), 'Could not resolve the MCP Toolkit SDK.')
     })
     .then(sdkTypesPath => readFile(sdkTypesPath, 'utf8'))
     .then(parseSupportedMcpProtocolVersions)
     .catch((error: unknown) => ({
       _tag: 'Invalid',
-      message: `Could not resolve the MCP SDK protocol versions: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Could not resolve the MCP SDK protocol versions: ${error instanceof Error
+        ? error.message
+        : String(error)}`,
     }))
 }
 
@@ -248,7 +263,9 @@ function resolveDescription(input: {
   if (candidate && candidate.length <= 100)
     return candidate
 
-  const owner = input.siteName && input.siteName.length <= 75 ? input.siteName : 'this site'
+  const owner = input.siteName && input.siteName.length <= 75
+    ? input.siteName
+    : 'this site'
   return `MCP server for ${owner}.`
 }
 
@@ -263,8 +280,12 @@ export function resolveMcpServerCard(input: {
   overrides: Required<Pick<McpServerCardConfig, 'cacheMaxAge'>> & Omit<McpServerCardConfig, 'cacheMaxAge'>
 }): McpServerCard {
   const title = input.overrides.title
-    || (input.toolkitTitle && input.toolkitTitle.length <= 100 ? input.toolkitTitle : undefined)
-    || (input.siteName && input.siteName.length <= 100 ? input.siteName : undefined)
+    || (input.toolkitTitle && input.toolkitTitle.length <= 100
+      ? input.toolkitTitle
+      : undefined)
+    || (input.siteName && input.siteName.length <= 100
+      ? input.siteName
+      : undefined)
   const card: McpServerCard = {
     $schema: MCP_SERVER_CARD_SCHEMA,
     name: input.name,
@@ -280,11 +301,13 @@ export function resolveMcpServerCard(input: {
   }
 
   if (URL.canParse(input.endpoint) && ['http:', 'https:'].includes(new URL(input.endpoint).protocol)) {
-    card.remotes = [{
-      type: 'streamable-http',
-      url: input.endpoint,
-      supportedProtocolVersions: input.protocolVersions,
-    }]
+    card.remotes = [
+      {
+        type: 'streamable-http',
+        url: input.endpoint,
+        supportedProtocolVersions: input.protocolVersions,
+      },
+    ]
   }
 
   if (title)

@@ -49,17 +49,19 @@ describe('late MCP Server Card dependency', async () => {
       description: 'MCP server installed by a later wrapper module.',
       title: 'Late MCP discovery',
       websiteUrl: 'https://late-mcp.example.com/mcp-docs',
-      remotes: [{
-        type: 'streamable-http',
-        url: 'https://late-mcp.example.com/docs/agent/mcp',
-        supportedProtocolVersions: [
-          '2025-11-25',
-          '2025-06-18',
-          '2025-03-26',
-          '2024-11-05',
-          '2024-10-07',
-        ],
-      }],
+      remotes: [
+        {
+          type: 'streamable-http',
+          url: 'https://late-mcp.example.com/docs/agent/mcp',
+          supportedProtocolVersions: [
+            '2025-11-25',
+            '2025-06-18',
+            '2025-03-26',
+            '2024-11-05',
+            '2024-10-07',
+          ],
+        },
+      ],
     })
   })
 
@@ -161,17 +163,23 @@ describe('late MCP Server Card dependency', async () => {
 
     expect(catalogResponse.status).toBe(200)
     await expect(catalogResponse.json()).resolves.toEqual({
-      linkset: [{
-        'anchor': 'https://late-mcp.example.com/docs/agent/mcp',
-        'item': [{
-          href: 'https://late-mcp.example.com/docs/agent/mcp',
-          type: 'application/json',
-        }],
-        'service-desc': [{
-          href: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
-          type: 'application/mcp-server-card+json',
-        }],
-      }],
+      linkset: [
+        {
+          'anchor': 'https://late-mcp.example.com/docs/agent/mcp',
+          'item': [
+            {
+              href: 'https://late-mcp.example.com/docs/agent/mcp',
+              type: 'application/json',
+            },
+          ],
+          'service-desc': [
+            {
+              href: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
+              type: 'application/mcp-server-card+json',
+            },
+          ],
+        },
+      ],
     })
     expect(homeResponse.headers.get('link')).toContain('rel="api-catalog"')
   })
@@ -186,13 +194,15 @@ describe('late MCP Server Card dependency', async () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=900')
     await expect(response.json()).resolves.toEqual({
       specVersion: '1.0',
-      entries: [{
-        identifier: 'urn:air:late-mcp.example.com:mcp:ai-ready',
-        displayName: 'Late MCP discovery',
-        description: 'MCP server installed by a later wrapper module.',
-        type: 'application/mcp-server-card+json',
-        url: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
-      }],
+      entries: [
+        {
+          identifier: 'urn:air:late-mcp.example.com:mcp:ai-ready',
+          displayName: 'Late MCP discovery',
+          description: 'MCP server installed by a later wrapper module.',
+          type: 'application/mcp-server-card+json',
+          url: 'https://late-mcp.example.com/docs/agent/mcp/server-card',
+        },
+      ],
     })
   })
 
@@ -212,7 +222,12 @@ describe('late MCP Server Card dependency', async () => {
     expect(await conditional.text()).toBe('')
   })
 
-  it.each([cardRoute, ...wellKnownCardRoutes, aiCatalogRoute, ardRoute])('supports browser CORS preflights for %s', async (route) => {
+  it.each([
+    cardRoute,
+    ...wellKnownCardRoutes,
+    aiCatalogRoute,
+    ardRoute,
+  ])('supports browser CORS preflights for %s', async (route) => {
     const response = await fetch(route, {
       method: 'OPTIONS',
       headers: {

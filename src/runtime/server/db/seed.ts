@@ -48,7 +48,9 @@ export function deriveLocale(event: AiReadyDatabaseEvent | undefined, route: str
       const host = headers instanceof Headers
         ? headers.get('x-forwarded-host') || headers.get('host')
         : headers?.['x-forwarded-host'] || headers?.host
-      requestHost = (Array.isArray(host) ? host[0] : host)?.split(',')[0]?.trim()
+      requestHost = (Array.isArray(host)
+        ? host[0]
+        : host)?.split(',')[0]?.trim()
     }
     catch {
       // An event without a readable request carries no host signal; fall
@@ -59,7 +61,9 @@ export function deriveLocale(event: AiReadyDatabaseEvent | undefined, route: str
   const host = requestHost && resolveI18nDomain(requestHost, i18n)._tag === 'known'
     ? requestHost
     : hostFromUrl(createUniversalContext(event).siteUrl)
-  return resolveLocaleFromRoute(route, i18n, host ? { host } : undefined).locale
+  return resolveLocaleFromRoute(route, i18n, host
+    ? { host }
+    : undefined).locale
 }
 
 /** Longest time `seedRoutes` lets `last_seen_at` lag behind a sighting. */

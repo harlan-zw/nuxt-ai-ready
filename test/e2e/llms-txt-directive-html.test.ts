@@ -10,7 +10,11 @@ describe('llms.txt directive in HTML', async () => {
     build: true,
     server: true,
     nuxtConfig: {
-      aiReady: { llmsTxt: { directive: { html: true } } },
+      aiReady: {
+        llmsTxt: {
+          directive: { html: true },
+        },
+      },
     },
   })
 

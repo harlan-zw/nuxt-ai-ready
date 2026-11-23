@@ -76,7 +76,9 @@ export async function indexPage(
   const isError = html.includes('__NUXT_ERROR__') || html.includes('nuxt-error-page')
 
   const { siteUrl } = createUniversalContext(event)
-  const fullUrl = siteUrl ? `${siteUrl}${route}` : route
+  const fullUrl = siteUrl
+    ? `${siteUrl}${route}`
+    : route
   const result = await convertHtmlToMarkdown(html, fullUrl, config.mdreamOptions, {
     extractUpdatedAt: true,
     hooks: { route, event, isPrerender: false },
@@ -176,7 +178,9 @@ export async function indexPageByRoute(
     return { success: false, gone: true }
   }
 
-  const html = fetched._tag === 'Html' ? fetched.html : null
+  const html = fetched._tag === 'Html'
+    ? fetched.html
+    : null
 
   if (typeof html === 'string' && html) {
     logger.debug(`[indexPageByRoute] Fetched ${route} (${html.length} bytes)`)
@@ -203,7 +207,9 @@ export async function indexPageByRoute(
     return await indexPage(route, html, options, event)
   }
   catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error
+      ? err.message
+      : String(err)
     logger.warn(`[indexPageByRoute] Failed to index ${route}:`, message)
     return { success: false, error: message || `Failed to index ${route}` }
   }

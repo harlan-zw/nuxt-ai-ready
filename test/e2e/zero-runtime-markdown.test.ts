@@ -27,7 +27,10 @@ describe('zeroRuntimeMarkdown', async () => {
   })
 
   it('serves HTML without advertising an unavailable Markdown twin', async () => {
-    const page = await fetch(url('/docs/docs/api'), { headers: { Accept: 'text/markdown' }, redirect: 'manual' })
+    const page = await fetch(url('/docs/docs/api'), {
+      headers: { Accept: 'text/markdown' },
+      redirect: 'manual',
+    })
     expect(page.status).toBe(200)
     expect(page.headers.get('content-type')).toContain('text/html')
     expect(page.headers.get('link')).toContain('rel="describedby"')

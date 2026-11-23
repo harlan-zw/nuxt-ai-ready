@@ -48,7 +48,9 @@ function getMarkdownRenderInfoPath(
   // Extract file extension
   const lastSegment = originalPath.split('/').pop() || ''
   const hasExtension = lastSegment.includes('.')
-  const extension = hasExtension ? lastSegment.substring(lastSegment.lastIndexOf('.')) : ''
+  const extension = hasExtension
+    ? lastSegment.substring(lastSegment.lastIndexOf('.'))
+    : ''
 
   // Skip non-.md extensions
   if (hasExtension && extension !== '.md') {
@@ -60,7 +62,9 @@ function getMarkdownRenderInfoPath(
   }
 
   // Normalize path
-  let path = isExplicit ? originalPath.slice(0, -3) : originalPath
+  let path = isExplicit
+    ? originalPath.slice(0, -3)
+    : originalPath
   if (path.endsWith('/index')) {
     path = path.slice(0, -5) || '/'
   }

@@ -28,7 +28,9 @@ const { data: markdownContent, status: mdStatus } = useAsyncData('page-markdown'
   if (!appFetch.value || !selectedRoute.value)
     return null
   try {
-    const mdRoute = selectedRoute.value === '/' ? '/index.md' : `${selectedRoute.value}.md`
+    const mdRoute = selectedRoute.value === '/'
+      ? '/index.md'
+      : `${selectedRoute.value}.md`
     return await appFetch.value(mdRoute, { responseType: 'text' }) as string
   }
   catch {

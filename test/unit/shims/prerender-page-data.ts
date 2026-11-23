@@ -2,7 +2,9 @@ export async function readPageDataFromFilesystem() {
   return {
     pages: ['/about', '/retired'].map(route => ({
       route,
-      title: route === '/about' ? 'About page' : 'Retired page',
+      title: route === '/about'
+        ? 'About page'
+        : 'Retired page',
       description: 'The about page description.',
       markdown: '# Page',
       headings: [],
@@ -15,5 +17,8 @@ export async function readPageDataFromFilesystem() {
 }
 
 export async function readMarkdownLinkAvailabilityFromFilesystem() {
-  return { runtimeMarkdownAvailable: false, paths: ['/about.md', '/retired.md'] }
+  return {
+    runtimeMarkdownAvailable: false,
+    paths: ['/about.md', '/retired.md'],
+  }
 }

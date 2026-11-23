@@ -35,7 +35,10 @@ export default defineNitroPlugin((nitro) => {
   // header here. Request headers are immutable on Cloudflare Workers.
   hooks.hook('response', (response, event) => {
     const header = readHeader(event)
-    if (header)
-      setLinkUnlessImmutable(response, response.status >= 400 ? header.error : header.success)
+    if (header) {
+      setLinkUnlessImmutable(response, response.status >= 400
+        ? header.error
+        : header.success)
+    }
   })
 })

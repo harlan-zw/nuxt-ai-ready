@@ -4,7 +4,15 @@ import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } 
 
 const LEADING_BLOCK_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 // Keys that mdream and the markdown middleware write into page frontmatter.
-const PAGE_FRONTMATTER_KEYS = new Set(['title', 'description', 'meta', 'canonical_url', 'last_updated', 'locale', 'alternates'])
+const PAGE_FRONTMATTER_KEYS = new Set([
+  'title',
+  'description',
+  'meta',
+  'canonical_url',
+  'last_updated',
+  'locale',
+  'alternates',
+])
 
 /**
  * Strip conversion fields while retaining image metadata for content hashing.
@@ -38,8 +46,15 @@ function stripPageFrontmatter(markdown: string): string {
   if (!images.length)
     return body
 
-  images.sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
-  return JSON.stringify([images, body.trim()])
+  images.sort(([left], [right]) => left < right
+    ? -1
+    : left > right
+      ? 1
+      : 0)
+  return JSON.stringify([
+    images,
+    body.trim(),
+  ])
 }
 
 /**
@@ -52,7 +67,9 @@ export async function computeContentHash(markdown: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(stripPageFrontmatter(markdown).trim())
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = [...new Uint8Array(hashBuffer)]
+  const hashArray = [
+    ...new Uint8Array(hashBuffer),
+  ]
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
 }
 
@@ -158,7 +175,9 @@ const RE_SLASH = /\//g
 export function normalizeRoute(route: string): string {
   if (!route || route === '/')
     return '/'
-  return route.startsWith('/') ? route : `/${route}`
+  return route.startsWith('/')
+    ? route
+    : `/${route}`
 }
 
 const RE_LIKE_META = /[\\%_]/g
@@ -196,7 +215,9 @@ export function toFtsMatchQuery(query: string): string | null {
     .split(RE_FTS_TERM_SPLIT)
     .filter(term => RE_FTS_TOKEN_CHAR.test(term))
     .map(term => `"${term.replace(RE_DOUBLE_QUOTE, '""')}"*`)
-  return terms.length ? terms.join(' ') : null
+  return terms.length
+    ? terms.join(' ')
+    : null
 }
 
 const MAX_BIND_PARAMS_PER_STATEMENT = 100
@@ -227,7 +248,9 @@ export function normalizeRouteKey(route: string): string {
 export async function compressToBase64(data: unknown): Promise<string> {
   const json = JSON.stringify(data)
   const encoder = new TextEncoder()
-  const stream = new Blob([encoder.encode(json)]).stream()
+  const stream = new Blob([
+    encoder.encode(json),
+  ]).stream()
   const compressed = stream.pipeThrough(new CompressionStream('gzip'))
   const buffer = await new Response(compressed).arrayBuffer()
   return Buffer.from(buffer).toString('base64')
@@ -353,7 +376,9 @@ export async function queryAllPages(db: DatabaseAdapter, options?: QueryAllPages
     route: row.route,
     title: row.title,
     description: row.description,
-    ...(options?.excludeMarkdown ? {} : { markdown: row.markdown }),
+    ...(options?.excludeMarkdown
+      ? {}
+      : { markdown: row.markdown }),
     headings: row.headings,
     keywords: JSON.parse(row.keywords || '[]'),
     contentHash: row.content_hash || undefined,
@@ -422,7 +447,9 @@ export async function exportDbDump(db: DatabaseAdapter): Promise<string> {
         ${lastRoute ? 'WHERE route > ?' : ''}
         ORDER BY route
         LIMIT ${DUMP_BATCH_SIZE}
-      `, lastRoute ? [lastRoute] : [])
+      `, lastRoute
+        ? [lastRoute]
+        : [])
 
       if (rows.length === 0)
         break
@@ -486,9 +513,15 @@ export async function importDbDump(db: DatabaseAdapter, rows: DumpRow[]): Promis
   const byRoute = new Map<string, DumpRow>()
   for (const row of rows) {
     const route = normalizeRoute(row.route)
-    byRoute.set(route, { ...row, route, route_key: normalizeRouteKey(route) })
+    byRoute.set(route, {
+      ...row,
+      route,
+      route_key: normalizeRouteKey(route),
+    })
   }
-  const canonical = [...byRoute.values()]
+  const canonical = [
+    ...byRoute.values(),
+  ]
 
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < canonical.length; i += IMPORT_ROWS_PER_STATEMENT) {

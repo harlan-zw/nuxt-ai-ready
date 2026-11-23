@@ -27,5 +27,7 @@ export function normalizePersistedRoute(
     return normalizedRoute
 
   const logicalRoute = toLogicalRoute(normalizedRoute, baseURL)
-  return sitemapRoutes.has(logicalRoute) ? logicalRoute : normalizedRoute
+  return sitemapRoutes.has(logicalRoute)
+    ? logicalRoute
+    : normalizedRoute
 }

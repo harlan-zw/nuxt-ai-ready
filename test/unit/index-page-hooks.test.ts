@@ -15,25 +15,39 @@ const contexts: MarkdownContext[] = []
 const handlers: Record<string, (payload: any) => void> = {
   'ai-ready:mdreamConfig': (options: MdreamOptions) => {
     options.filter ||= {}
-    options.filter.exclude = [...(options.filter.exclude || []), 'ul']
+    options.filter.exclude = [
+      ...(options.filter.exclude || []),
+      'ul',
+    ]
   },
   'ai-ready:page:markdown': (ctx: MarkdownContext) => {
     contexts.push(ctx)
     ctx.markdown += '\n\nNitro hook ran.'
   },
 }
-const hooks = { callHook: async (name: string, payload: unknown) => handlers[name]?.(payload) }
+const hooks = {
+  callHook: async (name: string, payload: unknown) => handlers[name]?.(payload),
+}
 
 vi.mock('#nuxtseo/nitro', () => ({
   useEvent: () => {
     throw new Error('No active event')
   },
   useNitroApp: () => ({ hooks }),
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
+  useRuntimeConfig: () => ({
+    'nuxt-ai-ready': config,
+    'site': { url: 'https://example.com' },
+  }),
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), success: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    success: vi.fn(),
+  },
 }))
 
 const { indexPage } = await import('../../src/runtime/server/utils/indexPage')

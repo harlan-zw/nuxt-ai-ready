@@ -81,7 +81,12 @@ describe('gET /llms.txt internal cache', () => {
     expect(status).toBe(200)
     expect(body).toBe('# llms.txt content')
     expect(defineCachedFunction).toHaveBeenCalledOnce()
-    expect(cachedOptions()[0]).toMatchObject({ name: 'llms-txt-files', group: 'ai-ready', maxAge: 1200, swr: true })
+    expect(cachedOptions()[0]).toMatchObject({
+      name: 'llms-txt-files',
+      group: 'ai-ready',
+      maxAge: 1200,
+      swr: true,
+    })
     expect(cacheControl).toContain('max-age=1200')
     expect(cacheControl).not.toContain('s-maxage')
   })
@@ -113,7 +118,9 @@ describe('gET /llms.txt internal cache', () => {
     buildLlmsTxtFiles.mockResolvedValueOnce({ '/llms.txt': 'First root', '/llms/skills.txt': 'First skills' })
     buildLlmsTxtFiles.mockResolvedValueOnce({ '/llms.txt': 'Second root', '/llms/skills.txt': 'Second skills' })
     async function read(path: string, host: string) {
-      return (await request(new Request(`http://localhost${path}`, { headers: { 'x-forwarded-host': host, 'x-forwarded-proto': 'https' } }))).text()
+      return (await request(new Request(`http://localhost${path}`, {
+        headers: { 'x-forwarded-host': host, 'x-forwarded-proto': 'https' },
+      }))).text()
     }
     expect(await read('/llms.txt', 'first.example.com')).toBe('First root')
     expect(await read('/llms/skills.txt', 'first.example.com')).toBe('First skills')

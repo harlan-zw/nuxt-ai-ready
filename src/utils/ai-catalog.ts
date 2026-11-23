@@ -22,13 +22,17 @@ export function resolveAiCatalog(input: {
 
   return {
     specVersion: '1.0',
-    entries: [{
-      identifier: `urn:air:${hostname}:mcp:${serverName}`,
-      displayName: input.serverCardTitle || input.serverCardName,
-      ...(input.serverCardDescription ? { description: input.serverCardDescription } : {}),
-      type: MCP_SERVER_CARD_MEDIA_TYPE,
-      url: input.serverCardUrl,
-    }],
+    entries: [
+      {
+        identifier: `urn:air:${hostname}:mcp:${serverName}`,
+        displayName: input.serverCardTitle || input.serverCardName,
+        ...(input.serverCardDescription
+          ? { description: input.serverCardDescription }
+          : {}),
+        type: MCP_SERVER_CARD_MEDIA_TYPE,
+        url: input.serverCardUrl,
+      },
+    ],
   }
 }
 

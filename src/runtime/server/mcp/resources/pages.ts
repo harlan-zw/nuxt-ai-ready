@@ -19,23 +19,25 @@ export default ({
     const pages = await queryPages(event, { limit, offset }) as PageEntry[]
     const total = await countPages(event)
     return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType: 'application/json',
-        text: JSON.stringify({
-          pages: pages.map(p => ({
-            route: p.route,
-            title: p.title || p.route,
-            description: p.description || '',
-            headings: p.headings || undefined,
-            keywords: p.keywords?.length ? p.keywords : undefined,
-          })),
-          total,
-          limit,
-          offset,
-          hasMore: offset + pages.length < total,
-        }),
-      }],
+      contents: [
+        {
+          uri: uri.toString(),
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            pages: pages.map(p => ({
+              route: p.route,
+              title: p.title || p.route,
+              description: p.description || '',
+              headings: p.headings || undefined,
+              keywords: p.keywords?.length ? p.keywords : undefined,
+            })),
+            total,
+            limit,
+            offset,
+            hasMore: offset + pages.length < total,
+          }),
+        },
+      ],
     }
   },
 } satisfies McpResourceDefinition)

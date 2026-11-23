@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('llms.txt generated before page indexing', async () => {
-  await setup({ rootDir: resolve('../fixtures/llms-txt-early-prerender'), build: true, server: false })
+  await setup({
+    rootDir: resolve('../fixtures/llms-txt-early-prerender'),
+    build: true,
+    server: false,
+  })
 
   it('writes the final page title and available Markdown twin', async () => {
     const output = join(useTestContext().nuxt!.options.buildDir, 'output/public')
