@@ -38,7 +38,9 @@ const PAGES = [
 
 function seed(tokenizer?: 'trigram'): Database.Database {
   const sqlite = new Database(':memory:')
-  for (const stmt of buildSchemaSql(tokenizer ? { ftsTokenizer: tokenizer } : undefined))
+  for (const stmt of buildSchemaSql(tokenizer
+    ? { ftsTokenizer: tokenizer }
+    : undefined))
     sqlite.exec(stmt)
   const insert = sqlite.prepare(`
     INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, indexed_at, is_error, indexed, source, last_seen_at, locale)
@@ -115,7 +117,10 @@ describe('searchPages FTS5 query escaping (drizzle layer)', () => {
   async function search(query: string) {
     const event = {
       context: {
-        _aiReadyDrizzle: { dialect: 'sqlite', db: drizzle({ client: sqlite }) },
+        _aiReadyDrizzle: {
+          dialect: 'sqlite',
+          db: drizzle({ client: sqlite }),
+        },
       },
     } as unknown as H3Event
     const { searchPages } = await import('../../src/runtime/server/db/drizzle/queries')

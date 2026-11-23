@@ -9,27 +9,41 @@ const config = vi.hoisted(() => ({
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ 'app': { baseURL: '/' }, 'nuxt-ai-ready': config }),
+  useRuntimeConfig: () => ({
+    'app': { baseURL: '/' },
+    'nuxt-ai-ready': config,
+  }),
   useEvent: () => undefined,
 }))
-vi.mock('#site-config/server/composables/getSiteConfig', () => ({ getSiteConfig: () => ({ name: 'Example', url: 'https://example.com' }) }))
+vi.mock('#site-config/server/composables/getSiteConfig', () => ({
+  getSiteConfig: () => ({ name: 'Example', url: 'https://example.com' }),
+}))
 vi.mock('#site-config/server/composables/utils', () => ({
   withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
   withSiteTrailingSlash: (_event: unknown, path: string) => path,
 }))
 vi.mock('../../src/runtime/server/utils/sitemap', () => ({
-  fetchSitemapUrlGroups: async () => new Map([['pages', [
-    { loc: 'https://example.com/about' },
-    { loc: 'https://example.com/broken' },
-  ]]]),
+  fetchSitemapUrlGroups: async () => new Map([
+    [
+      'pages',
+      [
+        { loc: 'https://example.com/about' },
+        { loc: 'https://example.com/broken' },
+      ],
+    ],
+  ]),
   getSitemapsFromConfig: () => [],
 }))
 vi.mock('#ai-ready-virtual/database-runtime.mjs', () => ({
   useRawDb: () => { throw new Error('Prerender must not open a runtime database.') },
   initSchema: () => { throw new Error('Prerender must not initialize a runtime database.') },
 }))
-vi.mock('../../src/runtime/server/utils/checkStale', () => ({ checkAndHandleStale: vi.fn() }))
-vi.mock('../../src/runtime/server/logger', () => ({ logger: { warn: config.warn } }))
+vi.mock('../../src/runtime/server/utils/checkStale', () => ({
+  checkAndHandleStale: vi.fn(),
+}))
+vi.mock('../../src/runtime/server/logger', () => ({
+  logger: { warn: config.warn },
+}))
 
 beforeEach(() => vi.clearAllMocks())
 

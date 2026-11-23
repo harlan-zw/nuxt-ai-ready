@@ -21,7 +21,11 @@ export interface MarkdownRequest {
 }
 
 export function toMarkdownRequest(event: H3Event, isPrerender = !!import.meta.prerender): MarkdownRequest {
-  return { path: event.path, headers: getHeaders(event), isPrerender }
+  return {
+    path: event.path,
+    headers: getHeaders(event),
+    isPrerender,
+  }
 }
 
 // Bot negotiation is optional. Default negotiation depends only on Accept.
@@ -68,7 +72,9 @@ export function getRequestRenderInfo(
   mode: MarkdownRequestMode = { _tag: 'runtime', contentNegotiation: true },
 ): MarkdownRenderInfo {
   const queryIndex = request.path.indexOf('?')
-  const originalPath = queryIndex === -1 ? request.path : request.path.slice(0, queryIndex)
+  const originalPath = queryIndex === -1
+    ? request.path
+    : request.path.slice(0, queryIndex)
   const isPrerender = mode._tag === 'prerender'
 
   if (isReservedPath(originalPath.replace(RE_MD_EXT, '')))
@@ -102,7 +108,11 @@ export function getRequestRenderInfo(
   if (negotiation === 'not-acceptable')
     return { notAcceptable: true }
 
-  return { path: normalizePath(originalPath), isExplicit: false, negotiation }
+  return {
+    path: normalizePath(originalPath),
+    isExplicit: false,
+    negotiation,
+  }
 }
 
 export function getMarkdownRenderInfo(

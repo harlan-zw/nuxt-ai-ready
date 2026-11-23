@@ -96,11 +96,26 @@ describe('searchPages postgres ILIKE escaping (raw layer)', () => {
   })
 
   it.each([
-    ['%', ['/pct']],
-    ['_', ['/us']],
-    ['100%', ['/pct']],
-    ['back\\slash', ['/back']],
-    ['sure', ['/pct']],
+    [
+      '%',
+      ['/pct'],
+    ],
+    [
+      '_',
+      ['/us'],
+    ],
+    [
+      '100%',
+      ['/pct'],
+    ],
+    [
+      'back\\slash',
+      ['/back'],
+    ],
+    [
+      'sure',
+      ['/pct'],
+    ],
   ])('term %r does not over-match (matches %s)', async (term, expectedRoutes) => {
     for (const [route, title] of [
       ['/pct', '100% sure'],
@@ -133,7 +148,10 @@ describe('searchPages LIKE fallback escaping (drizzle layer)', () => {
 
     const event = {
       context: {
-        _aiReadyDrizzle: { dialect: 'sqlite', db: drizzle({ client: sqlite }) },
+        _aiReadyDrizzle: {
+          dialect: 'sqlite',
+          db: drizzle({ client: sqlite }),
+        },
       },
     } as unknown as H3Event
 

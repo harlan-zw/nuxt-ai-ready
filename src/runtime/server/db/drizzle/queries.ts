@@ -68,7 +68,9 @@ const RE_SLASH = /\//g
 function normalizeRoute(route: string): string {
   if (!route || route === '/')
     return '/'
-  return route.startsWith('/') ? route : `/${route}`
+  return route.startsWith('/')
+    ? route
+    : `/${route}`
 }
 
 function normalizeRouteKey(route: string): string {
@@ -186,7 +188,9 @@ export async function getAllPages(
   }
 
   const rows = await query
-  return rows.map((row: any) => cols ? rowToMeta(row) : rowToPage(row))
+  return rows.map((row: any) => cols
+    ? rowToMeta(row)
+    : rowToPage(row))
 }
 
 /**
@@ -322,7 +326,9 @@ export async function countPages(
     conditions.push(eq(pages.isError, 0))
   }
 
-  let query = (client.db as any).select({ count: count() }).from(pages)
+  let query = (client.db as any).select({
+    count: count(),
+  }).from(pages)
   if (conditions.length > 0) {
     query = query.where(and(...conditions))
   }
@@ -359,7 +365,10 @@ export async function markPageIndexed(event: AiReadyDatabaseEvent | undefined, r
 
   await (client.db as any)
     .update(pages)
-    .set({ indexed: 1, indexedAt: Date.now() })
+    .set({
+      indexed: 1,
+      indexedAt: Date.now(),
+    })
     .where(eq(pages.route, route))
 }
 
@@ -462,10 +471,14 @@ const POSTGRES_SCHEMA_VERSION = 'v2.4.0-drizzle-postgres-source-lastmod'
 export async function initSchema(event?: AiReadyDatabaseEvent): Promise<void> {
   const client = await useDrizzle(event)
   const tokenizer = resolveFtsTokenizer(event)
-  const schemaVersion = client.dialect === 'postgres' ? POSTGRES_SCHEMA_VERSION : SQLITE_SCHEMA_VERSION
+  const schemaVersion = client.dialect === 'postgres'
+    ? POSTGRES_SCHEMA_VERSION
+    : SQLITE_SCHEMA_VERSION
 
   const currentVersion = await getSchemaVersion(client)
-  const currentTokenizer = client.dialect === 'postgres' ? null : await getStoredTokenizer(client)
+  const currentTokenizer = client.dialect === 'postgres'
+    ? null
+    : await getStoredTokenizer(client)
 
   const versionMatches = currentVersion === schemaVersion
   const tokenizerMatches = client.dialect === 'postgres' || !currentTokenizer || currentTokenizer === tokenizer
@@ -620,7 +633,10 @@ async function migratePostgresIntegerTimestamps(client: DrizzleDatabase): Promis
 async function migrateSourceLastmod(client: DrizzleDatabase, schemaVersion: string): Promise<void> {
   await getRawExecutor(client).batch([
     { sql: 'ALTER TABLE ai_ready_pages ADD COLUMN source_lastmod TEXT' },
-    { sql: 'UPDATE _ai_ready_info SET version = ? WHERE id = \'schema\'', params: [schemaVersion] },
+    {
+      sql: 'UPDATE _ai_ready_info SET version = ? WHERE id = \'schema\'',
+      params: [schemaVersion],
+    },
   ])
 }
 
@@ -839,9 +855,13 @@ export async function completeCronRun(
     .where(eq(cronRuns.id, runId))
     .limit(1)
 
-  const durationMs = existing[0] ? now - existing[0].startedAt : null
+  const durationMs = existing[0]
+    ? now - existing[0].startedAt
+    : null
   const status = result.errors.length > 0
-    ? (result.pagesIndexed > 0 ? 'partial' : 'error')
+    ? (result.pagesIndexed > 0
+        ? 'partial'
+        : 'error')
     : 'success'
 
   await (client.db as any)
@@ -1025,7 +1045,9 @@ export async function getNextSitemapToCrawl(
     .orderBy(sitemaps.lastCrawledAt)
     .limit(1)
 
-  return row.length ? rowToSitemap(row[0]) : null
+  return row.length
+    ? rowToSitemap(row[0])
+    : null
 }
 
 /**
@@ -1145,7 +1167,9 @@ export async function resetSitemapErrors(event: AiReadyDatabaseEvent | undefined
 
   // Count sitemaps with errors or abandoned continuation state.
   const countResult = await (client.db as any)
-    .select({ count: count() })
+    .select({
+      count: count(),
+    })
     .from(sitemaps)
     .where(or(
       gt(sitemaps.errorCount, 0),
@@ -1190,7 +1214,9 @@ export async function seedRoutes(
 
   // Inlined as a literal: a bind param would push a full chunk past D1's
   // 100-parameter cap. Truncating a finite number keeps it injection-safe.
-  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
+  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs)
+    ? options.refreshWindowMs!
+    : SEED_REFRESH_WINDOW_MS))
   const nowMs = Date.now()
 
   // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
@@ -1200,14 +1226,22 @@ export async function seedRoutes(
   for (const entry of routes) {
     // Canonicalise before keying the map: '' and '/' are one page, so leaving
     // them distinct here defeats the dedupe and collides on route_key instead.
-    const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
-    const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
-    const entryUrl = typeof entry === 'string' ? undefined : entry.url
+    const route = normalizeRoute(typeof entry === 'string'
+      ? entry
+      : entry.route)
+    const explicitLocale = typeof entry === 'string'
+      ? undefined
+      : entry.locale
+    const entryUrl = typeof entry === 'string'
+      ? undefined
+      : entry.url
     byRoute.set(route, {
       route,
       routeKey: normalizeRouteKey(route),
       locale: deriveLocale(event, route, explicitLocale, entryUrl),
-      sourceLastmod: parseSourceLastmod(typeof entry === 'string' ? undefined : entry.lastmod),
+      sourceLastmod: parseSourceLastmod(typeof entry === 'string'
+        ? undefined
+        : entry.lastmod),
     })
   }
 
@@ -1218,12 +1252,20 @@ export async function seedRoutes(
   // then go through `db.batch` so round-trips collapse into one.
   const rowsPerInsert = maxRowsPerInsert(5)
   const db = await useRawDb(event)
-  const entries = [...byRoute.values()]
+  const entries = [
+    ...byRoute.values(),
+  ]
   const stmts: { sql: string, params: unknown[] }[] = []
   for (let i = 0; i < entries.length; i += rowsPerInsert) {
     const batch = entries.slice(i, i + rowsPerInsert)
     const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
-    const params = batch.flatMap(r => [r.route, r.routeKey, r.sourceLastmod, nowMs, r.locale])
+    const params = batch.flatMap(r => [
+      r.route,
+      r.routeKey,
+      r.sourceLastmod,
+      nowMs,
+      r.locale,
+    ])
     stmts.push({
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, source_lastmod, indexed_at, is_error, indexed, source, last_seen_at, locale)

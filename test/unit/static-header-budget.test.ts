@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { enforceStaticHeaderBudget } from '../../src/utils/static-headers'
 
 function headersFile(rules: Array<[route: string, ...headers: string[]]>): string {
-  return `${rules.map(([route, ...headers]) => [route, ...headers.map(h => `  ${h}`)].join('\n')).join('\n')}\n`
+  return `${rules.map(([route, ...headers]) => [
+    route,
+    ...headers.map(h => `  ${h}`),
+  ].join('\n')).join('\n')}\n`
 }
 
 function markdownTwins(count: number): Array<[string, ...string[]]> {
@@ -61,7 +64,16 @@ describe('enforceStaticHeaderBudget', () => {
   })
 
   it('ignores comments and blank lines when counting rules', () => {
-    const contents = ['# generated', '', '/a', '  X-A: 1', '', '/b', '  X-B: 1', ''].join('\n')
+    const contents = [
+      '# generated',
+      '',
+      '/a',
+      '  X-A: 1',
+      '',
+      '/b',
+      '  X-B: 1',
+      '',
+    ].join('\n')
 
     expect(enforceStaticHeaderBudget(contents, 2)).toEqual({ contents, total: 2, dropped: 0 })
   })

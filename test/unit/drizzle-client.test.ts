@@ -19,7 +19,11 @@ vi.mock('../../src/runtime/server/db/drizzle/providers/sqlite.ts', () => ({
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': { database: { filename: ':memory:' } } }),
+  useRuntimeConfig: () => ({
+    'nuxt-ai-ready': {
+      database: { filename: ':memory:' },
+    },
+  }),
 }))
 
 vi.mock('../../src/runtime/server/db/drizzle/raw', () => ({
@@ -34,7 +38,10 @@ describe('drizzle client lifecycle', () => {
   })
 
   it.each([
-    ['event', { context: {} } as H3Event],
+    [
+      'event',
+      { context: {} } as H3Event,
+    ],
     ['fallback', undefined],
   ])('shares concurrent first client creation for the %s scope', async (_scope, event) => {
     mocks.createClient.mockImplementation(async () => {
@@ -72,9 +79,17 @@ describe('drizzle client lifecycle', () => {
     mocks.createClient.mockResolvedValue({ dialect: 'postgres', db: {} })
     const { closeDrizzle, finishDrizzleResponse, useDrizzle } = await import('../../src/runtime/server/db/drizzle/client')
     const request = { headers: {} }
-    const portable = { context: {}, node: { req: request } }
+    const portable = {
+      context: {},
+      node: { req: request },
+    }
     const client = await useDrizzle(portable)
-    const nested = { context: { ...portable.context }, node: { req: { headers: {} } } }
+    const nested = {
+      context: { ...portable.context },
+      node: {
+        req: { headers: {} },
+      },
+    }
 
     expect(await useDrizzle(nested)).toBe(client)
     await finishDrizzleResponse(nested)
@@ -82,16 +97,29 @@ describe('drizzle client lifecycle', () => {
     expect(mocks.closeDriver).not.toHaveBeenCalled()
 
     // Nitro 2 provides another event view for the same underlying request.
-    await finishDrizzleResponse({ context: portable.context, node: { req: request } })
+    await finishDrizzleResponse({
+      context: portable.context,
+      node: { req: request },
+    })
     expect(mocks.closeDriver).toHaveBeenCalledExactlyOnceWith(client.db)
   })
 
   it('closes the owner after a borrowed child finishes the final deferred task', async () => {
     mocks.createClient.mockResolvedValue({ dialect: 'postgres', db: {} })
     const { finishDrizzleResponse, trackDrizzleWork, useDrizzle } = await import('../../src/runtime/server/db/drizzle/client')
-    const owner = { context: {}, node: { req: { headers: {} } } }
+    const owner = {
+      context: {},
+      node: {
+        req: { headers: {} },
+      },
+    }
     const client = await useDrizzle(owner)
-    const child = { context: { ...owner.context }, node: { req: { headers: {} } } }
+    const child = {
+      context: { ...owner.context },
+      node: {
+        req: { headers: {} },
+      },
+    }
     let release: (() => void) | undefined
     const deferred = trackDrizzleWork(child, new Promise<void>((resolve) => {
       release = resolve

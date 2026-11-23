@@ -11,12 +11,14 @@ vi.mock('nitropack/runtime', () => ({
 
 const continuation: SitemapCrawlState = {
   _tag: 'continuation',
-  frontier: [{
-    url: 'https://example.com/child.xml',
-    depth: 1,
-    source: 'index_child',
-    parentUrl: 'https://example.com/sitemap.xml',
-  }],
+  frontier: [
+    {
+      url: 'https://example.com/child.xml',
+      depth: 1,
+      source: 'index_child',
+      parentUrl: 'https://example.com/sitemap.xml',
+    },
+  ],
   seenDocuments: ['https://example.com/sitemap.xml'],
   documentsAttempted: 100,
   urlsObserved: 50,
@@ -52,7 +54,9 @@ describe('sitemap continuation database state', () => {
   afterEach(() => sqlite.close())
 
   it('persists and restores a continuation as one atomic value', async () => {
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/sitemap.xml' },
+    ])
 
     await markSitemapCrawlPartial(event, 'sitemap.xml', continuation)
 
@@ -65,7 +69,9 @@ describe('sitemap continuation database state', () => {
   })
 
   it('clears continuation state after a clean crawl', async () => {
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/sitemap.xml' },
+    ])
     await markSitemapCrawlPartial(event, 'sitemap.xml', continuation)
 
     await markSitemapCrawled(event, 'sitemap.xml', 75)
@@ -78,7 +84,9 @@ describe('sitemap continuation database state', () => {
   })
 
   it('does not let a deferred hook seed clear active continuation state', async () => {
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/sitemap.xml' },
+    ])
     await markSitemapCrawlPartial(event, 'sitemap.xml', continuation)
 
     await markSitemapSeeded(event, 'sitemap.xml', 2, null)
@@ -89,7 +97,9 @@ describe('sitemap continuation database state', () => {
   })
 
   it('does not let a deferred hook overwrite a newer clean crawl', async () => {
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/sitemap.xml' },
+    ])
     await markSitemapCrawled(event, 'sitemap.xml', 75)
 
     await markSitemapSeeded(event, 'sitemap.xml', 2, null)
@@ -99,10 +109,14 @@ describe('sitemap continuation database state', () => {
   })
 
   it('clears stale continuation state when a configured route changes', async () => {
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/sitemap.xml' },
+    ])
     await markSitemapCrawlPartial(event, 'sitemap.xml', continuation)
 
-    await syncSitemaps(event, [{ name: 'sitemap.xml', route: '/new-sitemap.xml' }])
+    await syncSitemaps(event, [
+      { name: 'sitemap.xml', route: '/new-sitemap.xml' },
+    ])
 
     const next = await getNextSitemapToCrawl(event, -1)
     expect(next).toEqual(expect.objectContaining({

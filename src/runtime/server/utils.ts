@@ -128,7 +128,10 @@ function buildMdreamOptions(
     origin,
     ...mdreamOptions,
     frontmatter,
-    extraction: { ...extraction, ...mdreamOptions?.extraction },
+    extraction: {
+      ...extraction,
+      ...mdreamOptions?.extraction,
+    },
   }
 }
 
@@ -180,7 +183,14 @@ export async function convertHtmlToMarkdown(
   mdreamOptions: ModuleOptions['mdreamOptions'],
   opts: ConvertHtmlOptions,
 ) {
-  const meta: ExtractedMeta = { title: '', description: '', metaKeywords: '', headings: [], textContent: [], jsonLd: { blocks: [], bytes: 0 } }
+  const meta: ExtractedMeta = {
+    title: '',
+    description: '',
+    metaKeywords: '',
+    headings: [],
+    textContent: [],
+    jsonLd: { blocks: [], bytes: 0 },
+  }
   const options = buildMdreamOptions(url, mdreamOptions, meta, opts.extractUpdatedAt ?? false, opts.additionalFrontmatter ?? {})
 
   const nitroApp = useNitroApp()

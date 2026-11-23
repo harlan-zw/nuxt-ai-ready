@@ -66,5 +66,7 @@ export function absoluteMarkdownLinks(markdown: string, siteUrl: string): string
 
 /** A deployed path on the site's origin, or the path itself when no site URL is known. */
 export function absoluteSiteUrl(path: string, siteUrl: string | undefined): string {
-  return siteUrl ? new URL(path, new URL(siteUrl).origin).href : path
+  return siteUrl
+    ? new URL(path, new URL(siteUrl).origin).href
+    : path
 }

@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { initSchema } from '../../src/runtime/server/db/drizzle/queries'
 import { registerDriver } from '../../src/runtime/server/db/drizzle/raw'
 
-vi.mock('#nuxtseo/nitro', () => ({ useRuntimeConfig: () => ({}) }))
+vi.mock('#nuxtseo/nitro', () => ({
+  useRuntimeConfig: () => ({}),
+}))
 
 describe('source sitemap date schema migration', () => {
   let sqlite: Database.Database
@@ -22,13 +24,23 @@ describe('source sitemap date schema migration', () => {
     `)
     const db = drizzle({ client: sqlite })
     registerDriver(db, 'better-sqlite3', sqlite)
-    const event = { context: { _aiReadyDrizzle: { dialect: 'sqlite', db } } } as unknown as H3Event
+    const event = {
+      context: {
+        _aiReadyDrizzle: { dialect: 'sqlite', db },
+      },
+    } as unknown as H3Event
 
     await initSchema(event)
     await initSchema(event)
 
     expect(sqlite.prepare('SELECT route, markdown, updated_at, indexed, source_lastmod FROM ai_ready_pages').get())
-      .toEqual({ route: '/cms', markdown: 'Stored CMS content', updated_at: '2026-08-01', indexed: 1, source_lastmod: null })
+      .toEqual({
+        route: '/cms',
+        markdown: 'Stored CMS content',
+        updated_at: '2026-08-01',
+        indexed: 1,
+        source_lastmod: null,
+      })
     expect(sqlite.prepare('SELECT value FROM _ai_ready_info WHERE id = ?').get('custom')).toEqual({ value: 'preserved' })
   })
 })

@@ -18,13 +18,24 @@ function catalogConfig() {
   return {
     href: 'https://example.com/.well-known/api-catalog',
     mediaType: 'application/linkset+json',
-    document: { linkset: [{ anchor: 'https://example.com/' }] },
+    document: {
+      linkset: [
+        { anchor: 'https://example.com/' },
+      ],
+    },
   }
 }
 
 async function call(method: string) {
   const url = new URL('http://localhost/.well-known/api-catalog')
-  const event: RequestEvent = { req: new Request(url, { method }), url, res: { headers: new Headers() }, context: {} }
+  const event: RequestEvent = {
+    req: new Request(url, { method }),
+    url,
+    res: {
+      headers: new Headers(),
+    },
+    context: {},
+  }
   const body = await Promise.resolve().then(() => apiCatalogHandler(event)).catch((error: unknown) => {
     if (!isNuxtError(error))
       throw error
@@ -33,7 +44,9 @@ async function call(method: string) {
   })
   return {
     status: event.res.status || 200,
-    body: body == null ? '' : JSON.stringify(body),
+    body: body == null
+      ? ''
+      : JSON.stringify(body),
     headers: event.res.headers,
   }
 }

@@ -11,7 +11,9 @@ export default eventHandler(async (event) => {
 
   const [total, pending, recentlyIndexed24h, recentlyIndexed1h, recentPages] = await Promise.all([
     countPages(event),
-    countPages(event, { where: { pending: true } }),
+    countPages(event, {
+      where: { pending: true },
+    }),
     countRecentlyIndexed(event, 24 * 60 * 60 * 1000), // last 24h
     countRecentlyIndexed(event, 60 * 60 * 1000), // last 1h
     getRecentlyIndexedPages(event, 5),

@@ -35,7 +35,9 @@ async function startReindexStub(status: number, body: unknown, expectedToken?: s
   servers.push(server)
   await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
   const address = server.address()
-  const port = typeof address === 'object' && address ? address.port : 0
+  const port = typeof address === 'object' && address
+    ? address.port
+    : 0
   return `http://127.0.0.1:${port}`
 }
 
@@ -53,7 +55,15 @@ async function writeSecret(): Promise<string> {
 }
 
 function runReindex(url: string, cwd: string, route = '/about', env: Record<string, string> = {}) {
-  return execa(process.execPath, [cliPath, 'reindex', route, '--url', url, '--cwd', cwd], { reject: false, env })
+  return execa(process.execPath, [
+    cliPath,
+    'reindex',
+    route,
+    '--url',
+    url,
+    '--cwd',
+    cwd,
+  ], { reject: false, env })
 }
 
 describe('cli reindex error handling', () => {
@@ -99,7 +109,10 @@ describe('cli reindex error handling', () => {
     const root = 'cli-application-secret-with-at-least-32-characters'
     const token = Buffer.from(hkdfSync('sha256', root, 'nuxt', 'nuxt-ai-ready:runtime-sync', 32)).toString('hex')
 
-    const result = await execa(process.execPath, [cliPath, 'token'], { reject: false, env: { NUXT_APP_SECRET: root } })
+    const result = await execa(process.execPath, [cliPath, 'token'], {
+      reject: false,
+      env: { NUXT_APP_SECRET: root },
+    })
 
     expect(result.exitCode).toBe(0)
     expect(result.stdout.trim()).toBe(token)

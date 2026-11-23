@@ -10,6 +10,8 @@ describe('mapSitemapRoutes', () => {
       { loc: '/about' },
     ])
 
-    expect([...routes.keys()]).toEqual(['/v1.2', '/docs/v1.2/intro', '/about'])
+    expect([
+      ...routes.keys(),
+    ]).toEqual(['/v1.2', '/docs/v1.2/intro', '/about'])
   })
 })

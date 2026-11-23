@@ -11,7 +11,9 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
   const nestedRoutes = Array.from({ length: nestedPages }, (_, index) => `/guides/page-${index}`)
   describe(`cloudflare prerendered page negotiation at ${baseURL}`, async () => {
     await setup({
-      rootDir: resolve(routingSource === 'file' ? '../fixtures/cloudflare-external-routing' : '../fixtures/cloudflare'),
+      rootDir: resolve(routingSource === 'file'
+        ? '../fixtures/cloudflare-external-routing'
+        : '../fixtures/cloudflare'),
       build: true,
       server: false,
       nuxtConfig: {
@@ -23,7 +25,11 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
                   const about = pages.find(page => page.path === '/about')!
                   if (negotiation === 'default')
                     pages.push(...Array.from({ length: 60 }, (_, index) => ({ name: `static-page-${index}`, path: `/page-${index}`, file: about.file })))
-                  pages.push(...nestedRoutes.map(path => ({ name: path.slice(1).replace('/', '-'), path, file: about.file })))
+                  pages.push(...nestedRoutes.map(path => ({
+                    name: path.slice(1).replace('/', '-'),
+                    path,
+                    file: about.file,
+                  })))
                   if (nestedRoutes.length > 0)
                     pages.push({ name: 'live-guide', path: '/guides/live', file: about.file })
                 },
@@ -34,17 +40,41 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
           cloudflareNegotiationProtectAbout: protectAbout,
           cloudflareNegotiationProtectDocs: routingSource === 'file',
         },
-        aiReady: { database: false, ...(negotiation === 'explicit' ? { contentNegotiation: true } : {}) },
+        aiReady: {
+          database: false,
+          ...(negotiation === 'explicit'
+            ? { contentNegotiation: true }
+            : {}),
+        },
         nitro: {
           compatibilityDate: '2026-10-08',
           ...(negotiation === 'default' || nestedPages > 0
-            ? { prerender: { routes: [...negotiation === 'default' ? Array.from({ length: 60 }, (_, index) => `/page-${index}`) : [], ...nestedRoutes] } }
+            ? {
+                prerender: {
+                  routes: [
+                    ...negotiation === 'default'
+                      ? Array.from({ length: 60 }, (_, index) => `/page-${index}`)
+                      : [],
+                    ...nestedRoutes,
+                  ],
+                },
+              }
             : {}),
           cloudflare: {
             deployConfig: true,
             wrangler: {
               name: 'ai-ready-negotiation-test',
-              assets: { run_worker_first: ['/_nuxt/*', ...negotiation === 'default' ? [`${baseURL}docs/getting-started*`] : [], ...protectAbout && routingSource === 'config' ? [`${baseURL}about*`] : []] },
+              assets: {
+                run_worker_first: [
+                  '/_nuxt/*',
+                  ...negotiation === 'default'
+                    ? [`${baseURL}docs/getting-started*`]
+                    : [],
+                  ...protectAbout && routingSource === 'config'
+                    ? [`${baseURL}about*`]
+                    : [],
+                ],
+              },
             },
           },
         },
@@ -57,7 +87,18 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
 
     beforeAll(async () => {
       const output = join(useTestContext().nuxt!.options.buildDir, 'output')
-      worker = spawn('pnpm', ['exec', 'wrangler', 'dev', '--local', '--config', join(output, 'server/wrangler.json'), '--port', String(port), '--show-interactive-dev-session', 'false'], {
+      worker = spawn('pnpm', [
+        'exec',
+        'wrangler',
+        'dev',
+        '--local',
+        '--config',
+        join(output, 'server/wrangler.json'),
+        '--port',
+        String(port),
+        '--show-interactive-dev-session',
+        'false',
+      ], {
         cwd: resolve('../..'),
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
@@ -90,14 +131,22 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
     })
 
     it.each(['/', '/about', '/about/'])('serves the expected representation for static page %s', async (path) => {
-      const response = await fetch(`${origin}${baseURL}${path.slice(1)}`, { headers: { Accept: 'text/markdown' } })
+      const response = await fetch(`${origin}${baseURL}${path.slice(1)}`, {
+        headers: { Accept: 'text/markdown' },
+      })
       expect(response.status).toBe(200)
-      expect(response.headers.get('content-type')).toContain(negotiation === 'explicit' ? 'text/markdown' : 'text/html')
-      expect(await response.text()).toContain(negotiation === 'explicit' ? '#' : '<html')
+      expect(response.headers.get('content-type')).toContain(negotiation === 'explicit'
+        ? 'text/markdown'
+        : 'text/html')
+      expect(await response.text()).toContain(negotiation === 'explicit'
+        ? '#'
+        : '<html')
     })
 
     it('preserves the static HTML response', async () => {
-      const response = await fetch(`${origin}${baseURL}`, { headers: { Accept: 'text/html' } })
+      const response = await fetch(`${origin}${baseURL}`, {
+        headers: { Accept: 'text/html' },
+      })
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toContain('text/html')
       expect(response.headers.get('etag')).toBeTruthy()
@@ -114,7 +163,10 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
     })
 
     it('preserves static HEAD responses without rendering a body', async () => {
-      const response = await fetch(`${origin}${baseURL}`, { method: 'HEAD', headers: { Accept: 'text/html' } })
+      const response = await fetch(`${origin}${baseURL}`, {
+        method: 'HEAD',
+        headers: { Accept: 'text/html' },
+      })
       expect(response.status).toBe(200)
       expect(response.headers.get('etag')).toBeTruthy()
       expect(await response.text()).toBe('')
@@ -122,7 +174,9 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
 
     if (negotiation === 'default') {
       it('negotiates a page already routed through the Worker', async () => {
-        const response = await fetch(`${origin}${baseURL}docs/getting-started`, { headers: { Accept: 'text/markdown' } })
+        const response = await fetch(`${origin}${baseURL}docs/getting-started`, {
+          headers: { Accept: 'text/markdown' },
+        })
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toContain('text/markdown')
         expect(await response.text()).toContain('#')
@@ -144,12 +198,16 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
       })
 
       it.each(['guides/page-7', 'guides/page-7/'])('negotiates the globbed static page %s', async (path) => {
-        const markdown = await fetch(`${origin}${baseURL}${path}`, { headers: { Accept: 'text/markdown' } })
+        const markdown = await fetch(`${origin}${baseURL}${path}`, {
+          headers: { Accept: 'text/markdown' },
+        })
         expect(markdown.status).toBe(200)
         expect(markdown.headers.get('content-type')).toContain('text/markdown')
         expect(await markdown.text()).toContain('#')
 
-        const html = await fetch(`${origin}${baseURL}${path}`, { headers: { Accept: 'text/html' } })
+        const html = await fetch(`${origin}${baseURL}${path}`, {
+          headers: { Accept: 'text/html' },
+        })
         expect(html.status).toBe(200)
         expect(html.headers.get('content-type')).toContain('text/html')
         expect(html.headers.get('etag')).toBeTruthy()
@@ -164,7 +222,9 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
       })
 
       it('renders an unprerendered page under the same Worker-first glob', async () => {
-        const response = await fetch(`${origin}${baseURL}guides/live`, { headers: { Accept: 'text/html' } })
+        const response = await fetch(`${origin}${baseURL}guides/live`, {
+          headers: { Accept: 'text/html' },
+        })
         expect(response.status).toBe(200)
         expect(response.headers.get('vary')).toContain('Accept')
         expect(await response.text()).toContain('<h1>About')
@@ -173,13 +233,17 @@ export function cloudflareNegotiationSuite(baseURL: string, protectAbout = false
 
     if (protectAbout) {
       it.each(['/about', '/about/'])('keeps application access checks on existing Worker path %s', async (path) => {
-        const response = await fetch(`${origin}${baseURL}${path.slice(1)}`, { headers: { Accept: 'text/html' } })
+        const response = await fetch(`${origin}${baseURL}${path.slice(1)}`, {
+          headers: { Accept: 'text/html' },
+        })
         expect(response.status).toBe(401)
       })
     }
     if (routingSource === 'file') {
       it('keeps environment-specific Worker paths behind access checks', async () => {
-        const response = await fetch(`${origin}${baseURL}docs/api`, { headers: { Accept: 'text/html' } })
+        const response = await fetch(`${origin}${baseURL}docs/api`, {
+          headers: { Accept: 'text/html' },
+        })
         expect(response.status).toBe(401)
       })
     }

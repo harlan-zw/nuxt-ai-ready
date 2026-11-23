@@ -9,26 +9,38 @@ import { buildNegotiationContext, decideNegotiation, setLinkHeader, setMarkdownH
 
 const { match, config } = vi.hoisted(() => ({
   match: vi.fn((path: string) => ({ cache: path === '/disabled' })),
-  config: { 'app': { baseURL: '/' }, 'nuxt-ai-ready': { contentNegotiation: 'auto', botNegotiation: false, i18n: null as RuntimeI18nConfig | null } },
+  config: {
+    'app': { baseURL: '/' },
+    'nuxt-ai-ready': { contentNegotiation: 'auto', botNegotiation: false, i18n: null as RuntimeI18nConfig | null },
+  },
 }))
 vi.mock('#nuxtseo/h3', async (original) => {
   const h3 = await original<typeof import('#nuxtseo/h3')>()
-  return { ...h3, getHeaders: vi.fn(h3.getHeaders) }
+  return {
+    ...h3,
+    getHeaders: vi.fn(h3.getHeaders),
+  }
 })
-vi.mock('nuxtseo-shared/server', () => ({ createNitroRouteRuleMatcher: vi.fn(() => match) }))
+vi.mock('nuxtseo-shared/server', () => ({
+  createNitroRouteRuleMatcher: vi.fn(() => match),
+}))
 
 vi.mock('#ai-ready-virtual/agent-skills.mjs', () => ({ localAgentSkillArtifacts: {} }))
 vi.mock('#nuxtseo/nitro', () => ({
   defineNitroPlugin: (plugin: unknown) => plugin,
   useRuntimeConfig: vi.fn(() => structuredClone(config)),
 }))
-vi.mock('nuxt/server', () => ({ useRuntimeConfig: () => config }))
+vi.mock('nuxt/server', () => ({
+  useRuntimeConfig: () => config,
+}))
 // Simulate the supported Site Config API without the newer path resolver.
 vi.mock('#site-config/server/composables/utils', async () => {
   const utils = await import('../../node_modules/nuxt-site-config/dist/runtime/server/composables/utils.js')
   return { createSitePathResolver: undefined, withSiteUrl: utils.withSiteUrl }
 })
-vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: vi.fn() }))
+vi.mock('#site-config/server/init', () => ({
+  initRequestSiteConfig: vi.fn(),
+}))
 
 beforeEach(() => {
   config.app.baseURL = '/'
@@ -38,13 +50,18 @@ beforeEach(() => {
 
 function headerEvent(origin: string, configuredUrl = true) {
   const siteConfig = createSiteConfigStack()
-  siteConfig.push({ url: configuredUrl ? origin : undefined, env: 'production' })
+  siteConfig.push({
+    url: configuredUrl ? origin : undefined,
+    env: 'production',
+  })
   const url = new URL('/about', origin)
   const event = {
     req: new Request(url),
     url,
     path: url.pathname,
-    res: { headers: new Headers() },
+    res: {
+      headers: new Headers(),
+    },
     context: { siteConfig, siteConfigNitroOrigin: origin, _initedSiteConfig: true },
   } as unknown as H3Event
   return { event, siteConfig }
@@ -127,7 +144,10 @@ describe('request-specific header URL resolution', () => {
     config['nuxt-ai-ready'].i18n = {
       defaultLocale: 'en',
       strategy: 'prefix_except_default',
-      locales: [{ code: 'en', hreflang: 'en' }, { code: 'fr', hreflang: 'fr' }],
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr' },
+      ],
     }
     const { event, siteConfig } = headerEvent('https://before.example')
     const context = buildNegotiationContext(event, '/about')
@@ -145,10 +165,19 @@ describe('request-specific header URL resolution', () => {
 
 describe('negotiation locale context', () => {
   it.each([
-    [{ host: 'fr.example.com' }, 'fr.example.com'],
-    [{ 'host': 'internal.proxy', 'x-forwarded-host': 'fr.example.com' }, 'fr.example.com'],
+    [
+      { host: 'fr.example.com' },
+      'fr.example.com',
+    ],
+    [
+      { 'host': 'internal.proxy', 'x-forwarded-host': 'fr.example.com' },
+      'fr.example.com',
+    ],
   ])('uses the public request host: %j', (headers, expectedHost) => {
-    const event = { req: new Request('https://example.com/a-propos', { headers }), path: '/a-propos' } as unknown as H3Event
+    const event = {
+      req: new Request('https://example.com/a-propos', { headers }),
+      path: '/a-propos',
+    } as unknown as H3Event
 
     const context = buildNegotiationContext(event, '/a-propos')
 
@@ -158,8 +187,17 @@ describe('negotiation locale context', () => {
 
 describe('request-scoped negotiation', () => {
   it('rechecks bot negotiation after its configuration changes', () => {
-    const event = { req: new Request('https://example.com/about', { headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' } }), path: '/about', context: {} } as unknown as H3Event
-    expect(decideNegotiation(event, 'early')).toMatchObject({ _tag: 'html', negotiation: { vary: 'Accept' } })
+    const event = {
+      req: new Request('https://example.com/about', {
+        headers: { 'Accept': 'text/html', 'User-Agent': 'GPTBot' },
+      }),
+      path: '/about',
+      context: {},
+    } as unknown as H3Event
+    expect(decideNegotiation(event, 'early')).toMatchObject({
+      _tag: 'html',
+      negotiation: { vary: 'Accept' },
+    })
     config['nuxt-ai-ready'].botNegotiation = true
     expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept, Sec-Fetch-Dest, User-Agent' })
   })
@@ -167,7 +205,11 @@ describe('request-scoped negotiation', () => {
   it('reads headers and matches the route once across both stages', () => {
     vi.mocked(getHeaders).mockClear()
     match.mockClear()
-    const event = { req: new Request('https://example.com/about.md'), path: '/about.md', context: {} } as unknown as H3Event
+    const event = {
+      req: new Request('https://example.com/about.md'),
+      path: '/about.md',
+      context: {},
+    } as unknown as H3Event
 
     expect(decideNegotiation(event, 'early')).toEqual({ _tag: 'skip', reason: 'deferred' })
     expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
@@ -176,7 +218,13 @@ describe('request-scoped negotiation', () => {
   })
 
   it('rechecks the route policy after middleware rewrites the path', () => {
-    const event = { req: new Request('https://example.com/about', { headers: { accept: 'text/markdown' } }), path: '/about', context: {} } as unknown as H3Event
+    const event = {
+      req: new Request('https://example.com/about', {
+        headers: { accept: 'text/markdown' },
+      }),
+      path: '/about',
+      context: {},
+    } as unknown as H3Event
     expect(decideNegotiation(event, 'early')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
     Object.assign(event, { path: '/disabled' })
 
@@ -185,8 +233,20 @@ describe('request-scoped negotiation', () => {
 
   it('does not reuse negotiation for a new request sharing a context', () => {
     const context = {}
-    const first = { req: new Request('https://example.com/about', { headers: { accept: 'text/html' } }), path: '/about', context } as unknown as H3Event
-    const second = { req: new Request('https://example.com/about', { headers: { accept: 'text/markdown' } }), path: '/about', context } as unknown as H3Event
+    const first = {
+      req: new Request('https://example.com/about', {
+        headers: { accept: 'text/html' },
+      }),
+      path: '/about',
+      context,
+    } as unknown as H3Event
+    const second = {
+      req: new Request('https://example.com/about', {
+        headers: { accept: 'text/markdown' },
+      }),
+      path: '/about',
+      context,
+    } as unknown as H3Event
 
     expect(decideNegotiation(first, 'early')).toMatchObject({ _tag: 'html' })
     expect(decideNegotiation(second, 'middleware')).toEqual({ _tag: 'redirect', path: '/about', vary: 'Accept' })
@@ -195,14 +255,27 @@ describe('request-scoped negotiation', () => {
 
 describe('negotiation config access', () => {
   it.each([
-    ['/api/data', { accept: 'application/json' }],
-    ['/events', { accept: 'text/event-stream' }],
+    [
+      '/api/data',
+      { accept: 'application/json' },
+    ],
+    [
+      '/events',
+      { accept: 'text/event-stream' },
+    ],
     ['/asset.js', {}],
     ['/.well-known/api-catalog', {}],
-    ['/about', { 'x-ai-ready-internal': '1' }],
+    [
+      '/about',
+      { 'x-ai-ready-internal': '1' },
+    ],
   ])('skips %s without reading event config', (path, headers) => {
     vi.mocked(useRuntimeConfig).mockClear()
-    const event = { req: new Request(`https://example.com${path}`, { headers }), path, context: {} } as unknown as H3Event
+    const event = {
+      req: new Request(`https://example.com${path}`, { headers }),
+      path,
+      context: {},
+    } as unknown as H3Event
     expect(decideNegotiation(event, 'early')._tag).toBe('skip')
     expect(decideNegotiation(event, 'middleware')._tag).toBe('skip')
     expect(useRuntimeConfig).not.toHaveBeenCalled()
@@ -212,7 +285,11 @@ describe('negotiation config access', () => {
     config.app.baseURL = '/cache-check/'
     vi.mocked(createNitroRouteRuleMatcher).mockClear()
     for (let i = 0; i < 3; i++) {
-      const event = { req: new Request('https://example.com/about.md'), path: '/about.md', context: {} } as unknown as H3Event
+      const event = {
+        req: new Request('https://example.com/about.md'),
+        path: '/about.md',
+        context: {},
+      } as unknown as H3Event
       expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
     }
     expect(createNitroRouteRuleMatcher).toHaveBeenCalledTimes(1)

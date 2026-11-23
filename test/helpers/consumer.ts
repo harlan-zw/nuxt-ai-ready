@@ -60,7 +60,12 @@ export async function createConsumer(fixture: string, options: { drizzle: Consum
   if (typeof options.drizzle === 'object') {
     const stub = join(modules, 'drizzle-orm')
     await mkdir(stub)
-    await writeFile(join(stub, 'package.json'), JSON.stringify({ name: 'drizzle-orm', version: options.drizzle.version, type: 'module', exports: { '.': './index.js' } }))
+    await writeFile(join(stub, 'package.json'), JSON.stringify({
+      name: 'drizzle-orm',
+      version: options.drizzle.version,
+      type: 'module',
+      exports: { '.': './index.js' },
+    }))
     await writeFile(join(stub, 'index.js'), 'export {}\n')
   }
   const packageDir = join(modules, 'nuxt-ai-ready')

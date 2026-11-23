@@ -12,8 +12,14 @@ describe('content negotiation with response caching', async () => {
   })
 
   it.each([
-    ['Accept header', { Accept: 'text/markdown' }],
-    ['AI crawler user-agent', { 'User-Agent': 'GPTBot' }],
+    [
+      'Accept header',
+      { Accept: 'text/markdown' },
+    ],
+    [
+      'AI crawler user-agent',
+      { 'User-Agent': 'GPTBot' },
+    ],
   ])('keeps an inline ISR route as HTML for %s', async (_, headers) => {
     const response = await fetch(url('/isr'), {
       headers,

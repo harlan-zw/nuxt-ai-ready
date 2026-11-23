@@ -4,12 +4,14 @@ import { parseSitemapCrawlState, serializeSitemapCrawlState } from '../../src/ru
 
 const state: SitemapCrawlState = {
   _tag: 'continuation',
-  frontier: [{
-    url: 'https://example.com/child.xml',
-    depth: 1,
-    source: 'index_child',
-    parentUrl: 'https://example.com/sitemap.xml',
-  }],
+  frontier: [
+    {
+      url: 'https://example.com/child.xml',
+      depth: 1,
+      source: 'index_child',
+      parentUrl: 'https://example.com/sitemap.xml',
+    },
+  ],
   seenDocuments: ['https://example.com/sitemap.xml'],
   documentsAttempted: 100,
   urlsObserved: 20,
@@ -32,11 +34,13 @@ describe('sitemap crawl state', () => {
   it('rejects malformed frontier metadata at the storage boundary', () => {
     const malformed = JSON.stringify({
       ...state,
-      frontier: [{
-        url: 'https://example.com/child.xml',
-        depth: 1,
-        source: 'index_child',
-      }],
+      frontier: [
+        {
+          url: 'https://example.com/child.xml',
+          depth: 1,
+          source: 'index_child',
+        },
+      ],
     })
 
     const parsed = parseSitemapCrawlState(malformed)

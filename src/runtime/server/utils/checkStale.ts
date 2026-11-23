@@ -42,7 +42,13 @@ function parseBuildMeta(value: unknown): BuildMeta | null {
   const { buildId, pageCount, createdAt } = value as Record<string, unknown>
   if (typeof buildId !== 'string' || !buildId || typeof pageCount !== 'number')
     return null
-  return { buildId, pageCount, createdAt: typeof createdAt === 'string' ? createdAt : '' }
+  return {
+    buildId,
+    pageCount,
+    createdAt: typeof createdAt === 'string'
+      ? createdAt
+      : '',
+  }
 }
 
 /**
@@ -91,7 +97,9 @@ async function setStoredBuildId(event: AiReadyDatabaseEvent | undefined, buildId
  */
 async function getLastStaleCheck(event?: AiReadyDatabaseEvent): Promise<number | null> {
   const value = await getInfoValue(event, 'last_stale_check')
-  return value ? Number.parseInt(value, 10) : null
+  return value
+    ? Number.parseInt(value, 10)
+    : null
 }
 
 /**
@@ -134,7 +142,12 @@ export async function checkAndHandleStale(event?: AiReadyDatabaseEvent): Promise
     if (lastCheck && (Date.now() - lastCheck) < STALE_CHECK_INTERVAL_MS) {
       if (debug)
         logger.info(`[stale-check] Skipping - checked ${Math.round((Date.now() - lastCheck) / 1000)}s ago`)
-      return { action: 'none', dbCount, buildId: storedBuildId, reason: 'recently_checked' }
+      return {
+        action: 'none',
+        dbCount,
+        buildId: storedBuildId,
+        reason: 'recently_checked',
+      }
     }
   }
 
@@ -159,7 +172,12 @@ export async function checkAndHandleStale(event?: AiReadyDatabaseEvent): Promise
     const rows = await fetchDump(event)
     if (!rows) {
       logger.warn('[stale-check] Failed to fetch dump for restore')
-      return { action: 'none', dbCount: 0, dumpCount: meta.pageCount, reason: 'dump_fetch_failed' }
+      return {
+        action: 'none',
+        dbCount: 0,
+        dumpCount: meta.pageCount,
+        reason: 'dump_fetch_failed',
+      }
     }
 
     const { useRawDb } = await import('../db')
@@ -190,7 +208,12 @@ export async function checkAndHandleStale(event?: AiReadyDatabaseEvent): Promise
     const dumpRows = await fetchDump(event)
     if (!dumpRows) {
       logger.warn('[stale-check] Failed to fetch dump for hash comparison')
-      return { action: 'none', dbCount, dumpCount: meta.pageCount, reason: 'dump_fetch_failed' }
+      return {
+        action: 'none',
+        dbCount,
+        dumpCount: meta.pageCount,
+        reason: 'dump_fetch_failed',
+      }
     }
 
     // Get current DB hashes
@@ -234,7 +257,9 @@ export async function checkAndHandleStale(event?: AiReadyDatabaseEvent): Promise
     logger.info(`[stale-check] Build ID changed: ${changedRoutes.length} changed, ${newRows.length} new, ${unchangedCount} unchanged (buildId: ${meta.buildId})`)
 
     return {
-      action: changedRoutes.length > 0 || newRows.length > 0 ? 'marked_pending' : 'none',
+      action: changedRoutes.length > 0 || newRows.length > 0
+        ? 'marked_pending'
+        : 'none',
       buildId: meta.buildId,
       dbCount: dbCount + newRows.length,
       dumpCount: meta.pageCount,

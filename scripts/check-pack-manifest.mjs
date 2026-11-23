@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const FORBIDDEN_SPECIFIER = /^(?:https?:|git(?:\+[^:]+)?:|github:|gitlab:|bitbucket:|file:|link:|workspace:|catalog:)/
-const DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies']
+const DEPENDENCY_FIELDS = [
+  'dependencies',
+  'optionalDependencies',
+  'peerDependencies',
+  'devDependencies',
+]
 const BUNDLE_FIELDS = ['bundledDependencies', 'bundleDependencies']
 const VENDORED_PACKAGE = /(?:^|\/)(node_modules\/(?:@[^/]+\/)?[^/]+)/
 
@@ -31,8 +36,11 @@ try {
 
   for (const field of BUNDLE_FIELDS) {
     const bundled = manifest[field]
-    if (bundled === true || (Array.isArray(bundled) && bundled.length))
-      violations.push(`${field}: ${bundled === true ? 'true' : bundled.join(', ')}`)
+    if (bundled === true || (Array.isArray(bundled) && bundled.length)) {
+      violations.push(`${field}: ${bundled === true
+        ? 'true'
+        : bundled.join(', ')}`)
+    }
   }
 
   const entries = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split('\n').filter(Boolean)

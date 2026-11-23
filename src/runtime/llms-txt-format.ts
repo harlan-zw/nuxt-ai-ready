@@ -11,7 +11,9 @@ function normalizeInlineText(value: string): string {
 }
 
 function normalizeLinkTitle(value: string): string {
-  return escapeMarkdownHtml(normalizeInlineText(value)).replace(RE_LINK_TITLE_BRACKET, bracket => bracket === '[' ? '&#91;' : '&#93;')
+  return escapeMarkdownHtml(normalizeInlineText(value)).replace(RE_LINK_TITLE_BRACKET, bracket => bracket === '['
+    ? '&#91;'
+    : '&#93;')
 }
 
 function normalizeLinkHref(value: string): string {
@@ -25,13 +27,21 @@ function normalizeLinkHref(value: string): string {
 }
 
 function normalizeDescriptions(value?: string | string[]): string[] {
-  return (Array.isArray(value) ? value : value ? [value] : [])
+  return (Array.isArray(value)
+    ? value
+    : value
+      ? [value]
+      : [])
     .filter(description => description.trim())
     .map(normalizeInlineText)
 }
 
 function normalizePreambleBlocks(value?: string | string[]): string[] {
-  return (Array.isArray(value) ? value : value ? [value] : [])
+  return (Array.isArray(value)
+    ? value
+    : value
+      ? [value]
+      : [])
     .filter(block => block.trim())
     .map(block => block.trim().replace(RE_PREAMBLE_ATX_HEADING, '$1\\$2'))
 }
@@ -41,7 +51,9 @@ function normalizeLink(link: LlmsTxtLink, descriptionPrefixes: string[] = []): s
     .filter((value): value is string => Boolean(value?.trim()))
     .map(normalizeInlineText)
   const description = descriptions.join('; ')
-  return `- [${normalizeLinkTitle(link.title)}](${normalizeLinkHref(link.href)})${description ? `: ${description}` : ''}`
+  return `- [${normalizeLinkTitle(link.title)}](${normalizeLinkHref(link.href)})${description
+    ? `: ${description}`
+    : ''}`
 }
 
 function normalizeSection(section: LlmsTxtSection): string {
@@ -73,7 +85,10 @@ function normalizePreamble(config: LlmsTxtConfig): string[] {
 
 function normalizeOptionalSections(sections: LlmsTxtSection[]): string | undefined {
   const links = sections.flatMap(section =>
-    section.links?.map(link => normalizeLink(link, [section.title, ...normalizeDescriptions(section.description)])) ?? [],
+    section.links?.map(link => normalizeLink(link, [
+      section.title,
+      ...normalizeDescriptions(section.description),
+    ])) ?? [],
   )
   if (!links.length)
     return undefined
@@ -95,13 +110,25 @@ interface LlmsTxtPageLink {
 
 export function formatLlmsTxtPageLink(page: LlmsTxtPageLink): string {
   const description = page.description?.trim().replace(RE_INLINE_WHITESPACE, ' ')
-  const normalizedTitle = page.title ? normalizeInlineText(page.title) : ''
-  const title = normalizedTitle && normalizedTitle !== page.pathname ? normalizedTitle : page.pathname
+  const normalizedTitle = page.title
+    ? normalizeInlineText(page.title)
+    : ''
+  const title = normalizedTitle && normalizedTitle !== page.pathname
+    ? normalizedTitle
+    : page.pathname
   const href = (page.href || page.pathname).trim()
   const truncatedDescription = description
-    ? `${description.substring(0, 160)}${description.length > 160 ? '...' : ''}`
+    ? `${description.substring(0, 160)}${description.length > 160
+      ? '...'
+      : ''}`
     : undefined
-  return normalizeLink({ title, href, description: truncatedDescription ? escapeMarkdownHtml(truncatedDescription) : undefined })
+  return normalizeLink({
+    title,
+    href,
+    description: truncatedDescription
+      ? escapeMarkdownHtml(truncatedDescription)
+      : undefined,
+  })
 }
 
 /**

@@ -81,7 +81,9 @@ export function useWebMcpTool(
     const current = controller
     controller = undefined
     current?.abort()
-    state.value = getModelContext() ? { _tag: 'Inactive' } : { _tag: 'Unsupported' }
+    state.value = getModelContext()
+      ? { _tag: 'Inactive' }
+      : { _tag: 'Unsupported' }
   }
 
   const syncRegistration = () => {

@@ -133,7 +133,9 @@ function resolveUrl(
 }
 
 function normalizeLinks(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [value]
+  return Array.isArray(value)
+    ? value
+    : [value]
 }
 
 const registeredRelationPattern = /^[a-z][a-z0-9.-]*$/
@@ -153,13 +155,23 @@ function parseLinks(
   const resolved: ResolvedApiCatalogLinkTarget[] = []
   for (const [targetIndex, target] of normalizeLinks(input).entries()) {
     if (!target || typeof target !== 'object' || Array.isArray(target)) {
-      errors.push({ _tag: 'InvalidLink', entryIndex, relation, targetIndex })
+      errors.push({
+        _tag: 'InvalidLink',
+        entryIndex,
+        relation,
+        targetIndex,
+      })
       continue
     }
 
     const candidate = target as Partial<ApiCatalogLinkTarget>
     if (typeof candidate.href !== 'string' || !candidate.href.trim()) {
-      errors.push({ _tag: 'InvalidLinkHref', entryIndex, relation, targetIndex })
+      errors.push({
+        _tag: 'InvalidLinkHref',
+        entryIndex,
+        relation,
+        targetIndex,
+      })
       continue
     }
 
@@ -177,7 +189,9 @@ function parseLinks(
       ...(typeof candidate.type === 'string' && { type: candidate.type }),
       ...(typeof candidate.title === 'string' && { title: candidate.title }),
       ...(typeof candidate.hreflang === 'string'
-        ? { hreflang: [candidate.hreflang] }
+        ? {
+            hreflang: [candidate.hreflang],
+          }
         : (Array.isArray(candidate.hreflang) && candidate.hreflang.every(value => typeof value === 'string'))
             ? { hreflang: candidate.hreflang }
             : {}),
@@ -210,7 +224,9 @@ function parseEntry(
     errors.push(anchor.error)
 
   const resolved: ResolvedApiCatalogLinksetEntry = {
-    anchor: anchor._tag === 'Ok' ? anchor.value : entry.anchor,
+    anchor: anchor._tag === 'Ok'
+      ? anchor.value
+      : entry.anchor,
   }
 
   for (const [field, relation] of Object.entries(RELATION_FIELDS) as Array<[ApiCatalogRelationField, string]>) {
@@ -232,7 +248,12 @@ function parseEntry(
         }
         const parsed = parseLinks(links, relation, entryIndex, baseURL, errors)
         const existing = resolved[relation]
-        resolved[relation] = Array.isArray(existing) ? [...existing, ...parsed] : parsed
+        resolved[relation] = Array.isArray(existing)
+          ? [
+              ...existing,
+              ...parsed,
+            ]
+          : parsed
       }
     }
   }
@@ -258,7 +279,12 @@ export function resolveApiCatalogConfig(
     return { _tag: 'Disabled' }
 
   if (input !== undefined && (!input || typeof input !== 'object' || Array.isArray(input))) {
-    return { _tag: 'Invalid', errors: [{ _tag: 'InvalidOptions' }] }
+    return {
+      _tag: 'Invalid',
+      errors: [
+        { _tag: 'InvalidOptions' },
+      ],
+    }
   }
 
   const configuredEntries = input === undefined
@@ -266,9 +292,18 @@ export function resolveApiCatalogConfig(
     : Array.isArray((input as { entries?: unknown }).entries)
       ? (input as { entries: unknown[] }).entries
       : []
-  const entries = [...configuredEntries, ...generatedEntries]
-  if (entries.length === 0)
-    return { _tag: 'Invalid', errors: [{ _tag: 'MissingEntries' }] }
+  const entries = [
+    ...configuredEntries,
+    ...generatedEntries,
+  ]
+  if (entries.length === 0) {
+    return {
+      _tag: 'Invalid',
+      errors: [
+        { _tag: 'MissingEntries' },
+      ],
+    }
+  }
 
   const errors: ApiCatalogConfigError[] = []
   const baseURL = parseBaseURL(context.siteBaseURL)

@@ -70,7 +70,9 @@ export function parseSitemapCrawlState(value: string | null): SitemapCrawlStateP
   catch (error) {
     return {
       _tag: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error
+        ? error.message
+        : String(error),
     }
   }
 }

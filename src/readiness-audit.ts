@@ -33,7 +33,13 @@ interface Document {
   body: string
 }
 
-const capabilities: AuditCapability[] = ['llms', 'api-catalog', 'ai-catalog', 'mcp', 'skills']
+const capabilities: AuditCapability[] = [
+  'llms',
+  'api-catalog',
+  'ai-catalog',
+  'mcp',
+  'skills',
+]
 
 function publicUrl(input: string, base?: string): Result<URL> {
   if (!URL.canParse(input, base))
@@ -52,11 +58,16 @@ export function parseAuditOptions(input: { url: string, base?: string, capabilit
   const base = input.base || '/'
   if (!base.startsWith('/') || base.startsWith('//') || /[?#\\]/.test(base))
     return { _tag: 'Err', message: 'Use an application base path such as /docs/.' }
-  const selected = [...new Set((input.capabilities || '').split(',').map(value => value.trim()).filter(Boolean))]
+  const selected = [
+    ...new Set((input.capabilities || '').split(',').map(value => value.trim()).filter(Boolean)),
+  ]
   const unknown = selected.filter(value => !capabilities.includes(value as AuditCapability))
   if (unknown.length)
     return { _tag: 'Err', message: `Unknown capabilities: ${unknown.join(', ')}. Use ${capabilities.join(', ')}.` }
-  return { _tag: 'Ok', value: { url: url.value.href, base: `${new URL(base, url.value).pathname.replace(/\/+$/, '')}/`, capabilities: selected as AuditCapability[] } }
+  return {
+    _tag: 'Ok',
+    value: { url: url.value.href, base: `${new URL(base, url.value).pathname.replace(/\/+$/, '')}/`, capabilities: selected as AuditCapability[] },
+  }
 }
 
 async function readDocument(url: string, accept: string, dependencies: AuditDependencies): Promise<Result<Document>> {
@@ -65,11 +76,17 @@ async function readDocument(url: string, accept: string, dependencies: AuditDepe
   return Promise.resolve().then(async (): Promise<Result<Document>> => {
     let current = url
     for (let redirects = 0; redirects <= 5; redirects++) {
-      const response = await dependencies.fetch(current, { headers: { accept }, redirect: 'manual', signal })
+      const response = await dependencies.fetch(current, {
+        headers: { accept },
+        redirect: 'manual',
+        signal,
+      })
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         await response.body?.cancel()
         const location = response.headers.get('location')
-        const next = location ? publicUrl(location, current) : { _tag: 'Err' as const, message: 'Redirect has no Location header.' }
+        const next = location
+          ? publicUrl(location, current)
+          : { _tag: 'Err' as const, message: 'Redirect has no Location header.' }
         if (next._tag === 'Err')
           return next
         current = next.value.href
@@ -97,10 +114,20 @@ async function readDocument(url: string, accept: string, dependencies: AuditDepe
         }
         body += decoder.decode()
       }
-      return { _tag: 'Ok', value: { url: current, status: response.status, headers: response.headers, body } }
+      return {
+        _tag: 'Ok',
+        value: {
+          url: current,
+          status: response.status,
+          headers: response.headers,
+          body,
+        },
+      }
     }
     return { _tag: 'Err', message: 'Response exceeds the five redirect limit.' }
-  }).catch((error: unknown) => ({ _tag: 'Err', message: `Request failed: ${error instanceof Error ? error.message : String(error)}` }))
+  }).catch((error: unknown) => ({ _tag: 'Err', message: `Request failed: ${error instanceof Error
+    ? error.message
+    : String(error)}` }))
 }
 
 function responseFailure(document: Result<Document>): string | undefined {
@@ -118,11 +145,27 @@ function isHtml(body: string): boolean {
 
 function contentCheck(id: string, url: string, document: Result<Document>, accepts: (document: Document) => boolean, success: string, failure: string): AuditCheck {
   const error = responseFailure(document)
-  if (error)
-    return { id, url, status: 'fail', detail: error }
+  if (error) {
+    return {
+      id,
+      url,
+      status: 'fail',
+      detail: error,
+    }
+  }
   return document._tag === 'Ok' && accepts(document.value)
-    ? { id, url: document.value.url, status: 'pass', detail: success }
-    : { id, url, status: 'fail', detail: failure }
+    ? {
+        id,
+        url: document.value.url,
+        status: 'pass',
+        detail: success,
+      }
+    : {
+        id,
+        url,
+        status: 'fail',
+        detail: failure,
+      }
 }
 
 function markdown(document: Document): boolean {
@@ -159,7 +202,13 @@ function links(header: string | null): { href: string, rel: string[], type: stri
     const parameter = (name: string) => match[2]?.match(new RegExp(`;\\s*${name}\\s*=\\s*(?:"([^"]*)"|([^;\\s]+))`, 'i'))
     const rel = parameter('rel')
     const type = parameter('type')
-    return [{ href: match[1]!, rel: (rel?.[1] || rel?.[2] || '').split(/\s+/), type: type?.[1] || type?.[2] || '' }]
+    return [
+      {
+        href: match[1]!,
+        rel: (rel?.[1] || rel?.[2] || '').split(/\s+/),
+        type: type?.[1] || type?.[2] || '',
+      },
+    ]
   })
 }
 
@@ -185,8 +234,12 @@ function policyCheck(html: Result<Document>, md: Result<Document>, id = 'content
   const converted = md.value.headers.get('content-signal')
   if (!source && !converted)
     return { id, status: 'warn', detail: 'No HTTP Content-Signal. Check whether this matches your content policy.' }
-  const parsedSource = source ? policy(source) : undefined
-  const parsedConverted = converted ? policy(converted) : undefined
+  const parsedSource = source
+    ? policy(source)
+    : undefined
+  const parsedConverted = converted
+    ? policy(converted)
+    : undefined
   for (const parsed of [parsedSource, parsedConverted]) {
     if (parsed?._tag === 'Err')
       return { id, status: 'fail', detail: parsed.message }
@@ -205,7 +258,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseJson(body: string): Result<unknown> {
   try {
-    return { _tag: 'Ok', value: JSON.parse(body) }
+    return {
+      _tag: 'Ok',
+      value: JSON.parse(body),
+    }
   }
   catch {
     return { _tag: 'Err', message: 'Discovery response contains invalid JSON.' }
@@ -244,12 +300,18 @@ export async function auditSite(options: AuditOptions, dependencies: AuditDepend
     readDocument(options.url, 'text/html', dependencies),
     readDocument(options.url, 'text/markdown', dependencies),
   ])
-  const pageUrl = html._tag === 'Ok' && !responseFailure(html) ? html.value.url : options.url
+  const pageUrl = html._tag === 'Ok' && !responseFailure(html)
+    ? html.value.url
+    : options.url
   const page = new URL(pageUrl)
   const site = new URL(options.base, page)
-  const advertised = html._tag === 'Ok' ? links(html.value.headers.get('link')) : []
+  const advertised = html._tag === 'Ok'
+    ? links(html.value.headers.get('link'))
+    : []
   const alternate = advertised.find(link => link.rel.includes('alternate') && link.type.toLowerCase() === 'text/markdown')
-  const linkedUrl = alternate ? publicUrl(alternate.href, pageUrl) : undefined
+  const linkedUrl = alternate
+    ? publicUrl(alternate.href, pageUrl)
+    : undefined
   const direct = new URL(pageUrl)
   direct.pathname = `${direct.pathname.replace(/\/$/, '') || '/index'}.md`
   const robotsUrl = new URL('/robots.txt', page).href
@@ -257,36 +319,88 @@ export async function auditSite(options: AuditOptions, dependencies: AuditDepend
     readDocument(direct.href, 'text/markdown', dependencies),
     readDocument(robotsUrl, 'text/plain', dependencies),
   ])
-  const robotsSitemap = robots._tag === 'Ok' ? robots.value.body.match(/^sitemap:\s*(\S+)/im)?.[1] : undefined
-  const sitemapUrl = robotsSitemap ? publicUrl(robotsSitemap, robotsUrl) : publicUrl('sitemap.xml', site.href)
-  const sitemap = sitemapUrl._tag === 'Ok' ? await readDocument(sitemapUrl.value.href, 'application/xml, text/xml', dependencies) : sitemapUrl
+  const robotsSitemap = robots._tag === 'Ok'
+    ? robots.value.body.match(/^sitemap:\s*(\S+)/im)?.[1]
+    : undefined
+  const sitemapUrl = robotsSitemap
+    ? publicUrl(robotsSitemap, robotsUrl)
+    : publicUrl('sitemap.xml', site.href)
+  const sitemap = sitemapUrl._tag === 'Ok'
+    ? await readDocument(sitemapUrl.value.href, 'application/xml, text/xml', dependencies)
+    : sitemapUrl
   const missingUrl = new URL('.well-known/nuxt-ai-ready-audit-missing', site).href
   const missing = await readDocument(missingUrl, 'text/markdown', dependencies)
   const checks: AuditCheck[] = [
     contentCheck('html', options.url, html, doc => /^text\/html(?:;|$)/i.test(doc.headers.get('content-type') || '') && !!doc.body.trim(), 'Public HTML is available.', 'Expected a non-empty HTML page.'),
     contentCheck('markdown-negotiation', options.url, negotiated, markdown, 'Accept: text/markdown returns Markdown.', 'Expected a non-empty text/markdown response.'),
     contentCheck('markdown-url', direct.href, directMd, markdown, 'The direct Markdown URL is available.', 'Expected a non-empty text/markdown response.'),
-    { id: 'markdown-link', status: linkedUrl?._tag === 'Ok' && linkedUrl.value.href === direct.href ? 'pass' : 'warn', detail: linkedUrl?._tag === 'Ok' && linkedUrl.value.href === direct.href ? 'The Link header advertises the direct Markdown URL.' : alternate ? 'Inspect the alternate Markdown Link target.' : 'No alternate Markdown Link header.' },
+    {
+      id: 'markdown-link',
+      status: linkedUrl?._tag === 'Ok' && linkedUrl.value.href === direct.href
+        ? 'pass'
+        : 'warn',
+      detail: linkedUrl?._tag === 'Ok' && linkedUrl.value.href === direct.href
+        ? 'The Link header advertises the direct Markdown URL.'
+        : alternate ? 'Inspect the alternate Markdown Link target.' : 'No alternate Markdown Link header.',
+    },
     contentCheck('robots', robotsUrl, robots, doc => !isHtml(doc.body) && /^user-agent:\s*\S/im.test(doc.body), 'robots.txt is available. Inspect its crawler-specific rules.', 'Expected robots.txt with a User-agent group.'),
-    contentCheck('sitemap', sitemapUrl._tag === 'Ok' ? sitemapUrl.value.href : site.href, sitemap, doc => /<(?:urlset|sitemapindex)(?:\s|>)/i.test(doc.body) && /<loc>\s*https?:\/\/[^<]+<\/loc>/i.test(doc.body), 'A sitemap document is available.', 'Expected a sitemap with absolute URL entries.'),
+    contentCheck('sitemap', sitemapUrl._tag === 'Ok'
+      ? sitemapUrl.value.href
+      : site.href, sitemap, doc => /<(?:urlset|sitemapindex)(?:\s|>)/i.test(doc.body) && /<loc>\s*https?:\/\/[^<]+<\/loc>/i.test(doc.body), 'A sitemap document is available.', 'Expected a sitemap with absolute URL entries.'),
     policyCheck(html, negotiated),
     policyCheck(html, directMd, 'content-signal-markdown-url'),
-    { id: 'unknown-route', url: missingUrl, status: missing._tag === 'Ok' && [404, 410].includes(missing.value.status) ? 'pass' : 'fail', detail: missing._tag === 'Err' ? missing.message : [404, 410].includes(missing.value.status) ? 'Unknown routes return 404 or 410.' : `Unknown route returned HTTP ${missing.value.status}. Check fallback routing.` },
+    {
+      id: 'unknown-route',
+      url: missingUrl,
+      status: missing._tag === 'Ok' && [404, 410].includes(missing.value.status)
+        ? 'pass'
+        : 'fail',
+      detail: missing._tag === 'Err'
+        ? missing.message
+        : [404, 410].includes(missing.value.status)
+            ? 'Unknown routes return 404 or 410.'
+            : `Unknown route returned HTTP ${missing.value.status}. Check fallback routing.`,
+    },
   ]
   if (negotiated._tag === 'Ok' && !responseFailure(negotiated)) {
     const vary = (negotiated.value.headers.get('vary') || '').toLowerCase().split(',').map(value => value.trim())
-    checks.push({ id: 'vary-accept', status: vary.includes('accept') || vary.includes('*') ? 'pass' : 'fail', detail: vary.includes('accept') || vary.includes('*') ? 'Vary separates HTML and Markdown cache entries.' : 'Set Vary: Accept on negotiated responses.' })
+    checks.push({
+      id: 'vary-accept',
+      status: vary.includes('accept') || vary.includes('*')
+        ? 'pass'
+        : 'fail',
+      detail: vary.includes('accept') || vary.includes('*')
+        ? 'Vary separates HTML and Markdown cache entries.'
+        : 'Set Vary: Accept on negotiated responses.',
+    })
   }
-  const paths: Record<AuditCapability, string> = { 'llms': 'llms.txt', 'api-catalog': '.well-known/api-catalog', 'ai-catalog': '.well-known/ai-catalog.json', 'mcp': '.well-known/mcp/server-card.json', 'skills': '.well-known/agent-skills/index.json' }
+  const paths: Record<AuditCapability, string> = {
+    'llms': 'llms.txt',
+    'api-catalog': '.well-known/api-catalog',
+    'ai-catalog': '.well-known/ai-catalog.json',
+    'mcp': '.well-known/mcp/server-card.json',
+    'skills': '.well-known/agent-skills/index.json',
+  }
   const discovery = await Promise.all(capabilities.map(async (capability): Promise<AuditCheck> => {
-    const declaredLink = capability === 'api-catalog' ? advertised.find(link => link.rel.includes('api-catalog')) : undefined
+    const declaredLink = capability === 'api-catalog'
+      ? advertised.find(link => link.rel.includes('api-catalog'))
+      : undefined
     if (!options.capabilities.includes(capability) && !declaredLink)
       return { id: capability, status: 'skip', detail: 'Not declared. Use --capabilities to check this feature.' }
     const url = publicUrl(declaredLink?.href || paths[capability], declaredLink ? pageUrl : site.href)
     if (url._tag === 'Err')
       return { id: capability, status: 'fail', detail: url.message }
-    const document = await readDocument(url.value.href, capability === 'llms' ? 'text/plain' : 'application/json', dependencies)
+    const document = await readDocument(url.value.href, capability === 'llms'
+      ? 'text/plain'
+      : 'application/json', dependencies)
     return contentCheck(capability, url.value.href, document, doc => discoveryDocument(capability, doc), 'The discovery document is available.', 'The discovery document has an unexpected format.')
   }))
-  return { schemaVersion: 1, url: options.url, checks: [...checks, ...discovery] }
+  return {
+    schemaVersion: 1,
+    url: options.url,
+    checks: [
+      ...checks,
+      ...discovery,
+    ],
+  }
 }

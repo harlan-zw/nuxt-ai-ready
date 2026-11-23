@@ -23,18 +23,28 @@ vi.mock('#nuxtseo/nitro', () => ({
   defineNitroPlugin: (plugin: unknown) => plugin,
   useRuntimeConfig: vi.fn(() => structuredClone(runtimeConfig)),
 }))
-vi.mock('#site-config/server/composables/utils', () => ({ withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}` }))
+vi.mock('#site-config/server/composables/utils', () => ({
+  withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
+}))
 vi.mock('#site-config/server/init', () => ({ initRequestSiteConfig: initSiteConfig }))
-vi.mock('#ai-ready-virtual/agent-skills.mjs', () => ({ localAgentSkillArtifacts: { '/skills/example.md': {} } }))
-vi.mock('#ai-ready-virtual/cloudflare-fallback-paths.mjs', () => ({ default: new Set(['/docs/about']) }))
+vi.mock('#ai-ready-virtual/agent-skills.mjs', () => ({
+  localAgentSkillArtifacts: { '/skills/example.md': {} },
+}))
+vi.mock('#ai-ready-virtual/cloudflare-fallback-paths.mjs', () => ({
+  default: new Set(['/docs/about']),
+}))
 
 function event(path = '/docs/about', accept = 'text/markdown') {
   return {
-    req: new Request(`https://example.com${path}`, { headers: { accept } }),
+    req: new Request(`https://example.com${path}`, {
+      headers: { accept },
+    }),
     path,
     method: 'GET',
     context: {},
-    res: { headers: new Headers() },
+    res: {
+      headers: new Headers(),
+    },
   } as unknown as H3Event
 }
 
@@ -47,16 +57,26 @@ beforeEach(() => {
 
 describe('request-time configuration', () => {
   it('keeps overrides and rebuilds only when matcher inputs change', async () => {
-    runtimeConfig.nitro.routeRules = { '/**': { cache: true } }
+    runtimeConfig.nitro.routeRules = {
+      '/**': { cache: true },
+    }
     expect(decideNegotiation(event(), 'early')._tag).toBe('html')
     expect(decideNegotiation(event(), 'early')._tag).toBe('html')
     expect(createMatcher).toHaveBeenCalledTimes(1)
 
-    runtimeConfig.nitro.routeRules = { '/**': { cache: false, site: { name: 'Request site' } } }
+    runtimeConfig.nitro.routeRules = {
+      '/**': {
+        cache: false,
+        site: { name: 'Request site' },
+      },
+    }
     const request = event()
     expect(decideNegotiation(request, 'early')._tag).toBe('redirect')
     await ensureSiteConfig(request)
-    expect(initSiteConfig).toHaveBeenLastCalledWith(request, 'https://example.com', { cache: false, site: { name: 'Request site' } })
+    expect(initSiteConfig).toHaveBeenLastCalledWith(request, 'https://example.com', {
+      cache: false,
+      site: { name: 'Request site' },
+    })
     expect(createMatcher).toHaveBeenCalledTimes(2)
 
     runtimeConfig.app.baseURL = '/other/'
@@ -80,7 +100,11 @@ describe('request-time configuration', () => {
   it('serves a prerendered asset without reading runtime config', async () => {
     const request = event('/docs/about', 'text/html')
     const fetch = vi.fn(async () => new Response('<h1>About</h1>'))
-    request.context.cloudflare = { env: { ASSETS: { fetch } } }
+    request.context.cloudflare = {
+      env: {
+        ASSETS: { fetch },
+      },
+    }
     expect(await (await serveCloudflarePrerenderedPage(request))?.text()).toBe('<h1>About</h1>')
     expect(useRuntimeConfig).not.toHaveBeenCalled()
     expect(fetch).toHaveBeenCalledOnce()
@@ -89,15 +113,24 @@ describe('request-time configuration', () => {
   it('falls through synchronously for a live HTML page', () => {
     const request = event('/docs/live', 'text/html')
     const fetch = vi.fn()
-    request.context.cloudflare = { env: { ASSETS: { fetch } } }
+    request.context.cloudflare = {
+      env: {
+        ASSETS: { fetch },
+      },
+    }
     expect(serveCloudflarePrerenderedPage(request)).toBeUndefined()
     expect(fetch).not.toHaveBeenCalled()
     expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 })
 
-vi.mock('../../src/runtime/server/utils/content', () => ({ tryGetContentMarkdown: vi.fn() }))
-vi.mock('../../src/runtime/server/utils', () => ({ convertHtmlToMarkdown: vi.fn(), extractLastUpdated: vi.fn() }))
+vi.mock('../../src/runtime/server/utils/content', () => ({
+  tryGetContentMarkdown: vi.fn(),
+}))
+vi.mock('../../src/runtime/server/utils', () => ({
+  convertHtmlToMarkdown: vi.fn(),
+  extractLastUpdated: vi.fn(),
+}))
 
 it('runs Markdown middleware for an API without reading config', async () => {
   expect(await markdown(event('/api/data', 'application/json'))).toBeUndefined()

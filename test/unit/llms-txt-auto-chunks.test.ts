@@ -5,28 +5,44 @@ const mocks = vi.hoisted(() => ({
   config: {} as Record<string, unknown>,
 }))
 // Normalized @nuxtjs/sitemap 9 config for sitemap: { sitemaps: true }.
-vi.mock('#ai-ready-virtual/sitemap-config.mjs', () => ({ default: {
-  isMultiSitemap: true,
-  sitemaps: {
-    index: { sitemapName: 'index', _route: '/registry/sitemap_index.xml' },
-    chunks: { sitemapName: 'chunks', includeAppSources: true },
+vi.mock('#ai-ready-virtual/sitemap-config.mjs', () => ({
+  default: {
+    isMultiSitemap: true,
+    sitemaps: {
+      index: { sitemapName: 'index', _route: '/registry/sitemap_index.xml' },
+      chunks: { sitemapName: 'chunks', includeAppSources: true },
+    },
   },
-} }))
+}))
 vi.mock('#nuxtseo/nitro', () => ({
   fetchRawWithEvent: (event: H3Event, ...args: Parameters<H3Event['fetch']>) => event.fetch(...args),
   useRuntimeConfig: () => ({
     'app': { baseURL: '/registry/' },
     'site': { url: 'https://example.com' },
-    'nuxt-ai-ready': { database: { _tag: 'Disabled' }, llmsTxt: mocks.config },
+    'nuxt-ai-ready': {
+      database: { _tag: 'Disabled' },
+      llmsTxt: mocks.config,
+    },
   }),
 }))
-vi.mock('#site-config/server/composables/getSiteConfig', () => ({ getSiteConfig: () => ({ name: 'Example', url: 'https://example.com' }) }))
+vi.mock('#site-config/server/composables/getSiteConfig', () => ({
+  getSiteConfig: () => ({ name: 'Example', url: 'https://example.com' }),
+}))
 vi.mock('#site-config/server/composables/utils', () => ({
   withSiteUrl: (_event: unknown, path: string) => `https://example.com${path}`,
   withSiteTrailingSlash: (_event: unknown, path: string) => path,
 }))
-vi.mock('../../src/runtime/server/utils/cloudflare', () => ({ hasAssets: () => false }))
-vi.mock('#ai-ready-virtual/logger.mjs', () => ({ logger: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() } }))
+vi.mock('../../src/runtime/server/utils/cloudflare', () => ({
+  hasAssets: () => false,
+}))
+vi.mock('#ai-ready-virtual/logger.mjs', () => ({
+  logger: {
+    warn: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 const { buildLlmsTxtFiles } = await import('../../src/runtime/llms-txt-utils')
 const { fetchSitemapUrlGroups } = await import('../../src/runtime/server/utils/sitemap')
@@ -42,16 +58,27 @@ function event(): H3Event {
     url: new URL('https://example.com/registry/llms.txt'),
     path: '/registry/llms.txt',
     context: {},
-    fetch: vi.fn(async (route: string) => new Response(routes[route] || null, { status: routes[route] ? 200 : 404 })),
+    fetch: vi.fn(async (route: string) => new Response(routes[route] || null, {
+      status: routes[route] ? 200 : 404,
+    })),
   } as unknown as H3Event
 }
 
 beforeEach(() => {
-  mocks.config = { pages: 'sitemap', markdownLinks: true, sections: [{ title: 'LLM Resources', links: [] }] }
+  mocks.config = {
+    pages: 'sitemap',
+    markdownLinks: true,
+    sections: [
+      { title: 'LLM Resources', links: [] },
+    ],
+  }
 })
 
 describe('automatic chunk sitemap discovery', () => {
-  it.each([undefined, ['chunks']])('reads every chunk with selection %s and applies the base once', async (names) => {
+  it.each([
+    undefined,
+    ['chunks'],
+  ])('reads every chunk with selection %s and applies the base once', async (names) => {
     const request = event()
     const groups = await fetchSitemapUrlGroups(request, names)
     expect(groups.get('chunks')?.map(url => url.loc)).toEqual([
@@ -71,7 +98,9 @@ describe('automatic chunk sitemap discovery', () => {
 
   it('writes a section selected from the automatic chunks group', async () => {
     mocks.config.sitemaps = ['chunks']
-    mocks.config.sections = [{ title: 'Pages', sitemap: 'chunks' }]
+    mocks.config.sections = [
+      { title: 'Pages', sitemap: 'chunks' },
+    ]
     const files = await buildLlmsTxtFiles(event())
     expect(files['/llms.txt']).toContain('https://example.com/registry/llms/chunks.txt)')
     expect(files['/llms/chunks.txt']).toContain('https://example.com/registry/about.md)')

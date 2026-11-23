@@ -28,7 +28,11 @@ function skillRoute(name: string) {
 export const ROOT_SKILL_ALIAS = '/SKILL.md'
 
 function aliasesOf(skill: { alias?: string | string[] }): string[] {
-  return skill.alias === undefined ? [] : Array.isArray(skill.alias) ? skill.alias : [skill.alias]
+  return skill.alias === undefined
+    ? []
+    : Array.isArray(skill.alias)
+      ? skill.alias
+      : [skill.alias]
 }
 
 function skillUrl(name: string) {
@@ -46,14 +50,26 @@ function validateAlias(alias: unknown, index: number, sitemapMd: boolean): Agent
     return []
   if (Array.isArray(alias))
     return alias.flatMap(entry => validateAlias(entry, index, sitemapMd))
-  if (typeof alias !== 'string' || !/^\/(?:[^/?#\s]+\/)*[^/?#\s]+\.md$/.test(alias) || alias.split('/').includes('..'))
-    return [{ index, field: 'alias', message: 'must be a path-absolute route ending in .md, such as "/SKILL.md"' }]
-  if (alias.startsWith('/.well-known/'))
-    return [{ index, field: 'alias', message: 'must not use the /.well-known/ prefix reserved for discovery routes' }]
-  if (alias === '/index.md')
-    return [{ index, field: 'alias', message: 'must not use the module-owned markdown route "/index.md"' }]
-  if (sitemapMd && alias === '/sitemap.md')
-    return [{ index, field: 'alias', message: 'must not use the module-owned markdown route "/sitemap.md"' }]
+  if (typeof alias !== 'string' || !/^\/(?:[^/?#\s]+\/)*[^/?#\s]+\.md$/.test(alias) || alias.split('/').includes('..')) {
+    return [
+      { index, field: 'alias', message: 'must be a path-absolute route ending in .md, such as "/SKILL.md"' },
+    ]
+  }
+  if (alias.startsWith('/.well-known/')) {
+    return [
+      { index, field: 'alias', message: 'must not use the /.well-known/ prefix reserved for discovery routes' },
+    ]
+  }
+  if (alias === '/index.md') {
+    return [
+      { index, field: 'alias', message: 'must not use the module-owned markdown route "/index.md"' },
+    ]
+  }
+  if (sitemapMd && alias === '/sitemap.md') {
+    return [
+      { index, field: 'alias', message: 'must not use the module-owned markdown route "/sitemap.md"' },
+    ]
+  }
   return []
 }
 
@@ -87,7 +103,9 @@ function validateCommonFields(skill: Record<string, unknown>, index: number): Ag
 
 function validateSkill(skill: unknown, index: number, sitemapMd: boolean): AgentSkillsConfigIssue[] {
   if (!isRecord(skill)) {
-    return [{ index, field: 'source', message: 'must be a local or external skill entry' }]
+    return [
+      { index, field: 'source', message: 'must be a local or external skill entry' },
+    ]
   }
 
   const issues = validateCommonFields(skill, index)
@@ -151,8 +169,11 @@ function parseLocalSkillMetadata(
   index: number,
 ): AgentSkillsConfigIssue[] {
   const frontmatter = readSkillFrontmatter(content)
-  if (frontmatter._tag === 'Err')
-    return [{ index, field: 'file', message: frontmatter.message }]
+  if (frontmatter._tag === 'Err') {
+    return [
+      { index, field: 'file', message: frontmatter.message },
+    ]
+  }
   const { metadata } = frontmatter
 
   const issues: AgentSkillsConfigIssue[] = []
@@ -194,23 +215,33 @@ async function resolveLocalEntry(
   if (isAbsolute(skill.file) || (!isWithinDirectory(rootDir, file) && !publicDirectory)) {
     return {
       _tag: 'Invalid',
-      issues: [{
-        index,
-        field: 'file',
-        message: 'must resolve within the Nuxt root directory',
-      }],
+      issues: [
+        {
+          index,
+          field: 'file',
+          message: 'must resolve within the Nuxt root directory',
+        },
+      ],
     }
   }
-  return Promise.all([realpath(rootDir), realpath(file), publicDirectory ? realpath(publicDirectory) : undefined])
+  return Promise.all([
+    realpath(rootDir),
+    realpath(file),
+    publicDirectory
+      ? realpath(publicDirectory)
+      : undefined,
+  ])
     .then(([realRootDir, realFile, realPublicDirectory]) => {
       if (!isWithinDirectory(realRootDir, realFile) && !(realPublicDirectory && isWithinDirectory(realPublicDirectory, realFile))) {
         return {
           _tag: 'Invalid' as const,
-          issues: [{
-            index,
-            field: 'file' as const,
-            message: 'must resolve within the Nuxt root directory',
-          }],
+          issues: [
+            {
+              index,
+              field: 'file' as const,
+              message: 'must resolve within the Nuxt root directory',
+            },
+          ],
         }
       }
       return readFile(realFile).then((content) => {
@@ -218,11 +249,13 @@ async function resolveLocalEntry(
         if (!Buffer.from(text, 'utf8').equals(content)) {
           return {
             _tag: 'Invalid' as const,
-            issues: [{
-              index,
-              field: 'file' as const,
-              message: 'must contain valid UTF-8 text',
-            }],
+            issues: [
+              {
+                index,
+                field: 'file' as const,
+                message: 'must contain valid UTF-8 text',
+              },
+            ],
           }
         }
         const metadataIssues = parseLocalSkillMetadata(text, skill, index)
@@ -232,7 +265,10 @@ async function resolveLocalEntry(
             issues: metadataIssues,
           }
         }
-        const routes = [skillRoute(skill.name), ...aliasesOf(skill)]
+        const routes = [
+          skillRoute(skill.name),
+          ...aliasesOf(skill),
+        ]
         const digest = `sha256:${createHash('sha256').update(content).digest('hex')}` as const
         return {
           _tag: 'Resolved' as const,
@@ -250,11 +286,15 @@ async function resolveLocalEntry(
     })
     .catch((error: unknown) => ({
       _tag: 'Invalid' as const,
-      issues: [{
-        index,
-        field: 'file' as const,
-        message: `could not read ${file}: ${error instanceof Error ? error.message : String(error)}`,
-      }],
+      issues: [
+        {
+          index,
+          field: 'file' as const,
+          message: `could not read ${file}: ${error instanceof Error
+            ? error.message
+            : String(error)}`,
+        },
+      ],
     }))
 }
 
@@ -279,7 +319,9 @@ export async function resolveAgentSkillsConfig(
   if (!isRecord(config) || (config.skills !== undefined && !Array.isArray(config.skills))) {
     return {
       _tag: 'Invalid',
-      issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }],
+      issues: [
+        { field: 'agentSkills', message: 'skills must be an array when set' },
+      ],
     }
   }
   const configuredSkills: unknown[] = config.skills ?? []
@@ -309,8 +351,13 @@ export async function resolveAgentSkillsConfig(
   const skills = configuredSkills as AgentSkillConfig[]
   const resolved = await Promise.all(skills.map((skill, index) => skill.source === 'local'
     ? resolveLocalEntry(skill, index, rootDir, options.publicDirs ?? [])
-    : Promise.resolve({ _tag: 'Resolved' as const, entry: resolveExternalEntry(skill) })))
-  const fileIssues = resolved.flatMap(result => result._tag === 'Invalid' ? result.issues : [])
+    : Promise.resolve({
+        _tag: 'Resolved' as const,
+        entry: resolveExternalEntry(skill),
+      })))
+  const fileIssues = resolved.flatMap(result => result._tag === 'Invalid'
+    ? result.issues
+    : [])
   if (fileIssues.length > 0)
     return { _tag: 'Invalid', issues: fileIssues }
 
@@ -326,10 +373,20 @@ export async function resolveAgentSkillsConfig(
         localArtifacts[route] = result.content
       // Prefer the shortest alias: `/SKILL.md` beats `/skills/name/SKILL.md`.
       const [alias] = result.routes.slice(1).sort((a, b) => a.length - b.length)
-      links.push({ source: 'local', name: result.entry.name, description: result.entry.description, href: alias ?? result.routes[0]! })
+      links.push({
+        source: 'local',
+        name: result.entry.name,
+        description: result.entry.description,
+        href: alias ?? result.routes[0]!,
+      })
     }
     else {
-      links.push({ source: 'external', name: result.entry.name, description: result.entry.description, href: result.entry.url })
+      links.push({
+        source: 'external',
+        name: result.entry.name,
+        description: result.entry.description,
+        href: result.entry.url,
+      })
     }
   }
 
@@ -439,7 +496,10 @@ export async function discoverAgentSkills(options: DiscoverAgentSkillsOptions): 
 /** Explicit entries replace discovered ones with the same name; order is discovered first, then explicit. */
 export function mergeAgentSkills(discovered: readonly AgentSkillConfig[], configured: readonly AgentSkillConfig[]): AgentSkillConfig[] {
   const overridden = new Set(configured.map(skill => skill.name))
-  return [...discovered.filter(skill => !overridden.has(skill.name)), ...configured]
+  return [
+    ...discovered.filter(skill => !overridden.has(skill.name)),
+    ...configured,
+  ]
 }
 
 /**
@@ -450,19 +510,43 @@ export function applyRootAlias(
   skills: readonly AgentSkillConfig[],
   root: string | false | undefined,
 ): { _tag: 'Ok', skills: AgentSkillConfig[] } | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] } {
-  if (root === false)
-    return { _tag: 'Ok', skills: [...skills] }
+  if (root === false) {
+    return {
+      _tag: 'Ok',
+      skills: [...skills],
+    }
+  }
   const locals = skills.filter((skill): skill is LocalAgentSkillConfig => skill.source === 'local')
   const target = root === undefined
-    ? (locals.length === 1 ? locals[0] : undefined)
+    ? (locals.length === 1
+        ? locals[0]
+        : undefined)
     : locals.find(skill => skill.name === root)
-  if (root !== undefined && !target)
-    return { _tag: 'Invalid', issues: [{ field: 'root', message: `names no local skill: "${root}"` }] }
-  if (!target || aliasesOf(target).includes(ROOT_SKILL_ALIAS))
-    return { _tag: 'Ok', skills: [...skills] }
+  if (root !== undefined && !target) {
+    return {
+      _tag: 'Invalid',
+      issues: [
+        { field: 'root', message: `names no local skill: "${root}"` },
+      ],
+    }
+  }
+  if (!target || aliasesOf(target).includes(ROOT_SKILL_ALIAS)) {
+    return {
+      _tag: 'Ok',
+      skills: [...skills],
+    }
+  }
   return {
     _tag: 'Ok',
-    skills: skills.map(skill => skill === target ? { ...skill, alias: [...aliasesOf(skill), ROOT_SKILL_ALIAS] } : skill),
+    skills: skills.map(skill => skill === target
+      ? {
+          ...skill,
+          alias: [
+            ...aliasesOf(skill),
+            ROOT_SKILL_ALIAS,
+          ],
+        }
+      : skill),
   }
 }
 
@@ -481,10 +565,22 @@ export async function prepareAgentSkills(
   config: AgentSkillsConfig,
   options: PrepareAgentSkillsOptions,
 ): Promise<{ _tag: 'Ok', skills: AgentSkillConfig[] } | { _tag: 'Invalid', issues: AgentSkillsConfigIssue[] }> {
-  if (config.dir !== undefined && config.dir !== false && typeof config.dir !== 'string')
-    return { _tag: 'Invalid', issues: [{ field: 'dir', message: 'must be a string or false when set' }] }
-  if (config.skills !== undefined && !Array.isArray(config.skills))
-    return { _tag: 'Invalid', issues: [{ field: 'agentSkills', message: 'skills must be an array when set' }] }
+  if (config.dir !== undefined && config.dir !== false && typeof config.dir !== 'string') {
+    return {
+      _tag: 'Invalid',
+      issues: [
+        { field: 'dir', message: 'must be a string or false when set' },
+      ],
+    }
+  }
+  if (config.skills !== undefined && !Array.isArray(config.skills)) {
+    return {
+      _tag: 'Invalid',
+      issues: [
+        { field: 'agentSkills', message: 'skills must be an array when set' },
+      ],
+    }
+  }
   const discovered = config.dir === false
     ? { skills: [], issues: [] }
     : await discoverAgentSkills({
@@ -497,5 +593,8 @@ export async function prepareAgentSkills(
       })
   if (discovered.issues.length > 0)
     return { _tag: 'Invalid', issues: discovered.issues }
-  return { _tag: 'Ok', skills: mergeAgentSkills(discovered.skills, (config.skills ?? []) as AgentSkillConfig[]) }
+  return {
+    _tag: 'Ok',
+    skills: mergeAgentSkills(discovered.skills, (config.skills ?? []) as AgentSkillConfig[]),
+  }
 }

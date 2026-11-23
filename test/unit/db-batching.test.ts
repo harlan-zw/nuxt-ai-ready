@@ -197,7 +197,10 @@ describe('db: importDbDump batching (shared.ts)', () => {
   it('falls back to sequential exec when db.batch is absent', async () => {
     db = schemaDb()
     const adapter = makeAdapter(db, false)
-    await importDbDump(adapter, [dumpRow(1), dumpRow(2)])
+    await importDbDump(adapter, [
+      dumpRow(1),
+      dumpRow(2),
+    ])
     expect(db.prepare('SELECT COUNT(*) as count FROM ai_ready_pages').get()).toEqual({ count: 2 })
   })
 
@@ -213,7 +216,9 @@ describe('db: importDbDump batching (shared.ts)', () => {
       },
     }
 
-    await importDbDump(adapter, [dumpRow(1)])
+    await importDbDump(adapter, [
+      dumpRow(1),
+    ])
 
     expect(seen).toHaveLength(1)
     expect(seen[0]).not.toContain('INSERT OR REPLACE')
@@ -227,7 +232,9 @@ describe('db: importDbDump batching (shared.ts)', () => {
     await importDbDump(adapter, [original])
     const before = db.prepare('SELECT id FROM ai_ready_pages WHERE route = ?').get(original.route) as { id: number }
 
-    await importDbDump(adapter, [{ ...original, title: 'Updated title', markdown: '# Updated' }])
+    await importDbDump(adapter, [
+      { ...original, title: 'Updated title', markdown: '# Updated' },
+    ])
 
     const after = db.prepare('SELECT id, title, markdown FROM ai_ready_pages WHERE route = ?').get(original.route)
     expect(after).toEqual({ id: before.id, title: 'Updated title', markdown: '# Updated' })
@@ -284,7 +291,11 @@ describe('db: exportDbDump keyset pagination (shared.ts)', () => {
     await importDbDump(makeAdapter(db2), parsed as DumpRow[])
     const rows2 = db2.prepare('SELECT route, title, markdown FROM ai_ready_pages ORDER BY route').all()
     expect(rows2).toHaveLength(1100)
-    expect(rows2[0]).toEqual({ route: '/page-1', title: 'Page 1', markdown: expect.stringContaining('page 1') })
+    expect(rows2[0]).toEqual({
+      route: '/page-1',
+      title: 'Page 1',
+      markdown: expect.stringContaining('page 1'),
+    })
     const last = rows2[rows2.length - 1] as { route: string }
     expect(last.route).toBe('/page-999') // lexicographic max of /page-N routes
     db2.close()
@@ -299,8 +310,14 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
     registerDriver(client.db, 'node-sqlite', db)
 
     await getRawExecutor(client).batch([
-      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['one'] },
-      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['two'] },
+      {
+        sql: 'INSERT INTO proof (value) VALUES (?)',
+        params: ['one'],
+      },
+      {
+        sql: 'INSERT INTO proof (value) VALUES (?)',
+        params: ['two'],
+      },
     ])
 
     expect(db.prepare('SELECT value FROM proof ORDER BY value').all()).toEqual([
@@ -317,8 +334,14 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
     registerDriver(client.db, 'node-sqlite', db)
 
     await expect(getRawExecutor(client).batch([
-      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['same'] },
-      { sql: 'INSERT INTO proof (value) VALUES (?)', params: ['same'] },
+      {
+        sql: 'INSERT INTO proof (value) VALUES (?)',
+        params: ['same'],
+      },
+      {
+        sql: 'INSERT INTO proof (value) VALUES (?)',
+        params: ['same'],
+      },
     ])).rejects.toThrow()
 
     expect(db.prepare('SELECT COUNT(*) AS count FROM proof').get()).toEqual({ count: 0 })
@@ -369,7 +392,11 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
   it('chunks batches at 100 statements for remote drivers (libsql/d1/neon)', async () => {
     const calls: number[] = []
     const driver = {
-      prepare: () => ({ bind: () => ({ run: async () => {} }) }),
+      prepare: () => ({
+        bind: () => ({
+          run: async () => {},
+        }),
+      }),
       batch: async (stmts: unknown[]) => {
         calls.push(stmts.length)
       },
@@ -392,7 +419,9 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
     const driver = {
       unsafe: async (sql: string, params: unknown[]) => {
         calls.push({ sql, params })
-        return [{ route: '/docs' }]
+        return [
+          { route: '/docs' },
+        ]
       },
     }
     const db = {} as Record<string, unknown>
@@ -401,11 +430,15 @@ describe('db: raw executor batch (drizzle/raw.ts)', () => {
 
     const rows = await getRawExecutor(client).all('SELECT route FROM ai_ready_pages WHERE route = ? AND indexed = ?', ['/docs', 1])
 
-    expect(rows).toEqual([{ route: '/docs' }])
-    expect(calls).toEqual([{
-      sql: 'SELECT route FROM ai_ready_pages WHERE route = $1 AND indexed = $2',
-      params: ['/docs', 1],
-    }])
+    expect(rows).toEqual([
+      { route: '/docs' },
+    ])
+    expect(calls).toEqual([
+      {
+        sql: 'SELECT route FROM ai_ready_pages WHERE route = $1 AND indexed = $2',
+        params: ['/docs', 1],
+      },
+    ])
   })
 
   it('batches PostgreSQL queries in transactions and closes the client', async () => {

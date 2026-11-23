@@ -26,9 +26,16 @@ export default defineNuxtPlugin({
 
     useHead({
       link: [
-        ...(markdownAvailable ? [markdownLink] : []),
+        ...(markdownAvailable
+          ? [markdownLink]
+          : []),
         ...(describedby
-          ? [{ rel: 'describedby', href: joinURL(runtimeConfig.app.baseURL, 'llms.txt') } as unknown as { rel: 'alternate', href: string }]
+          ? [
+              {
+                rel: 'describedby',
+                href: joinURL(runtimeConfig.app.baseURL, 'llms.txt'),
+              } as unknown as { rel: 'alternate', href: string },
+            ]
           : []),
       ],
     })

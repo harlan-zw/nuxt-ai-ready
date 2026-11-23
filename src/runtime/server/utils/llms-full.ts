@@ -39,12 +39,21 @@ export function formatPageForLlmsFullTxt(
   markdown: string,
   siteUrl?: string,
 ): string {
-  const canonicalUrl = siteUrl ? joinURL(siteUrl, route) : route
-  const pageTitle = escapeMarkdownHtml((title && title !== route ? title : route).trim().replace(RE_INLINE_WHITESPACE, ' '))
+  const canonicalUrl = siteUrl
+    ? joinURL(siteUrl, route)
+    : route
+  const pageTitle = escapeMarkdownHtml((title && title !== route
+    ? title
+    : route).trim().replace(RE_INLINE_WHITESPACE, ' '))
   const pageDescription = escapeMarkdownHtml(description.trim().replace(RE_INLINE_WHITESPACE, ' '))
   const content = markdown.replace(RE_FRONTMATTER, '').trim()
 
-  const parts = ['---', '', `- **Page:** ${pageTitle}`, `- **Source:** ${canonicalUrl}`]
+  const parts = [
+    '---',
+    '',
+    `- **Page:** ${pageTitle}`,
+    `- **Source:** ${canonicalUrl}`,
+  ]
   if (pageDescription)
     parts.push(`- **Description:** ${pageDescription}`)
   const frontmatter = markdown.match(RE_FRONTMATTER)?.[1]

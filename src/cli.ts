@@ -50,12 +50,16 @@ function describeHttpError(status: number, body: unknown): string {
       : typeof error?.error === 'string' && error.error
         ? error.error
         : null
-  return message ? `${status}: ${message}` : `request failed with status ${status}`
+  return message
+    ? `${status}: ${message}`
+    : `request failed with status ${status}`
 }
 
 async function fetchJson<T = any>(url: string, init: RequestInit, errorLabel = 'Failed'): Promise<T> {
   const r = await fetch(url, init).catch((err) => {
-    throw new Error(`${errorLabel}: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`${errorLabel}: ${err instanceof Error
+      ? err.message
+      : String(err)}`)
   })
   if (!r.ok) {
     const body = await r.json().catch(() => {
@@ -76,7 +80,9 @@ const main = defineCommand({
   subCommands: {
     token: () => defineCommand({
       meta: { name: 'token', description: 'Print the runtime sync bearer token' },
-      args: { cwd: { type: 'string', description: 'Working directory', default: '.' } },
+      args: {
+        cwd: { type: 'string', description: 'Working directory', default: '.' },
+      },
       async run({ args }) {
         const secret = await requireSecret(resolve(args.cwd))
         process.stdout.write(`${secret}\n`)
@@ -135,7 +141,9 @@ const main = defineCommand({
         const url = joinURL(args.url, '/__ai-ready/status')
         consola.info(`Fetching status from ${args.url}...`)
 
-        const res = await fetchJson(url, { headers: authHeaders(secret) }, 'Failed to connect')
+        const res = await fetchJson(url, {
+          headers: authHeaders(secret),
+        }, 'Failed to connect')
 
         consola.box('AI Ready Status')
 
@@ -152,7 +160,11 @@ const main = defineCommand({
             consola.info(`  Recent:`)
             for (const p of res.activity.recentPages.slice(0, 5)) {
               const ago = Date.now() - p.indexedAt
-              const agoStr = ago < 60000 ? `${Math.round(ago / 1000)}s` : ago < 3600000 ? `${Math.round(ago / 60000)}m` : `${Math.round(ago / 3600000)}h`
+              const agoStr = ago < 60000
+                ? `${Math.round(ago / 1000)}s`
+                : ago < 3600000
+                  ? `${Math.round(ago / 60000)}m`
+                  : `${Math.round(ago / 3600000)}h`
               consola.info(`    ${colors.dim(`${agoStr} ago`)} ${p.route} ${colors.dim(p.title || '')}`)
             }
           }
@@ -166,8 +178,14 @@ const main = defineCommand({
           }
           if (res.cron.recentRuns?.length) {
             for (const run of res.cron.recentRuns) {
-              const status = run.status === 'success' ? colors.green(run.status) : run.status === 'error' ? colors.red(run.status) : colors.yellow(run.status)
-              consola.info(`  ${colors.dim(new Date(run.startedAt).toLocaleTimeString())} ${status} ${colors.dim(`${run.durationMs || 0}ms`)} ${run.pagesIndexed ? `${run.pagesIndexed} indexed` : ''}`)
+              const status = run.status === 'success'
+                ? colors.green(run.status)
+                : run.status === 'error'
+                  ? colors.red(run.status)
+                  : colors.yellow(run.status)
+              consola.info(`  ${colors.dim(new Date(run.startedAt).toLocaleTimeString())} ${status} ${colors.dim(`${run.durationMs || 0}ms`)} ${run.pagesIndexed
+                ? `${run.pagesIndexed} indexed`
+                : ''}`)
             }
           }
         }
@@ -176,7 +194,9 @@ const main = defineCommand({
           consola.log('')
           consola.info(colors.bold('Sitemaps:'))
           for (const s of res.sitemaps) {
-            const err = s.errorCount > 0 ? colors.red(` (${s.errorCount} errors)`) : ''
+            const err = s.errorCount > 0
+              ? colors.red(` (${s.errorCount} errors)`)
+              : ''
             consola.info(`  ${s.name}: ${colors.cyan(s.urlCount?.toString() || '0')} URLs${err}`)
           }
         }
@@ -229,7 +249,10 @@ const main = defineCommand({
         const url = joinURL(args.url, `/__ai-ready/poll?${params}`)
         consola.info(`Triggering poll at ${args.url}...`)
 
-        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
+        const res = await fetchJson(url, {
+          method: 'POST',
+          headers: authHeaders(secret),
+        })
 
         consola.success(`Indexed: ${colors.green(res.indexed?.toString() || '0')} pages`)
         consola.info(`Remaining: ${colors.yellow(res.remaining?.toString() || '0')}`)
@@ -280,7 +303,10 @@ const main = defineCommand({
         const url = joinURL(args.url, `/__ai-ready/restore?${params}`)
         consola.info(`Restoring database at ${args.url}...`)
 
-        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
+        const res = await fetchJson(url, {
+          method: 'POST',
+          headers: authHeaders(secret),
+        })
 
         consola.success(`Restored: ${colors.green(res.restored?.toString() || '0')} pages`)
         if (res.cleared) {
@@ -335,7 +361,9 @@ const main = defineCommand({
 
         const res = await fetchJson(url, {
           method: 'POST',
-          headers: secret ? authHeaders(secret) : undefined,
+          headers: secret
+            ? authHeaders(secret)
+            : undefined,
         })
 
         if (args.dry) {
@@ -398,12 +426,17 @@ const main = defineCommand({
         const url = joinURL(args.url, `/__ai-ready/reindex?${params}`)
         consola.info(`Reindexing ${args.route} at ${args.url}...`)
 
-        const res = await fetchJson(url, { method: 'POST', headers: authHeaders(secret) })
+        const res = await fetchJson(url, {
+          method: 'POST',
+          headers: authHeaders(secret),
+        })
 
         if (res.indexed) {
           consola.success(`Indexed: ${colors.green(res.route)}`)
           if (res.contentChanged !== undefined) {
-            consola.info(`Content changed: ${res.contentChanged ? colors.green('yes') : colors.yellow('no')}`)
+            consola.info(`Content changed: ${res.contentChanged
+              ? colors.green('yes')
+              : colors.yellow('no')}`)
           }
         }
         else if (res.skipped) {
@@ -413,7 +446,9 @@ const main = defineCommand({
           consola.success(`Removed: ${colors.green(res.route)} (HTTP 410)`)
         }
         else {
-          throw new Error(`Failed to reindex ${res.route ?? args.route}${res.error ? `: ${res.error}` : ''}`)
+          throw new Error(`Failed to reindex ${res.route ?? args.route}${res.error
+            ? `: ${res.error}`
+            : ''}`)
         }
       },
     }),

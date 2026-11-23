@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('publishing AI Terms on opt-in', async () => {
-  await setup({ rootDir: resolve('../fixtures/ai-terms'), build: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/ai-terms'),
+    build: true,
+    server: true,
+  })
 
   it('serves the policy as JSON without a database', async () => {
     const response = await fetch(url('/.well-known/ai-terms'))
@@ -20,8 +24,18 @@ describe('publishing AI Terms on opt-in', async () => {
       updated: '2026-11-18',
       default: 'deny',
       purpose_header: 'AI-Purpose',
-      uses: { training: { access: 'deny' }, search: { access: 'allow', attribution: 'required' } },
-      paths: [{ match: '/members/*', uses: { agent: { access: 'deny' } } }],
+      uses: {
+        training: { access: 'deny' },
+        search: { access: 'allow', attribution: 'required' },
+      },
+      paths: [
+        {
+          match: '/members/*',
+          uses: {
+            agent: { access: 'deny' },
+          },
+        },
+      ],
     })
   })
 

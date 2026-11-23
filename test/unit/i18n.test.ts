@@ -151,7 +151,9 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('does not fabricate alternates for locales omitted from a translated entry', () => {
     const partial: RuntimeI18nConfig = {
       ...prefixExceptDefault,
-      pages: { about: { fr: '/a-propos' } },
+      pages: {
+        about: { fr: '/a-propos' },
+      },
     }
     expect(computeLocaleAlternates('/fr/a-propos', partial).map(a => a.path))
       .toEqual(['/fr/a-propos'])
@@ -160,8 +162,14 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('keeps translations for the locales an entry does name', () => {
     const partial: RuntimeI18nConfig = {
       ...prefixExceptDefault,
-      locales: [en, fr, { code: 'de', hreflang: 'de-DE' }],
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      locales: [
+        en,
+        fr,
+        { code: 'de', hreflang: 'de-DE' },
+      ],
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     }
     // `de` is untranslated, so it keeps the default locale's path rather than
     // the requested `/a-propos`, which exists only under `fr`.
@@ -210,7 +218,9 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('carries optional params across locales', () => {
     const optional: RuntimeI18nConfig = {
       ...prefixExceptDefault,
-      pages: { 'blog-slug': { en: '/blog/[[slug]]', fr: '/journal/[[slug]]' } },
+      pages: {
+        'blog-slug': { en: '/blog/[[slug]]', fr: '/journal/[[slug]]' },
+      },
     }
     expect(computeLocaleAlternates('/blog/hello', optional).map(a => a.path))
       .toEqual(['/blog/hello', '/fr/journal/hello'])
@@ -221,7 +231,9 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('carries params embedded in static segments across locales', () => {
     const mixed: RuntimeI18nConfig = {
       ...prefixExceptDefault,
-      pages: { product: { en: '/products/product-[id]', fr: '/produits/produit-[id]' } },
+      pages: {
+        product: { en: '/products/product-[id]', fr: '/produits/produit-[id]' },
+      },
     }
     expect(computeLocaleAlternates('/products/product-42', mixed).map(a => a.path))
       .toEqual(['/products/product-42', '/fr/produits/produit-42'])
@@ -230,7 +242,9 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('prefixes every locale under the prefix strategy', () => {
     const prefixed: RuntimeI18nConfig = {
       ...prefixAll,
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     }
     expect(computeLocaleAlternates('/en/about', prefixed).map(a => a.path))
       .toEqual(['/en/about', '/fr/a-propos'])
@@ -239,7 +253,9 @@ describe('computeLocaleAlternates with translated routes', () => {
   it('ignores the table under no_prefix, where each page has one URL', () => {
     const single: RuntimeI18nConfig = {
       ...noPrefix,
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     }
     expect(computeLocaleAlternates('/about', single).map(a => a.path))
       .toEqual(['/about', '/about'])
@@ -248,9 +264,24 @@ describe('computeLocaleAlternates with translated routes', () => {
 
 describe('hasCjkLocale', () => {
   it('detects CJK locales by code prefix', () => {
-    expect(hasCjkLocale({ ...prefixExceptDefault, locales: [en, ja] })).toBe(true)
-    expect(hasCjkLocale({ ...prefixExceptDefault, locales: [en, { code: 'zh-CN', hreflang: 'zh-CN' }] })).toBe(true)
-    expect(hasCjkLocale({ ...prefixExceptDefault, locales: [en, { code: 'ko', hreflang: 'ko' }] })).toBe(true)
+    expect(hasCjkLocale({
+      ...prefixExceptDefault,
+      locales: [en, ja],
+    })).toBe(true)
+    expect(hasCjkLocale({
+      ...prefixExceptDefault,
+      locales: [
+        en,
+        { code: 'zh-CN', hreflang: 'zh-CN' },
+      ],
+    })).toBe(true)
+    expect(hasCjkLocale({
+      ...prefixExceptDefault,
+      locales: [
+        en,
+        { code: 'ko', hreflang: 'ko' },
+      ],
+    })).toBe(true)
   })
 
   it('returns false when no CJK locales present', () => {
@@ -265,8 +296,18 @@ describe('toRuntimeI18nConfig', () => {
       strategy: 'prefix_and_default',
       differentDomains: true,
       locales: [
-        { code: 'en', _hreflang: 'en', _sitemap: 'en', domain: 'en.example.com' },
-        { code: 'fr', _hreflang: 'fr-FR', _sitemap: 'fr', domain: 'fr.example.com' },
+        {
+          code: 'en',
+          _hreflang: 'en',
+          _sitemap: 'en',
+          domain: 'en.example.com',
+        },
+        {
+          code: 'fr',
+          _hreflang: 'fr-FR',
+          _sitemap: 'fr',
+          domain: 'fr.example.com',
+        },
       ],
     })
 
@@ -313,7 +354,9 @@ describe('toRuntimeI18nConfig', () => {
       pages: {
         admin: { _tag: 'unlocalized', path: '/admin' },
       },
-    }, [{ name: 'admin', path: '/admin' }])
+    }, [
+      { name: 'admin', path: '/admin' },
+    ])
 
     expect(config.pages).toEqual({
       admin: { _tag: 'unlocalized', path: '/admin' },

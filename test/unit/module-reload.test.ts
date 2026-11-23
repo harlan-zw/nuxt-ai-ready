@@ -24,7 +24,9 @@ describe('configuration warnings on Nitro reload', () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     try {
       await installModule(module, { database: false, agentSkills: false }, nuxt)
-      const reload = major === 3 ? 'build:reload' : 'rollup:reload'
+      const reload = major === 3
+        ? 'build:reload'
+        : 'rollup:reload'
       const callbacks = new Map<string, () => void>()
       const deprecated = vi.fn()
       const nitro = {
@@ -45,7 +47,11 @@ describe('configuration warnings on Nitro reload', () => {
       else
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('Set site.url'))
       warn.mockClear()
-      Object.assign(nitro.options.routeRules, { '/docs/**': { cache: { maxAge: 3600 } } })
+      Object.assign(nitro.options.routeRules, {
+        '/docs/**': {
+          cache: { maxAge: 3600 },
+        },
+      })
       callbacks.get(reload)?.()
       if (preparing)
         expect(warn).not.toHaveBeenCalled()
@@ -54,7 +60,9 @@ describe('configuration warnings on Nitro reload', () => {
       warn.mockClear()
       callbacks.get(reload)?.()
       expect(warn).not.toHaveBeenCalled()
-      Object.assign(nitro.options.routeRules, { '/isr/**': { isr: true } })
+      Object.assign(nitro.options.routeRules, {
+        '/isr/**': { isr: true },
+      })
       await nuxt.callHook('nitro:build:before', nitro as never)
       if (preparing)
         expect(warn).not.toHaveBeenCalled()

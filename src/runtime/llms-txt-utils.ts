@@ -37,42 +37,80 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
   const baseURL = runtimeConfig.app.baseURL
   const resolveUrl = (path: string) => withSiteUrl(event, toDeployedRoute(path, baseURL), { withBase: true })
   const resolvePageUrl = (path: string) => resolveUrl(withSiteTrailingSlash(event, path))
-  const canonicalSiteUrl = siteConfig.url ? resolveUrl('/') : undefined
+  const canonicalSiteUrl = siteConfig.url
+    ? resolveUrl('/')
+    : undefined
   const i18n = aiReadyConfig.i18n as RuntimeI18nConfig | null | undefined
   const i18nRuntime = i18n
-    ? { _tag: 'enabled' as const, config: i18n, ...await import('./llms-txt-i18n') }
+    ? {
+        _tag: 'enabled' as const,
+        config: i18n,
+        ...await import('./llms-txt-i18n'),
+      }
     : { _tag: 'disabled' as const }
-  const i18nContext = { host: getRequestHost(event, { xForwardedHost: true }) }
+  const i18nContext = {
+    host: getRequestHost(event, { xForwardedHost: true }),
+  }
   const parts = [`# ${(siteConfig.name || canonicalSiteUrl || 'Site').replace(/\s+/g, ' ').trim()}`]
   if (siteConfig.description)
     parts.push('', `> ${siteConfig.description.replace(/\s+/g, ' ').trim()}`)
   if (canonicalSiteUrl)
     parts.push('', `Canonical Origin: ${canonicalSiteUrl}`)
 
-  const sections = config.sections?.map(section => ({ ...section, links: section.links ? [...section.links] : undefined })) ?? []
+  const sections = config.sections?.map(section => ({
+    ...section,
+    links: section.links
+      ? [...section.links]
+      : undefined,
+  })) ?? []
   const resources = sections.find(section => section.title === 'LLM Resources' && !section.sitemap)
   if (resources) {
     resources.links ||= []
     for (const sitemap of getSitemapsFromConfig(event).filter(sitemap => config.sitemaps === undefined || config.sitemaps.includes(sitemap.name))) {
-      resources.links.push({ title: sitemap.route.split('/').pop() || `${sitemap.name}.xml`, href: resolveUrl(toLogicalRoute(sitemap.route, baseURL)), description: 'XML sitemap for search engines and crawlers.' })
+      resources.links.push({
+        title: sitemap.route.split('/').pop() || `${sitemap.name}.xml`,
+        href: resolveUrl(toLogicalRoute(sitemap.route, baseURL)),
+        description: 'XML sitemap for search engines and crawlers.',
+      })
     }
-    if (!getSitemapsFromConfig(event).length && (config.sitemaps === undefined || config.sitemaps.includes('sitemap')))
-      resources.links.push({ title: 'sitemap.xml', href: resolveUrl('/sitemap.xml'), description: 'XML sitemap for search engines and crawlers.' })
-    resources.links.push({ title: 'robots.txt', href: resolveUrl('/robots.txt'), description: 'Crawler rules and permissions.' })
+    if (!getSitemapsFromConfig(event).length && (config.sitemaps === undefined || config.sitemaps.includes('sitemap'))) {
+      resources.links.push({
+        title: 'sitemap.xml',
+        href: resolveUrl('/sitemap.xml'),
+        description: 'XML sitemap for search engines and crawlers.',
+      })
+    }
+    resources.links.push({
+      title: 'robots.txt',
+      href: resolveUrl('/robots.txt'),
+      description: 'Crawler rules and permissions.',
+    })
   }
 
-  if (config.pages === false && !sections.some(section => section.sitemap))
-    return Object.fromEntries(createLlmsTxtFiles({ header: parts.join('\n'), config, sections, pages: [], sitemapPages: new Map(), resolveUrl }))
+  if (config.pages === false && !sections.some(section => section.sitemap)) {
+    return Object.fromEntries(createLlmsTxtFiles({
+      header: parts.join('\n'),
+      config,
+      sections,
+      pages: [],
+      sitemapPages: new Map(),
+      resolveUrl,
+    }))
+  }
 
   // Database rows supply metadata. The selected sitemap supplies admission.
   const groups = await fetchSitemapUrlGroups(event, config.sitemaps)
-  const allowedOrigin = canonicalSiteUrl ? new URL(canonicalSiteUrl).origin : undefined
+  const allowedOrigin = canonicalSiteUrl
+    ? new URL(canonicalSiteUrl).origin
+    : undefined
   const requestOrigin = getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
   const sitemapPaths = new Map<string, Set<string>>()
   for (const [name, urls] of groups) {
     const paths = new Set<string>()
     for (const entry of urls) {
-      const url = URL.canParse(entry.loc, canonicalSiteUrl || 'http://localhost') ? new URL(entry.loc, canonicalSiteUrl || 'http://localhost') : undefined
+      const url = URL.canParse(entry.loc, canonicalSiteUrl || 'http://localhost')
+        ? new URL(entry.loc, canonicalSiteUrl || 'http://localhost')
+        : undefined
       if (!url || url.search || url.hash || (allowedOrigin && url.origin !== allowedOrigin && url.origin !== requestOrigin))
         continue
       const path = toLogicalRoute(url.pathname, baseURL)
@@ -80,19 +118,36 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
     }
     sitemapPaths.set(name, paths)
   }
-  const admitted = new Set([...sitemapPaths.values()].flatMap(paths => [...paths]))
+  const admitted = new Set([
+    ...sitemapPaths.values(),
+  ].flatMap(paths => [...paths]))
   // The query layer selects build storage during prerender and runtime storage otherwise.
   const read = config.pages === 'all'
-    ? Promise.all([queryPages(event), queryPages(event, { where: { hasError: true } })]).then(results => results.flat())
+    ? Promise.all([
+        queryPages(event),
+        queryPages(event, {
+          where: { hasError: true },
+        }),
+      ]).then(results => results.flat())
     // Include legacy deployed routes without scanning every retired database row.
-    : queryPageMetadata(event, [...admitted].flatMap(path => [path, toDeployedRoute(path, baseURL)]))
+    : queryPageMetadata(event, [...admitted].flatMap(path => [
+        path,
+        toDeployedRoute(path, baseURL),
+      ]))
   const stored = await read.catch((error) => {
-    logger.warn(`[ai-ready] Database unavailable for llms.txt. Using sitemap metadata: ${error instanceof Error ? error.message : String(error)}`)
+    logger.warn(`[ai-ready] Database unavailable for llms.txt. Using sitemap metadata: ${error instanceof Error
+      ? error.message
+      : String(error)}`)
     return []
   })
   const errorPaths = new Set(stored.filter(page => page.isError).map(page => normalizePersistedRoute(page.route, admitted, baseURL)))
-  const metadata = new Map(stored.map(page => [normalizePersistedRoute(page.route, admitted, baseURL), page]))
-  const availability = config.markdownLinks ? await findMarkdownLinkAvailability() : undefined
+  const metadata = new Map(stored.map(page => [
+    normalizePersistedRoute(page.route, admitted, baseURL),
+    page,
+  ]))
+  const availability = config.markdownLinks
+    ? await findMarkdownLinkAvailability()
+    : undefined
   const href = (path: string) => {
     const markdownPath = toMarkdownPath(path)
     if (availability && (availability.paths.has(decodePath(toDeployedRoute(markdownPath, baseURL))) || (availability.runtimeMarkdownAvailable && hasMarkdownTwin(path))))
@@ -100,13 +155,26 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
     return resolvePageUrl(path)
   }
   const pageMap = new Map<string, LlmsTxtPage>()
-  const candidates = config.pages === 'all' ? new Set([...admitted, ...metadata.keys()]) : admitted
+  const candidates = config.pages === 'all'
+    ? new Set([
+        ...admitted,
+        ...metadata.keys(),
+      ])
+    : admitted
   for (const pathname of [...candidates].sort()) {
     if (errorPaths.has(pathname))
       continue
     const page = metadata.get(pathname)
-    const locale = page?.locale || (i18nRuntime._tag === 'enabled' ? i18nRuntime.resolveLocaleFromRoute(pathname, i18nRuntime.config, i18nContext).locale : undefined)
-    pageMap.set(pathname, { pathname, href: href(pathname), title: page?.title, description: page?.description, locale })
+    const locale = page?.locale || (i18nRuntime._tag === 'enabled'
+      ? i18nRuntime.resolveLocaleFromRoute(pathname, i18nRuntime.config, i18nContext).locale
+      : undefined)
+    pageMap.set(pathname, {
+      pathname,
+      href: href(pathname),
+      title: page?.title,
+      description: page?.description,
+      locale,
+    })
   }
   let rootContent: string | undefined
   if (i18nRuntime._tag === 'enabled') {
@@ -119,8 +187,27 @@ export async function buildLlmsTxtFiles(event: H3Event): Promise<Record<string, 
         pageMap.delete(path)
     }
   }
-  const sitemapPages = new Map([...sitemapPaths].map(([name, paths]) => [name, [...paths].flatMap(path => pageMap.has(path) ? [pageMap.get(path)!] : [])]))
-  return Object.fromEntries(createLlmsTxtFiles({ header: parts.join('\n'), config, sections, rootContent, pages: config.pages === false ? [] : [...pageMap.values()], sitemapPages, resolveUrl }))
+  const sitemapPages = new Map([...sitemapPaths].map(([name, paths]) => [
+    name,
+    [...paths].flatMap(path => pageMap.has(path)
+      ? [
+          pageMap.get(path)!,
+        ]
+      : []),
+  ]))
+  return Object.fromEntries(createLlmsTxtFiles({
+    header: parts.join('\n'),
+    config,
+    sections,
+    rootContent,
+    pages: config.pages === false
+      ? []
+      : [
+          ...pageMap.values(),
+        ],
+    sitemapPages,
+    resolveUrl,
+  }))
 }
 
 export async function buildLlmsTxt(event: H3Event): Promise<string> {

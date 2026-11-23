@@ -49,7 +49,9 @@ describe('static usage policy budget', () => {
     ['overlapping security rules', '/private\n  ! X-Frame-Options\n/*\n  X-Frame-Options: DENY\n', '/private'],
   ])('preserves global-policy consumers with %s', (_name, existing, path) => {
     const policy = '  Content-Signal: search=yes, ai-input=yes, ai-train=yes\n'
-    const source = /^\/\*\n/m.test(existing) ? existing.replace(/^\/\*\n/m, `/*\n${policy}`) : `${existing}/*\n${policy}`
+    const source = /^\/\*\n/m.test(existing)
+      ? existing.replace(/^\/\*\n/m, `/*\n${policy}`)
+      : `${existing}/*\n${policy}`
     const expected = resolveCloudflareStaticHeaders(source, path)
     const result = resolveCloudflareStaticHeaders(normalizeStaticContentSignalHeaders(source), path)
     expect(result).toEqual(expected)

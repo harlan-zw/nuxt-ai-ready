@@ -8,7 +8,10 @@ const policy = {
     search: { access: 'allow', attribution: 'required' },
     answer: { access: 'allow' },
     training: { access: 'deny' },
-    agent: { access: 'paid', price: { amount: '0.002', currency: 'USD', per: 'page' } },
+    agent: {
+      access: 'paid',
+      price: { amount: '0.002', currency: 'USD', per: 'page' },
+    },
   },
   payment: { protocol: 'x402', endpoint: 'https://pay.example.com' },
 } satisfies AiTermsConfig

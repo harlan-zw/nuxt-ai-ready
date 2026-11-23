@@ -13,7 +13,12 @@ const { warn, mkdir, writeFile, rm } = vi.hoisted(() => ({
 
 // Break the circular virtual logger alias used in unit tests.
 vi.mock('#ai-ready-virtual/logger.mjs', () => ({
-  logger: { warn, debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+  logger: {
+    warn,
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 vi.mock('node:fs/promises', () => ({ mkdir, writeFile, rm }))
@@ -50,7 +55,9 @@ describe('resolveWritableDbPath', () => {
     const dbPath = '.erofs/ai-ready/pages.db'
     // primary mkdir fails read-only; temp dir succeeds
     mkdir.mockImplementation(async (dir: string) =>
-      dir.startsWith(tmpdir()) ? undefined : Promise.reject(rofs()))
+      dir.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(rofs()))
     writeFile.mockResolvedValue(undefined)
     rm.mockResolvedValue(undefined)
 
@@ -66,7 +73,9 @@ describe('resolveWritableDbPath', () => {
     const dbPath = '.readonly-existing/ai-ready/pages.db'
     mkdir.mockResolvedValue(undefined)
     writeFile.mockImplementation(async (file: string) =>
-      file.startsWith(tmpdir()) ? undefined : Promise.reject(rofs()))
+      file.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(rofs()))
     rm.mockResolvedValue(undefined)
 
     const result = await resolveWritableDbPath(dbPath)
@@ -77,7 +86,9 @@ describe('resolveWritableDbPath', () => {
   it('falls back on a permission error (EACCES)', async () => {
     const dbPath = '.eacces/ai-ready/pages.db'
     mkdir.mockImplementation(async (dir: string) =>
-      dir.startsWith(tmpdir()) ? undefined : Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' })))
+      dir.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(Object.assign(new Error('denied'), { code: 'EACCES' })))
     writeFile.mockResolvedValue(undefined)
     rm.mockResolvedValue(undefined)
 
@@ -92,7 +103,9 @@ describe('resolveWritableDbPath', () => {
     // on scripts.nuxt.com as "ENOENT: no such file or directory, mkdir '.data'").
     const dbPath = '.enoent/ai-ready/pages.db'
     mkdir.mockImplementation(async (dir: string) =>
-      dir.startsWith(tmpdir()) ? undefined : Promise.reject(Object.assign(new Error('no such file or directory'), { code: 'ENOENT' })))
+      dir.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(Object.assign(new Error('no such file or directory'), { code: 'ENOENT' })))
     writeFile.mockResolvedValue(undefined)
     rm.mockResolvedValue(undefined)
 
@@ -105,7 +118,9 @@ describe('resolveWritableDbPath', () => {
   it('falls back when a path segment is a file (ENOTDIR)', async () => {
     const dbPath = '.enotdir/ai-ready/pages.db'
     mkdir.mockImplementation(async (dir: string) =>
-      dir.startsWith(tmpdir()) ? undefined : Promise.reject(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' })))
+      dir.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' })))
     writeFile.mockResolvedValue(undefined)
     rm.mockResolvedValue(undefined)
 
@@ -116,7 +131,9 @@ describe('resolveWritableDbPath', () => {
 
   it('gives distinct fallback dirs to distinct configured paths', async () => {
     mkdir.mockImplementation(async (dir: string) =>
-      dir.startsWith(tmpdir()) ? undefined : Promise.reject(rofs()))
+      dir.startsWith(tmpdir())
+        ? undefined
+        : Promise.reject(rofs()))
     writeFile.mockResolvedValue(undefined)
     rm.mockResolvedValue(undefined)
 

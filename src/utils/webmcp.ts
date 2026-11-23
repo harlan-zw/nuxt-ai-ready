@@ -33,9 +33,20 @@ export interface ResolveSiteToolsOptions {
 
 function detachedSiteTools(): ResolvedSiteToolsConfig {
   return {
-    listPages: { defaultLimit: DEFAULT_LIST_LIMIT, mcp: { enabled: false }, webmcp: { enabled: false } },
-    searchPages: { defaultLimit: DEFAULT_SEARCH_LIMIT, mcp: { enabled: false }, webmcp: { enabled: false } },
-    getPageMarkdown: { mcp: { enabled: false }, webmcp: { enabled: false } },
+    listPages: {
+      defaultLimit: DEFAULT_LIST_LIMIT,
+      mcp: { enabled: false },
+      webmcp: { enabled: false },
+    },
+    searchPages: {
+      defaultLimit: DEFAULT_SEARCH_LIMIT,
+      mcp: { enabled: false },
+      webmcp: { enabled: false },
+    },
+    getPageMarkdown: {
+      mcp: { enabled: false },
+      webmcp: { enabled: false },
+    },
   }
 }
 
@@ -83,7 +94,9 @@ function resolveWebMcpAttachment(
       `${path}.webmcp.maxOutputChars`,
       warnings,
     ),
-    exposedTo: options?.exposedTo === undefined ? undefined : [...options.exposedTo],
+    exposedTo: options?.exposedTo === undefined
+      ? undefined
+      : [...options.exposedTo],
   }
 }
 
@@ -91,8 +104,12 @@ export function resolveSiteToolsConfig(
   input: SiteToolsConfig | undefined,
   options: ResolveSiteToolsOptions = {},
 ): ResolveSiteToolsConfigResult {
-  if (options.database?._tag === 'Disabled')
-    return { config: detachedSiteTools(), warnings: [] }
+  if (options.database?._tag === 'Disabled') {
+    return {
+      config: detachedSiteTools(),
+      warnings: [],
+    }
+  }
 
   const warnings: string[] = []
   return {
@@ -135,7 +152,9 @@ export function resolveWebMcpConfig(
   if (!input)
     return { _tag: 'Disabled' }
 
-  const options = input === true ? {} : input
+  const options = input === true
+    ? {}
+    : input
   const tools: ResolvedWebMcpToolsConfig = {}
   if (options.tools !== false) {
     if (toolsConfig.listPages.webmcp.enabled) {
@@ -163,7 +182,9 @@ export function resolveWebMcpConfig(
     _tag: 'Enabled',
     config: {
       tools,
-      exposedTo: options.exposedTo?.length ? [...options.exposedTo] : undefined,
+      exposedTo: options.exposedTo?.length
+        ? [...options.exposedTo]
+        : undefined,
     },
   }
 }

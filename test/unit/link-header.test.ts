@@ -16,7 +16,10 @@ function isAscii(s: string): boolean {
 describe('buildLinkHeader', () => {
   it('preserves encoding in the AI Terms discovery URL', () => {
     const href = 'https://example.com/caf%C3%A9/.well-known/ai-terms'
-    const header = buildLinkHeader('/about', 'markdown', { ...baseConfig, aiTerms: { href } })
+    const header = buildLinkHeader('/about', 'markdown', {
+      ...baseConfig,
+      aiTerms: { href },
+    })
     expect(header).toContain(`<${href}>; rel="ai-terms"`)
   })
 
@@ -120,7 +123,9 @@ describe('buildLinkHeader', () => {
         { code: 'en', hreflang: 'en' },
         { code: 'fr', hreflang: 'fr' },
       ],
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     }
     const config = { i18n } as ModulePublicRuntimeConfig
     const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl)
@@ -139,7 +144,9 @@ describe('buildLinkHeader', () => {
         { code: 'en', hreflang: 'en', domain: 'en.example.com' },
         { code: 'fr', hreflang: 'fr', domain: 'fr.example.com' },
       ],
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     } satisfies RuntimeI18nConfig
     const config = { ...baseConfig, i18n }
     const header = buildLinkHeader('/about', 'html', config, resolveExampleUrl, { host: 'en.example.com' })
@@ -154,10 +161,22 @@ describe('buildLinkHeader', () => {
       strategy: 'prefix_except_default',
       multiDomainLocales: true,
       locales: [
-        { code: 'en', hreflang: 'en', domains: ['en.example.com', 'fr.example.com'], defaultForDomains: ['en.example.com'] },
-        { code: 'fr', hreflang: 'fr', domains: ['en.example.com', 'fr.example.com'], defaultForDomains: ['fr.example.com'] },
+        {
+          code: 'en',
+          hreflang: 'en',
+          domains: ['en.example.com', 'fr.example.com'],
+          defaultForDomains: ['en.example.com'],
+        },
+        {
+          code: 'fr',
+          hreflang: 'fr',
+          domains: ['en.example.com', 'fr.example.com'],
+          defaultForDomains: ['fr.example.com'],
+        },
       ],
-      pages: { about: { en: '/about', fr: '/a-propos' } },
+      pages: {
+        about: { en: '/about', fr: '/a-propos' },
+      },
     }
 
     const header = buildLinkHeader('/a-propos', 'html', { ...baseConfig, i18n }, resolveExampleUrl, { host: 'fr.example.com' })
@@ -216,18 +235,31 @@ describe('status-aware Link headers', () => {
       { code: 'en', hreflang: 'en', domain: 'en.example.com' },
       { code: 'fr', hreflang: 'fr', domain: 'fr.example.com' },
     ],
-    pages: { about: { en: '/about', fr: '/a-propos' } },
+    pages: {
+      about: { en: '/about', fr: '/a-propos' },
+    },
   }
 
   it.each(['html', 'markdown'] as const)('preserves %s success and error headers with domains and a base path', (variant) => {
-    const config = { i18n, apiCatalog: { href: 'https://example.com/docs/.well-known/api-catalog' } }
+    const config = {
+      i18n,
+      apiCatalog: { href: 'https://example.com/docs/.well-known/api-catalog' },
+    }
     const resolveUrl = (path: string) => `https://en.example.com/docs${path}`
     const headers = buildStatusAwareLinkHeaders('/about', variant, config, resolveUrl, { host: 'en.example.com' })
-    const target = variant === 'html' ? '/about.md' : '/about'
-    const canonical = variant === 'markdown' ? ', <https://en.example.com/docs/about>; rel="canonical"' : ''
+    const target = variant === 'html'
+      ? '/about.md'
+      : '/about'
+    const canonical = variant === 'markdown'
+      ? ', <https://en.example.com/docs/about>; rel="canonical"'
+      : ''
     const apiCatalog = '<https://example.com/docs/.well-known/api-catalog>; rel="api-catalog"'
-    const base = `<https://en.example.com/docs${target}>; rel="alternate"; type="text/${variant === 'html' ? 'markdown' : 'html'}"${canonical}, <https://en.example.com/docs/llms.txt>; rel="describedby"`
-    const suffix = variant === 'markdown' ? '.md' : ''
+    const base = `<https://en.example.com/docs${target}>; rel="alternate"; type="text/${variant === 'html'
+      ? 'markdown'
+      : 'html'}"${canonical}, <https://en.example.com/docs/llms.txt>; rel="describedby"`
+    const suffix = variant === 'markdown'
+      ? '.md'
+      : ''
 
     expect(headers.error).toBe(`${base}, ${apiCatalog}`)
     expect(headers.success).toBe(`${base}, <https://en.example.com/docs/about${suffix}>; rel="alternate"; hreflang="en", <https://fr.example.com/docs/a-propos${suffix}>; rel="alternate"; hreflang="fr", ${apiCatalog}`)
@@ -265,7 +297,14 @@ describe('status-aware Link headers', () => {
 
   it('keeps relative links when URL resolution fails', () => {
     const headers = buildStatusAwareLinkHeaders('/missing', 'html', {
-      i18n: { ...i18n, differentDomains: false, locales: [{ code: 'en', hreflang: 'en' }, { code: 'fr', hreflang: 'fr' }] },
+      i18n: {
+        ...i18n,
+        differentDomains: false,
+        locales: [
+          { code: 'en', hreflang: 'en' },
+          { code: 'fr', hreflang: 'fr' },
+        ],
+      },
     }, () => { throw new Error('Site URL unavailable') })
 
     expect(headers).toEqual({

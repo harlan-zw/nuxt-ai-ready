@@ -9,7 +9,9 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'nuxt-ai-ready': config }),
 }))
 
-const { requireAuth } = vi.hoisted(() => ({ requireAuth: vi.fn() }))
+const { requireAuth } = vi.hoisted(() => ({
+  requireAuth: vi.fn(),
+}))
 vi.mock('../../src/runtime/server/utils/auth', () => ({ requireAuth }))
 
 const { tryAcquireCronLock, releaseCronLock } = vi.hoisted(() => ({
@@ -21,7 +23,9 @@ vi.mock('../../src/runtime/server/db/queries', () => ({
   releaseCronLock,
 }))
 
-const { batchIndexPages } = vi.hoisted(() => ({ batchIndexPages: vi.fn() }))
+const { batchIndexPages } = vi.hoisted(() => ({
+  batchIndexPages: vi.fn(),
+}))
 vi.mock('../../src/runtime/server/utils/batchIndex', () => ({ batchIndexPages }))
 
 const { default: pollEndpoint } = await import('../../src/runtime/server/routes/__ai-ready/poll.post')
@@ -41,7 +45,13 @@ describe('pOST /__ai-ready/poll limit defaults', () => {
     requireAuth.mockReturnValue(undefined)
     tryAcquireCronLock.mockResolvedValue({ _tag: 'acquired', token: 'lock-token' })
     releaseCronLock.mockResolvedValue(undefined)
-    batchIndexPages.mockResolvedValue({ indexed: 0, remaining: 0, errors: [], duration: 1, complete: true })
+    batchIndexPages.mockResolvedValue({
+      indexed: 0,
+      remaining: 0,
+      errors: [],
+      duration: 1,
+      complete: true,
+    })
   })
 
   it('defaults the batch size to runtimeSync.batchSize', async () => {

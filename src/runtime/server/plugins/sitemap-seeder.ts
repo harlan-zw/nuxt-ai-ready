@@ -130,13 +130,17 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
 
     // Capture source dates before enriching the public sitemap from our index.
     // Each URL also carries the host used for multi-domain locale resolution.
-    const routes = [...routeToUrl.entries()].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
+    const routes = [
+      ...routeToUrl.entries(),
+    ].map(([route, url]) => ({ route, url: url.loc, lastmod: url.lastmod }))
 
     logger.debug(`[sitemap-seeder] Processing ${routeToUrl.size} routes from ${sitemapName}`)
 
     // Surface diagnostics into the served sitemap XML only under debug, so
     // normal sitemaps stay clean. The output hook below renders whatever we record.
-    const record = isDebug(event) ? (m: string) => recordDiagnostic(event, m) : undefined
+    const record = isDebug(event)
+      ? (m: string) => recordDiagnostic(event, m)
+      : undefined
 
     // Enrich sitemap entries with lastmod from our indexed pages. This mutates
     // the rendered output, so it must complete before the hook returns. Single
@@ -185,7 +189,9 @@ export default function sitemapSeederPlugin(nitroApp: NitroApp) {
     const seed = async () => {
       const seedStart = Date.now()
       const pruneTtl = (useRuntimeConfig() as { 'nuxt-ai-ready'?: { runtimeSync?: { pruneTtl?: number } } })['nuxt-ai-ready']?.runtimeSync?.pruneTtl ?? 0
-      const seeded = await seedRoutes(event, routes, { refreshWindowMs: resolveSeedRefreshWindowMs(pruneTtl) }).catch((e) => {
+      const seeded = await seedRoutes(event, routes, {
+        refreshWindowMs: resolveSeedRefreshWindowMs(pruneTtl),
+      }).catch((e) => {
         logger.warn(`[sitemap-seeder] Failed to seed routes: ${e.message}`)
         return 0
       })

@@ -4,7 +4,9 @@ import { prerenderedMarkdownHeaderRules } from '../../src/utils/static-markdown-
 describe('prerenderedMarkdownHeaderRules', () => {
   it('preserves the source usage policy on a prerendered twin', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{ route: '/about.md', fileName: '/about.md', contentSignal: 'ai-train=no, search=yes' }],
+      [
+        { route: '/about.md', fileName: '/about.md', contentSignal: 'ai-train=no, search=yes' },
+      ],
       '/',
       true,
       [],
@@ -34,7 +36,9 @@ describe('prerenderedMarkdownHeaderRules', () => {
 
   it('maps the index twin to the root canonical and applies the base URL', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{ route: '/base/index.md', fileName: '/index.md' }],
+      [
+        { route: '/base/index.md', fileName: '/index.md' },
+      ],
       '/base',
       true,
       [],
@@ -65,7 +69,9 @@ describe('prerenderedMarkdownHeaderRules', () => {
 
   it('omits describedby when disabled', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{ route: '/a.md', fileName: '/a.md' }],
+      [
+        { route: '/a.md', fileName: '/a.md' },
+      ],
       '/',
       false,
       [],
@@ -80,7 +86,9 @@ describe('prerenderedMarkdownHeaderRules', () => {
 
   it('excludes an alias artifact route from twin rules', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{ route: '/SKILL.md', fileName: '/SKILL.md' }],
+      [
+        { route: '/SKILL.md', fileName: '/SKILL.md' },
+      ],
       '/',
       true,
       ['/SKILL.md'],
@@ -91,10 +99,12 @@ describe('prerenderedMarkdownHeaderRules', () => {
 
   it('excludes a well-known agent-skill artifact route from twin rules', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{
-        route: '/.well-known/agent-skills/seo-audit/SKILL.md',
-        fileName: '/.well-known/agent-skills/seo-audit/SKILL.md',
-      }],
+      [
+        {
+          route: '/.well-known/agent-skills/seo-audit/SKILL.md',
+          fileName: '/.well-known/agent-skills/seo-audit/SKILL.md',
+        },
+      ],
       '/',
       true,
       ['/.well-known/agent-skills/seo-audit/SKILL.md'],
@@ -105,7 +115,9 @@ describe('prerenderedMarkdownHeaderRules', () => {
 
   it('keeps twin rules for routes outside the artifact list', () => {
     const rules = prerenderedMarkdownHeaderRules(
-      [{ route: '/a.md', fileName: '/a.md' }],
+      [
+        { route: '/a.md', fileName: '/a.md' },
+      ],
       '/',
       true,
       ['/SKILL.md'],

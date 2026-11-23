@@ -23,7 +23,9 @@ const tool: McpToolDefinition<typeof inputSchema> = {
     const path = normalizeSiteRoute(route)
     if (!path) {
       return {
-        content: [{ type: 'text', text: 'A site route is required, such as /about. Call list_pages to see the available routes.' }],
+        content: [
+          { type: 'text', text: 'A site route is required, such as /about. Call list_pages to see the available routes.' },
+        ],
         isError: true,
       }
     }
@@ -31,7 +33,9 @@ const tool: McpToolDefinition<typeof inputSchema> = {
     const page = await queryPages(useEvent() as H3Event, { route: path, includeMarkdown: true })
     if (!page) {
       return {
-        content: [{ type: 'text', text: `No indexed page found at ${path}. Call search_pages or list_pages to find the correct route.` }],
+        content: [
+          { type: 'text', text: `No indexed page found at ${path}. Call search_pages or list_pages to find the correct route.` },
+        ],
         isError: true,
       }
     }

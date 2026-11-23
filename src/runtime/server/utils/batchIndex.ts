@@ -44,7 +44,9 @@ export async function batchIndexPages(
   const timeout = options.timeout ?? 30000
   const concurrency = options.concurrency ?? CONCURRENCY
 
-  const beforeCount = await countPages(event, { where: { pending: true } })
+  const beforeCount = await countPages(event, {
+    where: { pending: true },
+  })
   if (beforeCount === 0) {
     return {
       indexed: 0,
@@ -68,7 +70,10 @@ export async function batchIndexPages(
 
     // Fetch next chunk of pending pages
     const chunkSize = Math.min(concurrency, limit - processed)
-    const pages = await queryPages(event, { where: { pending: true }, limit: chunkSize }) as PageEntry[]
+    const pages = await queryPages(event, {
+      where: { pending: true },
+      limit: chunkSize,
+    }) as PageEntry[]
 
     if (pages.length === 0)
       break
@@ -109,7 +114,9 @@ export async function batchIndexPages(
       break
   }
 
-  const remaining = await countPages(event, { where: { pending: true } })
+  const remaining = await countPages(event, {
+    where: { pending: true },
+  })
 
   return {
     indexed,

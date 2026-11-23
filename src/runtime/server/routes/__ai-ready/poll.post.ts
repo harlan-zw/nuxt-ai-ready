@@ -20,8 +20,12 @@ export default eventHandler(async (event) => {
   }
   const defaultLimit = Math.max(1, Math.trunc(Math.min(config.runtimeSync?.batchSize ?? 10, 50))) || 10
 
-  const limit = query.limit ? Math.max(1, Math.min(50, Math.trunc(Number(query.limit)) || defaultLimit)) : defaultLimit
-  const timeout = query.timeout ? Math.max(1000, Math.trunc(Number(query.timeout)) || 30000) : undefined
+  const limit = query.limit
+    ? Math.max(1, Math.min(50, Math.trunc(Number(query.limit)) || defaultLimit))
+    : defaultLimit
+  const timeout = query.timeout
+    ? Math.max(1000, Math.trunc(Number(query.timeout)) || 30000)
+    : undefined
 
   try {
     const result = await batchIndexPages(event, {
@@ -33,7 +37,9 @@ export default eventHandler(async (event) => {
     return {
       indexed: result.indexed,
       remaining: result.remaining,
-      errors: result.errors.length > 0 ? result.errors : undefined,
+      errors: result.errors.length > 0
+        ? result.errors
+        : undefined,
       duration: result.duration,
       complete: result.complete,
     }

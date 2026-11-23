@@ -21,7 +21,9 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config }),
 }))
 
-vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'secret-token' }))
+vi.mock('nuxt/server', () => ({
+  deriveSecret: async () => 'secret-token',
+}))
 
 vi.mock('../../src/runtime/server/db/queries', () => ({
   tryAcquireCronLock,
@@ -33,7 +35,12 @@ vi.mock('../../src/runtime/server/utils/batchIndex', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }))
 
 const { default: pollEndpoint } = await import('../../src/runtime/server/routes/__ai-ready/poll.post')
@@ -45,7 +52,9 @@ const request = toWebHandler(app)
 async function postPoll(url = 'http://localhost/__ai-ready/poll', authenticated = true) {
   const response = await request(new Request(url, {
     method: 'POST',
-    headers: authenticated ? { authorization: 'Bearer secret-token' } : {},
+    headers: authenticated
+      ? { authorization: 'Bearer secret-token' }
+      : {},
   }))
   return { status: response.status, body: await response.json() }
 }

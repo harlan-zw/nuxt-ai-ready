@@ -11,7 +11,12 @@ describe('robots.txt content signals set through the robots module', async () =>
     server: true,
     nuxtConfig: {
       robots: {
-        groups: [{ userAgent: ['*'], contentSignal: { 'search': 'yes', 'ai-input': 'no', 'ai-train': 'no' } }],
+        groups: [
+          {
+            userAgent: ['*'],
+            contentSignal: { 'search': 'yes', 'ai-input': 'no', 'ai-train': 'no' },
+          },
+        ],
       },
     },
   })

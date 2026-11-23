@@ -26,9 +26,14 @@ vi.mock('node:crypto', async importOriginal => ({
 vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: (event?: unknown) => event && state.eventConfig
     ? state.eventConfig
-    : { 'appSecret': state.root, 'nuxt-ai-ready': { runtimeSyncSecret: state.legacy } },
+    : {
+        'appSecret': state.root,
+        'nuxt-ai-ready': { runtimeSyncSecret: state.legacy },
+      },
 }))
-vi.mock('#ai-ready-virtual/logger.mjs', () => ({ logger: { warn: state.warn } }))
+vi.mock('#ai-ready-virtual/logger.mjs', () => ({
+  logger: { warn: state.warn },
+}))
 vi.mock('nuxt/server', () => ({
   deriveSecret: state.derive,
 }))
@@ -43,7 +48,9 @@ app.use(eventHandler(async (event) => {
 const request = toWebHandler(app)
 function authorize(bearer?: string, query = '') {
   return request(new Request(`http://localhost/__ai-ready/status${query}`, {
-    headers: bearer === undefined ? {} : { authorization: `Bearer ${bearer}` },
+    headers: bearer === undefined
+      ? {}
+      : { authorization: `Bearer ${bearer}` },
   }))
 }
 
@@ -133,7 +140,10 @@ describe('runtime sync authentication', () => {
   })
 
   it('uses the request configuration when checking whether to use legacy authentication', async () => {
-    state.eventConfig = { 'appSecret': '', 'nuxt-ai-ready': { runtimeSyncSecret: 'legacy-token' } }
+    state.eventConfig = {
+      'appSecret': '',
+      'nuxt-ai-ready': { runtimeSyncSecret: 'legacy-token' },
+    }
     expect((await authorize('legacy-token')).status).toBe(200)
     expect((await authorize(token(root))).status).toBe(401)
   })
@@ -144,7 +154,15 @@ describe('runtime sync authentication', () => {
     expect((await authorize(undefined, '?secret=test-%EF%BF%BD')).status).toBe(401)
   })
 
-  it.each([undefined, '', 'too-short', 1234, false, [], {}])('fails closed after a warm key for an invalid root: %s', async (value) => {
+  it.each([
+    undefined,
+    '',
+    'too-short',
+    1234,
+    false,
+    [],
+    {},
+  ])('fails closed after a warm key for an invalid root: %s', async (value) => {
     expect((await authorize(token(root))).status).toBe(200)
     state.root = value
     expect((await authorize(token(root))).status).toBe(500)
@@ -250,7 +268,10 @@ describe('runtime sync authentication', () => {
     const derive = vi.spyOn(crypto.subtle, 'deriveBits')
     state.root = undefined
     state.bindings = { NUXT_APP_SECRET: root }
-    const responses = await Promise.all([authorize(token(root)), authorize(token(root))])
+    const responses = await Promise.all([
+      authorize(token(root)),
+      authorize(token(root)),
+    ])
     expect(responses.map(response => response.status)).toEqual([200, 200])
     expect(derive).toHaveBeenCalledTimes(1)
   })

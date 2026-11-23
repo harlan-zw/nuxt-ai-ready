@@ -8,7 +8,11 @@ import { resolveCloudflareStaticHeaders } from '../helpers/cloudflare-headers'
 const { resolve } = createResolver(import.meta.url)
 
 describe('publishing AI Terms alongside Cloudflare Content-Signal rules', async () => {
-  await setup({ rootDir: resolve('../fixtures/ai-terms-cloudflare-policy'), build: true, server: false })
+  await setup({
+    rootDir: resolve('../fixtures/ai-terms-cloudflare-policy'),
+    build: true,
+    server: false,
+  })
 
   it('keeps the private policy and adds one discovery link', async () => {
     const configPath = join(useTestContext().nuxt!.options.buildDir, 'output/server/wrangler.json')

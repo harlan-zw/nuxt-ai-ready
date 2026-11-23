@@ -79,7 +79,9 @@ function appendLocaleParts(
   if (config.i18n) {
     const alternates = computeLocaleAlternates(path, config.i18n, routeContext)
     for (const alt of alternates) {
-      const alternatePath = variant === 'markdown' ? toMarkdownPath(alt.path) : alt.path
+      const alternatePath = variant === 'markdown'
+        ? toMarkdownPath(alt.path)
+        : alt.path
       const href = resolveLocaleAlternateUrl(
         { ...alt, path: alternatePath },
         candidate => resolveHeaderUrl(candidate, resolveUrl),
@@ -128,5 +130,8 @@ export function buildStatusAwareLinkHeaders(
   appendLocaleParts(parts, path, variant, config, resolveUrl, routeContext)
   if (catalog)
     parts.push(catalog)
-  return { error, success: parts.join(', ') }
+  return {
+    error,
+    success: parts.join(', '),
+  }
 }

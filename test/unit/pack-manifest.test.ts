@@ -22,7 +22,13 @@ async function packFixture(manifest: Record<string, unknown>, files: Record<stri
     await writeFile(join(packageRoot, path), content)
   }
   const tarball = join(fixtureRoot, 'fixture.tgz')
-  await execa('tar', ['-czf', tarball, '-C', fixtureRoot, 'package'])
+  await execa('tar', [
+    '-czf',
+    tarball,
+    '-C',
+    fixtureRoot,
+    'package',
+  ])
   return tarball
 }
 
@@ -33,7 +39,9 @@ function check(tarball: string) {
 describe('packed manifest check', () => {
   it('accepts an archive that resolves every dependency from the registry', async () => {
     const tarball = await packFixture(
-      { dependencies: { 'mdream': '^2.0.1', '@mdream/js': '^2.0.1' } },
+      {
+        dependencies: { 'mdream': '^2.0.1', '@mdream/js': '^2.0.1' },
+      },
       { 'dist/module.mjs': 'export default {}\n' },
     )
 
@@ -69,7 +77,9 @@ describe('packed manifest check', () => {
 
   it('rejects an archive that ships a nested node_modules directory', async () => {
     const tarball = await packFixture(
-      { dependencies: { mdream: '^2.0.1' } },
+      {
+        dependencies: { mdream: '^2.0.1' },
+      },
       { 'node_modules/mdream/package.json': '{"name":"mdream"}\n' },
     )
 

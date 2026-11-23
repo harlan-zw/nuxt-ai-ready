@@ -10,7 +10,9 @@ export function mapSitemapRoutes<T extends SitemapRouteSource>(urls: readonly T[
   const routeToUrl = new Map<string, T>()
   for (const url of urls) {
     const route = url._path?.pathname
-      ?? (url.loc.startsWith('/') ? (url.loc.split('?')[0] ?? url.loc) : new URL(url.loc).pathname)
+      ?? (url.loc.startsWith('/')
+        ? (url.loc.split('?')[0] ?? url.loc)
+        : new URL(url.loc).pathname)
     if (hasMarkdownTwin(route))
       routeToUrl.set(route, url)
   }

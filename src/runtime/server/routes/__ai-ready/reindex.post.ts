@@ -6,7 +6,9 @@ export default eventHandler(async (event) => {
   await requireAuth(event)
 
   const query = getQuery(event)
-  const route = typeof query.route === 'string' ? query.route.trim() : ''
+  const route = typeof query.route === 'string'
+    ? query.route.trim()
+    : ''
 
   if (!route.startsWith('/')) {
     throw createError({ statusCode: 400, message: 'Invalid route. It must be an absolute path starting with "/", for example "/about".' })

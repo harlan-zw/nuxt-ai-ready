@@ -45,13 +45,15 @@ function parseFileSections(markdown: string): Record<string, ParsedLink[]> {
 describe('normalizeLlmsTxtConfig', () => {
   it('formats link descriptions on the same line', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{
-        title: 'Documentation',
-        links: [
-          { title: 'Getting Started', href: '/start.md' },
-          { title: 'API\nReference', href: ' /api.md ', description: 'Complete\n API reference' },
-        ],
-      }],
+      sections: [
+        {
+          title: 'Documentation',
+          links: [
+            { title: 'Getting Started', href: '/start.md' },
+            { title: 'API\nReference', href: ' /api.md ', description: 'Complete\n API reference' },
+          ],
+        },
+      ],
     })
 
     expect(result).toContain('- [Getting Started](/start.md)')
@@ -62,11 +64,15 @@ describe('normalizeLlmsTxtConfig', () => {
   it('moves notes and section descriptions into the preamble', () => {
     const result = normalizeLlmsTxtConfig({
       notes: ['Generated automatically.', 'Prefer the stable API.'],
-      sections: [{
-        title: 'API Reference',
-        description: ['Reference documentation.', 'Examples use TypeScript.'],
-        links: [{ title: 'REST API', href: '/api.md' }],
-      }],
+      sections: [
+        {
+          title: 'API Reference',
+          description: ['Reference documentation.', 'Examples use TypeScript.'],
+          links: [
+            { title: 'REST API', href: '/api.md' },
+          ],
+        },
+      ],
     })
 
     const headingIndex = result.indexOf('## API Reference')
@@ -80,11 +86,15 @@ describe('normalizeLlmsTxtConfig', () => {
   it('escapes headings embedded in preamble content', () => {
     const result = normalizeLlmsTxtConfig({
       notes: '## Important\nRead this first.',
-      sections: [{
-        title: 'Documentation',
-        description: '# Overview\nPrimary resources.',
-        links: [{ title: 'Guide', href: '/guide.md' }],
-      }],
+      sections: [
+        {
+          title: 'Documentation',
+          description: '# Overview\nPrimary resources.',
+          links: [
+            { title: 'Guide', href: '/guide.md' },
+          ],
+        },
+      ],
     })
 
     expect(result).toContain('\\## Important')
@@ -95,11 +105,15 @@ describe('normalizeLlmsTxtConfig', () => {
 
   it('preserves Markdown preamble content outside file-list sections', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{
-        title: 'Examples',
-        description: '```bash\ncurl /api\n```',
-        links: [{ title: 'Example', href: '/example.md' }],
-      }],
+      sections: [
+        {
+          title: 'Examples',
+          description: '```bash\ncurl /api\n```',
+          links: [
+            { title: 'Example', href: '/example.md' },
+          ],
+        },
+      ],
     })
 
     expect(result).toMatch(/^\*\*Examples:\*\*[\s\S]*```bash[\s\S]*## Examples/)
@@ -111,12 +125,16 @@ describe('normalizeLlmsTxtConfig', () => {
         {
           title: 'Debug Endpoints',
           optional: true,
-          links: [{ title: 'Debug Route', href: '/debug.md', description: 'Internal diagnostics' }],
+          links: [
+            { title: 'Debug Route', href: '/debug.md', description: 'Internal diagnostics' },
+          ],
         },
         {
           title: 'Legacy API',
           optional: true,
-          links: [{ title: 'Version 1', href: '/v1.md' }],
+          links: [
+            { title: 'Version 1', href: '/v1.md' },
+          ],
         },
       ],
     })
@@ -129,12 +147,16 @@ describe('normalizeLlmsTxtConfig', () => {
 
   it('keeps optional section descriptions inside the optional file list', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{
-        title: 'Debug Endpoints',
-        description: ['Internal debugging tools.', 'May expose implementation details.'],
-        optional: true,
-        links: [{ title: 'Debug Route', href: '/debug.md', description: 'Runtime diagnostics' }],
-      }],
+      sections: [
+        {
+          title: 'Debug Endpoints',
+          description: ['Internal debugging tools.', 'May expose implementation details.'],
+          optional: true,
+          links: [
+            { title: 'Debug Route', href: '/debug.md', description: 'Runtime diagnostics' },
+          ],
+        },
+      ],
     })
 
     const optionalIndex = result.indexOf('## Optional')
@@ -144,13 +166,17 @@ describe('normalizeLlmsTxtConfig', () => {
 
   it('emits parser-safe Markdown links for reserved title and URL characters', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{
-        title: 'Documentation',
-        links: [{
-          title: 'Array[T]',
-          href: '/guides/(typed arrays).md',
-        }],
-      }],
+      sections: [
+        {
+          title: 'Documentation',
+          links: [
+            {
+              title: 'Array[T]',
+              href: '/guides/(typed arrays).md',
+            },
+          ],
+        },
+      ],
     })
 
     expect(result).toContain('- [Array&#91;T&#93;](/guides/%28typed%20arrays%29.md)')
@@ -159,7 +185,9 @@ describe('normalizeLlmsTxtConfig', () => {
 
   it('omits an empty optional file-list section', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{ title: 'Empty', optional: true }],
+      sections: [
+        { title: 'Empty', optional: true },
+      ],
     })
 
     expect(result).toBe('')
@@ -167,7 +195,9 @@ describe('normalizeLlmsTxtConfig', () => {
 
   it('keeps a description-only required section in the preamble without emitting an empty H2', () => {
     const result = normalizeLlmsTxtConfig({
-      sections: [{ title: 'Context', description: 'Read this first.' }],
+      sections: [
+        { title: 'Context', description: 'Read this first.' },
+      ],
     })
 
     expect(result).toBe('**Context:**\n\nRead this first.')
@@ -189,7 +219,9 @@ describe('normalizeLlmsTxtConfig', () => {
         {
           title: 'Examples',
           optional: true,
-          links: [{ title: 'Demo', href: '/demo.md', description: 'Runnable project' }],
+          links: [
+            { title: 'Demo', href: '/demo.md', description: 'Runnable project' },
+          ],
         },
       ],
     }
@@ -229,7 +261,9 @@ describe('llms.txt generated file-list entries', () => {
         ['en', 2],
         ['fr', 3],
       ]),
-      pathname => pathname === '/' ? '/docs/' : `/docs${pathname}`,
+      pathname => pathname === '/'
+        ? '/docs/'
+        : `/docs${pathname}`,
     )).toEqual([
       '## Available Languages on Website',
       '',
@@ -252,7 +286,10 @@ describe('llms.txt generated file-list entries', () => {
 
     expect(formatAvailableLanguagesSection(
       i18n,
-      new Map([['en', 2], ['fr', 3]]),
+      new Map([
+        ['en', 2],
+        ['fr', 3],
+      ]),
       pathname => pathname,
       { host: 'en.example.com' },
     )).toEqual([

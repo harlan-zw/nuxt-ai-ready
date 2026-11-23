@@ -8,7 +8,10 @@ vi.mock('#nuxtseo/nitro', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
 }))
 
 afterEach(() => vi.restoreAllMocks())

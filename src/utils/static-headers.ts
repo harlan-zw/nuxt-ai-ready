@@ -17,9 +17,13 @@ export function ensureStaticHeader(
   value: string,
   mode: 'default' | 'append' = 'default',
 ): string {
-  const eol = contents.includes('\r\n') ? '\r\n' : '\n'
+  const eol = contents.includes('\r\n')
+    ? '\r\n'
+    : '\n'
   const routePattern = new RegExp(`^${escapeRegExp(route)}[\\t ]*\\r?$`, 'gm')
-  const routeMatches = [...contents.matchAll(routePattern)]
+  const routeMatches = [
+    ...contents.matchAll(routePattern),
+  ]
   const routeMatch = routeMatches.at(-1)
 
   if (!routeMatch || routeMatch.index === undefined) {
@@ -35,7 +39,9 @@ export function ensureStaticHeader(
   }
 
   const routeLineEnd = routeMatch.index + routeMatch[0].length
-  const blockStart = contents[routeLineEnd] === '\n' ? routeLineEnd + 1 : routeLineEnd
+  const blockStart = contents[routeLineEnd] === '\n'
+    ? routeLineEnd + 1
+    : routeLineEnd
   const nextBlockPattern = /^(?![\t ]|\r?$).+/gm
   nextBlockPattern.lastIndex = blockStart
   const nextBlock = nextBlockPattern.exec(contents)
@@ -57,7 +63,9 @@ export function ensureStaticHeader(
       if (match) {
         const merged = block.replace(valuePattern, (_line, prefix: string, current: string, suffix: string) => {
           const appended = name.toLowerCase() === 'link'
-            ? current.includes(value) ? current : [current, value].filter(Boolean).join(', ')
+            ? current.includes(value)
+              ? current
+              : [current, value].filter(Boolean).join(', ')
             : mergeVaryHeader(current, value)
           return `${prefix}${appended}${suffix}`
         })
@@ -67,7 +75,9 @@ export function ensureStaticHeader(
     return contents
   }
 
-  const prefix = blockStart === routeLineEnd ? eol : ''
+  const prefix = blockStart === routeLineEnd
+    ? eol
+    : ''
   return `${contents.slice(0, blockStart)}${prefix}  ${name}: ${value}${eol}${contents.slice(blockStart)}`
 }
 
@@ -123,7 +133,11 @@ function parseHeaderLine(line: string): HeaderLine | undefined {
   const name = line.slice(0, colon).trim()
   if (!name || name.startsWith('!') || /\s/.test(name))
     return undefined
-  const eol = line.endsWith('\r\n') ? '\r\n' : line.endsWith('\n') ? '\n' : ''
+  const eol = line.endsWith('\r\n')
+    ? '\r\n'
+    : line.endsWith('\n')
+      ? '\n'
+      : ''
   return {
     name,
     value: line.slice(colon + 1, line.length - eol.length).trim(),
@@ -136,7 +150,11 @@ const RE_DETACH_LINE = /^[\t ]+![\t ]*([^\s:]+)/
 function patternToRegExp(pattern: string): RegExp {
   const source = pattern
     .split(/(\*|:\w+)/)
-    .map(part => part === '*' ? '.*' : part.startsWith(':') ? '[^/]+' : escapeRegExp(part))
+    .map(part => part === '*'
+      ? '.*'
+      : part.startsWith(':')
+        ? '[^/]+'
+        : escapeRegExp(part))
     .join('')
   return new RegExp(`^${source}$`)
 }
@@ -160,12 +178,18 @@ export function normalizeStaticContentSignalHeaders(contents: string, generatedD
   const hasPolicy = (block: HeaderBlock) => block.text.split(/\r?\n/).slice(1).some(line => policyLine.test(line))
   const repeated = new Map<string, HeaderBlock[]>()
   for (const block of parsed) {
-    if (block.route !== null)
-      repeated.set(block.route, [...repeated.get(block.route) || [], block])
+    if (block.route !== null) {
+      repeated.set(block.route, [
+        ...repeated.get(block.route) || [],
+        block,
+      ])
+    }
   }
   const combined = new Set<string>()
   const blocks = parsed.flatMap((block) => {
-    const group = block.route === null ? [] : repeated.get(block.route)!
+    const group = block.route === null
+      ? []
+      : repeated.get(block.route)!
     if (group.length < 2 || !group.some(hasPolicy))
       return [block]
     if (combined.has(block.route!))
@@ -175,7 +199,12 @@ export function normalizeStaticContentSignalHeaders(contents: string, generatedD
     // Preserve that rule's unrelated fields, and retain the final explicit policy.
     const lines = group.at(-1)!.text.split(/\r?\n/).slice(1).filter(line => !policyLine.test(line))
     const policy = group.filter(hasPolicy).at(-1)!.text.split(/\r?\n/).slice(1).filter(line => policyLine.test(line))
-    return [{ route: block.route, text: `${block.route}\n${[...lines, ...policy].join('\n')}\n` }]
+    return [
+      { route: block.route, text: `${block.route}\n${[
+        ...lines,
+        ...policy,
+      ].join('\n')}\n` },
+    ]
   })
   const discoveryLinks = new Set(generatedDiscovery)
   const isGeneratedDiscovery = (line: string) => {
@@ -295,11 +324,15 @@ function headerTokens(name: string, value: string): string[] {
     return splitLinkEntries(value)
   if (name === 'vary')
     return value.split(',').map(token => token.trim()).filter(Boolean)
-  return [value.trim()]
+  return [
+    value.trim(),
+  ]
 }
 
 function tokenKey(name: string, token: string): string {
-  return name === 'vary' ? token.toLowerCase() : token
+  return name === 'vary'
+    ? token.toLowerCase()
+    : token
 }
 
 /**
@@ -319,7 +352,9 @@ export function dedupeStaticHeaders(contents: string, names: readonly string[]):
   const detached = new Set<string>()
   const parsed = blocks.map((block) => {
     const headers: Array<{ name: string, tokens: string[] }> = []
-    for (const line of block.text.split(/(?<=\n)/).slice(block.route === null ? 0 : 1)) {
+    for (const line of block.text.split(/(?<=\n)/).slice(block.route === null
+      ? 0
+      : 1)) {
       const detach = line.match(RE_DETACH_LINE)
       if (detach) {
         detached.add(detach[1]!.toLowerCase())
@@ -329,8 +364,12 @@ export function dedupeStaticHeaders(contents: string, names: readonly string[]):
       if (!header)
         continue
       const name = header.name.toLowerCase()
-      if (owned.has(name))
-        headers.push({ name, tokens: headerTokens(name, header.value) })
+      if (owned.has(name)) {
+        headers.push({
+          name,
+          tokens: headerTokens(name, header.value),
+        })
+      }
     }
     return headers
   })
@@ -382,15 +421,22 @@ export function dedupeStaticHeaders(contents: string, names: readonly string[]):
       if (remaining.length === tokens.length)
         return [line]
       changed = true
-      if (remaining.length > 0)
-        return [header.withValue(remaining.join(', '))]
+      if (remaining.length > 0) {
+        return [
+          header.withValue(remaining.join(', ')),
+        ]
+      }
       headerLines--
       return []
     })
     // Comments and blank lines stay; a rule without headers does not.
-    return headerLines === 0 ? kept.join('') : `${routeLine}${kept.join('')}`
+    return headerLines === 0
+      ? kept.join('')
+      : `${routeLine}${kept.join('')}`
   })
-  return changed ? output.join('') : contents
+  return changed
+    ? output.join('')
+    : contents
 }
 
 /** Cloudflare rejects a `_headers` file with more rules than this (code 100324). */
@@ -419,7 +465,10 @@ function splitHeaderBlocks(contents: string): HeaderBlock[] {
     const isRoute = /^[^\s#]/.test(line)
     if (isRoute) {
       blocks.push(current)
-      current = { route: line.trimEnd(), text: '' }
+      current = {
+        route: line.trimEnd(),
+        text: '',
+      }
     }
     current.text += line
   }

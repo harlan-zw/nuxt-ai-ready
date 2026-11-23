@@ -45,7 +45,9 @@ export function buildSitemapMd(entries: SitemapMdEntry[], options: SitemapMdOpti
     else
       groups.set(key, [entry])
   }
-  const keys = [...groups.keys()].sort((a, b) => {
+  const keys = [
+    ...groups.keys(),
+  ].sort((a, b) => {
     if (a === '')
       return -1
     if (b === '')

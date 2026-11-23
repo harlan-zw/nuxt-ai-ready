@@ -44,7 +44,9 @@ Add llms.txt sections and notes; `notes` renders before the first heading:
 export default defineNuxtConfig({
   aiReady: {
     llmsTxt: {
-      sections: [{ title: 'Skills', sitemap: 'skills', path: '/llms/skills.txt' }],
+      sections: [
+        { title: 'Skills', sitemap: 'skills', path: '/llms/skills.txt' }
+      ],
       notes: 'Built with Nuxt AI Ready',
     },
   },
@@ -70,7 +72,11 @@ Drop an element from every conversion with `mdreamOptions`, e.g. `aiReady: { mdr
 Content Signals: a `contentSignal` object states the whole policy, so an omitted permission renders as `no`:
 
 ```ts
-export default defineNuxtConfig({ aiReady: { contentSignal: { search: true, aiInput: true, aiTrain: false } } })
+export default defineNuxtConfig({
+  aiReady: {
+    contentSignal: { search: true, aiInput: true, aiTrain: false }
+  }
+})
 // robots.txt: Content-Signal: ai-train=no, search=yes, ai-input=yes
 ```
 

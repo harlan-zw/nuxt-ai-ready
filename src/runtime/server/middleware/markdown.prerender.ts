@@ -96,7 +96,9 @@ export default defineEventHandler(async (event) => {
   }
   else {
     logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-    const response = await fetchRawWithEvent(event, deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    const response = await fetchRawWithEvent(event, deployedPath, {
+      signal: AbortSignal.timeout(30000),
+    }).catch((err) => {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         throw createError({
           statusCode: 504,

@@ -57,7 +57,14 @@ function importCandidates(importer, specifier) {
     ]
   }
 
-  const extensions = ['.js', '.mjs', '.cjs', '.d.ts', '.d.mts', '.d.cts']
+  const extensions = [
+    '.js',
+    '.mjs',
+    '.cjs',
+    '.d.ts',
+    '.d.mts',
+    '.d.cts',
+  ]
   return [
     base,
     ...extensions.map(suffix => `${base}${suffix}`),
@@ -70,7 +77,11 @@ function extractRelativeImports(source) {
 }
 
 function extractImports(source) {
-  return [...new Set(importPatterns.flatMap(pattern => [...source.matchAll(pattern)].map(match => match[1])))]
+  return [
+    ...new Set(importPatterns.flatMap(pattern => [
+      ...source.matchAll(pattern),
+    ].map(match => match[1]))),
+  ]
 }
 
 async function findMissingRelativeImports(packageRoot) {
@@ -122,7 +133,7 @@ async function findUninstalledModuleDependencies(packageRoot) {
         throw new Error(`Module dependency has no package metadata: ${name}`)
       const metadata = JSON.parse(await readFile(metadataPath, 'utf8'))
       if (typeof metadata.name !== 'string')
-        throw new Error(`Module dependency has no package name: ${name}`)
+        throw new TypeError(`Module dependency has no package name: ${name}`)
       return metadata.name
     }))
   return required.filter(name => !installed.has(name))
@@ -136,9 +147,15 @@ const [missing, incompatible, uninstalled] = await Promise.all([
 ])
 
 const failures = [
-  ...(missing.length ? [`Published package has unresolved relative imports:\n${missing.map(item => `- ${item}`).join('\n')}`] : []),
-  ...(incompatible.length ? [`Published server runtime bypasses Nitro compatibility aliases:\n${incompatible.map(item => `- ${item}`).join('\n')}`] : []),
-  ...(uninstalled.length ? [`Required module dependencies are missing from dependencies:\n${uninstalled.map(item => `- ${item}`).join('\n')}`] : []),
+  ...(missing.length
+    ? [`Published package has unresolved relative imports:\n${missing.map(item => `- ${item}`).join('\n')}`]
+    : []),
+  ...(incompatible.length
+    ? [`Published server runtime bypasses Nitro compatibility aliases:\n${incompatible.map(item => `- ${item}`).join('\n')}`]
+    : []),
+  ...(uninstalled.length
+    ? [`Required module dependencies are missing from dependencies:\n${uninstalled.map(item => `- ${item}`).join('\n')}`]
+    : []),
 ]
 if (failures.length)
   throw new Error(failures.join('\n'))

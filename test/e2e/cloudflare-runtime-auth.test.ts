@@ -20,7 +20,11 @@ describe('cloudflare runtime auth without Node compatibility', async () => {
       nitro: {
         preset: 'cloudflare-module',
         compatibilityDate: '2024-12-01',
-        cloudflare: { nodeCompat: false, deployConfig: true, wrangler: { name: 'ai-ready-runtime-auth-test' } },
+        cloudflare: {
+          nodeCompat: false,
+          deployConfig: true,
+          wrangler: { name: 'ai-ready-runtime-auth-test' },
+        },
       },
     },
   })
@@ -48,7 +52,11 @@ describe('cloudflare runtime auth without Node compatibility', async () => {
       String(port),
       '--show-interactive-dev-session',
       'false',
-    ], { cwd: fileURLToPath(new URL('../..', import.meta.url)), stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+    ], {
+      cwd: fileURLToPath(new URL('../..', import.meta.url)),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    })
 
     await new Promise<void>((resolve, reject) => {
       let logs = ''
@@ -82,15 +90,27 @@ describe('cloudflare runtime auth without Node compatibility', async () => {
 
   it('authenticates using the request binding without a build secret', async () => {
     // An authenticated request reaches route validation before any D1 query.
-    const response = await fetch(`${origin}/__ai-ready/reindex`, { method: 'POST', headers: { authorization: `Bearer ${token}` } })
-    expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({ message: expect.stringContaining('Invalid route') })
-  })
-
-  it.each([undefined, root, 'legacy-token', '0'.repeat(token.length)])('rejects an invalid bearer token: %s', async (bearer) => {
     const response = await fetch(`${origin}/__ai-ready/reindex`, {
       method: 'POST',
-      headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({
+      message: expect.stringContaining('Invalid route'),
+    })
+  })
+
+  it.each([
+    undefined,
+    root,
+    'legacy-token',
+    '0'.repeat(token.length),
+  ])('rejects an invalid bearer token: %s', async (bearer) => {
+    const response = await fetch(`${origin}/__ai-ready/reindex`, {
+      method: 'POST',
+      headers: bearer
+        ? { authorization: `Bearer ${bearer}` }
+        : {},
     })
     expect(response.status).toBe(401)
   })
@@ -103,6 +123,8 @@ describe('cloudflare runtime auth without Node compatibility', async () => {
       headers: { authorization: 'Bearer legacy-runtime-token' },
     })
     expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({ message: expect.stringContaining('Invalid route') })
+    expect(await response.json()).toMatchObject({
+      message: expect.stringContaining('Invalid route'),
+    })
   }, 70000)
 })

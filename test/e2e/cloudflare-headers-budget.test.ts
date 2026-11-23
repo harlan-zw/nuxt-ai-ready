@@ -14,8 +14,12 @@ describe('cloudflare _headers rule budget', async () => {
   const logs: Array<{ type: string, message: string }> = []
   const reporter: ConsolaReporter = {
     log(log) {
-      if (log.tag === 'nuxt-ai-ready')
-        logs.push({ type: log.type, message: log.args.join(' ') })
+      if (log.tag === 'nuxt-ai-ready') {
+        logs.push({
+          type: log.type,
+          message: log.args.join(' '),
+        })
+      }
     },
   }
   consola.addReporter(reporter)
@@ -28,7 +32,10 @@ describe('cloudflare _headers rule budget', async () => {
     nuxtConfig: {
       nitro: {
         compatibilityDate: '2026-10-08',
-        cloudflare: { deployConfig: true, wrangler: { name: 'headers-budget-test' } },
+        cloudflare: {
+          deployConfig: true,
+          wrangler: { name: 'headers-budget-test' },
+        },
       },
     },
   })
@@ -49,6 +56,11 @@ describe('cloudflare _headers rule budget', async () => {
   it('reports the shared Markdown rule once as information', () => {
     const budget = logs.filter(log => ['info', 'warn'].includes(log.type) && log.message.includes('_headers'))
 
-    expect(budget).toEqual([{ type: 'info', message: expect.stringContaining('canonical') }])
+    expect(budget).toEqual([
+      {
+        type: 'info',
+        message: expect.stringContaining('canonical'),
+      },
+    ])
   })
 })

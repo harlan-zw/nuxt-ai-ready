@@ -22,10 +22,16 @@ const files = [
   '4.releases/1.v1.md',
 ]
 const read = path => readFileSync(`${root}/${path}`, 'utf8')
-const blocks = markdown => [...markdown.matchAll(/^```(\w+)(?:[ \t][^\n]*)?\n([\s\S]*?)^```/gm)]
+function blocks(markdown) {
+  return [
+    ...markdown.matchAll(/^```(\w+)(?:[ \t][^\n]*)?\n([\s\S]*?)^```/gm),
+  ]
+}
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor
 function compile(code) {
-  const source = code.trim().startsWith('aiReady:') ? `export default defineNuxtConfig({ ${code} })` : code
+  const source = code.trim().startsWith('aiReady:')
+    ? `export default defineNuxtConfig({ ${code} })`
+    : code
   const result = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
     reportDiagnostics: true,
@@ -35,7 +41,10 @@ function compile(code) {
   const runnable = result.outputText.replace(/^import[\s\S]*?from ['"][^'"]+['"];?\n/gm, '')
     .replace(/^export default /gm, '')
     .replace(/^export /gm, '')
-  return { runnable, run: new AsyncFunction(runnable) }
+  return {
+    runnable,
+    run: new AsyncFunction(runnable),
+  }
 }
 let count = 0
 for (const file of files) {
@@ -88,9 +97,15 @@ const registrations = new Map()
 const messages = []
 const plugin = runInNewContext(compile(indexed).runnable, {
   defineNitroPlugin: value => value,
-  console: { info: message => messages.push(message) },
+  console: {
+    info: message => messages.push(message),
+  },
 })
-plugin({ hooks: { hook: (name, callback) => registrations.set(name, callback) } })
+plugin({
+  hooks: {
+    hook: (name, callback) => registrations.set(name, callback),
+  },
+})
 const callback = registrations.get('ai-ready:page:indexed')
 callback({ route: '/unchanged', contentChanged: false })
 callback({ route: '/changed', contentChanged: true })
@@ -102,11 +117,24 @@ process.stdout.write('Current formatter replay and changed-content hook checks p
 
 const conversionExample = hooks.find(([, , code]) => code.includes('hook(\'ai-ready:mdreamConfig\''))[2]
 const conversionHooks = new Map()
-const conversionPlugin = runInNewContext(compile(conversionExample).runnable, { defineNitroPlugin: value => value })
-conversionPlugin({ hooks: { hook: (name, callback) => conversionHooks.set(name, callback) } })
+const conversionPlugin = runInNewContext(compile(conversionExample).runnable, {
+  defineNitroPlugin: value => value,
+})
+conversionPlugin({
+  hooks: {
+    hook: (name, callback) => conversionHooks.set(name, callback),
+  },
+})
 const configureConversion = conversionHooks.get('ai-ready:mdreamConfig')
 const html = '<main><h1>Article</h1><p>Keep this paragraph.</p><div class="author-bio">Biography</div><div class="existing-exclude">Existing exclusion</div></main>'
-for (const initialOptions of [{}, { filter: { exclude: ['.existing-exclude'] } }]) {
+for (const initialOptions of [
+  {},
+  {
+    filter: {
+      exclude: ['.existing-exclude'],
+    },
+  },
+]) {
   const options = structuredClone(initialOptions)
   configureConversion(options)
   const markdown = htmlToMarkdown(html, options)

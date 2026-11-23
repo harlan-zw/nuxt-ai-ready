@@ -63,7 +63,10 @@ async function build(contentSource: boolean): Promise<IndexedBuild> {
   await execa('nuxi', ['generate'], {
     cwd: fixtureDir,
     preferLocal: true,
-    env: { ...process.env, AI_READY_CONTENT_SOURCE: contentSource ? 'on' : 'off' },
+    env: {
+      ...process.env,
+      AI_READY_CONTENT_SOURCE: contentSource ? 'on' : 'off',
+    },
   })
 
   const publicDir = join(fixtureDir, '.output/public')
@@ -108,7 +111,10 @@ describe.skipIf(!comarkSupportsContentSource())('comark content source equivalen
 
   it('records the same titles and descriptions', () => {
     const meta = (build: IndexedBuild) => Object.fromEntries(
-      build.pages.map(page => [page.route, { title: page.title, description: page.description }]),
+      build.pages.map(page => [
+        page.route,
+        { title: page.title, description: page.description },
+      ]),
     )
     expect(meta(fromCollection)).toEqual(meta(fromHtml))
   })
@@ -116,7 +122,9 @@ describe.skipIf(!comarkSupportsContentSource())('comark content source equivalen
   it('keeps every heading and the prose under it on both paths', async () => {
     for (const route of ROUTES) {
       const source = await readFile(join(fixtureDir, `content${route}.md`), 'utf-8')
-      const headings = [...source.matchAll(/^#{1,6} (.+)$/gm)].map(match => match[1]!)
+      const headings = [
+        ...source.matchAll(/^#{1,6} (.+)$/gm),
+      ].map(match => match[1]!)
       expect(headings.length).toBeGreaterThan(1)
 
       for (const heading of headings) {
@@ -132,7 +140,12 @@ describe.skipIf(!comarkSupportsContentSource())('comark content source equivalen
   })
 
   it('returns the same routes from full text search', async () => {
-    for (const term of ['enabled', 'restart', 'trailing', 'prose']) {
+    for (const term of [
+      'enabled',
+      'restart',
+      'trailing',
+      'prose',
+    ]) {
       expect(await fromCollection.ftsRoutes(term), term).toEqual(await fromHtml.ftsRoutes(term))
     }
   })

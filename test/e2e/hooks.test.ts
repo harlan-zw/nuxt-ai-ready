@@ -13,7 +13,12 @@ describe('ai-ready hooks e2e', async () => {
       nitro: {
         prerender: {
           crawlLinks: true,
-          routes: ['/', '/about', '/docs/getting-started', '/docs/api'],
+          routes: [
+            '/',
+            '/about',
+            '/docs/getting-started',
+            '/docs/api',
+          ],
           failOnError: false,
         },
       },
@@ -64,7 +69,9 @@ describe('ai-ready hooks e2e', async () => {
       const markdown = await $fetch<string>('/about.md')
       const frontmatter = parse(markdown.match(/^---\n([\s\S]*?)\n---/)![1]!)
       const expected = { '@context': 'https://schema.org', '@type': 'Article', 'headline': 'Metadata in every conversion path' }
-      const structuredData = (value: string) => [...value.matchAll(/```json\n([\s\S]*?)\n```/g)].map(match => JSON.parse(match[1]!))
+      const structuredData = (value: string) => [
+        ...value.matchAll(/```json\n([\s\S]*?)\n```/g),
+      ].map(match => JSON.parse(match[1]!))
 
       expect(frontmatter.meta['og:image']).toBe('https://test.example.com/cover.png')
       expect(structuredData(markdown)).toContainEqual(expected)

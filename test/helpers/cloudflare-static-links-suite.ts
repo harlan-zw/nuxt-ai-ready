@@ -10,8 +10,12 @@ const { resolve } = createResolver(import.meta.url)
 
 function expectEachValueOnce(headers: Record<string, string | null | undefined>) {
   for (const [name, value] of Object.entries(headers)) {
-    const tokens = headerTokens(value).map(token => name === 'vary' ? token.toLowerCase() : token)
-    expect(tokens, name).toEqual([...new Set(tokens)])
+    const tokens = headerTokens(value).map(token => name === 'vary'
+      ? token.toLowerCase()
+      : token)
+    expect(tokens, name).toEqual([
+      ...new Set(tokens),
+    ])
   }
 }
 
@@ -23,10 +27,17 @@ export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
       build: true,
       nuxtConfig: {
         app: { baseURL },
-        ...discovery ? {} : { aiReady: { apiCatalog: false, describedby: false } },
+        ...discovery
+          ? {}
+          : {
+              aiReady: { apiCatalog: false, describedby: false },
+            },
         nitro: {
           compatibilityDate: '2026-10-08',
-          cloudflare: { deployConfig: true, wrangler: { name: 'static-links-test' } },
+          cloudflare: {
+            deployConfig: true,
+            wrangler: { name: 'static-links-test' },
+          },
         },
       },
     })
@@ -34,7 +45,18 @@ export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
     let worker: ReturnType<typeof spawn>
     beforeAll(async () => {
       const output = join(useTestContext().nuxt!.options.buildDir, 'output')
-      worker = spawn('pnpm', ['exec', 'wrangler', 'dev', '--local', '--config', join(output, 'server/wrangler.json'), '--port', String(port), '--show-interactive-dev-session', 'false'], {
+      worker = spawn('pnpm', [
+        'exec',
+        'wrangler',
+        'dev',
+        '--local',
+        '--config',
+        join(output, 'server/wrangler.json'),
+        '--port',
+        String(port),
+        '--show-interactive-dev-session',
+        'false',
+      ], {
         cwd: resolve('../..'),
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
@@ -65,7 +87,9 @@ export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
       await exited
     })
     it.each(['/', '/about'])('advertises discovery on asset-served HTML %s', async (path) => {
-      const response = await fetch(`http://127.0.0.1:${port}${baseURL}${path.slice(1)}`, { headers: { Accept: 'text/markdown' } })
+      const response = await fetch(`http://127.0.0.1:${port}${baseURL}${path.slice(1)}`, {
+        headers: { Accept: 'text/markdown' },
+      })
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toContain('text/html')
       expect(response.headers.get('etag')).toBeTruthy()
@@ -82,7 +106,15 @@ export function cloudflareStaticLinksSuite(baseURL: string, discovery = true) {
       expect(response.headers.get('x-frame-options')).toBe('DENY')
     })
 
-    it.each(['', 'index.md', 'about.md', 'docs/api.md', 'sitemap.md', 'llms.txt', '.well-known/api-catalog'])('merges the _headers rules for %s into one value per header', async (file) => {
+    it.each([
+      '',
+      'index.md',
+      'about.md',
+      'docs/api.md',
+      'sitemap.md',
+      'llms.txt',
+      '.well-known/api-catalog',
+    ])('merges the _headers rules for %s into one value per header', async (file) => {
       const wranglerPath = join(useTestContext().nuxt!.options.buildDir, 'output/server/wrangler.json')
       const wrangler = JSON.parse(await readFile(wranglerPath, 'utf8')) as { assets: { directory: string } }
       const contents = await readFile(join(dirname(wranglerPath), wrangler.assets.directory, '_headers'), 'utf8')

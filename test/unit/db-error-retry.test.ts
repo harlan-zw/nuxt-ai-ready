@@ -127,9 +127,13 @@ describe('errored page retry (raw layer)', () => {
     await seedRoutes(undefined, ['/ok', '/flaky'])
     await upsertPage(undefined, errorPage('/flaky'))
 
-    const pending = await queryPages(undefined, { where: { pending: true } }) as { route: string }[]
+    const pending = await queryPages(undefined, {
+      where: { pending: true },
+    }) as { route: string }[]
     expect(pending.map(p => p.route)).toEqual(['/ok'])
-    expect(await countPages(undefined, { where: { pending: true } })).toBe(1)
+    expect(await countPages(undefined, {
+      where: { pending: true },
+    })).toBe(1)
   })
 
   it('retries an errored page after the refresh window expires', async () => {
@@ -139,14 +143,20 @@ describe('errored page retry (raw layer)', () => {
 
     await seedRoutes(undefined, ['/flaky'])
     await upsertPage(undefined, errorPage('/flaky'))
-    expect(await queryPages(undefined, { where: { pending: true } })).toEqual([])
+    expect(await queryPages(undefined, {
+      where: { pending: true },
+    })).toEqual([])
 
     await seedRoutes(undefined, ['/flaky'])
-    expect(await queryPages(undefined, { where: { pending: true } })).toEqual([])
+    expect(await queryPages(undefined, {
+      where: { pending: true },
+    })).toEqual([])
     now.mockReturnValue(start + 25 * 60 * 60 * 1000)
     await seedRoutes(undefined, ['/flaky'])
 
-    const pending = await queryPages(undefined, { where: { pending: true } }) as { route: string }[]
+    const pending = await queryPages(undefined, {
+      where: { pending: true },
+    }) as { route: string }[]
     expect(pending.map(p => p.route)).toEqual(['/flaky'])
     expect(row('/flaky')).toMatchObject({ is_error: 0, indexed: 0 })
   })

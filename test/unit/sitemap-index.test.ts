@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { crawlSitemapByRoute, fetchSitemapByRoute } from '../../src/runtime/server/utils/sitemap'
 
 vi.mock('#ai-ready-virtual/logger.mjs', () => ({
-  logger: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+  logger: {
+    warn: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+  },
 }))
 
 vi.mock('nitropack/runtime', () => ({
@@ -312,7 +317,9 @@ describe('fetchSitemapByRoute', () => {
 
     const { urls, error } = await fetchSitemapByRoute(event, '/sitemap.xml')
 
-    expect(urls).toEqual([{ loc: 'https://example.com/about', lastmod: undefined }])
+    expect(urls).toEqual([
+      { loc: 'https://example.com/about', lastmod: undefined },
+    ])
     expect(error).toBe('Sitemap parse failed: malformed')
   })
 })

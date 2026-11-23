@@ -43,7 +43,9 @@ function resolveToken(source: string, mode: TokenMode): Promise<TokenVerifier> {
   // Nuxt reads its root synchronously, before the first crypto await.
   const token = mode === 'nuxt'
     ? deriveSecret(RUNTIME_SYNC_SECRET_PURPOSE)
-    : mode === 'binding' ? deriveRuntimeSyncSecret(source) : Promise.resolve(source)
+    : mode === 'binding'
+      ? deriveRuntimeSyncSecret(source)
+      : Promise.resolve(source)
   const entry: TokenCacheEntry = {
     source,
     mode,
@@ -61,7 +63,9 @@ function resolveToken(source: string, mode: TokenMode): Promise<TokenVerifier> {
 async function resolveExpectedToken(event: H3Event): Promise<TokenVerifier> {
   const bindings = getCfEnv(event)
   const bindingRoot = bindings?.NUXT_APP_SECRET
-  const configuredRoot = bindingRoot === undefined ? useRuntimeConfig(event).appSecret : bindingRoot
+  const configuredRoot = bindingRoot === undefined
+    ? useRuntimeConfig(event).appSecret
+    : bindingRoot
   if (configuredRoot === undefined || configuredRoot === '') {
     const moduleConfig = useRuntimeConfig(event)['nuxt-ai-ready'] as ModulePublicRuntimeConfig | undefined
     const legacy = bindings?.NUXT_NUXT_AI_READY_RUNTIME_SYNC_SECRET
@@ -79,8 +83,12 @@ async function resolveExpectedToken(event: H3Event): Promise<TokenVerifier> {
   }
 
   // Nuxt derives with no event argument. Nitro 2 bindings require direct derivation.
-  const mode = bindingRoot === undefined ? 'nuxt' : 'binding'
-  const root = mode === 'nuxt' ? useRuntimeConfig().appSecret : bindingRoot
+  const mode = bindingRoot === undefined
+    ? 'nuxt'
+    : 'binding'
+  const root = mode === 'nuxt'
+    ? useRuntimeConfig().appSecret
+    : bindingRoot
   if (typeof root !== 'string' || root.length < 32)
     throw createError({ statusCode: 500, message: APPLICATION_SECRET_ERROR })
 
@@ -95,9 +103,15 @@ async function resolveExpectedToken(event: H3Event): Promise<TokenVerifier> {
 export async function requireAuth(event: H3Event): Promise<void> {
   const secret = await resolveExpectedToken(event)
   const authHeader = getHeader(event, 'authorization')
-  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
-  const querySecret = bearer ? undefined : getQuery(event).secret
-  const received = bearer || (querySecret ? String(querySecret) : '')
+  const bearer = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : undefined
+  const querySecret = bearer
+    ? undefined
+    : getQuery(event).secret
+  const received = bearer || (querySecret
+    ? String(querySecret)
+    : '')
   if (received.length !== secret.length || !await globalThis.crypto.subtle.verify(HMAC, secret.key, secret.signature, encodeToken(received))) {
     throw createError({ statusCode: 401, message: 'Unauthorized' })
   }

@@ -6,11 +6,17 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#nuxtseo/nitro', () => ({
-  useRuntimeConfig: () => ({ 'nuxt-ai-ready': { debug: false } }),
+  useRuntimeConfig: () => ({
+    'nuxt-ai-ready': { debug: false },
+  }),
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
 }))
 
 vi.mock('../../src/runtime/server/utils/cloudflare', () => ({

@@ -6,7 +6,11 @@ describe('cloudflare negotiation routing', () => {
     const pages = cloudflarePrerenderedPages([
       { route: '/', fileName: '/index.html' },
       { route: '/about/', fileName: '/about/index.html' },
-      { route: '/missing', fileName: '/missing.html', error: new Error('not found') },
+      {
+        route: '/missing',
+        fileName: '/missing.html',
+        error: new Error('not found'),
+      },
       { route: '/about.md', fileName: '/about.md' },
       { route: '/api/render', fileName: '/api/render.html' },
     ], '/base/')
@@ -31,7 +35,9 @@ describe('cloudflare negotiation routing', () => {
   })
 
   it('keeps environment-specific Worker paths behind application middleware', () => {
-    expect(cloudflareStaticFallbackPaths(undefined, ['/', '/private/page'], [['/private/*']])).toEqual(['/'])
+    expect(cloudflareStaticFallbackPaths(undefined, ['/', '/private/page'], [
+      ['/private/*'],
+    ])).toEqual(['/'])
     expect(cloudflareStaticFallbackPaths(undefined, ['/'], [true])).toEqual([])
   })
 
@@ -42,13 +48,26 @@ describe('cloudflare negotiation routing', () => {
   })
 
   it('routes a directory of pages through one glob when exact paths exceed the platform limit', () => {
-    const pages = ['/', '/about', ...Array.from({ length: 60 }, (_, index) => `/docs/page-${index}`)]
-    expect(cloudflareNegotiationPatterns(['/_nuxt/*'], pages)).toEqual(['/_nuxt/*', '/', '/about', '/about/', '/docs/*'])
+    const pages = [
+      '/',
+      '/about',
+      ...Array.from({ length: 60 }, (_, index) => `/docs/page-${index}`),
+    ]
+    expect(cloudflareNegotiationPatterns(['/_nuxt/*'], pages)).toEqual([
+      '/_nuxt/*',
+      '/',
+      '/about',
+      '/about/',
+      '/docs/*',
+    ])
     expect(cloudflareStaticFallbackPaths(['/_nuxt/*'], pages)).toHaveLength(123)
   })
 
   it('keeps a directory index page exact beside the deepest glob that fits', () => {
-    const pages = ['/docs', ...Array.from({ length: 60 }, (_, index) => `/docs/guide/page-${index}`)]
+    const pages = [
+      '/docs',
+      ...Array.from({ length: 60 }, (_, index) => `/docs/guide/page-${index}`),
+    ]
     expect(cloudflareNegotiationPatterns(undefined, pages)).toEqual(['/docs', '/docs/', '/docs/guide/*'])
   })
 

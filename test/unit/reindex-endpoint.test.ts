@@ -10,9 +10,14 @@ const config = {
   database: { filename: '' },
 }
 
-const { fetchWithEvent, convertHtmlToMarkdown } = vi.hoisted(() => ({ fetchWithEvent: vi.fn(), convertHtmlToMarkdown: vi.fn() }))
+const { fetchWithEvent, convertHtmlToMarkdown } = vi.hoisted(() => ({
+  fetchWithEvent: vi.fn(),
+  convertHtmlToMarkdown: vi.fn(),
+}))
 
-vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
+vi.mock('nuxt/server', () => ({
+  deriveSecret: async () => 'test-secret',
+}))
 
 vi.mock('../../src/runtime/server/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/runtime/server/utils')>()
@@ -25,12 +30,26 @@ vi.mock('#nuxtseo/nitro', () => ({
   useEvent: () => {
     throw new Error('No active event')
   },
-  useNitroApp: () => ({ hooks: { callHook: vi.fn() } }),
-  useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': config, 'site': { url: 'https://example.com' } }),
+  useNitroApp: () => ({
+    hooks: {
+      callHook: vi.fn(),
+    },
+  }),
+  useRuntimeConfig: () => ({
+    'appSecret': 'test-application-secret-with-32-characters',
+    'nuxt-ai-ready': config,
+    'site': { url: 'https://example.com' },
+  }),
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), success: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    success: vi.fn(),
+  },
 }))
 
 const { default: reindexEndpoint } = await import('../../src/runtime/server/routes/__ai-ready/reindex.post')
@@ -49,7 +68,9 @@ function readerEvent() {
 async function reindex(query = '', token: string | null = 'test-secret') {
   const response = await request(new Request(`http://localhost/__ai-ready/reindex${query}`, {
     method: 'POST',
-    headers: token ? { authorization: `Bearer ${token}` } : {},
+    headers: token
+      ? { authorization: `Bearer ${token}` }
+      : {},
   }))
   return { status: response.status, body: await response.json() }
 }

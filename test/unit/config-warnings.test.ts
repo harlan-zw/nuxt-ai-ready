@@ -11,30 +11,74 @@ const defaults = {
 describe('resolveConfigurationWarnings', () => {
   it('includes a working cache fix and explains why HTTP Vary alone is insufficient', () => {
     const varies = ['accept']
-    const [warning] = resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { maxAge: 3600 } } } })
+    const [warning] = resolveConfigurationWarnings({
+      ...defaults,
+      routeRules: {
+        '/docs/**': {
+          cache: { maxAge: 3600 },
+        },
+      },
+    })
     expect(warning).toContain('cache: { varies: [\'accept\'] }')
     expect(warning).toContain('Keep existing cache options and varies entries.')
     expect(warning).toContain('HTTP Vary alone does not change Nitro\'s cache key.')
     expect(warning).toContain('https://nuxtseo.com/docs/ai-ready/guides/markdown#cache-safety')
-    expect(resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { maxAge: 3600, varies } } } })).toEqual([])
+    expect(resolveConfigurationWarnings({
+      ...defaults,
+      routeRules: {
+        '/docs/**': {
+          cache: { maxAge: 3600, varies },
+        },
+      },
+    })).toEqual([])
   })
 
   it('includes the SSR-independent fix for ISR and unsafe explicit negotiation', () => {
-    const [isr] = resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { isr: true } } })
+    const [isr] = resolveConfigurationWarnings({
+      ...defaults,
+      routeRules: {
+        '/docs/**': { isr: true },
+      },
+    })
     expect(isr).toContain('isr: false')
     expect(isr).toContain('use explicit .md URLs')
-    const [override] = resolveConfigurationWarnings({ ...defaults, policy: 'enabled', routeRules: { '/docs/**': { cache: true } } })
+    const [override] = resolveConfigurationWarnings({
+      ...defaults,
+      policy: 'enabled',
+      routeRules: {
+        '/docs/**': { cache: true },
+      },
+    })
     expect(override).toContain('Remove aiReady.contentNegotiation')
     expect(override).not.toContain('contentNegotiation: \'auto\'')
     expect(override).toContain('cache: { varies: [\'accept\'] }')
   })
 
   it('offers the cheaper bot opt-out before expensive cache variation', () => {
-    const [warning] = resolveConfigurationWarnings({ ...defaults, botNegotiation: true, routeRules: { '/docs/**': { cache: { varies: ['accept'] } } } })
+    const [warning] = resolveConfigurationWarnings({
+      ...defaults,
+      botNegotiation: true,
+      routeRules: {
+        '/docs/**': {
+          cache: {
+            varies: ['accept'],
+          },
+        },
+      },
+    })
     expect(warning).toContain('aiReady: { botNegotiation: false }')
     expect(warning).toContain('cache: { varies: [\'accept\', \'sec-fetch-dest\', \'user-agent\'] }')
     expect(warning).toContain('Raw User-Agent variation can create many cache entries.')
-    expect(resolveConfigurationWarnings({ ...defaults, routeRules: { '/docs/**': { cache: { varies: ['accept'] } } } })).toEqual([])
+    expect(resolveConfigurationWarnings({
+      ...defaults,
+      routeRules: {
+        '/docs/**': {
+          cache: {
+            varies: ['accept'],
+          },
+        },
+      },
+    })).toEqual([])
   })
 
   it('restores automatic negotiation with a valid public configuration action', () => {
@@ -48,7 +92,9 @@ describe('resolveConfigurationWarnings', () => {
       ...defaults,
       routeRules: {
         '/': { isr: 3600 },
-        '/docs/**': { cache: { maxAge: 3600 } },
+        '/docs/**': {
+          cache: { maxAge: 3600 },
+        },
       },
     })
     expect(warnings).toEqual([
@@ -61,17 +107,27 @@ describe('resolveConfigurationWarnings', () => {
     expect(resolveConfigurationWarnings({
       ...defaults,
       policy: 'enabled',
-      routeRules: { '/docs/**': { cache: true } },
-    })).toEqual([expect.stringContaining('contentNegotiation: true overrides cache protection')])
+      routeRules: {
+        '/docs/**': { cache: true },
+      },
+    })).toEqual([
+      expect.stringContaining('contentNegotiation: true overrides cache protection'),
+    ])
   })
 
   it('ignores complete cache variation, disabled caches, and header-only rules', () => {
     expect(resolveConfigurationWarnings({
       ...defaults,
       routeRules: {
-        '/': { cache: { varies: ['User-Agent', 'ACCEPT', 'Sec-Fetch-Dest'] as const } },
+        '/': {
+          cache: {
+            varies: ['User-Agent', 'ACCEPT', 'Sec-Fetch-Dest'] as const,
+          },
+        },
         '/about': { cache: false, isr: false },
-        '/contact': { cache: { headersOnly: true } },
+        '/contact': {
+          cache: { headersOnly: true },
+        },
       },
     })).toEqual([])
   })
@@ -80,8 +136,14 @@ describe('resolveConfigurationWarnings', () => {
     expect(resolveConfigurationWarnings({
       ...defaults,
       routeRules: {
-        '/**': { cache: { varies: ['accept', 'sec-fetch-dest', 'user-agent'] } },
-        '/docs/**': { cache: { maxAge: 3600 } },
+        '/**': {
+          cache: {
+            varies: ['accept', 'sec-fetch-dest', 'user-agent'],
+          },
+        },
+        '/docs/**': {
+          cache: { maxAge: 3600 },
+        },
       },
     })).toEqual([])
   })
@@ -103,11 +165,21 @@ describe('resolveConfigurationWarnings', () => {
     expect(resolveConfigurationWarnings({
       ...defaults,
       policy: 'disabled',
-      routeRules: { '/': { isr: true }, '/docs/**': { cache: true } },
-    })).toEqual([expect.stringContaining('contentNegotiation: false disables Accept and bot negotiation')])
+      routeRules: {
+        '/': { isr: true },
+        '/docs/**': { cache: true },
+      },
+    })).toEqual([
+      expect.stringContaining('contentNegotiation: false disables Accept and bot negotiation'),
+    ])
   })
 
-  it.each([undefined, 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000'])('warns without a public site URL: %s', (siteUrl) => {
+  it.each([
+    undefined,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://[::1]:3000',
+  ])('warns without a public site URL: %s', (siteUrl) => {
     expect(resolveConfigurationWarnings({ ...defaults, siteUrl })).toEqual([
       expect.stringContaining('Set site.url to the public production URL'),
     ])
@@ -118,7 +190,9 @@ describe('resolveConfigurationWarnings', () => {
       ...defaults,
       siteUrl: 'http://localhost:3000',
       reportSiteUrl: false,
-      routeRules: { '/docs/**': { cache: true } },
+      routeRules: {
+        '/docs/**': { cache: true },
+      },
     }
     expect(resolveConfigurationWarnings(input)).toEqual([
       expect.stringContaining('response caching disables automatic Markdown negotiation'),

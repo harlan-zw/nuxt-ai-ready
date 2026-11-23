@@ -7,10 +7,14 @@ import ts from 'typescript'
 
 const article = readFileSync(new URL('../../docs/content/3.advanced/1.indexnow.md', import.meta.url), 'utf8')
 function execute(label, globals) {
-  const fence = [...article.matchAll(/```ts \[([^\]]+)\]\n([\s\S]*?)\n```/g)].find(match => match[1] === label)
+  const fence = [
+    ...article.matchAll(/```ts \[([^\]]+)\]\n([\s\S]*?)\n```/g),
+  ].find(match => match[1] === label)
   if (!fence)
     throw new Error(`Missing executable example: ${label}`)
-  const js = ts.transpileModule(fence[2], { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  const js = ts.transpileModule(fence[2], {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText
   const context = { exports: {}, ...globals }
   vm.runInNewContext(js, context)
   return context.exports
@@ -26,10 +30,17 @@ async function main() {
       requests.push(JSON.parse(JSON.stringify({ url, ...options })))
     },
   })
-  const config = { key: 'a'.repeat(32), siteUrl: 'https://example.com' }
+  const config = {
+    key: 'a'.repeat(32),
+    siteUrl: 'https://example.com',
+  }
   let indexed
   execute('server/plugins/indexnow.ts', {
-    defineNitroPlugin: setup => setup({ hooks: { hook: (name, handler) => { indexed = handler } } }),
+    defineNitroPlugin: setup => setup({
+      hooks: {
+        hook: (name, handler) => { indexed = handler },
+      },
+    }),
     useRuntimeConfig: () => ({ indexNowKey: config.key, indexNowSiteUrl: config.siteUrl }),
     submitIndexNow,
   })
@@ -45,16 +56,18 @@ async function main() {
   await submitIndexNow([], config)
   assert.deepEqual(requests, [])
   await submitIndexNow(['/changed#part', '/changed', '/deleted'], config)
-  assert.deepEqual(requests, [{
-    url: 'https://api.indexnow.org/indexnow',
-    method: 'POST',
-    body: {
-      host: 'example.com',
-      key: config.key,
-      keyLocation: 'https://example.com/indexnow-key.txt',
-      urlList: ['https://example.com/changed', 'https://example.com/deleted'],
+  assert.deepEqual(requests, [
+    {
+      url: 'https://api.indexnow.org/indexnow',
+      method: 'POST',
+      body: {
+        host: 'example.com',
+        key: config.key,
+        keyLocation: 'https://example.com/indexnow-key.txt',
+        urlList: ['https://example.com/changed', 'https://example.com/deleted'],
+      },
     },
-  }])
+  ])
   requests.length = 0
   await assert.rejects(submitIndexNow(['https://other.example/page'], config), /must use/)
   await assert.rejects(submitIndexNow(['/page'], { ...config, key: '' }), /not configured/)
