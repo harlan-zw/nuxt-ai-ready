@@ -4,7 +4,7 @@
 
 ### 🩹 Fixes
 
-- **Markdown:** Pin `mdream` and `@mdream/js` to 2.1.0. This avoids a 128 KiB increase in the Linux ARM64 native binary. [#252](https://github.com/harlan-zw/nuxt-ai-ready/pull/252)
+- **Markdown:** Require `mdream` and `@mdream/js` 2.2.0 or newer within major version 2.
 
 ## v3.6.0
 

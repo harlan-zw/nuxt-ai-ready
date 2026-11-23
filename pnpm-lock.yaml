@@ -171,8 +171,8 @@ catalogs:
       specifier: ^0.18.0
       version: 0.18.0
     '@mdream/js':
-      specifier: 2.1.0
-      version: 2.1.0
+      specifier: ^2.2.0
+      version: 2.2.0
     '@types/better-sqlite3':
       specifier: ^9.6.0
       version: 9.6.0
@@ -207,8 +207,8 @@ catalogs:
       specifier: ^2.0.8
       version: 2.0.8
     mdream:
-      specifier: 2.1.0
-      version: 2.1.0
+      specifier: ^2.2.0
+      version: 2.2.0
     nitropack:
       specifier: ^2.13.6
       version: 2.13.6
@@ -333,7 +333,7 @@ importers:
     dependencies:
       '@mdream/js':
         specifier: 'catalog:'
-        version: 2.1.0
+        version: 2.2.0
       '@neondatabase/serverless':
         specifier: ^1.0.0
         version: 1.1.0
@@ -360,7 +360,7 @@ importers:
         version: 6.1.7
       mdream:
         specifier: 'catalog:'
-        version: 2.1.0
+        version: 2.2.0
       nuxt-site-config:
         specifier: catalog:nuxt
         version: 5.0.4(@nuxt/schema@4.6.4)(confbox@0.3.2)(dotenv@17.4.2)(giget@3.3.0)(jiti@2.7.0)(magic-string@1.4.3)(mlly@1.8.2)(nuxt@4.6.4(039ce013223d284f0f668f41c7ac43e3))(oxc-parser@0.157.0)(rolldown@1.2.19)(unplugin@3.4.0(esbuild@0.28.2)(rolldown@1.2.19)(rollup@4.64.10)(vite@8.3.8(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(yaml@2.9.1)))(vue@3.5.45(typescript@6.0.3))(zod@4.6.7)
@@ -1773,76 +1773,76 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@mdream/js@2.1.0':
-    resolution: {integrity: sha512-fctd6z1bvutUEEj5nyxgVq60et2Fu4m61okxHqHAXoGVjJv3KqxVLbqtJAgzs43ytZryFXb8FIWYO916dEVqjA==}
+  '@mdream/js@2.2.0':
+    resolution: {integrity: sha512-70RCATPfGScKFplQ9XFi7dAOj/U5bCvoWIz1IabhOD57ThxjWrhj3/NDakHShiXseifKhNXPUbzXbeyVbNHH5Q==}
     hasBin: true
 
-  '@mdream/rust-android-arm-eabi@2.1.0':
-    resolution: {integrity: sha512-ZS0Ql9OqVe6smwDNvhvSFW9MCuvMfjpylS7YwyT3e7f82qxYMaH/iRUrUwB2ztffoyQIOC8zqgO1OsgiOr1xmw==}
+  '@mdream/rust-android-arm-eabi@2.2.0':
+    resolution: {integrity: sha512-b8tSmEQXxptVZ50eecv/bBGy5mF3wBrvniThhqsIW1WWwHEE8AqK5pp/0o2kFFyokMFoVLYPKYw87IvSBp4ugQ==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm]
     os: [android]
 
-  '@mdream/rust-android-arm64@2.1.0':
-    resolution: {integrity: sha512-K5XQSoDZ/pIdIYcYDVK1G6zc8ipwi8vyAr/dL0nuDtzovOP0aWWpg0ImyHAKA3UC/MLsGMuupPPvMu6eInM2pg==}
+  '@mdream/rust-android-arm64@2.2.0':
+    resolution: {integrity: sha512-1i0skwOVTBb4UCHDIJNXFG7DzjZjLNEAZp930OV5jli3tXBy/1uOSxwcTa6wK2qKE+ludXdCMBSNn7UFZ4DVOA==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm64]
     os: [android]
 
-  '@mdream/rust-darwin-arm64@2.1.0':
-    resolution: {integrity: sha512-jkCqALTpNoC8pdj3MrLVxvtB2ZtWQhD/G3E2FTJtDd+KD17pD4HMNEeJ+yc/7uT5HJqWu8/f7QOLwG4eiBz5qQ==}
+  '@mdream/rust-darwin-arm64@2.2.0':
+    resolution: {integrity: sha512-2ZlMhxioeT/U7I7vInTNqpjpaBOsksor0g8CpZrgxeMtYEs/PtXSQau2UNtAoMwfyEIudcd/QEAhxA08/kHgZQ==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@mdream/rust-darwin-x64@2.1.0':
-    resolution: {integrity: sha512-dVTfJHk6rUvXZMliwiovyScfe5Vgle4v+4fzFq2JtFL2rOU4852A/0sMV56RTsIMfzuhXm7qiASE4Gj0d/3E3A==}
+  '@mdream/rust-darwin-x64@2.2.0':
+    resolution: {integrity: sha512-4zB3k3c9OFgWA26xcsQhU9SZuPiFHRmEdjfNtlxc13sO01NxdCiW1vGDGye0Qks1h4QEtp0HDHMJlwHqLoQNmA==}
     engines: {node: '>= 22.0.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@mdream/rust-freebsd-x64@2.1.0':
-    resolution: {integrity: sha512-My0qtUm06Yuv8gJi0kKVV8mPLvZ3NUkv5F1+lNqqEV3D8W2/JDfAbusBwMBsXKKEeqdA8n/627IjEgqh54iNEg==}
+  '@mdream/rust-freebsd-x64@2.2.0':
+    resolution: {integrity: sha512-UfSS2AmfdhKgQSvKh7zzuKU1IlZsv++ZSpyUOm/SxjKMrb0jy8nMaXBuzNTahUOp2uhkEGNwoXYF64/BcYSbRQ==}
     engines: {node: '>= 22.0.0'}
     cpu: [x64]
     os: [freebsd]
 
-  '@mdream/rust-linux-arm-gnueabihf@2.1.0':
-    resolution: {integrity: sha512-Nk99/mC9USjyDvNH93yP+7cZZcIc55esGTt1JkiK5K0+nFJdJM8fNQozcGxeZG01qptFdPeVPcqdw3fkgj2CoA==}
+  '@mdream/rust-linux-arm-gnueabihf@2.2.0':
+    resolution: {integrity: sha512-xHeXCG6+jVDAs3KB5P/rrtokyRpfRXAjsGl63X9EhPUw0paklCHFvXJgrkA/941cNN7m8nBwnGgt4FC55fQAcg==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm]
     os: [linux]
 
-  '@mdream/rust-linux-arm64-gnu@2.1.0':
-    resolution: {integrity: sha512-8kmWBb8xTBAETRpwulQmxu0AnSptj7oTFqWhFRGFgbkKVHAxR7dXKuvFvC9qllXAfII1A2ZuyHpBHt9w5lGMcg==}
+  '@mdream/rust-linux-arm64-gnu@2.2.0':
+    resolution: {integrity: sha512-49KR670mtI/9986qXGP0I1XYpSqSFvlOLCvj5S7gBck2GWx5itPs8sgigozJAykqfTfIHaFUAChrfgLZuONprQ==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@mdream/rust-linux-arm64-musl@2.1.0':
-    resolution: {integrity: sha512-pN4oXZMOwAGSEpRbELOjPh+hV8NXIfCQJcQkQQrtrZ+3anxtnXaV9bL8m0noZwEcZ15fj/6IESSR7d+2D77usA==}
+  '@mdream/rust-linux-arm64-musl@2.2.0':
+    resolution: {integrity: sha512-i5eiAhdRm2dZOoFBw+MRY6wHo3wYU1vIgC/67qjkldf36V3kjZboQdXbXphPtWcYl7goa28e2ZF3vbua8cnmDA==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@mdream/rust-linux-x64-gnu@2.1.0':
-    resolution: {integrity: sha512-yB9goh1wzk7R5fz1yCZ3oCqPRh58EvWUPiEEDYnUfmv9wiC77PA21vkwWCvE+J93avLiwYdnUDTwX9IWEchb8g==}
+  '@mdream/rust-linux-x64-gnu@2.2.0':
+    resolution: {integrity: sha512-ZgJWn4r47ZDP7KmwMVHkL4iPcFaUHz0sq4tCEMA7VW4+wQeJhk9VGOIhsOZwLgOSErsXULeHwhrQAx3jn0Qxuw==}
     engines: {node: '>= 22.0.0'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@mdream/rust-linux-x64-musl@2.1.0':
-    resolution: {integrity: sha512-3cNNLYlFIEWJyRfXoHZQUd1IM/Hk/1LQKAGoQgS0nB1u8EXn1f+jfM+wPWtqLNN5gQkdVqUxNIybYvq7z7d7KQ==}
+  '@mdream/rust-linux-x64-musl@2.2.0':
+    resolution: {integrity: sha512-VVwTSMDTWLdKCPwvhGBzmTWG+o36QZU9hMQo0aAqXf4P+Bq5IHMEfTm597x2+ZBET+bg0S4simyLEICQ3XDI8A==}
     engines: {node: '>= 22.0.0'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@mdream/rust-wasm32-wasi@2.1.0':
-    resolution: {integrity: sha512-0qaSWQKZmeYufr67ymAJ8NrBgJM/z5rx73013a9Qo/jIUiiaHvk12UAy3rMTyFA6FpfktdQP7h5+qewYyrGPSA==}
+  '@mdream/rust-wasm32-wasi@2.2.0':
+    resolution: {integrity: sha512-bLHsYjVYmH174vDkq11bGRp+fVT+pM+BqGuqOlvadiyP5/IHdl3RskV7wBuJJu38rz5+tESgeH1DNaYHZCxtzw==}
     engines: {node: '>= 22.0.0'}
     cpu: [wasm32]
     bundledDependencies:
@@ -1853,14 +1853,14 @@ packages:
       - '@emnapi/wasi-threads'
       - tslib
 
-  '@mdream/rust-win32-arm64-msvc@2.1.0':
-    resolution: {integrity: sha512-/fQfVPN3SohP2SqpXoA+9YA/uJHgl5MppcgJ1ud6oum132tZ5Iv68s9E3taZa+1i31OmBdJIAPnyZS9IDlytsA==}
+  '@mdream/rust-win32-arm64-msvc@2.2.0':
+    resolution: {integrity: sha512-+5eBtoFydlMU2HQ92bKeqsq6u4vpe7FasdhW8NmC7xJkzRAuYyDaau7dY0ZCV1tpgmPEQ+L55+PE1fKlDZA5nQ==}
     engines: {node: '>= 22.0.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@mdream/rust-win32-x64-msvc@2.1.0':
-    resolution: {integrity: sha512-HqH0Uh/OZJo+zHnHep3CobefIBk7pEapRN1l1v6Qv44wuBOrPSzA3rhjx79wzSnpXvZj3TC6ET3CM9MVK1Jirw==}
+  '@mdream/rust-win32-x64-msvc@2.2.0':
+    resolution: {integrity: sha512-VP7gqfLrQm6HGwB3vC+lKeGF62CJNfZhL+6EA8Cfs5iWKE6fWKdly84opNbv43jVp+J/NUpN6CYVa3PSE/NJqw==}
     engines: {node: '>= 22.0.0'}
     cpu: [x64]
     os: [win32]
@@ -7821,8 +7821,8 @@ packages:
   mdn-data@2.35.0:
     resolution: {integrity: sha512-k+1+dEIm2z/BEfdvYzT/fIyAGeDBo/1AJNJI4ilFXJRYoxP/3Ds+GP8shAOIq8jYXY9N5nGB3Ag104NsagmLAA==}
 
-  mdream@2.1.0:
-    resolution: {integrity: sha512-iYqnp2TjcwLslqrvwoObS0sc4gesbL+CDtc0Zqxo1ceg83ZammD3XFJ9xYlRNaMkbqtRkMmy4VSo/ZKckPv9fg==}
+  mdream@2.2.0:
+    resolution: {integrity: sha512-xiWcdWbteyhdNwobtkh/bgXpCJuSbdxCc5Wu9GTtx22sqJcEW1Yyj7SoDT6R74anIPG9kR/xvmxs5CZ2N/SIXg==}
     hasBin: true
 
   mdurl@2.1.0:
@@ -11835,48 +11835,48 @@ snapshots:
       - encoding
       - supports-color
 
-  '@mdream/js@2.1.0':
+  '@mdream/js@2.2.0':
     dependencies:
       cac: 7.1.0
       pathe: 2.0.3
 
-  '@mdream/rust-android-arm-eabi@2.1.0':
+  '@mdream/rust-android-arm-eabi@2.2.0':
     optional: true
 
-  '@mdream/rust-android-arm64@2.1.0':
+  '@mdream/rust-android-arm64@2.2.0':
     optional: true
 
-  '@mdream/rust-darwin-arm64@2.1.0':
+  '@mdream/rust-darwin-arm64@2.2.0':
     optional: true
 
-  '@mdream/rust-darwin-x64@2.1.0':
+  '@mdream/rust-darwin-x64@2.2.0':
     optional: true
 
-  '@mdream/rust-freebsd-x64@2.1.0':
+  '@mdream/rust-freebsd-x64@2.2.0':
     optional: true
 
-  '@mdream/rust-linux-arm-gnueabihf@2.1.0':
+  '@mdream/rust-linux-arm-gnueabihf@2.2.0':
     optional: true
 
-  '@mdream/rust-linux-arm64-gnu@2.1.0':
+  '@mdream/rust-linux-arm64-gnu@2.2.0':
     optional: true
 
-  '@mdream/rust-linux-arm64-musl@2.1.0':
+  '@mdream/rust-linux-arm64-musl@2.2.0':
     optional: true
 
-  '@mdream/rust-linux-x64-gnu@2.1.0':
+  '@mdream/rust-linux-x64-gnu@2.2.0':
     optional: true
 
-  '@mdream/rust-linux-x64-musl@2.1.0':
+  '@mdream/rust-linux-x64-musl@2.2.0':
     optional: true
 
-  '@mdream/rust-wasm32-wasi@2.1.0':
+  '@mdream/rust-wasm32-wasi@2.2.0':
     optional: true
 
-  '@mdream/rust-win32-arm64-msvc@2.1.0':
+  '@mdream/rust-win32-arm64-msvc@2.2.0':
     optional: true
 
-  '@mdream/rust-win32-x64-msvc@2.1.0':
+  '@mdream/rust-win32-x64-msvc@2.2.0':
     optional: true
 
   '@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)':
@@ -18895,21 +18895,21 @@ snapshots:
 
   mdn-data@2.35.0: {}
 
-  mdream@2.1.0:
+  mdream@2.2.0:
     optionalDependencies:
-      '@mdream/rust-android-arm-eabi': 2.1.0
-      '@mdream/rust-android-arm64': 2.1.0
-      '@mdream/rust-darwin-arm64': 2.1.0
-      '@mdream/rust-darwin-x64': 2.1.0
-      '@mdream/rust-freebsd-x64': 2.1.0
-      '@mdream/rust-linux-arm-gnueabihf': 2.1.0
-      '@mdream/rust-linux-arm64-gnu': 2.1.0
-      '@mdream/rust-linux-arm64-musl': 2.1.0
-      '@mdream/rust-linux-x64-gnu': 2.1.0
-      '@mdream/rust-linux-x64-musl': 2.1.0
-      '@mdream/rust-wasm32-wasi': 2.1.0
-      '@mdream/rust-win32-arm64-msvc': 2.1.0
-      '@mdream/rust-win32-x64-msvc': 2.1.0
+      '@mdream/rust-android-arm-eabi': 2.2.0
+      '@mdream/rust-android-arm64': 2.2.0
+      '@mdream/rust-darwin-arm64': 2.2.0
+      '@mdream/rust-darwin-x64': 2.2.0
+      '@mdream/rust-freebsd-x64': 2.2.0
+      '@mdream/rust-linux-arm-gnueabihf': 2.2.0
+      '@mdream/rust-linux-arm64-gnu': 2.2.0
+      '@mdream/rust-linux-arm64-musl': 2.2.0
+      '@mdream/rust-linux-x64-gnu': 2.2.0
+      '@mdream/rust-linux-x64-musl': 2.2.0
+      '@mdream/rust-wasm32-wasi': 2.2.0
+      '@mdream/rust-win32-arm64-msvc': 2.2.0
+      '@mdream/rust-win32-x64-msvc': 2.2.0
 
   mdurl@2.1.0: {}
 
