@@ -4,6 +4,7 @@
 
 ### 🚀 Enhancements
 
+- **Markdown:** Set `aiReady.zeroRuntimeMarkdown: true` to serve prerendered Markdown without a request-time converter. Prerender every page you want to serve as Markdown. [Prerendered-only Markdown guide](https://github.com/harlan-zw/nuxt-ai-ready/blob/f14126a93cca5b368d359db8cf7dd7b16985cbaf/docs/content/2.guides/1.markdown.md#prerendered-only-markdown)
 - **AI Terms:** Set `aiReady.aiTerms` to publish an access policy at `/.well-known/ai-terms`. [AI Terms guide](https://github.com/harlan-zw/nuxt-ai-ready/blob/6a6cf7148d518c6b3fd6a3b200d2fc130a7442ed/docs/content/2.guides/11.ai-terms.md)
 
 ### 🩹 Fixes
