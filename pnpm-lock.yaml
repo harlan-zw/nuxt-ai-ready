@@ -171,7 +171,7 @@ catalogs:
       specifier: ^0.18.0
       version: 0.18.0
     '@mdream/js':
-      specifier: ^2.1.0
+      specifier: 2.1.0
       version: 2.1.0
     '@types/better-sqlite3':
       specifier: ^9.6.0
@@ -207,7 +207,7 @@ catalogs:
       specifier: ^2.0.8
       version: 2.0.8
     mdream:
-      specifier: ^2.1.0
+      specifier: 2.1.0
       version: 2.1.0
     nitropack:
       specifier: ^2.13.6
