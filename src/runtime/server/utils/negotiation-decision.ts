@@ -1,6 +1,7 @@
 import type { ContentNegotiationPolicy } from '../../types'
 import type { ContentNegotiationResolution, NegotiationRouteRule } from './content-negotiation'
 import type { MarkdownRequest } from './markdown-request'
+import { toMarkdownPath } from '../../markdown-path'
 import { getContentNegotiationVary, resolveContentNegotiation } from './content-negotiation'
 import { getRequestRenderInfo } from './markdown-request'
 
@@ -19,6 +20,7 @@ export interface NegotiationInput {
   routeRule: NegotiationRouteRule
   policy: ContentNegotiationPolicy
   botNegotiation?: boolean
+  hasPrerenderedMarkdown?: (path: string) => boolean
   /**
    * Routes that already serve a Markdown file verbatim, such as an agent skill
    * alias. They are answered by their own handler, never rendered.
@@ -29,9 +31,10 @@ export interface NegotiationInput {
 export type NegotiationDecision
   = | { _tag: 'skip', reason: 'well-known' | 'internal' | 'artifact' | 'not-a-page' | 'deferred' }
     | { _tag: 'not-acceptable', vary: ReturnType<typeof getContentNegotiationVary> }
-    | { _tag: 'html', path: string, negotiation: ContentNegotiationResolution }
+    | { _tag: 'html', path: string, negotiation: ContentNegotiationResolution, markdownAvailable?: false }
     | { _tag: 'redirect', path: string, vary: ReturnType<typeof getContentNegotiationVary> }
     | { _tag: 'render', path: string }
+    | { _tag: 'missing-markdown' }
 
 /**
  * Decide how one request maps to an HTML or Markdown representation.
@@ -68,10 +71,15 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   if (renderInfo.isExplicit) {
     // The early stage never renders. A prerendered `.md` file answers first, and
     // rendering belongs behind any auth middleware the site registers.
-    return stage === 'early'
-      ? { _tag: 'skip', reason: 'deferred' }
-      : { _tag: 'render', path: renderInfo.path }
+    if (stage === 'early')
+      return { _tag: 'skip', reason: 'deferred' }
+    if (input.hasPrerenderedMarkdown)
+      return input.hasPrerenderedMarkdown(path) ? { _tag: 'skip', reason: 'deferred' } : { _tag: 'missing-markdown' }
+    return { _tag: 'render', path: renderInfo.path }
   }
+
+  if (input.hasPrerenderedMarkdown?.(toMarkdownPath(renderInfo.path)) === false)
+    return { _tag: 'html', path: renderInfo.path, negotiation, markdownAvailable: false }
 
   if (renderInfo.negotiation === 'markdown')
     return { _tag: 'redirect', path: renderInfo.path, vary: getContentNegotiationVary(input.botNegotiation) }

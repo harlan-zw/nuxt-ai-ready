@@ -3,6 +3,7 @@ import type { LlmsTxtPage } from './llms-txt-files'
 import type { RuntimeI18nConfig } from './server/utils/i18n'
 import type { LlmsTxtConfig } from './types'
 import { decodePath } from 'ufo'
+import prerenderedMarkdownPaths from '#ai-ready-virtual/prerendered-markdown-paths.mjs'
 import { createError, getRequestHost, getRequestURL } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
 import { getSiteConfig } from '#site-config/server/composables/getSiteConfig'
@@ -18,7 +19,7 @@ export { normalizeLlmsTxtConfig } from './llms-txt-format'
 
 async function findMarkdownLinkAvailability() {
   if (!import.meta.prerender)
-    return { runtimeMarkdownAvailable: true, paths: new Set<string>() }
+    return { runtimeMarkdownAvailable: prerenderedMarkdownPaths === null, paths: prerenderedMarkdownPaths ?? new Set<string>() }
   const { readMarkdownLinkAvailabilityFromFilesystem } = await import('#ai-ready-virtual/read-page-data.mjs')
   const availability = await readMarkdownLinkAvailabilityFromFilesystem()
   return {
