@@ -8,7 +8,9 @@ import { describe, expect, it } from 'vitest'
 import module from '../../src/module'
 
 async function resolveVirtualModule(entry: unknown) {
-  return typeof entry === 'function' ? await entry() : entry
+  return typeof entry === 'function'
+    ? await entry()
+    : entry
 }
 
 describe('#ai-ready-virtual/sitemap-config.mjs', () => {

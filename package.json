@@ -135,6 +135,7 @@
     "execa": "catalog:",
     "h3": "catalog:",
     "happy-dom": "catalog:dev-test",
+    "nitro": "catalog:",
     "nitropack": "catalog:",
     "nuxt": "catalog:nuxt",
     "nuxt-site-config": "catalog:nuxt",
