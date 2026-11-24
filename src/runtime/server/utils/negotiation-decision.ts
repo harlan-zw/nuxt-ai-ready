@@ -65,29 +65,49 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   if (!renderInfo)
     return { _tag: 'skip', reason: 'not-a-page' }
 
-  if ('notAcceptable' in renderInfo)
-    return { _tag: 'not-acceptable', vary: getContentNegotiationVary(input.botNegotiation) }
+  if ('notAcceptable' in renderInfo) {
+    return {
+      _tag: 'not-acceptable',
+      vary: getContentNegotiationVary(input.botNegotiation),
+    }
+  }
 
   if (renderInfo.isExplicit) {
     // The early stage never renders. A prerendered `.md` file answers first, and
     // rendering belongs behind any auth middleware the site registers.
     if (stage === 'early')
       return { _tag: 'skip', reason: 'deferred' }
-    if (input.hasPrerenderedMarkdown)
-      return input.hasPrerenderedMarkdown(path) ? { _tag: 'skip', reason: 'deferred' } : { _tag: 'missing-markdown' }
+    if (input.hasPrerenderedMarkdown) {
+      return input.hasPrerenderedMarkdown(path)
+        ? { _tag: 'skip', reason: 'deferred' }
+        : { _tag: 'missing-markdown' }
+    }
     return { _tag: 'render', path: renderInfo.path }
   }
 
-  if (input.hasPrerenderedMarkdown?.(toMarkdownPath(renderInfo.path)) === false)
-    return { _tag: 'html', path: renderInfo.path, negotiation, markdownAvailable: false }
+  if (input.hasPrerenderedMarkdown?.(toMarkdownPath(renderInfo.path)) === false) {
+    return {
+      _tag: 'html',
+      path: renderInfo.path,
+      negotiation,
+      markdownAvailable: false,
+    }
+  }
 
-  if (renderInfo.negotiation === 'markdown')
-    return { _tag: 'redirect', path: renderInfo.path, vary: getContentNegotiationVary(input.botNegotiation) }
+  if (renderInfo.negotiation === 'markdown') {
+    return {
+      _tag: 'redirect',
+      path: renderInfo.path,
+      vary: getContentNegotiationVary(input.botNegotiation),
+    }
+  }
 
   return { _tag: 'html', path: renderInfo.path, negotiation }
 }
 
 function withoutQuery(path: string): string {
   const queryIndex = path.indexOf('?')
-  return queryIndex === -1 ? path : path.slice(0, queryIndex)
+  return queryIndex === -1
+    ? path
+    : path.slice(0, queryIndex)
 }

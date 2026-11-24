@@ -96,7 +96,9 @@ describe('errored page retry (drizzle layer)', () => {
     insertPage(sqlite, '/err', 1, 0)
     insertPage(sqlite, '/pend', 0, 0)
 
-    expect(await getPendingPages(event, 10)).toEqual([{ route: '/pend' }])
+    expect(await getPendingPages(event, 10)).toEqual([
+      { route: '/pend' },
+    ])
     expect(await countPages(event, { indexed: false })).toBe(1)
   })
 })

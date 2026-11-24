@@ -25,7 +25,14 @@ const tool: McpToolDefinition<typeof inputSchema> = {
   async handler({ query, limit }) {
     const event = useEvent() as H3Event
     const results = await searchPages(event, query, { limit })
-    return { content: [{ type: 'text', text: JSON.stringify(results) }] }
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(results),
+        },
+      ],
+    }
   },
 }
 

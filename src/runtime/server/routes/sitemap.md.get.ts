@@ -19,7 +19,9 @@ async function buildSitemapMarkdown(event: H3Event): Promise<string> {
   catch (err) {
     logger.warn(
       `[ai-ready] Database unavailable for sitemap.md, serving an empty sitemap: `
-      + `${err instanceof Error ? err.message : String(err)}`,
+      + `${err instanceof Error
+        ? err.message
+        : String(err)}`,
     )
   }
 

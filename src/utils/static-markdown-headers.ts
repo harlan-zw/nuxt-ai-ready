@@ -48,7 +48,9 @@ export function pageRouteFromMarkdownTwin(fileName: string | undefined): string 
   const pageRoute = normalizePagePath(fileName.replace(RE_MD_EXT, ''))
   if (pageRoute === '/index')
     return '/'
-  return isStaticMarkdownSourceRoute(pageRoute) ? pageRoute : null
+  return isStaticMarkdownSourceRoute(pageRoute)
+    ? pageRoute
+    : null
 }
 
 /** Exact header rule for one prerendered `.md` file. */
@@ -88,13 +90,18 @@ export function prerenderedMarkdownHeaderRules(
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
           'Vary': 'Accept',
-          'Link': [buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby), aiTermsLink].filter(Boolean).join(', '),
+          'Link': [
+            buildStaticMarkdownLinkHeader(pageRoute, baseURL, describedby),
+            aiTermsLink,
+          ].filter(Boolean).join(', '),
           ...(entry.contentSignal !== undefined && { 'Content-Signal': entry.contentSignal }),
         },
       })
     }
   }
-  return [...rules.values()]
+  return [
+    ...rules.values(),
+  ]
 }
 
 const RE_EXACT_MARKDOWN_ROUTE = /^\/[^*:\s]*\.md$/
@@ -141,14 +148,20 @@ export function planStaticMarkdownHeaderRules(
   rules = rules.map((rule) => {
     if (!hasContentSignal(rule.headers) || matchingStaticContentSignals(routeRules, rule.route).length === 0)
       return rule
-    return { ...rule, headers: Object.fromEntries(Object.entries(rule.headers).filter(([name]) => name.toLowerCase() !== 'content-signal')) }
+    return {
+      ...rule,
+      headers: Object.fromEntries(Object.entries(rule.headers).filter(([name]) => name.toLowerCase() !== 'content-signal')),
+    }
   })
   if (limit === null)
     return { _tag: 'apply', rules }
   const entries = Object.entries(routeRules).filter(isStaticHeaderRouteRule)
   const registeredMarkdown = entries.map(([route]) => route).filter(route => RE_EXACT_MARKDOWN_ROUTE.test(route))
   const other = entries.length - registeredMarkdown.length
-  const markdown = new Set([...registeredMarkdown, ...rules.map(rule => rule.route)])
+  const markdown = new Set([
+    ...registeredMarkdown,
+    ...rules.map(rule => rule.route),
+  ])
   const total = other + markdown.size
   if (total <= limit)
     return { _tag: 'apply', rules }
@@ -159,7 +172,13 @@ export function planStaticMarkdownHeaderRules(
   ])
   if (other + policyRoutes.size > limit)
     return { _tag: 'blocked', total: other + policyRoutes.size, limit }
-  return { _tag: 'skip', drop: registeredMarkdown.filter(route => !policyRoutes.has(route)), total, dropped: markdown.size - policyRoutes.size, rules: policyRules }
+  return {
+    _tag: 'skip',
+    drop: registeredMarkdown.filter(route => !policyRoutes.has(route)),
+    total,
+    dropped: markdown.size - policyRoutes.size,
+    rules: policyRules,
+  }
 }
 
 /**
@@ -184,7 +203,9 @@ export function applyStaticMarkdownHeaderPlan(
   const applied: [path: string, headers: Record<string, string>][] = []
   for (const { route, headers } of plan.rules) {
     const existing = routeRules[route] as { headers?: Record<string, string> } | undefined
-    const merged = defu({ headers: { ...headers } }, existing)
+    const merged = defu({
+      headers: { ...headers },
+    }, existing)
     if (hasContentSignal(existing?.headers)) {
       for (const name of Object.keys(merged.headers)) {
         if (name.toLowerCase() === 'content-signal')

@@ -32,12 +32,16 @@ function notFoundMarkdown(
     ``,
     `- [Sitemap](${resolveUrl('/sitemap.xml')})`,
     `- [llms.txt](${resolveUrl('/llms.txt')})`,
-    ...(config.llmsFullTxt === false ? [] : [`- [llms-full.txt](${resolveUrl('/llms-full.txt')})`]),
+    ...(config.llmsFullTxt === false
+      ? []
+      : [`- [llms-full.txt](${resolveUrl('/llms-full.txt')})`]),
     ``,
   ].join('\n')
 
   const i18n = config.i18n
-  const locale = i18n ? resolveLocaleFromRoute(path, i18n, routeContext).locale : undefined
+  const locale = i18n
+    ? resolveLocaleFromRoute(path, i18n, routeContext).locale
+    : undefined
   const alternates = i18n
     ? computeLocaleAlternates(path, i18n, routeContext).map(a => ({
         hreflang: a.hreflang,
@@ -118,7 +122,9 @@ export async function renderMarkdown(event: H3Event, markdownPath: string) {
   const siteUrl = resolveUrl('/')
   const redirectOptions = {
     pageUrl: `${origin}${resolvePath(path)}`,
-    origins: URL.canParse(siteUrl) ? [new URL(siteUrl).origin] : [],
+    origins: URL.canParse(siteUrl)
+      ? [new URL(siteUrl).origin]
+      : [],
   }
   let htmlPath = resolvePath(path)
   let response: Response | null = null
@@ -145,7 +151,9 @@ export async function renderMarkdown(event: H3Event, markdownPath: string) {
       htmlPath = redirect.path
       continue
     }
-    setHeader(event, 'location', redirect._tag === 'redirect' ? redirect.location : location)
+    setHeader(event, 'location', redirect._tag === 'redirect'
+      ? redirect.location
+      : location)
     return createError({
       statusCode: response.status,
       statusMessage: response.statusText,

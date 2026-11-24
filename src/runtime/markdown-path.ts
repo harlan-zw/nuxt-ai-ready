@@ -45,5 +45,7 @@ export function hasMarkdownTwin(path: string): boolean {
 
 /** The `.md` sibling a page may advertise, or null when it has none. */
 export function markdownAlternatePath(path: string): string | null {
-  return hasMarkdownTwin(path) ? toMarkdownPath(path) : null
+  return hasMarkdownTwin(path)
+    ? toMarkdownPath(path)
+    : null
 }

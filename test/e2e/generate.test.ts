@@ -61,7 +61,13 @@ describe('nuxt generate (static build)', async () => {
       nitro: {
         prerender: {
           crawlLinks: true,
-          routes: ['/', '/about/', '/docs/getting-started', '/docs/api', '/render-count'],
+          routes: [
+            '/',
+            '/about/',
+            '/docs/getting-started',
+            '/docs/api',
+            '/render-count',
+          ],
           failOnError: false,
         },
       },

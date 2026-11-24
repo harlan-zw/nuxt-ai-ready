@@ -26,15 +26,23 @@ describe('api catalog, RFC 9727', async () => {
       '<https://test.example.com/.well-known/api-catalog>; rel="api-catalog"',
     )
     expect(body).toEqual({
-      linkset: [{
-        'anchor': 'https://test.example.com/api',
-        'service-desc': [{
-          href: 'https://test.example.com/openapi.json',
-          type: 'application/vnd.oai.openapi+json;version=3.1',
-        }],
-        'service-doc': [{ href: 'https://test.example.com/docs/api', type: 'text/html' }],
-        'status': [{ href: 'https://test.example.com/api/health', type: 'application/json' }],
-      }],
+      linkset: [
+        {
+          'anchor': 'https://test.example.com/api',
+          'service-desc': [
+            {
+              href: 'https://test.example.com/openapi.json',
+              type: 'application/vnd.oai.openapi+json;version=3.1',
+            },
+          ],
+          'service-doc': [
+            { href: 'https://test.example.com/docs/api', type: 'text/html' },
+          ],
+          'status': [
+            { href: 'https://test.example.com/api/health', type: 'application/json' },
+          ],
+        },
+      ],
     })
   })
 
@@ -48,7 +56,9 @@ describe('api catalog, RFC 9727', async () => {
   })
 
   it('advertises the catalog from page responses', async () => {
-    const response = await fetch(url('/'), { headers: { accept: 'text/html' } })
+    const response = await fetch(url('/'), {
+      headers: { accept: 'text/html' },
+    })
 
     expect(response.headers.get('link')).toContain(
       '<https://test.example.com/.well-known/api-catalog>; rel="api-catalog"',

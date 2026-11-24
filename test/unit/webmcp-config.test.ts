@@ -91,9 +91,16 @@ describe('resolveWebMcpConfig', () => {
     })
   })
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('replaces invalid output budget %s', (maxOutputChars) => {
+  it.each([
+    0,
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+  ])('replaces invalid output budget %s', (maxOutputChars) => {
     const result = resolveSiteToolsConfig({
-      searchPages: { webmcp: { maxOutputChars } },
+      searchPages: {
+        webmcp: { maxOutputChars },
+      },
     })
     const attachment = result.config.searchPages.webmcp
     expect(attachment.enabled).toBe(true)

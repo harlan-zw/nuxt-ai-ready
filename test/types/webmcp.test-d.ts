@@ -17,7 +17,10 @@ test('infers tool input from its JSON schema and preserves arbitrary output', ()
       type: 'object',
       properties: {
         count: { type: 'number' },
-        mode: { type: 'string', enum: ['replace', 'increment'] },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'increment'],
+        },
       },
       required: ['count'],
     },
@@ -44,7 +47,10 @@ test('infers composable tool input directly from its JSON schema', () => {
       type: 'object',
       properties: {
         count: { type: 'number' },
-        mode: { type: 'string', enum: ['replace', 'increment'] },
+        mode: {
+          type: 'string',
+          enum: ['replace', 'increment'],
+        },
       },
       required: ['count'],
     },

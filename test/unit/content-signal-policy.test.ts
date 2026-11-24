@@ -20,7 +20,12 @@ describe('content signal policy', () => {
   })
 
   it('emits Content-Usage when contentUsage is true', () => {
-    const group = robotsGroup({ aiTrain: false, contentUsage: true, search: true, aiInput: true })
+    const group = robotsGroup({
+      aiTrain: false,
+      contentUsage: true,
+      search: true,
+      aiInput: true,
+    })
 
     expect(group?.contentUsage).toEqual(['train-ai=n'])
     expect(group?.contentSignal).toEqual(['ai-train=no, search=yes, ai-input=yes'])

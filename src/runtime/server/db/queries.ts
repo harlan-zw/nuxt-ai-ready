@@ -131,14 +131,18 @@ async function getPrerenderDb(): Promise<RawExecutor> {
       const isErrorQuery = sql.includes('is_error = 1') || (params.includes(1) && sql.includes('is_error'))
       const excludeErrors = sql.includes('is_error = 0')
       const includeMarkdown = wantsMarkdown(sql)
-      const admittedRoutes = sql.includes('WHERE route IN (') ? new Set(params) : undefined
+      const admittedRoutes = sql.includes('WHERE route IN (')
+        ? new Set(params)
+        : undefined
 
       if (isErrorQuery) {
         return [...errorRoutes].map(route => ({
           route,
           title: '',
           description: '',
-          ...(includeMarkdown ? { markdown: '' } : {}),
+          ...(includeMarkdown
+            ? { markdown: '' }
+            : {}),
           headings: '[]',
           keywords: '[]',
           updated_at: '',
@@ -153,18 +157,33 @@ async function getPrerenderDb(): Promise<RawExecutor> {
         route: p.route,
         title: p.title,
         description: p.description,
-        ...(includeMarkdown ? { markdown: p.markdown } : {}),
+        ...(includeMarkdown
+          ? { markdown: p.markdown }
+          : {}),
         headings: p.headings,
         keywords: JSON.stringify(p.keywords),
         updated_at: p.updatedAt,
-        is_error: errorRoutes.has(p.route) ? 1 : 0,
+        is_error: errorRoutes.has(p.route)
+          ? 1
+          : 0,
         indexed: 1,
         locale: p.locale || '',
       }))
       if (admittedRoutes && !excludeErrors) {
         for (const route of errorRoutes) {
-          if (admittedRoutes.has(route))
-            rows.push({ route, title: '', description: '', headings: [], keywords: '[]', updated_at: '', is_error: 1, indexed: 0, locale: '' })
+          if (admittedRoutes.has(route)) {
+            rows.push({
+              route,
+              title: '',
+              description: '',
+              headings: [],
+              keywords: '[]',
+              updated_at: '',
+              is_error: 1,
+              indexed: 0,
+              locale: '',
+            })
+          }
         }
       }
       return rows as T[]
@@ -180,11 +199,15 @@ async function getPrerenderDb(): Promise<RawExecutor> {
           route: page.route,
           title: page.title,
           description: page.description,
-          ...(includeMarkdown ? { markdown: page.markdown } : {}),
+          ...(includeMarkdown
+            ? { markdown: page.markdown }
+            : {}),
           headings: page.headings,
           keywords: JSON.stringify(page.keywords),
           updated_at: page.updatedAt,
-          is_error: errorRoutes.has(page.route) ? 1 : 0,
+          is_error: errorRoutes.has(page.route)
+            ? 1
+            : 0,
           indexed: 1,
           locale: page.locale || '',
         } as T
@@ -243,7 +266,9 @@ export async function queryPageMetadata(event: AiReadyDatabaseEvent | undefined,
   const db = await getDb(event)
   if (!db)
     return []
-  const unique = [...new Set(routes)]
+  const unique = [
+    ...new Set(routes),
+  ]
   const pages: PageMetadata[] = []
   for (let i = 0; i < unique.length; i += 100) {
     const batch = unique.slice(i, i + 100)
@@ -251,7 +276,13 @@ export async function queryPageMetadata(event: AiReadyDatabaseEvent | undefined,
       `SELECT route, title, description, is_error, locale FROM ai_ready_pages WHERE route IN (${batch.map(() => '?').join(', ')})`,
       batch,
     )
-    pages.push(...rows.map(row => ({ route: row.route, title: row.title, description: row.description, isError: row.is_error === 1, locale: row.locale || '' })))
+    pages.push(...rows.map(row => ({
+      route: row.route,
+      title: row.title,
+      description: row.description,
+      isError: row.is_error === 1,
+      locale: row.locale || '',
+    })))
   }
   return pages
 }
@@ -302,7 +333,9 @@ function buildWhereClause(where?: QueryPagesOptions['where']): { sql: string, pa
   }
 
   return {
-    sql: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    sql: conditions.length
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '',
     params,
   }
 }
@@ -321,11 +354,15 @@ function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
 type DatabaseNumber = number | string | bigint
 
 function toNumber(value: DatabaseNumber | null | undefined, fallback = 0): number {
-  return value === null || value === undefined ? fallback : Number(value)
+  return value === null || value === undefined
+    ? fallback
+    : Number(value)
 }
 
 function toNullableNumber(value: DatabaseNumber | null | undefined): number | null {
-  return value === null || value === undefined ? null : Number(value)
+  return value === null || value === undefined
+    ? null
+    : Number(value)
 }
 
 function rowToEntry(row: PageRow): PageEntry {
@@ -388,8 +425,11 @@ export async function queryPages(
   const { route, includeMarkdown, where, limit, offset } = options
 
   const db = await getDb(event)
-  if (!db)
-    return route ? undefined : []
+  if (!db) {
+    return route
+      ? undefined
+      : []
+  }
 
   // Project only the columns actually needed. markdown is by far the largest
   // column, so meta-only consumers shouldn't pay to transfer it across the wire.
@@ -402,7 +442,9 @@ export async function queryPages(
     const row = await db.first<PageRow>(`SELECT ${cols} FROM ai_ready_pages WHERE route = ?`, [route])
     if (!row)
       return undefined
-    return includeMarkdown ? rowToData(row) : rowToEntry(row)
+    return includeMarkdown
+      ? rowToData(row)
+      : rowToEntry(row)
   }
 
   // Build query. A deterministic order keeps concurrent runs and offset
@@ -420,7 +462,9 @@ export async function queryPages(
   }
 
   const rows = await db.all<PageRow>(sql, params)
-  return includeMarkdown ? rows.map(rowToData) : rows.map(rowToEntry)
+  return includeMarkdown
+    ? rows.map(rowToData)
+    : rows.map(rowToEntry)
 }
 
 export interface StreamPagesOptions {
@@ -448,7 +492,9 @@ export async function* streamPages(
     const where = `WHERE is_error = 0${lastRoute ? ' AND route > ?' : ''}`
     const rows = await db.all<PageRow>(
       `SELECT * FROM ai_ready_pages ${where} ORDER BY route LIMIT ?`,
-      lastRoute ? [lastRoute, batchSize] : [batchSize],
+      lastRoute
+        ? [lastRoute, batchSize]
+        : [batchSize],
     )
 
     if (rows.length === 0)
@@ -530,7 +576,17 @@ export async function searchPages(
         AND (title ILIKE ? ESCAPE ? OR description ILIKE ? ESCAPE ? OR markdown ILIKE ? ESCAPE ? OR headings ILIKE ? ESCAPE ?)
       ORDER BY route
       LIMIT ?
-    `, [searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, searchTerm, LIKE_ESCAPE, limit])
+    `, [
+      searchTerm,
+      LIKE_ESCAPE,
+      searchTerm,
+      LIKE_ESCAPE,
+      searchTerm,
+      LIKE_ESCAPE,
+      searchTerm,
+      LIKE_ESCAPE,
+      limit,
+    ])
   }
 
   const ftsQuery = toFtsMatchQuery(query)
@@ -579,7 +635,9 @@ export async function upsertPage(event: AiReadyDatabaseEvent | undefined, page: 
   const keywordsJson = JSON.stringify(page.keywords)
   const indexedAt = Date.now()
   const source = page.source || 'runtime'
-  const lastSeenAt = source === 'runtime' ? indexedAt : null
+  const lastSeenAt = source === 'runtime'
+    ? indexedAt
+    : null
   const locale = deriveLocale(event, route, page.locale)
 
   // upsertPage never sees the page's own URL, so a locale without an explicit
@@ -609,7 +667,23 @@ export async function upsertPage(event: AiReadyDatabaseEvent | undefined, page: 
         ? `,
       locale = excluded.locale`
         : ''}
-  `, [route, routeKey, page.title, page.description, page.markdown, page.headings, keywordsJson, page.contentHash || null, page.updatedAt, indexedAt, page.isError ? 1 : 0, page.isError ? 0 : 1, source, lastSeenAt, locale])
+  `, [
+    route,
+    routeKey,
+    page.title,
+    page.description,
+    page.markdown,
+    page.headings,
+    keywordsJson,
+    page.contentHash || null,
+    page.updatedAt,
+    indexedAt,
+    page.isError ? 1 : 0,
+    page.isError ? 0 : 1,
+    source,
+    lastSeenAt,
+    locale,
+  ])
 }
 
 /**
@@ -667,7 +741,9 @@ export async function getPageIndexState(
         indexedAt: toNumber(row.indexed_at),
         contentHash: row.content_hash,
         updatedAt: row.updated_at || '',
-        source: row.source === 'runtime' ? 'runtime' : 'prerender',
+        source: row.source === 'runtime'
+          ? 'runtime'
+          : 'prerender',
       }
     : undefined
 }
@@ -710,7 +786,9 @@ export async function seedRoutes(
 
   // Inlined as a literal: a bind param would push a full chunk past D1's
   // 100-parameter cap. Truncating a finite number keeps it injection-safe.
-  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs) ? options.refreshWindowMs! : SEED_REFRESH_WINDOW_MS))
+  const refreshWindowMs = Math.max(0, Math.trunc(Number.isFinite(options.refreshWindowMs)
+    ? options.refreshWindowMs!
+    : SEED_REFRESH_WINDOW_MS))
   const nowMs = Date.now()
 
   // Resolve + dedupe rows up front (pure, no IO). Deduping by route avoids
@@ -720,14 +798,22 @@ export async function seedRoutes(
   for (const entry of routes) {
     // Canonicalise before keying the map: '' and '/' are one page, so leaving
     // them distinct here defeats the dedupe and collides on route_key instead.
-    const route = normalizeRoute(typeof entry === 'string' ? entry : entry.route)
-    const explicitLocale = typeof entry === 'string' ? undefined : entry.locale
-    const entryUrl = typeof entry === 'string' ? undefined : entry.url
+    const route = normalizeRoute(typeof entry === 'string'
+      ? entry
+      : entry.route)
+    const explicitLocale = typeof entry === 'string'
+      ? undefined
+      : entry.locale
+    const entryUrl = typeof entry === 'string'
+      ? undefined
+      : entry.url
     byRoute.set(route, {
       route,
       routeKey: normalizeRouteKey(route),
       locale: deriveLocale(event, route, explicitLocale, entryUrl),
-      sourceLastmod: parseSourceLastmod(typeof entry === 'string' ? undefined : entry.lastmod),
+      sourceLastmod: parseSourceLastmod(typeof entry === 'string'
+        ? undefined
+        : entry.lastmod),
     })
   }
 
@@ -743,9 +829,17 @@ export async function seedRoutes(
   // its index entries, which cost millions of D1 row writes a month.
   const rowsPerInsert = maxRowsPerInsert(5)
   const stmts: { sql: string, params: unknown[] }[] = []
-  for (const batch of chunk([...byRoute.values()], rowsPerInsert)) {
+  for (const batch of chunk([
+    ...byRoute.values(),
+  ], rowsPerInsert)) {
     const valuesSql = batch.map(() => `(?, ?, '', '', '', '[]', '[]', '', ?, 0, 0, 0, 'runtime', ?, ?)`).join(', ')
-    const params = batch.flatMap(r => [r.route, r.routeKey, r.sourceLastmod, nowMs, r.locale])
+    const params = batch.flatMap(r => [
+      r.route,
+      r.routeKey,
+      r.sourceLastmod,
+      nowMs,
+      r.locale,
+    ])
     stmts.push({
       sql: `
         INSERT INTO ai_ready_pages (route, route_key, title, description, markdown, headings, keywords, updated_at, source_lastmod, indexed_at, is_error, indexed, source, last_seen_at, locale)
@@ -775,7 +869,9 @@ export async function prunePage(event: AiReadyDatabaseEvent | undefined, route: 
   const db = await getDb(event)
   if (!db)
     return
-  await db.exec('DELETE FROM ai_ready_pages WHERE route = ?', [normalizeRoute(route)])
+  await db.exec('DELETE FROM ai_ready_pages WHERE route = ?', [
+    normalizeRoute(route),
+  ])
 }
 
 /**
@@ -885,7 +981,9 @@ export async function startCronRun(event: AiReadyDatabaseEvent | undefined): Pro
     'INSERT INTO ai_ready_cron_runs (started_at, status) VALUES (?, ?) RETURNING id',
     [now, 'running'],
   )
-  return row ? toNumber(row.id) : null
+  return row
+    ? toNumber(row.id)
+    : null
 }
 
 /**
@@ -906,10 +1004,14 @@ export async function completeCronRun(
 
   const now = Date.now()
   const row = await db.first<{ started_at: DatabaseNumber }>('SELECT started_at FROM ai_ready_cron_runs WHERE id = ?', [runId])
-  const durationMs = row ? now - toNumber(row.started_at) : null
+  const durationMs = row
+    ? now - toNumber(row.started_at)
+    : null
 
   const status = result.errors.length > 0
-    ? (result.pagesIndexed > 0 ? 'partial' : 'error')
+    ? (result.pagesIndexed > 0
+        ? 'partial'
+        : 'error')
     : 'success'
 
   await db.exec(`
@@ -921,7 +1023,15 @@ export async function completeCronRun(
       errors = ?,
       status = ?
     WHERE id = ?
-  `, [now, durationMs, result.pagesIndexed, result.pagesRemaining, JSON.stringify(result.errors), status, runId])
+  `, [
+    now,
+    durationMs,
+    result.pagesIndexed,
+    result.pagesRemaining,
+    JSON.stringify(result.errors),
+    status,
+    runId,
+  ])
 }
 
 /**
@@ -1015,7 +1125,9 @@ export async function getCronFastPathStatus(
   return {
     totalPages: toNumber(row.total_pages),
     pendingPages: toNumber(row.pending_pages),
-    lastStaleCheck: row.last_stale_check ? Number.parseInt(row.last_stale_check, 10) : null,
+    lastStaleCheck: row.last_stale_check
+      ? Number.parseInt(row.last_stale_check, 10)
+      : null,
     buildId: row.build_id,
     sitemapsNeedCrawl: toNumber(row.sitemaps_need_crawl),
   }
@@ -1072,7 +1184,9 @@ export async function tryAcquireCronLock(event: AiReadyDatabaseEvent | undefined
       `SELECT value FROM _ai_ready_info WHERE id = 'cron_lock' AND ${cronLockField(db, 'value', 't')} = ?`,
       [token],
     )
-    return row ? { _tag: 'acquired', token } : { _tag: 'held' }
+    return row
+      ? { _tag: 'acquired', token }
+      : { _tag: 'held' }
   }
   catch (error) {
     // The upsert may have landed before the verify read failed, leaving a
@@ -1109,8 +1223,12 @@ export interface CronLockStatus {
 const RE_CRON_LOCK_NUMERIC = /^\d+$/
 
 function parseCronLockValue(value: string): CronLockRecord | null {
-  if (RE_CRON_LOCK_NUMERIC.test(value))
-    return { acquiredAt: Number(value), expiresAt: Number(value) + CRON_LOCK_TTL_MS }
+  if (RE_CRON_LOCK_NUMERIC.test(value)) {
+    return {
+      acquiredAt: Number(value),
+      expiresAt: Number(value) + CRON_LOCK_TTL_MS,
+    }
+  }
   const parsed = safeJsonParse<{ a?: unknown, e?: unknown } | null>(value, null)
   if (parsed && typeof parsed === 'object' && typeof parsed.a === 'number' && typeof parsed.e === 'number')
     return { acquiredAt: parsed.a, expiresAt: parsed.e }
@@ -1122,20 +1240,38 @@ function parseCronLockValue(value: string): CronLockRecord | null {
  */
 export async function getCronLockStatus(event: AiReadyDatabaseEvent | undefined): Promise<CronLockStatus> {
   const db = await getDb(event)
-  if (!db)
-    return { held: false, since: null, elapsedMs: null, stale: false }
+  if (!db) {
+    return {
+      held: false,
+      since: null,
+      elapsedMs: null,
+      stale: false,
+    }
+  }
 
   const row = await db.first<{ value: string }>(
     'SELECT value FROM _ai_ready_info WHERE id = ?',
     ['cron_lock'],
   )
 
-  if (!row)
-    return { held: false, since: null, elapsedMs: null, stale: false }
+  if (!row) {
+    return {
+      held: false,
+      since: null,
+      elapsedMs: null,
+      stale: false,
+    }
+  }
 
   const record = parseCronLockValue(row.value)
-  if (!record)
-    return { held: false, since: null, elapsedMs: null, stale: false }
+  if (!record) {
+    return {
+      held: false,
+      since: null,
+      elapsedMs: null,
+      stale: false,
+    }
+  }
 
   const now = Date.now()
   const stale = now >= record.expiresAt
@@ -1301,7 +1437,9 @@ export async function getNextSitemapToCrawl(
     ORDER BY last_crawled_at ASC NULLS FIRST
     LIMIT 1
   `, [threshold])
-  return row ? rowToSitemapEntry(row) : null
+  return row
+    ? rowToSitemapEntry(row)
+    : null
 }
 
 /**
@@ -1344,7 +1482,11 @@ export async function markSitemapCrawled(
       last_error = NULL,
       crawl_state = NULL
     WHERE name = ?
-  `, [Date.now(), urlCount, name])
+  `, [
+    Date.now(),
+    urlCount,
+    name,
+  ])
 }
 
 /**
@@ -1364,7 +1506,9 @@ export async function markSitemapSeeded(
   const expectedClause = expectedLastCrawledAt === null
     ? 'last_crawled_at IS NULL'
     : 'last_crawled_at = ?'
-  const expectedParams = expectedLastCrawledAt === null ? [] : [expectedLastCrawledAt]
+  const expectedParams = expectedLastCrawledAt === null
+    ? []
+    : [expectedLastCrawledAt]
 
   await db.exec(`
     UPDATE ai_ready_sitemaps SET
@@ -1376,7 +1520,12 @@ export async function markSitemapSeeded(
       AND crawl_state IS NULL
       AND error_count = 0
       AND ${expectedClause}
-  `, [Date.now(), urlCount, name, ...expectedParams])
+  `, [
+    Date.now(),
+    urlCount,
+    name,
+    ...expectedParams,
+  ])
 }
 
 /** Persist a resumable sitemap crawl without incrementing its error budget. */
@@ -1397,7 +1546,12 @@ export async function markSitemapCrawlPartial(
       last_error = NULL,
       crawl_state = ?
     WHERE name = ?
-  `, [Date.now(), state.urlsObserved, serializeSitemapCrawlState(state), name])
+  `, [
+    Date.now(),
+    state.urlsObserved,
+    serializeSitemapCrawlState(state),
+    name,
+  ])
 }
 
 /**
@@ -1419,7 +1573,11 @@ export async function markSitemapError(
       last_error = ?,
       crawl_state = NULL
     WHERE name = ?
-  `, [Date.now(), error, name])
+  `, [
+    Date.now(),
+    error,
+    name,
+  ])
 }
 
 /**
@@ -1484,7 +1642,11 @@ export async function getRecentlyIndexedPages(
     'SELECT route, title, indexed_at FROM ai_ready_pages WHERE indexed = 1 AND is_error = 0 ORDER BY indexed_at DESC LIMIT ?',
     [limit],
   )
-  return rows.map(r => ({ route: r.route, title: r.title, indexedAt: toNumber(r.indexed_at) }))
+  return rows.map(r => ({
+    route: r.route,
+    title: r.title,
+    indexedAt: toNumber(r.indexed_at),
+  }))
 }
 
 /**

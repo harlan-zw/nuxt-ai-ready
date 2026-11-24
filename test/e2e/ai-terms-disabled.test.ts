@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('disabling AI Terms', async () => {
-  await setup({ rootDir: resolve('../fixtures/ai-terms-disabled'), build: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/ai-terms-disabled'),
+    build: true,
+    server: true,
+  })
 
   it('suppresses the inherited policy and all discovery links', async () => {
     expect((await fetch(url('/.well-known/ai-terms'))).status).toBe(404)

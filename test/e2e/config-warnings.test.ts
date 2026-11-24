@@ -19,7 +19,12 @@ describe('configuration warnings', () => {
       cwd: resolve('../fixtures/content-negotiation-disabled'),
       dev,
       ready: false,
-      overrides: { routeRules: { '/news/**': { swr: 600 }, '/': { isr: 600 } } },
+      overrides: {
+        routeRules: {
+          '/news/**': { swr: 600 },
+          '/': { isr: 600 },
+        },
+      },
     })
     nuxt.hook('modules:done', () => {
       nuxt.hook('nitro:init', async (nitro) => {
@@ -29,7 +34,10 @@ describe('configuration warnings', () => {
         await nuxt.callHook('nitro:build:before', nitro)
         if (dev) {
           await nitro.updateConfig({
-            routeRules: { ...nitro.options.routeRules, '/changed': { swr: 600 } },
+            routeRules: {
+              ...nitro.options.routeRules,
+              '/changed': { swr: 600 },
+            },
           })
         }
       })
@@ -43,7 +51,11 @@ describe('configuration warnings', () => {
       expect.stringContaining('"/": ISR'),
       expect.stringContaining('"/docs/**": response caching'),
       expect.stringContaining('"/news/**": response caching'),
-      ...dev ? [expect.stringContaining('"/changed": response caching')] : [],
+      ...dev
+        ? [
+            expect.stringContaining('"/changed": response caching'),
+          ]
+        : [],
     ])
   }, 60000)
 })

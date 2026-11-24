@@ -5,7 +5,9 @@ const mocks = vi.hoisted(() => ({
   getPageLastmods: vi.fn(),
   getSitemapLastCrawledAt: vi.fn(),
   markSitemapSeeded: vi.fn(),
-  runtimeConfig: { 'nuxt-ai-ready': { debug: false } } as Record<string, unknown>,
+  runtimeConfig: {
+    'nuxt-ai-ready': { debug: false },
+  } as Record<string, unknown>,
   seedRoutes: vi.fn(),
 }))
 
@@ -22,7 +24,12 @@ vi.mock('#nuxtseo/nitro', () => ({
 }))
 
 vi.mock('#ai-ready-virtual/logger.mjs', () => ({
-  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
 }))
 
 type ResolvedHandler = (ctx: { urls: Array<{ loc: string, lastmod?: string | Date }>, sitemapName: string, event: H3Event }) => Promise<void>
@@ -54,7 +61,13 @@ function makeEvent() {
 
 async function runHandler(handler: ResolvedHandler, sitemapName = 'sitemap.xml'): Promise<void> {
   const { deferred, event } = makeEvent()
-  const done = handler({ urls: [{ loc: 'https://example.com/about' }], sitemapName, event })
+  const done = handler({
+    urls: [
+      { loc: 'https://example.com/about' },
+    ],
+    sitemapName,
+    event,
+  })
   await vi.advanceTimersByTimeAsync(3500)
   await done
   await Promise.all(deferred)

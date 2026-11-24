@@ -1,11 +1,19 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ useRawDb: vi.fn(), initSchema: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  useRawDb: vi.fn(),
+  initSchema: vi.fn(),
+}))
 vi.mock('../../src/runtime/server/db/drizzle/raw', () => ({ useRawDb: mocks.useRawDb }))
 vi.mock('../../src/runtime/server/db/drizzle/queries', () => ({ initSchema: mocks.initSchema }))
-vi.mock('../../src/runtime/server/utils/checkStale', () => ({ checkAndHandleStale: async () => {} }))
-vi.mock('#nuxtseo/nitro', () => ({ useRuntimeConfig: () => ({}), useEvent: () => undefined }))
+vi.mock('../../src/runtime/server/utils/checkStale', () => ({
+  checkAndHandleStale: async () => {},
+}))
+vi.mock('#nuxtseo/nitro', () => ({
+  useRuntimeConfig: () => ({}),
+  useEvent: () => undefined,
+}))
 
 let db: Database.Database
 const parameterCounts: number[] = []
@@ -36,9 +44,20 @@ describe('llms.txt metadata lookup', () => {
       insert(route)
     insert('/retired')
     insert('/error', 1)
-    const rows = await queryPageMetadata(undefined, [...routes, '/error', '/missing', routes[0]!])
+    const rows = await queryPageMetadata(undefined, [
+      ...routes,
+      '/error',
+      '/missing',
+      routes[0]!,
+    ])
     expect(rows).toHaveLength(206)
-    expect(rows.find(row => row.route === '/page-0')).toEqual({ route: '/page-0', title: 'Title /page-0', description: 'Description', isError: false, locale: 'en' })
+    expect(rows.find(row => row.route === '/page-0')).toEqual({
+      route: '/page-0',
+      title: 'Title /page-0',
+      description: 'Description',
+      isError: false,
+      locale: 'en',
+    })
     expect(rows.find(row => row.route === '/error')?.isError).toBe(true)
     expect(rows.some(row => row.route === '/retired')).toBe(false)
     expect(parameterCounts).toEqual([100, 100, 7])

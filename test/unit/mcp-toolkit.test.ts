@@ -5,7 +5,10 @@ describe('resolveMcpToolkitState', () => {
   it('detects a toolkit configured after AI Ready', () => {
     expect(hasConfiguredNuxtModule([
       'nuxt-ai-ready',
-      ['@nuxtjs/mcp-toolkit', { enabled: true }],
+      [
+        '@nuxtjs/mcp-toolkit',
+        { enabled: true },
+      ],
     ], '@nuxtjs/mcp-toolkit')).toBe(true)
   })
 
@@ -19,10 +22,30 @@ describe('resolveMcpToolkitState', () => {
   })
 
   it.each([
-    { options: false as const, static: false, generating: false, tag: 'Disabled' },
-    { options: { enabled: false }, static: false, generating: false, tag: 'Disabled' },
-    { options: undefined, static: true, generating: false, tag: 'Static' },
-    { options: undefined, static: false, generating: true, tag: 'Static' },
+    {
+      options: false as const,
+      static: false,
+      generating: false,
+      tag: 'Disabled',
+    },
+    {
+      options: { enabled: false },
+      static: false,
+      generating: false,
+      tag: 'Disabled',
+    },
+    {
+      options: undefined,
+      static: true,
+      generating: false,
+      tag: 'Static',
+    },
+    {
+      options: undefined,
+      static: false,
+      generating: true,
+      tag: 'Static',
+    },
   ])('does not advertise an unavailable server: $tag', ({ options, static: isStatic, generating, tag }) => {
     expect(resolveMcpToolkitState({
       installed: true,

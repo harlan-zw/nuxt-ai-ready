@@ -22,7 +22,9 @@ function importSpecifiers(path: string): { dynamic: string[], static: string[] }
       && ts.isStringLiteral(node.moduleSpecifier)) {
       staticImports.push(node.moduleSpecifier.text)
     }
-    const firstArgument = ts.isCallExpression(node) ? node.arguments[0] : undefined
+    const firstArgument = ts.isCallExpression(node)
+      ? node.arguments[0]
+      : undefined
     if (ts.isCallExpression(node)
       && node.expression.kind === ts.SyntaxKind.ImportKeyword
       && firstArgument

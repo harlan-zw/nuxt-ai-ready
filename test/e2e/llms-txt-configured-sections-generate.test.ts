@@ -12,7 +12,17 @@ describe('static configured section discovery', async () => {
     rootDir: resolve('../fixtures/llms-configured-sections'),
     build: true,
     server: false,
-    nuxtConfig: { robots: { robotsTxt: false }, nitro: { static: true, prerender: { routes: ['/about'], crawlLinks: false, failOnError: true } } },
+    nuxtConfig: {
+      robots: { robotsTxt: false },
+      nitro: {
+        static: true,
+        prerender: {
+          routes: ['/about'],
+          crawlLinks: false,
+          failOnError: true,
+        },
+      },
+    },
   })
 
   it('writes every linked configured child file without losing links', async () => {
@@ -31,7 +41,9 @@ describe('static configured section discovery', async () => {
       }
     }
     await walk('/llms.txt')
-    const all = [...documents.values()].join('\n')
+    const all = [
+      ...documents.values(),
+    ].join('\n')
     for (let i = 0; i < 25; i++)
       expect(all).toContain(`First paragraph ${i}.\n\nSecond paragraph ${i}.`)
     expect(all).not.toContain('Hidden optional context.')

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { verifyCatalogDiscovery } from '../../helpers/catalog-discovery.ts'
 import { verifyNegotiationCache } from '../../helpers/negotiation-cache.ts'
 
 const server = spawn(process.execPath, ['.output/server/index.mjs'], {
@@ -30,6 +31,7 @@ async function waitForServer() {
 
 try {
   const origin = await waitForServer()
+  await verifyCatalogDiscovery(origin)
   await verifyNegotiationCache(origin)
   const protectedMarkdown = await fetch(`${origin}/cache/protected.md`)
   if (protectedMarkdown.status !== 403)

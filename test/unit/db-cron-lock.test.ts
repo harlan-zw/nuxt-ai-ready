@@ -186,7 +186,9 @@ function makePostgresStub() {
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
       throw new Error('cannot extract field from a scalar (a non-object)')
     const field = (parsed as Record<string, unknown>)[key]
-    return field === undefined ? null : String(field)
+    return field === undefined
+      ? null
+      : String(field)
   }
 
   function evalExtract(expr: string, rowValue: string): string | null {
@@ -244,13 +246,17 @@ function makePostgresStub() {
       const byId = q.match(/^SELECT value FROM _ai_ready_info WHERE id = \?$/)
       if (byId) {
         const existing = rows.get(params[0] as string)
-        return existing === undefined ? undefined : { value: existing }
+        return existing === undefined
+          ? undefined
+          : { value: existing }
       }
       throw new Error(`Postgres stub received unexpected statement: ${q}`)
     },
     async all(sql: string, params: unknown[] = []) {
       const row = await adapter.first(sql, params)
-      return row ? [row] : []
+      return row
+        ? [row]
+        : []
     },
     async batch() {
       throw new Error('Postgres stub does not implement batch')

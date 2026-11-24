@@ -77,7 +77,10 @@ describe('agent skills discovery', async () => {
   it('serves the alias verbatim, even to a client that asks for HTML', async () => {
     // Content negotiation owns explicit `.md` requests and would otherwise
     // render this route and add generated frontmatter. The alias must skip it.
-    const response = await fetch('/docs/SKILL.md', { headers: { accept: 'text/html,application/xhtml+xml' }, redirect: 'manual' })
+    const response = await fetch('/docs/SKILL.md', {
+      headers: { accept: 'text/html,application/xhtml+xml' },
+      redirect: 'manual',
+    })
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
@@ -90,7 +93,9 @@ describe('agent skills discovery', async () => {
     const index = await fetch('/.well-known/agent-skills/index.json').then(response => response.json()) as { skills: Array<{ name: string, url: string }> }
     expect(index.skills.map(skill => skill.name)).toEqual(['site-review', 'seo-audit', 'seo-toolkit'])
 
-    const mirrored = await fetch('/docs/skills/site-review/SKILL.md', { headers: { accept: 'text/html' } })
+    const mirrored = await fetch('/docs/skills/site-review/SKILL.md', {
+      headers: { accept: 'text/html' },
+    })
     expect(mirrored.status).toBe(200)
     expect(mirrored.headers.get('content-type')).toBe('text/markdown; charset=utf-8')
     await expect(mirrored.text()).resolves.toBe(reviewSkill)

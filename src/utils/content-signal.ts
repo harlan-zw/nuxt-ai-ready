@@ -47,7 +47,9 @@ function hasContentSignal(value: unknown): boolean {
 }
 
 function isWildcardGroup(group: RobotsGroup): boolean {
-  const userAgents = Array.isArray(group.userAgent) ? group.userAgent : [group.userAgent ?? '*']
+  const userAgents = Array.isArray(group.userAgent)
+    ? group.userAgent
+    : [group.userAgent ?? '*']
   return userAgents.length === 1 && userAgents[0] === '*'
 }
 
@@ -55,7 +57,10 @@ function wildcardGroup(groups: RobotsGroup[]): RobotsGroup {
   const existing = groups.find(isWildcardGroup)
   if (existing)
     return existing
-  const group: RobotsGroup = { userAgent: ['*'], disallow: [''] }
+  const group: RobotsGroup = {
+    userAgent: ['*'],
+    disallow: [''],
+  }
   groups.push(group)
   return group
 }

@@ -3,10 +3,22 @@ import { siteToolCacheKey } from '../../src/runtime/server/mcp/cache-key'
 
 describe('siteToolCacheKey', () => {
   it.each([
-    [{ route: '/guide/setup' }, { route: '/guide-setup' }],
-    [{ route: '/guide' }, { route: 'guide' }],
-    [{ query: 'nuxt seo', limit: 10 }, { query: 'nuxt', limit: 10 }],
-    [{ query: 'nuxt', limit: 10 }, { query: 'nuxt', limit: 1 }],
+    [
+      { route: '/guide/setup' },
+      { route: '/guide-setup' },
+    ],
+    [
+      { route: '/guide' },
+      { route: 'guide' },
+    ],
+    [
+      { query: 'nuxt seo', limit: 10 },
+      { query: 'nuxt', limit: 10 },
+    ],
+    [
+      { query: 'nuxt', limit: 10 },
+      { query: 'nuxt', limit: 1 },
+    ],
   ])('gives distinct arguments distinct keys: %#', (a, b) => {
     expect(siteToolCacheKey(a)).not.toBe(siteToolCacheKey(b))
   })
@@ -16,7 +28,12 @@ describe('siteToolCacheKey', () => {
   })
 
   it('keeps keys URL safe and one length for any argument text', () => {
-    const keys = ['/guide/setup', '/search?q=nuxt#results', '/über/straße', 'x'.repeat(4096)]
+    const keys = [
+      '/guide/setup',
+      '/search?q=nuxt#results',
+      '/über/straße',
+      'x'.repeat(4096),
+    ]
       .map(route => siteToolCacheKey({ route }))
     for (const key of keys)
       expect(key).toMatch(/^[\w-]+$/)

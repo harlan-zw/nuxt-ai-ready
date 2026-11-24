@@ -18,10 +18,34 @@ const currentTab = computed(() => {
 })
 
 const navItems = [
-  { value: 'pages', to: '/ai-ready', icon: 'carbon:list', label: 'Pages', devOnly: false },
-  { value: 'llms-txt', to: '/ai-ready/llms-txt', icon: 'carbon:document', label: 'llms.txt', devOnly: false },
-  { value: 'debug', to: '/ai-ready/debug', icon: 'carbon:debug', label: 'Debug', devOnly: true },
-  { value: 'docs', to: '/ai-ready/docs', icon: 'carbon:book', label: 'Docs', devOnly: false },
+  {
+    value: 'pages',
+    to: '/ai-ready',
+    icon: 'carbon:list',
+    label: 'Pages',
+    devOnly: false,
+  },
+  {
+    value: 'llms-txt',
+    to: '/ai-ready/llms-txt',
+    icon: 'carbon:document',
+    label: 'llms.txt',
+    devOnly: false,
+  },
+  {
+    value: 'debug',
+    to: '/ai-ready/debug',
+    icon: 'carbon:debug',
+    label: 'Debug',
+    devOnly: true,
+  },
+  {
+    value: 'docs',
+    to: '/ai-ready/docs',
+    icon: 'carbon:book',
+    label: 'Docs',
+    devOnly: false,
+  },
 ]
 
 const runtimeVersion = computed(() => data.value?.version || 'unknown')

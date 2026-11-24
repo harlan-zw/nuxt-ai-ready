@@ -29,22 +29,24 @@ const tool: McpToolDefinition<typeof inputSchema> = {
     const total = await countPages(event)
 
     return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          pages: pages.map(p => ({
-            route: p.route,
-            title: p.title || p.route,
-            description: p.description || '',
-            headings: p.headings || undefined,
-            keywords: p.keywords?.length ? p.keywords : undefined,
-          })),
-          total,
-          limit,
-          offset,
-          hasMore: offset + pages.length < total,
-        }),
-      }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            pages: pages.map(p => ({
+              route: p.route,
+              title: p.title || p.route,
+              description: p.description || '',
+              headings: p.headings || undefined,
+              keywords: p.keywords?.length ? p.keywords : undefined,
+            })),
+            total,
+            limit,
+            offset,
+            hasMore: offset + pages.length < total,
+          }),
+        },
+      ],
     }
   },
 }

@@ -16,7 +16,10 @@ describe('publishing AI Terms in Cloudflare static assets', async () => {
       nitro: {
         preset: 'cloudflare-module',
         compatibilityDate: '2026-10-08',
-        cloudflare: { deployConfig: true, wrangler: { name: 'ai-terms-test' } },
+        cloudflare: {
+          deployConfig: true,
+          wrangler: { name: 'ai-terms-test' },
+        },
       },
     },
   })
@@ -27,7 +30,12 @@ describe('publishing AI Terms in Cloudflare static assets', async () => {
     return join(dirname(configPath), config.assets.directory)
   }
 
-  it.each(['/', '/index.md', '/.well-known/api-catalog', '/.well-known/ai-terms'])('keeps one policy discovery link on %s', async (route) => {
+  it.each([
+    '/',
+    '/index.md',
+    '/.well-known/api-catalog',
+    '/.well-known/ai-terms',
+  ])('keeps one policy discovery link on %s', async (route) => {
     const contents = await readFile(join(await assets(), '_headers'), 'utf8')
     const headers = resolveCloudflareStaticHeaders(contents, route)
     expect(headers.link?.match(/rel="ai-terms"/g)).toHaveLength(1)

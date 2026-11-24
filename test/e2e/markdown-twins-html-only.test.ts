@@ -45,7 +45,10 @@ describe('markdown twins for HTML pages only', async () => {
     nuxtConfig: {
       nitro: {
         compatibilityDate: '2026-10-08',
-        cloudflare: { deployConfig: true, wrangler: { name: 'markdown-twins-test' } },
+        cloudflare: {
+          deployConfig: true,
+          wrangler: { name: 'markdown-twins-test' },
+        },
       },
     },
   })

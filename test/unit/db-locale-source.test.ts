@@ -74,7 +74,11 @@ const prefixI18n: RuntimeI18nConfig = {
 function eventWithHost(host: string): H3Event {
   return {
     path: '/',
-    node: { req: { headers: { host } } },
+    node: {
+      req: {
+        headers: { host },
+      },
+    },
   } as unknown as H3Event
 }
 
@@ -214,7 +218,10 @@ describe('indexed page locale source', () => {
     await seedRoutes(eventWithHost('en.example.com'), [
       { route: '/a-propos', url: 'https://fr.example.com/a-propos' },
     ])
-    await upsertPage(eventWithHost('en.example.com'), { ...page('/a-propos'), locale: 'en' })
+    await upsertPage(eventWithHost('en.example.com'), {
+      ...page('/a-propos'),
+      locale: 'en',
+    })
 
     expect(localeOf('/a-propos')).toBe('en')
   })

@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest'
 const { resolve } = createResolver(import.meta.url)
 
 describe('bounded configured section discovery', async () => {
-  await setup({ rootDir: resolve('../fixtures/llms-configured-sections'), dev: true, server: true })
+  await setup({
+    rootDir: resolve('../fixtures/llms-configured-sections'),
+    dev: true,
+    server: true,
+  })
 
   it('serves complete required and optional lists through bounded child files', async () => {
     const documents = new Map<string, string>()
@@ -27,7 +31,9 @@ describe('bounded configured section discovery', async () => {
       expect(await head.text()).toBe('')
     }
     await walk('/llms.txt')
-    const all = [...documents.values()].join('\n')
+    const all = [
+      ...documents.values(),
+    ].join('\n')
     for (let i = 0; i < 25; i++)
       expect(all).toContain(`First paragraph ${i}.\n\nSecond paragraph ${i}.`)
     expect(all).not.toContain('Hidden optional context.')

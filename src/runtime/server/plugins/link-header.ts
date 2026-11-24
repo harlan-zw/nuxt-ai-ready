@@ -43,7 +43,9 @@ export default defineNitroPlugin((nitro) => {
     if (!header)
       return
 
-    setHeader(event, 'link', getResponseStatus(event) >= 400 ? header.error : header.success)
+    setHeader(event, 'link', getResponseStatus(event) >= 400
+      ? header.error
+      : header.success)
   })
 
   nitro.hooks.hook('render:html', (_html, { event }) => {
@@ -56,7 +58,10 @@ export default defineNitroPlugin((nitro) => {
       setHeader(event, 'link', errorHeader)
       return
     }
-    if (header)
-      setHeader(event, 'link', getResponseStatus(event) >= 400 ? header.error : header.success)
+    if (header) {
+      setHeader(event, 'link', getResponseStatus(event) >= 400
+        ? header.error
+        : header.success)
+    }
   })
 })

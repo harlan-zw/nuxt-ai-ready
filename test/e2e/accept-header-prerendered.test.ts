@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
-import { fetch, setup, url } from '@nuxt/test-utils/e2e'
+import { fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -14,8 +16,11 @@ describe('accept header negotiation for prerendered routes', async () => {
     server: true,
     nuxtConfig: {
       routeRules: {
-        '/about.md': { headers: { 'vary': 'Origin', 'content-signal': 'search=no', 'x-markdown-rule': 'about' } },
+        '/about.md': {
+          headers: { 'vary': 'Origin', 'content-signal': 'search=no', 'x-markdown-rule': 'about' },
+        },
         '/docs/getting-started.md': { proxy: '/api/prerendered-markdown-proxy' },
+        '/preserved.md': { proxy: '/api/raw-markdown' },
       },
       nitro: {
         preset: 'node-server',
@@ -23,17 +28,26 @@ describe('accept header negotiation for prerendered routes', async () => {
           'rollup:before': (nitro) => {
             if (nitro.options.preset === 'nitro-prerender')
               return
-            nitro.options.routeRules['/render-count'] = { headers: { 'x-added-at-bundle': 'html' } }
+            nitro.options.routeRules['/render-count'] = {
+              headers: { 'x-added-at-bundle': 'html' },
+            }
             nitro.options.routeRules['/about.md']!.headers!['x-added-at-bundle'] = 'markdown'
             nitro.options.runtimeConfig.nitro.routeRules = {
               ...nitro.options.routeRules,
-              '/render-count': { headers: { ...nitro.options.routeRules['/render-count']!.headers, 'x-runtime-only': 'kept' } },
+              '/render-count': {
+                headers: { ...nitro.options.routeRules['/render-count']!.headers, 'x-runtime-only': 'kept' },
+              },
             }
           },
         },
         prerender: {
           crawlLinks: false,
-          routes: ['/', '/about', '/docs/getting-started.md'],
+          routes: [
+            '/',
+            '/about',
+            '/docs/getting-started.md',
+            '/preserved.md',
+          ],
           failOnError: false,
         },
       },
@@ -51,6 +65,13 @@ describe('accept header negotiation for prerendered routes', async () => {
     expect(response.headers.get('last-modified')).toBeTruthy()
     expect(response.headers.get('vary')).toContain('Accept')
     expect(response.headers.get('link')).toContain('rel="alternate"')
+  })
+
+  it('prerenders a Markdown response byte for byte', async () => {
+    const buildDir = useTestContext().nuxt!.options.buildDir
+    const rawMarkdown = await readFile(join(buildDir, 'output/public/preserved.md'), 'utf8')
+
+    expect(rawMarkdown).toBe('---\r\ntitle: Preserved\r\n---\r\n\r\n# Preserved\r\n')
   })
 
   it('redirects a markdown client to the prerendered .md twin', async () => {
@@ -101,7 +122,9 @@ describe('accept header negotiation for prerendered routes', async () => {
     const initial = await fetch(request, { method: 'HEAD' })
     const etag = initial.headers.get('etag')
     expect(etag).toBeTruthy()
-    const response = await fetch(request, { headers: { 'If-None-Match': etag! } })
+    const response = await fetch(request, {
+      headers: { 'If-None-Match': etag! },
+    })
 
     expect(response.status).toBe(304)
     expect(response.headers.get('vary')).toBe('Origin, Accept')
@@ -127,7 +150,9 @@ describe('accept header negotiation for prerendered routes', async () => {
   })
 
   it('returns markdown with Accept variation when following homepage negotiation', async () => {
-    const response = await fetch(url('/'), { headers: { Accept: 'text/markdown' } })
+    const response = await fetch(url('/'), {
+      headers: { Accept: 'text/markdown' },
+    })
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('text/markdown')
     expect(response.headers.get('vary')).toContain('Accept')

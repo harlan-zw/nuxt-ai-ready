@@ -17,7 +17,9 @@ describe('restore on first query', async () => {
     nuxtConfig: {
       mcp: { enabled: false },
       aiReady: {
-        database: { filename: join(tmpdir(), `ai-ready-restore-${randomUUID()}.db`) },
+        database: {
+          filename: join(tmpdir(), `ai-ready-restore-${randomUUID()}.db`),
+        },
       },
     },
   })

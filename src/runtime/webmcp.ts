@@ -208,7 +208,9 @@ export function checkToolBudget(tool: WebMcpTool<any, any>): string[] {
   for (const [param, schema] of Object.entries(tool.inputSchema?.properties || {})) {
     if (param.length > WEB_MCP_BUDGET.name)
       warnings.push(`Parameter name "${tool.name}.${param}" is ${param.length} characters, over the ${WEB_MCP_BUDGET.name} character budget.`)
-    const description = typeof schema.description === 'string' ? schema.description : ''
+    const description = typeof schema.description === 'string'
+      ? schema.description
+      : ''
     if (description.length > WEB_MCP_BUDGET.paramDescription)
       warnings.push(`Description for "${tool.name}.${param}" is ${description.length} characters, over the ${WEB_MCP_BUDGET.paramDescription} character budget.`)
   }
@@ -226,15 +228,27 @@ export function truncateToolOutput(text: string, maxChars: number, hint?: string
   const notice = hint
     ? `\n\n[Truncated at ${budget} characters. ${hint}]`
     : `\n\n[Truncated at ${budget} characters.]`
-  if (notice.length >= budget)
-    return budget === 1 ? '…' : `${text.slice(0, budget - 1)}…`
+  if (notice.length >= budget) {
+    return budget === 1
+      ? '…'
+      : `${text.slice(0, budget - 1)}…`
+  }
   return text.slice(0, budget - notice.length) + notice
 }
 
 export function toolText(text: string): WebMcpToolResult {
-  return { content: [{ type: 'text', text }] }
+  return {
+    content: [
+      { type: 'text', text },
+    ],
+  }
 }
 
 export function toolError(message: string): WebMcpToolResult {
-  return { content: [{ type: 'text', text: message }], isError: true }
+  return {
+    content: [
+      { type: 'text', text: message },
+    ],
+    isError: true,
+  }
 }

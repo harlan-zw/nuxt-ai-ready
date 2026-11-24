@@ -23,7 +23,10 @@ function mountTool(enabled = ref(true)) {
       return () => h('div')
     },
   })
-  return { wrapper: mount(component), state: () => state! }
+  return {
+    wrapper: mount(component),
+    state: () => state!,
+  }
 }
 
 afterEach(() => {
@@ -40,7 +43,9 @@ describe('useWebMcpTool', () => {
   }
 
   it('keeps support false during SSR and exposes registration success after mount', async () => {
-    const modelContext = { registerTool: vi.fn(() => Promise.resolve()) } as unknown as WebMcpModelContext
+    const modelContext = {
+      registerTool: vi.fn(() => Promise.resolve()),
+    } as unknown as WebMcpModelContext
     setModelContext(modelContext)
 
     const serverState = ref<WebMcpToolRegistrationState>()
@@ -60,7 +65,9 @@ describe('useWebMcpTool', () => {
   })
 
   it('reacts to enabled state', async () => {
-    const modelContext = { registerTool: vi.fn(() => Promise.resolve()) } as unknown as WebMcpModelContext
+    const modelContext = {
+      registerTool: vi.fn(() => Promise.resolve()),
+    } as unknown as WebMcpModelContext
     setModelContext(modelContext)
     const enabled = ref(false)
     const { wrapper, state } = mountTool(enabled)
@@ -95,7 +102,9 @@ describe('useWebMcpTool', () => {
     })
     const wrapper = mount(defineComponent({
       setup: () => () => h(KeepAlive, null, {
-        default: () => visible.value ? h(child) : h('div'),
+        default: () => visible.value
+          ? h(child)
+          : h('div'),
       }),
     }))
 
@@ -110,7 +119,9 @@ describe('useWebMcpTool', () => {
 
   it('surfaces registration failure', async () => {
     const error = new Error('duplicate tool')
-    const modelContext = { registerTool: vi.fn(() => Promise.reject(error)) } as unknown as WebMcpModelContext
+    const modelContext = {
+      registerTool: vi.fn(() => Promise.reject(error)),
+    } as unknown as WebMcpModelContext
     setModelContext(modelContext)
 
     const { wrapper, state } = mountTool()
@@ -128,7 +139,9 @@ describe('useWebMcpTool', () => {
       }),
     } as unknown as WebMcpModelContext
     setModelContext(modelContext)
-    setWebMcpDefaults({ exposedTo: ['https://agent.example.com'] })
+    setWebMcpDefaults({
+      exposedTo: ['https://agent.example.com'],
+    })
 
     const global = mountTool()
     await flushPromises()
@@ -138,7 +151,9 @@ describe('useWebMcpTool', () => {
     let explicit: ReturnType<typeof useWebMcpTool> | undefined
     const wrapper = mount(defineComponent({
       setup() {
-        explicit = useWebMcpTool(tool, { exposedTo: ['https://other.example.com'] })
+        explicit = useWebMcpTool(tool, {
+          exposedTo: ['https://other.example.com'],
+        })
         return () => h('div')
       },
     }))

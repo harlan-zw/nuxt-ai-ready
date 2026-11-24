@@ -14,7 +14,15 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const files = [
   '1.getting-started/0.introduction.md',
   '1.getting-started/1.installation.md',
-  ...['0.content-signals', '1.markdown', '2.llms-txt', '10.api-catalog', '11.agent-skills', '8.i18n', '9.webmcp'].map(name => `2.guides/${name}.md`),
+  ...[
+    '0.content-signals',
+    '1.markdown',
+    '2.llms-txt',
+    '10.api-catalog',
+    '11.agent-skills',
+    '8.i18n',
+    '9.webmcp',
+  ].map(name => `2.guides/${name}.md`),
 ]
 const revision = process.argv[2]
 function read(file) {
@@ -23,12 +31,16 @@ function read(file) {
     : readFileSync(resolve(root, 'docs/content', file), 'utf8')
 }
 function snippets(file) {
-  return [...read(file).matchAll(/^```(\w+)(?: \[([^\]]+)\])?\n([\s\S]*?)^```/gm)]
+  return [
+    ...read(file).matchAll(/^```(\w+)(?: \[([^\]]+)\])?\n([\s\S]*?)^```/gm),
+  ]
     .map(([, language, label, code]) => ({ language, label, code }))
 }
 function execute(code, globals = {}) {
   const exports = {}
-  const compiled = ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } })
+  const compiled = ts.transpileModule(code, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  })
   vm.runInNewContext(compiled.outputText, { exports, ...globals })
   return exports
 }
@@ -45,21 +57,30 @@ function loadSource(path) {
       if (!id.startsWith('.'))
         return nativeRequire(id)
       const source = resolve(dirname(absolute), `${id}.ts`)
-      return existsSync(source) ? loadSource(source) : nativeRequire(id)
+      return existsSync(source)
+        ? loadSource(source)
+        : nativeRequire(id)
     },
   })
 }
 function configs(file, globals = {}) {
-  return snippets(file).filter(s => s.language === 'ts' && s.code.includes('defineNuxtConfig(')).map(s => execute(s.code, { defineNuxtConfig: value => value, ...globals }).default)
+  return snippets(file).filter(s => s.language === 'ts' && s.code.includes('defineNuxtConfig(')).map(s => execute(s.code, {
+    defineNuxtConfig: value => value,
+    ...globals,
+  }).default)
 }
 function getHook(file, name, label) {
   let hook
   const source = snippets(file).find(s => s.label === label)
   execute(source.code, {
-    defineNitroPlugin: setup => setup({ hooks: { hook: (registered, handler) => {
-      if (registered === name)
-        hook = handler
-    } } }),
+    defineNitroPlugin: setup => setup({
+      hooks: {
+        hook: (registered, handler) => {
+          if (registered === name)
+            hook = handler
+        },
+      },
+    }),
   })
   return hook
 }
@@ -71,7 +92,9 @@ async function main() {
         JSON.parse(snippet.code)
       if (!['ts', 'vue'].includes(snippet.language))
         continue
-      const code = snippet.language === 'vue' ? snippet.code.match(/<script[^>]*>([\s\S]*?)<\/script>/)?.[1] : snippet.code
+      const code = snippet.language === 'vue'
+        ? snippet.code.match(/<script[^>]*>([\s\S]*?)<\/script>/)?.[1]
+        : snippet.code
       if (!code)
         continue
       const source = ts.createSourceFile(snippet.label || file, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
@@ -105,7 +128,11 @@ async function main() {
     mkdirSync(dirname(skillPath), { recursive: true })
     writeFileSync(skillPath, skill)
     const digest = createHash('sha256').update(skill).digest('hex')
-    const examples = configs('2.guides/11.agent-skills.md', { process: { env: { SEO_TOOLKIT_SHA256: digest } } })
+    const examples = configs('2.guides/11.agent-skills.md', {
+      process: {
+        env: { SEO_TOOLKIT_SHA256: digest },
+      },
+    })
     const local = examples.find(config => config.aiReady.agentSkills?.skills?.[0]?.source === 'local')
     const skillResult = await resolveAgentSkillsConfig(local.aiReady.agentSkills, scratch)
     assert.equal(skillResult._tag, 'Enabled')
@@ -120,9 +147,16 @@ async function main() {
         },
       }),
     })
-    const payload = { skills: [{ name: 'internal-audit' }, { name: 'seo-audit' }] }
+    const payload = {
+      skills: [
+        { name: 'internal-audit' },
+        { name: 'seo-audit' },
+      ],
+    }
     filter(payload)
-    assert.deepEqual(payload.skills, [{ name: 'seo-audit' }])
+    assert.deepEqual(payload.skills, [
+      { name: 'seo-audit' },
+    ])
   }
   finally {
     rmSync(scratch, { recursive: true, force: true })
@@ -133,7 +167,11 @@ async function main() {
     ref: value => ({ value }),
     useWebMcpTool: (definition) => {
       tool = definition
-      return { state: { value: { _tag: 'Registered' } } }
+      return {
+        state: {
+          value: { _tag: 'Registered' },
+        },
+      }
     },
     watchEffect: run => run(),
   })
@@ -143,7 +181,10 @@ async function main() {
     i18n: {
       defaultLocale: 'en',
       strategy: 'prefix_except_default',
-      locales: [{ code: 'en', hreflang: 'en' }, { code: 'fr', hreflang: 'fr-FR' }],
+      locales: [
+        { code: 'en', hreflang: 'en' },
+        { code: 'fr', hreflang: 'fr-FR' },
+      ],
     },
   }, path => `https://acme.example${path}`)
   assert.match(header, /<https:\/\/acme\.example\/about\.md>; rel="alternate"; hreflang="en"/)

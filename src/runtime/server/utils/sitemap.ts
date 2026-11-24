@@ -62,7 +62,10 @@ export type SitemapCrawlResult
  */
 export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
   const runtimeConfig = useRuntimeConfig(event)
-  const sitemapConfig = { ...staticSitemapConfig, ...runtimeConfig.sitemap } as {
+  const sitemapConfig = {
+    ...staticSitemapConfig,
+    ...runtimeConfig.sitemap,
+  } as {
     sitemaps?: Record<string, { sitemapName?: string, _route?: string, route?: string }>
     isMultiSitemap?: boolean
   } | undefined
@@ -77,11 +80,15 @@ export function getSitemapsFromConfig(event?: H3Event): SitemapConfig[] {
     if (key === 'index')
       continue
     // Automatic chunks have no route. Their index is the discovery root.
-    const route = sitemap._route || sitemap.route || (key === 'chunks' ? sitemapConfig.sitemaps.index?._route || sitemapConfig.sitemaps.index?.route : undefined)
+    const route = sitemap._route || sitemap.route || (key === 'chunks'
+      ? sitemapConfig.sitemaps.index?._route || sitemapConfig.sitemaps.index?.route
+      : undefined)
     if (route) {
       sitemaps.push({
         name: (sitemap.sitemapName || key).replace(/\.xml$/, ''),
-        route: route.startsWith('/') ? route : `/${route}`,
+        route: route.startsWith('/')
+          ? route
+          : `/${route}`,
       })
     }
   }
@@ -125,7 +132,10 @@ type RecoveredUrlset
 
 function parseAbsoluteUrl(input: string, base?: string): ParsedUrl {
   try {
-    return { _tag: 'ok', value: new URL(input, base) }
+    return {
+      _tag: 'ok',
+      value: new URL(input, base),
+    }
   }
   catch {
     return { _tag: 'error', input }
@@ -157,8 +167,12 @@ async function readBoundedBody(
   body: ReadableStream<Uint8Array> | null,
   maxWireBytes: number,
 ): Promise<BoundedBodyResult> {
-  if (!body)
-    return { _tag: 'ok', body: new Uint8Array() }
+  if (!body) {
+    return {
+      _tag: 'ok',
+      body: new Uint8Array(),
+    }
+  }
 
   const reader = body.getReader()
   const chunks: Uint8Array[] = []
@@ -275,14 +289,20 @@ function createLocalSitemapLoader(
     }
 
     const route = `${parsed.value.pathname}${parsed.value.search}`
-    logger.debug(`[sitemap] Fetching ${route} via ${usePublicAsset ? 'ASSETS.fetch' : event ? 'event.fetch' : 'globalThis.$fetch'}`)
+    logger.debug(`[sitemap] Fetching ${route} via ${usePublicAsset
+      ? 'ASSETS.fetch'
+      : event ? 'event.fetch' : 'globalThis.$fetch'}`)
     const fetched = await fetchLocalRoute(event, route, usePublicAsset, request)
     if (fetched._tag === 'error') {
       return {
         _tag: 'load_error',
         url: request.url,
-        code: fetched.timedOut ? 'timeout' : fetched.cancelled ? 'cancelled' : 'network',
-        detail: fetched.error instanceof Error ? fetched.error.message : String(fetched.error),
+        code: fetched.timedOut
+          ? 'timeout'
+          : fetched.cancelled ? 'cancelled' : 'network',
+        detail: fetched.error instanceof Error
+          ? fetched.error.message
+          : String(fetched.error),
       }
     }
 
@@ -329,7 +349,9 @@ function createLocalSitemapLoader(
         _tag: 'load_error',
         url: request.url,
         code: 'network',
-        detail: read.error instanceof Error ? read.error.message : String(read.error),
+        detail: read.error instanceof Error
+          ? read.error.message
+          : String(read.error),
       }
     }
     if (read.result._tag === 'limit') {
@@ -434,7 +456,9 @@ function formatWalkError(result: {
     return `Sitemap parse failed: ${parseFailures[0]}`
 
   const failures = result.failures.map(formatWalkFailure)
-  const details = failures.length > 0 ? `; ${failures.join('; ')}` : ''
+  const details = failures.length > 0
+    ? `; ${failures.join('; ')}`
+    : ''
   return `sitemap walk partial (${result.reasons.join(', ')}${details})`
 }
 
@@ -456,7 +480,9 @@ export async function crawlSitemapByRoute(
   const configuredSiteUrl = createUniversalContext(event).siteUrl ?? SITEMAP_FALLBACK_ORIGIN
   const siteUrl = parseAbsoluteUrl(configuredSiteUrl)
   // Development sitemaps use the local server origin, including their chunk links.
-  const requestOrigin = import.meta.dev && event ? getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin : undefined
+  const requestOrigin = import.meta.dev && event
+    ? getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
+    : undefined
   if (siteUrl._tag === 'error') {
     return {
       _tag: 'failed',
@@ -628,7 +654,10 @@ export async function fetchSitemapUrlGroups(event: H3Event, names?: readonly str
       // partial page list beats none. The error is already logged downstream and
       // matters to the cron crawl-status path, not to URL aggregation here.
       const { urls } = await fetchSitemapByRoute(event, sitemap.route)
-      groups.set(sitemap.name, [...(groups.get(sitemap.name) || []), ...urls])
+      groups.set(sitemap.name, [
+        ...(groups.get(sitemap.name) || []),
+        ...urls,
+      ])
     }
 
     return groups
@@ -653,5 +682,7 @@ export async function fetchSitemapUrlGroups(event: H3Event, names?: readonly str
 }
 
 export async function fetchSitemapUrls(event: H3Event): Promise<SitemapUrl[]> {
-  return [...(await fetchSitemapUrlGroups(event)).values()].flat()
+  return [
+    ...(await fetchSitemapUrlGroups(event)).values(),
+  ].flat()
 }

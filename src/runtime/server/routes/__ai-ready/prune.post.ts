@@ -15,7 +15,9 @@ export default eventHandler(async (event) => {
     await requireAuth(event)
   }
 
-  const ttl = query.ttl ? Math.max(0, Math.trunc(Number(query.ttl)) || config.runtimeSync.pruneTtl) : config.runtimeSync.pruneTtl
+  const ttl = query.ttl
+    ? Math.max(0, Math.trunc(Number(query.ttl)) || config.runtimeSync.pruneTtl)
+    : config.runtimeSync.pruneTtl
 
   // The seeder resolves its window from the configured pruneTtl, never the
   // ttl override, so pruning uses that same window.
@@ -24,7 +26,12 @@ export default eventHandler(async (event) => {
   // Dry run: preview stale routes without deleting
   if (dry) {
     const routes = await getStaleRoutes(event, ttl, refreshWindowMs)
-    return { routes, count: routes.length, ttl, dry: true }
+    return {
+      routes,
+      count: routes.length,
+      ttl,
+      dry: true,
+    }
   }
 
   // Execute prune

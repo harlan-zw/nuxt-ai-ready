@@ -8,8 +8,16 @@ vi.mock('h3', () => ({
   getHeaders: (event: any) => event.node.req.headers,
   getRequestURL: (event: any) => new URL(event.node.req.url, 'https://example.com'),
 }))
-vi.mock('mdream', () => ({ htmlToMarkdown: () => '' }))
-vi.mock('nitropack/runtime', () => ({ useNitroApp: () => ({ hooks: { callHook: () => {} } }) }))
+vi.mock('mdream', () => ({
+  htmlToMarkdown: () => '',
+}))
+vi.mock('nitropack/runtime', () => ({
+  useNitroApp: () => ({
+    hooks: {
+      callHook: () => {},
+    },
+  }),
+}))
 
 const { getMarkdownRenderInfo, negotiateRepresentation } = await import('../../src/runtime/server/utils/markdown-request')
 
@@ -18,7 +26,12 @@ function mockEvent(headers: Record<string, string>, path = '/', requestUrl = pat
   const lower: Record<string, string> = {}
   for (const k in headers)
     lower[k.toLowerCase()] = headers[k]!
-  return { node: { req: { headers: lower, url: requestUrl } }, path } as unknown as H3Event
+  return {
+    node: {
+      req: { headers: lower, url: requestUrl },
+    },
+    path,
+  } as unknown as H3Event
 }
 
 describe('getMarkdownRenderInfo', () => {
@@ -94,9 +107,17 @@ describe('negotiateRepresentation', () => {
     expect(negotiateRepresentation(mockEvent({ 'accept': 'text/markdown', 'sec-fetch-dest': 'document' }))).toBe('markdown')
   })
 
-  it.each(['text/html,text/markdown;q=0', 'text/html,TEXT/MARKDOWN;Q=0', 'text/html,text/*;q=0', 'text/html,*/*;q=0', 'application/x-probe'])('honors format rejection with bot negotiation: %s', (accept) => {
+  it.each([
+    'text/html,text/markdown;q=0',
+    'text/html,TEXT/MARKDOWN;Q=0',
+    'text/html,text/*;q=0',
+    'text/html,*/*;q=0',
+    'application/x-probe',
+  ])('honors format rejection with bot negotiation: %s', (accept) => {
     expect(negotiateRepresentation(mockEvent({ accept, 'user-agent': 'GPTBot' }), true))
-      .toBe(accept.startsWith('text/html') ? 'html' : 'not-acceptable')
+      .toBe(accept.startsWith('text/html')
+        ? 'html'
+        : 'not-acceptable')
   })
 
   it.each(['text/html,text/markdown;q=0.5,text/*;q=0', 'text/html,text/plain;q=0,*/*;q=0.5'])('allows acceptable Markdown with bot negotiation: %s', (accept) => {

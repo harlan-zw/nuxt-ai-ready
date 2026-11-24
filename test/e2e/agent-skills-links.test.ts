@@ -19,19 +19,23 @@ describe('external agent skill links in llms.txt', () => {
       cwd: resolve('../fixtures/agent-skills'),
       dev: false,
       ready: false,
-      overrides: { site: { url: siteUrl } },
+      overrides: {
+        site: { url: siteUrl },
+      },
     })
     nuxt.options.aiReady = {
       agentSkills: {
         dir: false,
-        skills: [{
-          source: 'external',
-          name: 'external-tool',
-          type: 'skill-md',
-          description: 'Use the external tool.',
-          url,
-          digest: `sha256:${'a'.repeat(64)}`,
-        }],
+        skills: [
+          {
+            source: 'external',
+            name: 'external-tool',
+            type: 'skill-md',
+            description: 'Use the external tool.',
+            url,
+            digest: `sha256:${'a'.repeat(64)}`,
+          },
+        ],
       },
     }
     let sections: LlmsTxtConfig['sections'] = []

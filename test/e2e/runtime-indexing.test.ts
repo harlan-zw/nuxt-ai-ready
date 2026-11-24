@@ -259,7 +259,10 @@ describe('runtime indexing', async () => {
     // Set its last_seen_at to now (simulating sitemap seeding)
     await fetch('/api/__db-test?action=set-last-seen', {
       method: 'POST',
-      body: { route: '/freshly-seeded', timestamp: Date.now() },
+      body: {
+        route: '/freshly-seeded',
+        timestamp: Date.now(),
+      },
     })
 
     const { rows } = (await fetch('/api/__db-test?action=raw')) as { rows: Array<{ route: string, last_seen_at: number }> }

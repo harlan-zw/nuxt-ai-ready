@@ -15,7 +15,9 @@ describe('resolveApiCatalogConfig', () => {
         {
           anchor: '/api',
           serviceDesc: { href: '/openapi.json', type: 'application/vnd.oai.openapi+json' },
-          serviceDoc: [{ href: '/docs/api', type: 'text/html', title: 'API documentation' }],
+          serviceDoc: [
+            { href: '/docs/api', type: 'text/html', title: 'API documentation' },
+          ],
           status: { href: 'status', type: 'application/json' },
         },
       ],
@@ -50,20 +52,26 @@ describe('resolveApiCatalogConfig', () => {
 
   it('preserves RFC 3986 network-path references', () => {
     const result = resolveApiCatalogConfig({
-      entries: [{
-        anchor: '//api.example.net/v1',
-        serviceDesc: { href: '//api.example.net/openapi.json' },
-      }],
+      entries: [
+        {
+          anchor: '//api.example.net/v1',
+          serviceDesc: { href: '//api.example.net/openapi.json' },
+        },
+      ],
     }, { siteBaseURL: 'https://example.com/docs/' })
 
     expect(result).toMatchObject({
       _tag: 'Enabled',
       config: {
         document: {
-          linkset: [{
-            'anchor': 'https://api.example.net/v1',
-            'service-desc': [{ href: 'https://api.example.net/openapi.json' }],
-          }],
+          linkset: [
+            {
+              'anchor': 'https://api.example.net/v1',
+              'service-desc': [
+                { href: 'https://api.example.net/openapi.json' },
+              ],
+            },
+          ],
         },
       },
     })
@@ -71,39 +79,47 @@ describe('resolveApiCatalogConfig', () => {
 
   it('preserves absolute URLs and optional target attributes', () => {
     const result = resolveApiCatalogConfig({
-      entries: [{
-        anchor: 'https://api.example.net/v1',
-        item: {
-          href: 'https://api.example.net/v1/openapi.json',
-          hreflang: 'en',
-          media: 'screen',
+      entries: [
+        {
+          anchor: 'https://api.example.net/v1',
+          item: {
+            href: 'https://api.example.net/v1/openapi.json',
+            hreflang: 'en',
+            media: 'screen',
+          },
         },
-      }],
+      ],
     }, { siteBaseURL: 'https://example.com/' })
 
     expect(result).toMatchObject({
       _tag: 'Enabled',
       config: {
         document: {
-          linkset: [{
-            anchor: 'https://api.example.net/v1',
-            item: [{
-              href: 'https://api.example.net/v1/openapi.json',
-              hreflang: ['en'],
-              media: 'screen',
-            }],
-          }],
+          linkset: [
+            {
+              anchor: 'https://api.example.net/v1',
+              item: [
+                {
+                  href: 'https://api.example.net/v1/openapi.json',
+                  hreflang: ['en'],
+                  media: 'screen',
+                },
+              ],
+            },
+          ],
         },
       },
     })
   })
 
   it('merges generated entries before resolving once', () => {
-    const generatedEntries: ApiCatalogEntry[] = [{
-      anchor: '/mcp',
-      item: { href: '/mcp', type: 'application/json' },
-      serviceDesc: { href: '/.well-known/mcp/server-card.json', type: 'application/json' },
-    }]
+    const generatedEntries: ApiCatalogEntry[] = [
+      {
+        anchor: '/mcp',
+        item: { href: '/mcp', type: 'application/json' },
+        serviceDesc: { href: '/.well-known/mcp/server-card.json', type: 'application/json' },
+      },
+    ]
 
     const result = resolveApiCatalogConfig(undefined, {
       siteBaseURL: 'https://example.com/',
@@ -114,14 +130,20 @@ describe('resolveApiCatalogConfig', () => {
       _tag: 'Enabled',
       config: {
         document: {
-          linkset: [{
-            'anchor': 'https://example.com/mcp',
-            'item': [{ href: 'https://example.com/mcp', type: 'application/json' }],
-            'service-desc': [{
-              href: 'https://example.com/.well-known/mcp/server-card.json',
-              type: 'application/json',
-            }],
-          }],
+          linkset: [
+            {
+              'anchor': 'https://example.com/mcp',
+              'item': [
+                { href: 'https://example.com/mcp', type: 'application/json' },
+              ],
+              'service-desc': [
+                {
+                  href: 'https://example.com/.well-known/mcp/server-card.json',
+                  type: 'application/json',
+                },
+              ],
+            },
+          ],
         },
       },
     })
@@ -130,7 +152,12 @@ describe('resolveApiCatalogConfig', () => {
   it('honors an explicit false over generated entries', () => {
     expect(resolveApiCatalogConfig(false, {
       siteBaseURL: 'https://example.com/',
-      generatedEntries: [{ anchor: '/mcp', item: { href: '/mcp' } }],
+      generatedEntries: [
+        {
+          anchor: '/mcp',
+          item: { href: '/mcp' },
+        },
+      ],
     })).toEqual({ _tag: 'Disabled' })
   })
 
@@ -139,54 +166,86 @@ describe('resolveApiCatalogConfig', () => {
       siteBaseURL: 'https://example.com/',
     })).toEqual({
       _tag: 'Invalid',
-      errors: [{ _tag: 'MissingEntries' }],
+      errors: [
+        { _tag: 'MissingEntries' },
+      ],
     })
 
     expect(resolveApiCatalogConfig({
-      entries: [{ anchor: '', serviceDesc: { href: '' } }],
+      entries: [
+        {
+          anchor: '',
+          serviceDesc: { href: '' },
+        },
+      ],
     }, {
       siteBaseURL: 'https://example.com/',
     })).toEqual({
       _tag: 'Invalid',
       errors: [
         { _tag: 'InvalidAnchor', entryIndex: 0 },
-        { _tag: 'InvalidLinkHref', entryIndex: 0, relation: 'serviceDesc', targetIndex: 0 },
+        {
+          _tag: 'InvalidLinkHref',
+          entryIndex: 0,
+          relation: 'serviceDesc',
+          targetIndex: 0,
+        },
       ],
     })
   })
 
   it.each([
-    ['anchor', { anchor: { href: 'https://evil.example/' } }],
-    ['bad relation', { 'bad relation': { href: 'https://api.example.com/docs' } }],
+    [
+      'anchor',
+      {
+        anchor: { href: 'https://evil.example/' },
+      },
+    ],
+    [
+      'bad relation',
+      {
+        'bad relation': { href: 'https://api.example.com/docs' },
+      },
+    ],
   ])('rejects the invalid custom relation %s', (relation, relations) => {
     expect(resolveApiCatalogConfig({
-      entries: [{
-        anchor: 'https://api.example.com/',
-        serviceDesc: { href: 'https://api.example.com/openapi.json' },
-        relations,
-      }],
+      entries: [
+        {
+          anchor: 'https://api.example.com/',
+          serviceDesc: { href: 'https://api.example.com/openapi.json' },
+          relations,
+        },
+      ],
     }, {})).toEqual({
       _tag: 'Invalid',
-      errors: [{ _tag: 'InvalidRelation', entryIndex: 0, relation }],
+      errors: [
+        { _tag: 'InvalidRelation', entryIndex: 0, relation },
+      ],
     })
   })
 
   it('accepts an absolute URI extension relation', () => {
     expect(resolveApiCatalogConfig({
-      entries: [{
-        anchor: 'https://api.example.com/',
-        relations: {
-          'https://relations.example.com/policy': { href: 'https://api.example.com/policy' },
+      entries: [
+        {
+          anchor: 'https://api.example.com/',
+          relations: {
+            'https://relations.example.com/policy': { href: 'https://api.example.com/policy' },
+          },
         },
-      }],
+      ],
     }, {})).toMatchObject({
       _tag: 'Enabled',
       config: {
         document: {
-          linkset: [{
-            'anchor': 'https://api.example.com/',
-            'https://relations.example.com/policy': [{ href: 'https://api.example.com/policy' }],
-          }],
+          linkset: [
+            {
+              'anchor': 'https://api.example.com/',
+              'https://relations.example.com/policy': [
+                { href: 'https://api.example.com/policy' },
+              ],
+            },
+          ],
         },
       },
     })
@@ -196,7 +255,9 @@ describe('resolveApiCatalogConfig', () => {
     { anchor: 'https://api.example.com/' },
     { anchor: 'https://api.example.com/', item: [] },
   ])('rejects entries without links: %j', (entry) => {
-    expect(resolveApiCatalogConfig({ entries: [entry] }, {})).toMatchObject({
+    expect(resolveApiCatalogConfig({
+      entries: [entry],
+    }, {})).toMatchObject({
       _tag: 'Invalid',
       errors: expect.arrayContaining([
         expect.objectContaining({ _tag: 'MissingLinks', entryIndex: 0 }),
@@ -206,7 +267,12 @@ describe('resolveApiCatalogConfig', () => {
 
   it('reports a missing site URL only for relative values', () => {
     expect(resolveApiCatalogConfig({
-      entries: [{ anchor: '/api', item: { href: '/api' } }],
+      entries: [
+        {
+          anchor: '/api',
+          item: { href: '/api' },
+        },
+      ],
     }, {})).toEqual({
       _tag: 'Invalid',
       errors: [
@@ -218,12 +284,27 @@ describe('resolveApiCatalogConfig', () => {
 
   it('returns a tagged error for malformed URLs', () => {
     expect(resolveApiCatalogConfig({
-      entries: [{ anchor: 'https://[', item: { href: 'https://%' } }],
+      entries: [
+        {
+          anchor: 'https://[',
+          item: { href: 'https://%' },
+        },
+      ],
     }, { siteBaseURL: 'https://example.com/' })).toEqual({
       _tag: 'Invalid',
       errors: [
-        { _tag: 'InvalidUrl', entryIndex: 0, field: 'anchor', value: 'https://[' },
-        { _tag: 'InvalidUrl', entryIndex: 0, field: 'item[0].href', value: 'https://%' },
+        {
+          _tag: 'InvalidUrl',
+          entryIndex: 0,
+          field: 'anchor',
+          value: 'https://[',
+        },
+        {
+          _tag: 'InvalidUrl',
+          entryIndex: 0,
+          field: 'item[0].href',
+          value: 'https://%',
+        },
       ],
     })
   })

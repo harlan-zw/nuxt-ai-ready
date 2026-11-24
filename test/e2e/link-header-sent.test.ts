@@ -17,7 +17,9 @@ describe('status-aware Link header on responses already sent', async () => {
   })
 
   it('leaves a proxied response alone', async () => {
-    const response = await fetch(url('/ingest/e'), { headers: { Accept: 'text/html' } })
+    const response = await fetch(url('/ingest/e'), {
+      headers: { Accept: 'text/html' },
+    })
 
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('proxied body')
@@ -25,7 +27,9 @@ describe('status-aware Link header on responses already sent', async () => {
   })
 
   it('leaves a 304 from the swr cache alone', async () => {
-    const first = await fetch(url('/cached'), { headers: { Accept: 'text/html' } })
+    const first = await fetch(url('/cached'), {
+      headers: { Accept: 'text/html' },
+    })
     expect(first.status).toBe(200)
     const etag = first.headers.get('etag')
     expect(etag).toBeTruthy()
@@ -39,7 +43,9 @@ describe('status-aware Link header on responses already sent', async () => {
   })
 
   it('still sends hreflang alternates on a rendered page', async () => {
-    const response = await fetch(url('/about'), { headers: { Accept: 'text/html' } })
+    const response = await fetch(url('/about'), {
+      headers: { Accept: 'text/html' },
+    })
 
     expect(response.status).toBe(200)
     expect(response.headers.get('link')).toContain('hreflang="fr"')

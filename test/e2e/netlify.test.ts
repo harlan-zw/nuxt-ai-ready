@@ -11,7 +11,9 @@ function getHeaderBlock(contents: string, route: string) {
   const lines = contents.split(/\r?\n/)
   const start = lines.lastIndexOf(route)
   const end = lines.findIndex((line, index) => index > start && line.length > 0 && !/^\s/.test(line))
-  return lines.slice(start, end === -1 ? undefined : end).join('\n')
+  return lines.slice(start, end === -1
+    ? undefined
+    : end).join('\n')
 }
 
 describe('netlify build output', async () => {

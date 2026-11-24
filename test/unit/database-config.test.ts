@@ -9,7 +9,12 @@ function input(overrides: Partial<ResolveDatabaseInput> = {}): ResolveDatabaseIn
     rootDir: '/app',
     preset: '',
     hasPostgresUrl: false,
-    requested: { runtimeSync: false, cron: false, mcp: false, webmcp: false },
+    requested: {
+      runtimeSync: false,
+      cron: false,
+      mcp: false,
+      webmcp: false,
+    },
     ...overrides,
   }
 }
@@ -28,7 +33,12 @@ describe('resolveDatabaseConfig', () => {
 
   it('enables sqlite when runtime sync needs storage', () => {
     expect(resolveDatabase(undefined, {
-      requested: { runtimeSync: true, cron: false, mcp: false, webmcp: false },
+      requested: {
+        runtimeSync: true,
+        cron: false,
+        mcp: false,
+        webmcp: false,
+      },
     })).toEqual({
       _tag: 'Enabled',
       type: 'sqlite',
@@ -120,14 +130,24 @@ describe('resolveDatabaseConfig', () => {
 
   it('keeps explicit disable for optional page tools', () => {
     expect(resolveDatabase(false, {
-      requested: { runtimeSync: false, cron: false, mcp: true, webmcp: true },
+      requested: {
+        runtimeSync: false,
+        cron: false,
+        mcp: true,
+        webmcp: true,
+      },
     })).toEqual({ _tag: 'Disabled' })
   })
 
   it('rejects a disabled database with runtimeSync', () => {
     const result = resolveDatabaseConfig(input({
       database: false,
-      requested: { runtimeSync: true, cron: false, mcp: false, webmcp: false },
+      requested: {
+        runtimeSync: true,
+        cron: false,
+        mcp: false,
+        webmcp: false,
+      },
     }))
     expect(result._tag).toBe('Invalid')
     expect(result._tag === 'Invalid' && result.conflicts).toEqual(['runtimeSync'])
@@ -137,14 +157,24 @@ describe('resolveDatabaseConfig', () => {
   it('reports every conflicting option at once', () => {
     const result = resolveDatabaseConfig(input({
       database: { type: 'none' },
-      requested: { runtimeSync: true, cron: true, mcp: false, webmcp: false },
+      requested: {
+        runtimeSync: true,
+        cron: true,
+        mcp: false,
+        webmcp: false,
+      },
     }))
     expect(result._tag === 'Invalid' && result.conflicts).toEqual(['runtimeSync', 'cron'])
   })
 
   it('allows those options when the database is enabled', () => {
     const result = resolveDatabaseConfig(input({
-      requested: { runtimeSync: true, cron: true, mcp: false, webmcp: false },
+      requested: {
+        runtimeSync: true,
+        cron: true,
+        mcp: false,
+        webmcp: false,
+      },
     }))
     expect(result._tag).toBe('Resolved')
   })
@@ -152,17 +182,28 @@ describe('resolveDatabaseConfig', () => {
 
 describe('site tools with a disabled database', () => {
   it('detaches every site tool from MCP', () => {
-    const { config } = resolveSiteToolsConfig(undefined, { database: { _tag: 'Disabled' } })
+    const { config } = resolveSiteToolsConfig(undefined, {
+      database: { _tag: 'Disabled' },
+    })
     expect([config.listPages.mcp.enabled, config.searchPages.mcp.enabled, config.getPageMarkdown.mcp.enabled])
       .toEqual([false, false, false])
   })
 
   it('detaches every site tool from WebMCP even when requested', () => {
     const { config } = resolveSiteToolsConfig(
-      { listPages: { webmcp: { enabled: true } } },
-      { database: { _tag: 'Disabled' } },
+      {
+        listPages: {
+          webmcp: { enabled: true },
+        },
+      },
+      {
+        database: { _tag: 'Disabled' },
+      },
     )
-    expect(resolveWebMcpConfig(true, config)).toEqual({ _tag: 'Enabled', config: { tools: {}, exposedTo: undefined } })
+    expect(resolveWebMcpConfig(true, config)).toEqual({
+      _tag: 'Enabled',
+      config: { tools: {}, exposedTo: undefined },
+    })
   })
 
   it('keeps site tools attached when the database is enabled', () => {

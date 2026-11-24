@@ -36,7 +36,9 @@ export async function readCloudflareAssetRouting(rootDir: string): Promise<{ roo
         root: parseRouting(config.assets?.run_worker_first),
         environments: Object.values(config.env || {}).flatMap((env) => {
           const routing = parseRouting(env.assets?.run_worker_first)
-          return routing === undefined ? [] : [routing]
+          return routing === undefined
+            ? []
+            : [routing]
         }),
       }
     }

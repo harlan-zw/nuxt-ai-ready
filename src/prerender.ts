@@ -32,6 +32,7 @@ type PrerenderFetch = ReturnType<typeof createPrerenderFetch>['fetch']
 const RE_HTML_MD_EXT = /\.(html|md)$/
 const RE_INDEX_SUFFIX = /\/index$/
 const RE_MD_EXT = /\.md$/
+const RE_JSON_CONTENT_TYPE = /^application\/(?:[^;\s]+\+)?json(?:\s*;|$)/i
 const RE_NEGATED_GLOB = /^(!?)(.*)$/
 const RE_PARENT_DIR_GLOB = /!?\.\.\//
 const RE_MARKDOWN_ALTERNATE_TAG = /<link\b[^>]*\sdata-ai-ready-markdown(?:="")?(?=[\s/>])[^>]*>/g
@@ -260,7 +261,9 @@ function flattenHeadings(headings: Array<Record<string, string>> | undefined): s
 }
 
 function resolveRouteLocale(route: string, i18n: PrerenderI18nConfig | null | undefined): string {
-  return i18n ? resolveLocaleFromRoute(route, i18n).locale : ''
+  return i18n
+    ? resolveLocaleFromRoute(route, i18n).locale
+    : ''
 }
 
 async function processMarkdownRoute(
@@ -314,8 +317,12 @@ async function processSitemapEntry(
   nitro: Nitro,
   entry: string | SitemapEntry,
 ): Promise<{ crawled: boolean, skipped: boolean }> {
-  const loc = typeof entry === 'string' ? entry : entry.loc
-  const lastmod = typeof entry === 'string' ? undefined : entry.lastmod
+  const loc = typeof entry === 'string'
+    ? entry
+    : entry.loc
+  const lastmod = typeof entry === 'string'
+    ? undefined
+    : entry.lastmod
   // Handle both absolute URLs and relative paths
   const parsedRoute = parsePrerenderRoute(loc, nitro.options.baseURL)
   if (parsedRoute._tag === 'Invalid') {
@@ -360,7 +367,12 @@ async function processSitemapEntry(
   const mdUrl = toDeployedRoute(mdRoute, nitro.options.baseURL)
   // Sitemap discovery uses its own fetch loop, outside Nitro's prerender queue.
   // Respect exclusions for both the source page and its generated twin.
-  const candidates = [route, toDeployedRoute(route, nitro.options.baseURL), mdRoute, mdUrl]
+  const candidates = [
+    route,
+    toDeployedRoute(route, nitro.options.baseURL),
+    mdRoute,
+    mdUrl,
+  ]
   const ignored = nitro.options.prerender.ignore.some(pattern => candidates.some((path) => {
     if (typeof pattern === 'string')
       return path.startsWith(pattern)
@@ -379,8 +391,9 @@ async function processSitemapEntry(
   // fails to render at build time fails the same way on the second attempt. The
   // caller skips the route either way, so the retry only pays for a second full
   // SSR render of every broken page.
-  const res = await crawlerFetch(state)(mdUrl, {
+  const res = await crawlerFetch(state).raw<string, 'text'>(mdUrl, {
     headers: { 'x-nitro-prerender': mdRoute },
+    responseType: 'text',
     retry: 0,
     signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
   }).catch((err) => {
@@ -391,21 +404,12 @@ async function processSitemapEntry(
     else
       logger.debug(`Skipping ${route}: ${err.message}`)
     return null
-  }) as string | null
+  })
 
-  if (!res)
+  if (!res || !RE_JSON_CONTENT_TYPE.test(res.headers.get('content-type') ?? ''))
     return { crawled: false, skipped: false }
 
-  // Check if response is JSON before parsing
-  let parsed: ParsedMarkdownResult
-  try {
-    parsed = JSON.parse(res) as ParsedMarkdownResult
-  }
-  catch (err) {
-    // Response is not JSON - likely HTML was returned instead of markdown
-    logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`, err)
-    return { crawled: false, skipped: false }
-  }
+  const parsed = JSON.parse(res._data ?? '') as ParsedMarkdownResult
 
   // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
   await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
@@ -424,7 +428,12 @@ async function processSitemapEntry(
       if (existing?.isFile())
         return { crawled: true, skipped: false }
     }
-    const generated: PrerenderRoute = { route: mdRoute, fileName: mdRoute, contents: JSON.stringify(parsed) }
+    const generated: PrerenderRoute = {
+      route: mdRoute,
+      fileName: mdRoute,
+      contentType: 'application/json',
+      contents: JSON.stringify(parsed),
+    }
     await nitro.hooks.callHook('prerender:generate', generated, nitro)
     if (generated.skip || generated.error)
       return { crawled: true, skipped: false }
@@ -491,7 +500,9 @@ export async function crawlSitemapContent(
         continue
       const documentKey = toLogicalRoute(url.pathname, nitro.options.baseURL)
       const localDocument = documents.get(documentKey)
-      const identity = localDocument ? `local:${documentKey}` : url.href
+      const identity = localDocument
+        ? `local:${documentKey}`
+        : url.href
       if (seen.has(identity))
         continue
       // Generated documents are already bounded by the configured sitemap.
@@ -533,18 +544,30 @@ interface PrerenderSitemapConfig {
 export async function crawlConfiguredSitemaps(state: CrawlerState, nuxt: Nuxt, nitro: Nitro, sitemap: PrerenderSitemapConfig, documents = new Map<string, () => string>()): Promise<void> {
   const names = state.llmsTxtConfig?.sitemaps
   const singleName = (sitemap.sitemapName || 'sitemap.xml').replace(/\.xml$/, '')
-  const configured = sitemap.sitemaps && typeof sitemap.sitemaps === 'object' ? sitemap.sitemaps : undefined
+  const configured = sitemap.sitemaps && typeof sitemap.sitemaps === 'object'
+    ? sitemap.sitemaps
+    : undefined
   const roots = configured
     ? Object.entries(configured).flatMap(([key, definition]) => {
         const name = (definition.sitemapName || key).replace(/\.xml$/, '')
         if (key === 'index' || (names !== undefined && !names.includes(name)))
           return []
-        const route = definition._route || definition.route || (key === 'chunks' ? configured.index?._route || configured.index?.route : undefined)
-        return [route ? toLogicalRoute(route, nitro.options.baseURL) : joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`)]
+        const route = definition._route || definition.route || (key === 'chunks'
+          ? configured.index?._route || configured.index?.route
+          : undefined)
+        return [
+          route
+            ? toLogicalRoute(route, nitro.options.baseURL)
+            : joinURL(sitemap.sitemapsPathPrefix ?? '/__sitemap__/', `${name}.xml`),
+        ]
       })
     : names !== undefined && !names.includes(sitemap.sitemaps ? 'chunks' : singleName)
       ? []
-      : [sitemap.sitemaps ? '/sitemap_index.xml' : `/${sitemap.sitemapName || 'sitemap.xml'}`]
+      : [
+          sitemap.sitemaps
+            ? '/sitemap_index.xml'
+            : `/${sitemap.sitemapName || 'sitemap.xml'}`,
+        ]
   for (const root of roots) {
     const content = documents.get(root)?.() ?? await crawlerFetch(state)(toDeployedRoute(root, nitro.options.baseURL), {
       headers: { 'x-nitro-prerender': root },
@@ -662,7 +685,9 @@ export function setupPrerenderHandler(
 
   nuxt.hooks.hook('nitro:init', async (nitro: Nitro) => {
     // llms-full.txt is streamed directly to public dir
-    const llmsFullTxtPath = options.llmsFullTxt === false ? undefined : join(nitro.options.output.publicDir, 'llms-full.txt')
+    const llmsFullTxtPath = options.llmsFullTxt === false
+      ? undefined
+      : join(nitro.options.output.publicDir, 'llms-full.txt')
     const state = createCrawlerState(
       dbPath,
       llmsFullTxtPath,
@@ -708,7 +733,8 @@ export function setupPrerenderHandler(
         return
       }
 
-      if (!route.fileName?.endsWith('.md'))
+      // Only JSON holds a page twin envelope. Independently served Markdown already has its final bytes.
+      if (!route.fileName?.endsWith('.md') || !RE_JSON_CONTENT_TYPE.test(route.contentType ?? ''))
         return
 
       let pageRoute = withLeadingSlash(route.fileName).replace(RE_MD_EXT, '')
@@ -722,11 +748,13 @@ export function setupPrerenderHandler(
         initPromise = initCrawler(state)
       await initPromise
 
-      const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
+      const parsed = JSON.parse(route.contents ?? '') as ParsedMarkdownResult
       if (parsed.contentSignal !== undefined) {
         ;(route as PrerenderRoute & { contentSignal?: string }).contentSignal = parsed.contentSignal
         // Cloudflare serves directory-index HTML at a trailing-slash URL.
-        for (const sourceRoute of pageRoute === '/' ? ['/'] : [pageRoute, `${pageRoute}/`]) {
+        for (const sourceRoute of pageRoute === '/'
+          ? ['/']
+          : [pageRoute, `${pageRoute}/`]) {
           if (matchingStaticContentSignals(nitro.options.routeRules, sourceRoute).includes(parsed.contentSignal))
             continue
           const source = nitro.options.routeRules[sourceRoute] ||= {}
@@ -883,7 +911,9 @@ export function setupPrerenderHandler(
           }
         }
       }
-      const llmsFullStats = state.llmsFullTxtPath ? await stat(state.llmsFullTxtPath) : { size: 0 }
+      const llmsFullStats = state.llmsFullTxtPath
+        ? await stat(state.llmsFullTxtPath)
+        : { size: 0 }
       // The streamed file must still be registered as a prerendered route:
       // otherwise presets keep the runtime handler's route, and on Vercel that
       // function output shadows the static file (nuxt/scripts#825).
@@ -899,7 +929,9 @@ export function setupPrerenderHandler(
       const totalKb = kb(llmsSize + llmsFullStats.size)
       const dim = (s: string) => colorize('dim', s)
       const cyan = (s: string) => colorize('cyan', s)
-      const timeStr = state.totalProcessingTime >= 100 ? ` in ${cyan(`${(state.totalProcessingTime / 1000).toFixed(1)}s`)}` : ''
+      const timeStr = state.totalProcessingTime >= 100
+        ? ` in ${cyan(`${(state.totalProcessingTime / 1000).toFixed(1)}s`)}`
+        : ''
       logger.info(`Indexed ${cyan(String(state.prerenderedRoutes.size))} pages for llms.txt${timeStr} → ${cyan(`${totalKb}kb`)}`)
       logger.info(dim(`  llms.txt files: ${kb(llmsSize)}kb, llms-full.txt: ${kb(llmsFullStats.size)}kb`))
     }
@@ -918,7 +950,10 @@ export function setupPrerenderHandler(
 
         // Follow selected roots, not every generated document or the global index.
         // A chunk inherits admission through its selected parent sitemap.
-        const documents = new Map(ctx.sitemaps.map(sitemap => [toLogicalRoute(sitemap.name, nitro.options.baseURL), () => sitemap.content]))
+        const documents = new Map(ctx.sitemaps.map(sitemap => [
+          toLogicalRoute(sitemap.name, nitro.options.baseURL),
+          () => sitemap.content,
+        ]))
         await crawlConfiguredSitemaps(state, nuxt, nitro, ctx.options, documents)
 
         await writeLlmsFiles()

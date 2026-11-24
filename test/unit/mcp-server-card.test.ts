@@ -35,7 +35,9 @@ describe('parseMcpServerCardConfig', () => {
     true,
     { cacheMaxAge: -1 },
     { description: '' },
-    { description: 'x'.repeat(101) },
+    {
+      description: 'x'.repeat(101),
+    },
     { name: 'Human readable name' },
     { websiteUrl: '/docs/mcp' },
   ])('returns an error value for invalid config: %j', (config) => {
@@ -145,7 +147,9 @@ describe('resolveMcpServerCard', () => {
       toolkit: {
         version: '2.4.0',
         description: 'Toolkit description',
-        icons: [{ src: 'https://example.com/icon.png' }],
+        icons: [
+          { src: 'https://example.com/icon.png' },
+        ],
       },
       overrides: {
         cacheMaxAge: 900,
@@ -159,12 +163,16 @@ describe('resolveMcpServerCard', () => {
       description: 'Toolkit description',
       title: 'Example discovery server',
       websiteUrl: 'https://example.com/docs/mcp',
-      icons: [{ src: 'https://example.com/icon.png' }],
-      remotes: [{
-        type: 'streamable-http',
-        url: 'https://example.com/docs/agent/mcp',
-        supportedProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'],
-      }],
+      icons: [
+        { src: 'https://example.com/icon.png' },
+      ],
+      remotes: [
+        {
+          type: 'streamable-http',
+          url: 'https://example.com/docs/agent/mcp',
+          supportedProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26'],
+        },
+      ],
     })
   })
 

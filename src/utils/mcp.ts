@@ -21,7 +21,9 @@ export type McpToolkitState
 
 export function hasConfiguredNuxtModule(modules: unknown[], name: string): boolean {
   return modules.some((entry) => {
-    const module = Array.isArray(entry) ? entry[0] : entry
+    const module = Array.isArray(entry)
+      ? entry[0]
+      : entry
     if (typeof module === 'string')
       return module === name
     if ((typeof module === 'function' || (typeof module === 'object' && module !== null)) && 'meta' in module)

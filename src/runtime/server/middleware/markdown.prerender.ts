@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
     const markdown = `${frontmatter}\n${absoluteMarkdownLinks(contentPage.markdown, canonicalUrl)}`
     const headings = extractHeadingsFromMarkdown(contentPage.markdown)
     const keywords = extractKeywords(contentPage.markdown, '')
-    return JSON.stringify({
+    return Response.json({
       markdown,
       title: contentPage.title || '',
       description: contentPage.description || '',
@@ -96,7 +96,9 @@ export default defineEventHandler(async (event) => {
   }
   else {
     logger.debug(`[markdown.prerender] Fetching HTML for ${path}`)
-    const response = await fetchRawWithEvent(event, deployedPath, { signal: AbortSignal.timeout(30000) }).catch((err) => {
+    const response = await fetchRawWithEvent(event, deployedPath, {
+      signal: AbortSignal.timeout(30000),
+    }).catch((err) => {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         throw createError({
           statusCode: 504,
@@ -161,7 +163,7 @@ export default defineEventHandler(async (event) => {
   // Extract keywords from content
   const keywords = extractKeywords(result.textContent, result.metaKeywords)
 
-  return JSON.stringify({
+  return Response.json({
     markdown: result.markdown,
     title: result.title,
     description: result.description,

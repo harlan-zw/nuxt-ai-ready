@@ -76,11 +76,19 @@ function parsePageSummary(input: unknown): PageSummary | undefined {
 
   return {
     route: input.route,
-    ...(typeof input.title === 'string' ? { title: input.title } : {}),
-    ...(typeof input.description === 'string' ? { description: input.description } : {}),
-    ...(typeof input.headings === 'string' ? { headings: input.headings } : {}),
+    ...(typeof input.title === 'string'
+      ? { title: input.title }
+      : {}),
+    ...(typeof input.description === 'string'
+      ? { description: input.description }
+      : {}),
+    ...(typeof input.headings === 'string'
+      ? { headings: input.headings }
+      : {}),
     ...(Array.isArray(input.keywords)
-      ? { keywords: input.keywords.filter((keyword): keyword is string => typeof keyword === 'string') }
+      ? {
+          keywords: input.keywords.filter((keyword): keyword is string => typeof keyword === 'string'),
+        }
       : {}),
   }
 }
@@ -95,12 +103,18 @@ function parsePagesResponse(input: unknown): PagesResponse {
   if (!isRecord(input))
     return {}
 
-  const page = input.page === null ? null : parsePageSummary(input.page)
+  const page = input.page === null
+    ? null
+    : parsePageSummary(input.page)
   return {
-    ...(page !== undefined ? { page } : {}),
+    ...(page !== undefined
+      ? { page }
+      : {}),
     pages: parsePageList(input.pages),
     results: parsePageList(input.results),
-    ...(typeof input.total === 'number' && Number.isFinite(input.total) ? { total: input.total } : {}),
+    ...(typeof input.total === 'number' && Number.isFinite(input.total)
+      ? { total: input.total }
+      : {}),
   }
 }
 
@@ -110,12 +124,16 @@ function getErrorStatus(error: unknown): number | undefined {
   const response = error.response
   if (isRecord(response) && typeof response.status === 'number')
     return response.status
-  return typeof error.statusCode === 'number' ? error.statusCode : undefined
+  return typeof error.statusCode === 'number'
+    ? error.statusCode
+    : undefined
 }
 
 function fetchResource(path: string, options?: FetchOptions): Promise<FetchResult<unknown>> {
   return Promise.resolve()
-    .then(() => options ? globalThis.$fetch<unknown, string>(path, options) : globalThis.$fetch<unknown, string>(path))
+    .then(() => options
+      ? globalThis.$fetch<unknown, string>(path, options)
+      : globalThis.$fetch<unknown, string>(path))
     .then(
       value => ({ _tag: 'Ok', value }) as const,
       error => getErrorStatus(error) === 404
@@ -147,7 +165,9 @@ function searchIndex(pages: PageSummary[], query: string, limit: number): PageSu
       let score = 0
       for (const [field, weight] of SEARCH_WEIGHTS) {
         const value = page[field]
-        const haystack = (Array.isArray(value) ? value.join(' ') : value || '').toLowerCase()
+        const haystack = (Array.isArray(value)
+          ? value.join(' ')
+          : value || '').toLowerCase()
         for (const term of terms) {
           if (haystack.includes(term))
             score += weight
@@ -174,7 +194,9 @@ function clamp(input: unknown, fallback: number, max: number): number {
 
 function positiveInteger(input: unknown, fallback: number): number {
   const value = Math.trunc(Number(input))
-  return Number.isFinite(value) && value > 0 ? value : fallback
+  return Number.isFinite(value) && value > 0
+    ? value
+    : fallback
 }
 
 function cleanSummaryPart(input: string): string {
@@ -218,7 +240,9 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
 
     const render = (visibleLines: string[]) => {
       const omitted = pageLines.length - visibleLines.length
-      const note = omitted ? ` ${omitted} left out to fit; ${recovery}.` : ''
+      const note = omitted
+        ? ` ${omitted} left out to fit; ${recovery}.`
+        : ''
       return `${summaryForCount(visibleLines.length)}${note}${visibleLines.join('')}`
     }
 
@@ -235,7 +259,10 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
   function fetchPages(query: Record<string, unknown>): Promise<FetchResult<PagesResponse>> {
     return fetchResource(pagesPath, { query }).then(result =>
       result._tag === 'Ok'
-        ? { _tag: 'Ok', value: parsePagesResponse(result.value) }
+        ? {
+            _tag: 'Ok',
+            value: parsePagesResponse(result.value),
+          }
         : result,
     )
   }
@@ -251,8 +278,13 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
         index = undefined
       if (result._tag !== 'Ok')
         return result
-      const data = isRecord(result.value) ? result.value.pages : undefined
-      return { _tag: 'Ok', value: parsePageList(data) }
+      const data = isRecord(result.value)
+        ? result.value.pages
+        : undefined
+      return {
+        _tag: 'Ok',
+        value: parsePageList(data),
+      }
     })
     return index
   }
@@ -265,8 +297,12 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
 
     const prerendered = await fetchIndex()
     reportFetchError('prerendered page index', prerendered)
-    if (prerendered._tag === 'Ok')
-      return { _tag: 'Ok', value: prerendered.value.some(page => page.route === route) }
+    if (prerendered._tag === 'Ok') {
+      return {
+        _tag: 'Ok',
+        value: prerendered.value.some(page => page.route === route),
+      }
+    }
     if (runtime._tag === 'Ok')
       return { _tag: 'Ok', value: false }
     if (runtime._tag === 'Error')
@@ -298,8 +334,12 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
 
         const runtime = await fetchPages({ limit: size, offset: start })
         reportFetchError('page index', runtime)
-        let pages = runtime._tag === 'Ok' ? runtime.value.pages || [] : []
-        let total = runtime._tag === 'Ok' ? runtime.value.total ?? 0 : 0
+        let pages = runtime._tag === 'Ok'
+          ? runtime.value.pages || []
+          : []
+        let total = runtime._tag === 'Ok'
+          ? runtime.value.total ?? 0
+          : 0
 
         if (!pages.length) {
           const prerendered = await fetchIndex()
@@ -313,8 +353,11 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
           }
         }
 
-        if (!pages.length)
-          return toolText(start ? `No pages past offset ${start}.` : 'This site has no indexed pages yet.')
+        if (!pages.length) {
+          return toolText(start
+            ? `No pages past offset ${start}.`
+            : 'This site has no indexed pages yet.')
+        }
 
         return formatPages(
           pages,
@@ -347,7 +390,9 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
         const size = clamp(limit, searchPagesLimit, 50)
         const runtime = await fetchPages({ q, limit: size })
         reportFetchError('page search', runtime)
-        let results = runtime._tag === 'Ok' ? runtime.value.results || [] : []
+        let results = runtime._tag === 'Ok'
+          ? runtime.value.results || []
+          : []
 
         if (!results.length) {
           const prerendered = await fetchIndex()
@@ -364,7 +409,9 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
         return formatPages(
           results,
           count => count
-            ? `${count} result${count === 1 ? '' : 's'} for "${q}".`
+            ? `${count} result${count === 1
+              ? ''
+              : 's'} for "${q}".`
             : `Results for "${q}".`,
           'narrow the query',
           searchPagesMaxOutputChars,
@@ -413,9 +460,15 @@ export function createSiteTools(options: SiteToolsOptions = {}): WebMcpTool[] {
     },
   ]
   const enabled = new Set([
-    ...(listPagesOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.list_pages.name]),
-    ...(searchPagesOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.search_pages.name]),
-    ...(getPageMarkdownOptions?.enabled === false ? [] : [SITE_TOOL_CATALOG.get_page_markdown.name]),
+    ...(listPagesOptions?.enabled === false
+      ? []
+      : [SITE_TOOL_CATALOG.list_pages.name]),
+    ...(searchPagesOptions?.enabled === false
+      ? []
+      : [SITE_TOOL_CATALOG.search_pages.name]),
+    ...(getPageMarkdownOptions?.enabled === false
+      ? []
+      : [SITE_TOOL_CATALOG.get_page_markdown.name]),
   ])
   return tools.filter(tool => enabled.has(tool.name as typeof SITE_TOOL_CATALOG[keyof typeof SITE_TOOL_CATALOG]['name']))
 }

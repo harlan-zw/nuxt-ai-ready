@@ -23,7 +23,9 @@ vi.mock('#nuxtseo/nitro', () => ({
   useRuntimeConfig: () => ({ 'appSecret': 'test-application-secret-with-32-characters', 'nuxt-ai-ready': mocks.config }),
 }))
 
-vi.mock('nuxt/server', () => ({ deriveSecret: async () => 'test-secret' }))
+vi.mock('nuxt/server', () => ({
+  deriveSecret: async () => 'test-secret',
+}))
 
 vi.mock('../../src/runtime/server/db/drizzle/queries', () => ({
   initSchema: mocks.initSchema,
@@ -38,7 +40,12 @@ vi.mock('../../src/runtime/server/utils/batchIndex', () => ({
 }))
 
 vi.mock('../../src/runtime/server/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }))
 
 const { default: pollEndpoint } = await import('../../src/runtime/server/routes/__ai-ready/poll.post')

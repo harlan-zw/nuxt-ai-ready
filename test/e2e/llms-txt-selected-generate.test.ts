@@ -22,7 +22,14 @@ describe('selected sitemaps during nuxt generate', async () => {
     nuxtConfig: {
       app: { baseURL: '/registry/' },
       robots: { robotsTxt: false },
-      nitro: { static: true, prerender: { routes: ['/about'], crawlLinks: false, failOnError: true } },
+      nitro: {
+        static: true,
+        prerender: {
+          routes: ['/about'],
+          crawlLinks: false,
+          failOnError: true,
+        },
+      },
     },
   })
 

@@ -4,7 +4,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { STATUS_AWARE_LINK_HEADER } from '../../src/runtime/server/plugins/link-header'
 import linkHeaderPlugin from '../../src/runtime/server/plugins/link-header-nitro3'
 
-vi.mock('#nuxtseo/nitro', () => ({ defineNitroPlugin: (plugin: unknown) => plugin }))
+vi.mock('#nuxtseo/nitro', () => ({
+  defineNitroPlugin: (plugin: unknown) => plugin,
+}))
 
 type ResponseHook = (response: Response, event: { context: Record<string, unknown> }) => void
 
@@ -22,7 +24,11 @@ function installResponseHook(): ResponseHook {
 }
 
 const header = { error: '</fr/missing.md>; rel="alternate"', success: '</fr/page.md>; rel="alternate", </page>; rel="alternate"; hreflang="en"' }
-const event = () => ({ context: { [STATUS_AWARE_LINK_HEADER]: header } })
+function event() {
+  return {
+    context: { [STATUS_AWARE_LINK_HEADER]: header },
+  }
+}
 
 describe('nitro 3 status-aware Link header', () => {
   const server = createServer((_req, res) => {

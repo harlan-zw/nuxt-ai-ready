@@ -180,21 +180,31 @@ export default defineNuxtModule<ModuleOptions>({
     const { resolve } = createResolver(moduleEntryUrl)
     const { version, peerDependencies } = await readPackageMetadata(resolve('../package.json'))
 
-    logger.level = (config.debug || nuxt.options.debug) ? 4 : 3
+    logger.level = (config.debug || nuxt.options.debug)
+      ? 4
+      : 3
 
     if (config.enabled === false) {
       logger.debug('Module is disabled, skipping setup.')
       return
     }
-    setupRuntimeAliases({ namespace: '#ai-ready', app: resolve('./runtime/app'), server: resolve('./runtime/server') }, nuxt)
+    setupRuntimeAliases({
+      namespace: '#ai-ready',
+      app: resolve('./runtime/app'),
+      server: resolve('./runtime/server'),
+    }, nuxt)
 
     // Agent skills: `public/skills/<name>/SKILL.md` in the project and its layers is
     // discovered, merged with explicit config, offered to the
     // `ai-ready:agent-skills` hook, then given its root alias and resolved.
-    const agentSkillsConfig: false | AgentSkillsConfig = config.agentSkills === false ? false : (config.agentSkills ?? {})
+    const agentSkillsConfig: false | AgentSkillsConfig = config.agentSkills === false
+      ? false
+      : (config.agentSkills ?? {})
     const agentSkillsError = (issues: AgentSkillsConfigIssue[]): Error => {
       const details = issues
-        .map(issue => `${issue.index === undefined ? 'agentSkills' : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
+        .map(issue => `${issue.index === undefined
+          ? 'agentSkills'
+          : `agentSkills.skills[${issue.index}]`}.${issue.field}: ${issue.message}`)
         .join('\n')
       return new Error(`[nuxt-ai-ready] Invalid Agent Skills configuration:\n${details}`)
     }
@@ -216,7 +226,10 @@ export default defineNuxtModule<ModuleOptions>({
       agentSkillsResult = await resolveAgentSkillsConfig(
         { ...agentSkillsConfig, skills: rooted.skills },
         nuxt.options.rootDir,
-        { sitemapMd: config.sitemapMd !== false, publicDirs: getLayerDirectories(nuxt).map(layer => layer.public) },
+        {
+          sitemapMd: config.sitemapMd !== false,
+          publicDirs: getLayerDirectories(nuxt).map(layer => layer.public),
+        },
       )
       if (agentSkillsResult._tag === 'Invalid')
         throw agentSkillsError(agentSkillsResult.issues)
@@ -302,17 +315,25 @@ export default defineNuxtModule<ModuleOptions>({
     const nitroCompatibility = setupNitroRuntimeCompatibility(nuxt)
 
     const siteConfig = useSiteConfig()
-    const aiTermsResult = resolveAiTermsConfig(config.aiTerms, siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined)
+    const aiTermsResult = resolveAiTermsConfig(config.aiTerms, siteConfig.url
+      ? withSiteUrl('/', { withBase: true })
+      : undefined)
     if (aiTermsResult._tag === 'Invalid') {
       throw new Error([
         '[nuxt-ai-ready] Invalid AI Terms configuration:',
         ...aiTermsResult.errors.map(error => `- ${error}`),
       ].join('\n'))
     }
-    const aiTermsConfig = aiTermsResult._tag === 'Enabled' ? aiTermsResult.config : undefined
-    const aiTermsLink = aiTermsConfig ? `<${aiTermsConfig.href}>; rel="ai-terms"` : undefined
+    const aiTermsConfig = aiTermsResult._tag === 'Enabled'
+      ? aiTermsResult.config
+      : undefined
+    const aiTermsLink = aiTermsConfig
+      ? `<${aiTermsConfig.href}>; rel="ai-terms"`
+      : undefined
     const apiCatalogResult = resolveApiCatalogConfig(config.apiCatalog, {
-      siteBaseURL: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
+      siteBaseURL: siteConfig.url
+        ? withSiteUrl('/', { withBase: true })
+        : undefined,
       generatedEntries: [],
     })
     const deferredGeneratedApiCatalog = apiCatalogResult._tag === 'Invalid'
@@ -453,17 +474,22 @@ export default defineNuxtModule<ModuleOptions>({
       defaultLlmsTxtSections.push({
         title: 'Agent Skills',
         description: `Skills an agent can install from this site. The index at ${indexUrl} carries a sha256 digest for each one.`,
-        links: [{ title: 'Agent Skills index', href: indexUrl, description: 'Every published skill and its sha256 digest.' }, ...agentSkillsResult.links.map(link => ({
-          title: link.name,
-          href: link.source === 'local'
-            ? withSiteUrl(link.href.slice(1), { withBase: true })
-            : resolveExternalSkillUrl(link.href, indexUrl),
-          description: link.description,
-        }))],
+        links: [
+          { title: 'Agent Skills index', href: indexUrl, description: 'Every published skill and its sha256 digest.' },
+          ...agentSkillsResult.links.map(link => ({
+            title: link.name,
+            href: link.source === 'local'
+              ? withSiteUrl(link.href.slice(1), { withBase: true })
+              : resolveExternalSkillUrl(link.href, indexUrl),
+            description: link.description,
+          })),
+        ],
       })
     }
 
-    const directiveConfig = config.llmsTxt === false ? undefined : config.llmsTxt?.directive
+    const directiveConfig = config.llmsTxt === false
+      ? undefined
+      : config.llmsTxt?.directive
     const llmsTxtDirective = {
       markdown: directiveConfig?.markdown !== false,
       html: directiveConfig?.html === true,
@@ -496,11 +522,15 @@ export default defineNuxtModule<ModuleOptions>({
     // Allow other modules to extend llms.txt content via hook
     const llmsTxtPayload = {
       sections: mergedLlmsTxt.sections || [],
-      notes: typeof mergedLlmsTxt.notes === 'string' ? [mergedLlmsTxt.notes] : (mergedLlmsTxt.notes || []),
+      notes: typeof mergedLlmsTxt.notes === 'string'
+        ? [mergedLlmsTxt.notes]
+        : (mergedLlmsTxt.notes || []),
     }
     await nuxt.callHook('ai-ready:llms-txt' as any, llmsTxtPayload)
     mergedLlmsTxt.sections = llmsTxtPayload.sections
-    mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0 ? llmsTxtPayload.notes : undefined
+    mergedLlmsTxt.notes = llmsTxtPayload.notes.length > 0
+      ? llmsTxtPayload.notes
+      : undefined
     const parsedHookLlmsTxt = parseLlmsTxtConfig(mergedLlmsTxt)
     if (parsedHookLlmsTxt._tag === 'Invalid')
       throw new Error(`[nuxt-ai-ready] ${parsedHookLlmsTxt.message}`)
@@ -510,12 +540,16 @@ export default defineNuxtModule<ModuleOptions>({
     const buildDbPath = join(nuxt.options.buildDir, '.data/ai-ready/build.db')
 
     // Resolve runtimeSync before registering runtime endpoints and its CLI token.
-    const runtimeSyncConfig = typeof config.runtimeSync === 'object' ? config.runtimeSync : {}
+    const runtimeSyncConfig = typeof config.runtimeSync === 'object'
+      ? config.runtimeSync
+      : {}
     const runtimeSyncEnabled = !!config.runtimeSync || !!config.cron
 
     // WebMCP exposes tools to in-browser agents via document.modelContext
     const webmcpResult = resolveWebMcpConfig(config.webmcp, siteToolsConfig)
-    const webmcpConfig = webmcpResult._tag === 'Enabled' ? webmcpResult.config : null
+    const webmcpConfig = webmcpResult._tag === 'Enabled'
+      ? webmcpResult.config
+      : null
 
     // @ts-expect-error untyped
     const isStatic = nuxt.options.nitro.static || nuxt.options._generate || false
@@ -536,10 +570,16 @@ export default defineNuxtModule<ModuleOptions>({
       const resources = mergedLlmsTxt.sections?.find(section => section.title === 'LLM Resources')
       resources?.links?.push({ title: 'API catalog', href: catalog.href, description: 'The public API and service descriptions.' })
 
-      addServerHandler({ route: API_CATALOG_PATH, handler: resolve('./runtime/server/routes/api-catalog'), lazy: true })
+      addServerHandler({
+        route: API_CATALOG_PATH,
+        handler: resolve('./runtime/server/routes/api-catalog'),
+        lazy: true,
+      })
       const apiCatalogLink = `<${catalog.href}>; rel="api-catalog"`
       extendRouteRules('/**', {
-        headers: { Link: [apiCatalogLink, aiTermsLink].filter(Boolean).join(', ') },
+        headers: {
+          Link: [apiCatalogLink, aiTermsLink].filter(Boolean).join(', '),
+        },
       })
       extendRouteRules(API_CATALOG_PATH, {
         headers: {
@@ -619,7 +659,12 @@ export default defineNuxtModule<ModuleOptions>({
             firstSection.links.push(mcpLink)
         }
         else {
-          mergedLlmsTxt.sections = [{ title: 'LLM Tools', links: [mcpLink] }]
+          mergedLlmsTxt.sections = [
+            {
+              title: 'LLM Tools',
+              links: [mcpLink],
+            },
+          ]
         }
       }
 
@@ -628,19 +673,21 @@ export default defineNuxtModule<ModuleOptions>({
       if (siteConfig.url && config.apiCatalog !== false) {
         const generatedApiCatalog = resolveApiCatalogConfig(config.apiCatalog, {
           siteBaseURL: withSiteUrl('/', { withBase: true }),
-          generatedEntries: [{
-            anchor: finalMcpToolkitState.route,
-            item: {
-              href: finalMcpToolkitState.route,
-              type: 'application/json',
-            },
-            ...(mcpServerCardResult._tag === 'Enabled' && {
-              serviceDesc: {
-                href: mcpServerCardRoute,
-                type: MCP_SERVER_CARD_MEDIA_TYPE,
+          generatedEntries: [
+            {
+              anchor: finalMcpToolkitState.route,
+              item: {
+                href: finalMcpToolkitState.route,
+                type: 'application/json',
               },
-            }),
-          }],
+              ...(mcpServerCardResult._tag === 'Enabled' && {
+                serviceDesc: {
+                  href: mcpServerCardRoute,
+                  type: MCP_SERVER_CARD_MEDIA_TYPE,
+                },
+              }),
+            },
+          ],
         })
         if (generatedApiCatalog._tag === 'Invalid') {
           throw new Error([
@@ -721,9 +768,24 @@ export default defineNuxtModule<ModuleOptions>({
 
       const handler = resolve('./runtime/server/routes/mcp-server-card')
       for (const route of [mcpServerCardRoute, ...MCP_SERVER_CARD_WELL_KNOWN_PATHS]) {
-        addServerHandler({ route, method: 'get', handler, lazy: true })
-        addServerHandler({ route, method: 'head', handler, lazy: true })
-        addServerHandler({ route, method: 'options', handler, lazy: true })
+        addServerHandler({
+          route,
+          method: 'get',
+          handler,
+          lazy: true,
+        })
+        addServerHandler({
+          route,
+          method: 'head',
+          handler,
+          lazy: true,
+        })
+        addServerHandler({
+          route,
+          method: 'options',
+          handler,
+          lazy: true,
+        })
         extendRouteRules(route, {
           sitemap: false,
           headers: {
@@ -756,9 +818,24 @@ export default defineNuxtModule<ModuleOptions>({
 
         const aiCatalogHandler = resolve('./runtime/server/routes/ai-catalog')
         for (const route of [ARD_PATH, AI_CATALOG_PATH]) {
-          addServerHandler({ route, method: 'get', handler: aiCatalogHandler, lazy: true })
-          addServerHandler({ route, method: 'head', handler: aiCatalogHandler, lazy: true })
-          addServerHandler({ route, method: 'options', handler: aiCatalogHandler, lazy: true })
+          addServerHandler({
+            route,
+            method: 'get',
+            handler: aiCatalogHandler,
+            lazy: true,
+          })
+          addServerHandler({
+            route,
+            method: 'head',
+            handler: aiCatalogHandler,
+            lazy: true,
+          })
+          addServerHandler({
+            route,
+            method: 'options',
+            handler: aiCatalogHandler,
+            lazy: true,
+          })
           extendRouteRules(route, {
             sitemap: false,
             headers: {
@@ -795,7 +872,9 @@ export default defineNuxtModule<ModuleOptions>({
       logger.warn(LEGACY_RUNTIME_SYNC_SECRET_WARNING)
     const syncSecret = typeof appSecret === 'string' && appSecret.length >= 32
       ? await deriveRuntimeSyncSecret(appSecret)
-      : appSecret === undefined || appSecret === '' ? legacySecret : undefined
+      : appSecret === undefined || appSecret === ''
+        ? legacySecret
+        : undefined
     if (runtimeSyncEnabled && syncSecret) {
       await mkdir(dirname(secretPath), { recursive: true })
       // Existing open file handles must not see the new token.
@@ -848,7 +927,12 @@ export default defineNuxtModule<ModuleOptions>({
       // For Node.js presets, externalize mdream so createRequire can find the native .node binary.
       // For edge presets (Cloudflare, Vercel Edge, Deno), export conditions auto-resolve to WASM.
       const preset = String(nitroConfig.preset || '')
-      const isEdgePreset = ['cloudflare', 'vercel-edge', 'netlify-edge', 'deno'].some(p => preset.startsWith(p))
+      const isEdgePreset = [
+        'cloudflare',
+        'vercel-edge',
+        'netlify-edge',
+        'deno',
+      ].some(p => preset.startsWith(p))
       if (isEdgePreset)
         nitroConfig.experimental.wasm = true
       if (nitroCompatibility._tag === 'nitro-v3') {
@@ -856,8 +940,12 @@ export default defineNuxtModule<ModuleOptions>({
           noExternals?: boolean | Array<string | RegExp>
           traceDeps?: Array<string | RegExp>
         }
-        if (nitro3Config.noExternals !== true)
-          nitro3Config.noExternals = [...nitro3Config.noExternals || [], RE_SITEMAPD_PACKAGE]
+        if (nitro3Config.noExternals !== true) {
+          nitro3Config.noExternals = [
+            ...nitro3Config.noExternals || [],
+            RE_SITEMAPD_PACKAGE,
+          ]
+        }
         if (!isEdgePreset) {
           nitro3Config.traceDeps ||= []
           nitro3Config.traceDeps.push('mdream*')
@@ -1065,7 +1153,10 @@ export function trackDrizzleWork(event, work) { return work }
       // so a page's Markdown comes from the collection rather than from a
       // second SSR render. See src/content-source.ts.
       nitroConfig.virtual['#ai-ready-virtual/content-lookup.mjs'] = contentLookupModule(contentSource)
-      nitroConfig.virtual['#ai-ready-virtual/sitemap-config.mjs'] = `export { default } from '#sitemap-virtual/static-config.mjs'`
+      nitroConfig.virtual['#ai-ready-virtual/sitemap-config.mjs'] = () =>
+        nitroConfig.virtual?.['#sitemap-virtual/static-config.mjs']
+          ? `export { default } from '#sitemap-virtual/static-config.mjs'`
+          : 'export default {}'
     })
 
     nuxt.options.runtimeConfig['nuxt-ai-ready'] = {
@@ -1122,7 +1213,11 @@ export function trackDrizzleWork(event, work) { return work }
         : './runtime/server/plugins/content-signal-capture.prerender')
       nuxt.hook('nitro:init', (nitro) => {
         nitro.hooks.hook('prerender:config', (prerenderConfig) => {
-          prerenderConfig.plugins = [...prerenderConfig.plugins || [], htmlCapturePlugin, policyCapturePlugin]
+          prerenderConfig.plugins = [
+            ...prerenderConfig.plugins || [],
+            htmlCapturePlugin,
+            policyCapturePlugin,
+          ]
         })
       })
       addPlugin({
@@ -1159,17 +1254,41 @@ export function trackDrizzleWork(event, work) { return work }
     if (generateLlmsTxt) {
       // Nitro strips a route prefix from middleware paths. The handler needs
       // the full path to distinguish generated files from application routes.
-      addServerHandler({ middleware: true, method: undefined, handler: resolve('./runtime/server/routes/llms.txt.get'), lazy: true })
+      addServerHandler({
+        middleware: true,
+        method: undefined,
+        handler: resolve('./runtime/server/routes/llms.txt.get'),
+        lazy: true,
+      })
     }
-    if (config.llmsFullTxt !== false)
-      addServerHandler({ route: '/llms-full.txt', method: undefined, handler: resolve('./runtime/server/routes/llms-full.txt.get'), lazy: true })
+    if (config.llmsFullTxt !== false) {
+      addServerHandler({
+        route: '/llms-full.txt',
+        method: undefined,
+        handler: resolve('./runtime/server/routes/llms-full.txt.get'),
+        lazy: true,
+      })
+    }
     if (config.sitemapMd !== false) {
-      addServerHandler({ route: SITEMAP_MD_ROUTE, method: undefined, handler: resolve('./runtime/server/routes/sitemap.md.get'), lazy: true })
+      addServerHandler({
+        route: SITEMAP_MD_ROUTE,
+        method: undefined,
+        handler: resolve('./runtime/server/routes/sitemap.md.get'),
+        lazy: true,
+      })
     }
     if (agentSkillsResult._tag === 'Enabled') {
-      addServerHandler({ route: AGENT_SKILLS_INDEX_ROUTE, handler: resolve('./runtime/server/routes/agent-skills-index'), lazy: true })
+      addServerHandler({
+        route: AGENT_SKILLS_INDEX_ROUTE,
+        handler: resolve('./runtime/server/routes/agent-skills-index'),
+        lazy: true,
+      })
       for (const route of Object.keys(agentSkillsResult.localArtifacts)) {
-        addServerHandler({ route, handler: resolve('./runtime/server/routes/agent-skills-artifact'), lazy: true })
+        addServerHandler({
+          route,
+          handler: resolve('./runtime/server/routes/agent-skills-artifact'),
+          lazy: true,
+        })
         extendRouteRules(route, {
           headers: {
             'Content-Type': 'text/markdown; charset=utf-8',
@@ -1212,29 +1331,68 @@ export function trackDrizzleWork(event, work) { return work }
         webmcp: webmcpConfig,
       } satisfies ModuleAppRuntimeConfig as any
 
-      addPlugin({ mode: 'client', src: resolve('./runtime/app/plugins/webmcp.client') })
+      addPlugin({
+        mode: 'client',
+        src: resolve('./runtime/app/plugins/webmcp.client'),
+      })
       if (Object.keys(webmcpConfig.tools).length) {
-        addServerHandler({ route: '/__ai-ready/pages', handler: resolve('./runtime/server/routes/__ai-ready/pages.get'), lazy: true })
+        addServerHandler({
+          route: '/__ai-ready/pages',
+          handler: resolve('./runtime/server/routes/__ai-ready/pages.get'),
+          lazy: true,
+        })
       }
     }
 
     // Devtools API endpoint (only accessible in dev or debug mode)
     if (nuxt.options.dev || config.debug) {
-      addServerHandler({ route: '/__ai-ready__/debug.json', handler: resolve('./runtime/server/routes/__ai-ready/devtools.get'), lazy: true })
+      addServerHandler({
+        route: '/__ai-ready__/debug.json',
+        handler: resolve('./runtime/server/routes/__ai-ready/devtools.get'),
+        lazy: true,
+      })
     }
 
     // Debug endpoint (only accessible when debug: true)
     if (config.debug) {
-      addServerHandler({ route: '/__ai-ready-debug', handler: resolve('./runtime/server/routes/__ai-ready-debug.get'), lazy: true })
+      addServerHandler({
+        route: '/__ai-ready-debug',
+        handler: resolve('./runtime/server/routes/__ai-ready-debug.get'),
+        lazy: true,
+      })
     }
 
     // Indexing control endpoints (only if runtimeSync enabled)
     if (runtimeSyncEnabled) {
-      addServerHandler({ route: '/__ai-ready/status', handler: resolve('./runtime/server/routes/__ai-ready/status.get'), lazy: true })
-      addServerHandler({ route: '/__ai-ready/poll', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/poll.post'), lazy: true })
-      addServerHandler({ route: '/__ai-ready/prune', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/prune.post'), lazy: true })
-      addServerHandler({ route: '/__ai-ready/restore', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/restore.post'), lazy: true })
-      addServerHandler({ route: '/__ai-ready/reindex', method: 'post', handler: resolve('./runtime/server/routes/__ai-ready/reindex.post'), lazy: true })
+      addServerHandler({
+        route: '/__ai-ready/status',
+        handler: resolve('./runtime/server/routes/__ai-ready/status.get'),
+        lazy: true,
+      })
+      addServerHandler({
+        route: '/__ai-ready/poll',
+        method: 'post',
+        handler: resolve('./runtime/server/routes/__ai-ready/poll.post'),
+        lazy: true,
+      })
+      addServerHandler({
+        route: '/__ai-ready/prune',
+        method: 'post',
+        handler: resolve('./runtime/server/routes/__ai-ready/prune.post'),
+        lazy: true,
+      })
+      addServerHandler({
+        route: '/__ai-ready/restore',
+        method: 'post',
+        handler: resolve('./runtime/server/routes/__ai-ready/restore.post'),
+        lazy: true,
+      })
+      addServerHandler({
+        route: '/__ai-ready/reindex',
+        method: 'post',
+        handler: resolve('./runtime/server/routes/__ai-ready/reindex.post'),
+        lazy: true,
+      })
 
       // Sitemap seeder plugin - hooks into @nuxtjs/sitemap to seed routes on render
       addNitroPlugin(resolve('./runtime/server/plugins/sitemap-seeder'))
@@ -1242,12 +1400,20 @@ export function trackDrizzleWork(event, work) { return work }
 
     // Cron endpoint (for Vercel and other HTTP-based cron systems)
     if (config.cron && !nuxt.options.dev) {
-      addServerHandler({ route: '/__ai-ready/cron', handler: resolve('./runtime/server/routes/__ai-ready/cron.get'), lazy: true })
+      addServerHandler({
+        route: '/__ai-ready/cron',
+        handler: resolve('./runtime/server/routes/__ai-ready/cron.get'),
+        lazy: true,
+      })
     }
 
     // Setup prerendering hooks for static generation
     if (aiTermsConfig) {
-      addServerHandler({ route: AI_TERMS_PATH, handler: resolve('./runtime/server/routes/ai-terms'), lazy: true })
+      addServerHandler({
+        route: AI_TERMS_PATH,
+        handler: resolve('./runtime/server/routes/ai-terms'),
+        lazy: true,
+      })
       addNitroPlugin(resolve('./runtime/server/plugins/ai-terms'))
       extendRouteRules('/**', {
         headers: {
@@ -1281,24 +1447,34 @@ export function trackDrizzleWork(event, work) { return work }
 
     if (prerenderMarkdown) {
       const { setupPrerenderHandler } = await import('./prerender')
-      setupPrerenderHandler({ ...config, llmsTxt: generateLlmsTxt ? config.llmsTxt : false }, buildDbPath, {
+      setupPrerenderHandler({
+        ...config,
+        llmsTxt: generateLlmsTxt ? config.llmsTxt : false,
+      }, buildDbPath, {
         name: siteConfig.name,
-        url: siteConfig.url ? withSiteUrl('/', { withBase: true }) : undefined,
+        url: siteConfig.url
+          ? withSiteUrl('/', { withBase: true })
+          : undefined,
         description: siteConfig.description,
       }, mergedLlmsTxt, {
         ftsTokenizer,
         i18n: i18nConfig,
-        artifactRoutes: agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+        artifactRoutes: agentSkillsResult._tag === 'Enabled'
+          ? Object.keys(agentSkillsResult.localArtifacts)
+          : [],
         runtimeDatabase: database._tag,
-        onMarkdownPaths: zeroRuntimeMarkdown ? (paths) => { prerenderedMarkdownPaths = paths } : undefined,
+        onMarkdownPaths: zeroRuntimeMarkdown
+          ? (paths) => { prerenderedMarkdownPaths = paths }
+          : undefined,
       })
     }
 
     // Add lifecycle plugin to handle database connection cleanup
     if (databaseEnabled) {
-      addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
-        ? './runtime/server/plugins/db-lifecycle-nitro3'
-        : './runtime/server/plugins/db-lifecycle'))
+      addNitroPlugin({
+        nitro2: resolve('./runtime/server/plugins/db-lifecycle'),
+        nitro3: resolve('./runtime/server/plugins/db-lifecycle-nitro3'),
+      })
     }
 
     if (nuxt.options.dev) {
@@ -1313,10 +1489,14 @@ export function trackDrizzleWork(event, work) { return work }
 
     // Add route rules for static files with proper charset
     for (const route of [generateLlmsTxt && '/llms.txt', generateLlmsTxt && '/llms/**', config.llmsFullTxt !== false && '/llms-full.txt'].filter((route): route is string => Boolean(route))) {
-      extendRouteRules(route, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      extendRouteRules(route, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
     }
     if (config.sitemapMd !== false) {
-      extendRouteRules(SITEMAP_MD_ROUTE, { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } })
+      extendRouteRules(SITEMAP_MD_ROUTE, {
+        headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+      })
     }
 
     const staticBaseURL = nuxt.options.app.baseURL || '/'
@@ -1344,7 +1524,9 @@ export function trackDrizzleWork(event, work) { return work }
     nuxt.hook('nitro:init', (nitro) => {
       warnConfiguration(nitro)
       // @ts-expect-error Nitro 2 types do not include Nitro 3's build:reload hook.
-      nitro.hooks.hook(getNitroVersion(nuxt) === 3 ? 'build:reload' : 'rollup:reload', () => warnConfiguration(nitro))
+      nitro.hooks.hook(getNitroVersion(nuxt) === 3
+        ? 'build:reload'
+        : 'rollup:reload', () => warnConfiguration(nitro))
     })
     // Inline page rules and later modules can update rules after Nitro initializes.
     nuxt.hook('nitro:build:before', warnConfiguration)
@@ -1374,7 +1556,9 @@ export function trackDrizzleWork(event, work) { return work }
             nitro._prerenderedRoutes || [],
             staticBaseURL,
             config.describedby !== false,
-            agentSkillsResult._tag === 'Enabled' ? Object.keys(agentSkillsResult.localArtifacts) : [],
+            agentSkillsResult._tag === 'Enabled'
+              ? Object.keys(agentSkillsResult.localArtifacts)
+              : [],
             isCloudflarePreset ? undefined : aiTermsLink,
           ),
           isCloudflarePreset ? CLOUDFLARE_STATIC_HEADER_RULE_LIMIT : null,
@@ -1399,12 +1583,23 @@ export function trackDrizzleWork(event, work) { return work }
           // globs past it. The fallback list below stays exact either way.
           const additions = cloudflareWorkerFirstAdditions(routing, pages)
           const environmentConfig = wrangler as typeof wrangler & { env?: Record<string, { assets?: { run_worker_first?: boolean | string[] } }> }
-          const configuredEnvironments = Object.values(environmentConfig.env || {}).flatMap(env => env.assets?.run_worker_first === undefined ? [] : [env.assets.run_worker_first])
-          cloudflareFallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [...fileRouting.environments, ...configuredEnvironments])
+          const configuredEnvironments = Object.values(environmentConfig.env || {}).flatMap(env => env.assets?.run_worker_first === undefined
+            ? []
+            : [env.assets.run_worker_first])
+          cloudflareFallbackPaths = cloudflareStaticFallbackPaths(routing, pages, [
+            ...fileRouting.environments,
+            ...configuredEnvironments,
+          ])
           // Nitro merges the file again when writing wrangler.json. Add only
           // new patterns here, or every file-backed pattern would be duplicated.
-          if (additions.length > 0)
-            assets.run_worker_first = [...Array.isArray(assets.run_worker_first) ? assets.run_worker_first : [], ...additions]
+          if (additions.length > 0) {
+            assets.run_worker_first = [
+              ...Array.isArray(assets.run_worker_first)
+                ? assets.run_worker_first
+                : [],
+              ...additions,
+            ]
+          }
         }
         prerenderFinished = true
       })
@@ -1425,7 +1620,9 @@ export function trackDrizzleWork(event, work) { return work }
         // the tables. Presets still read the exact deployment rules.
         const runtimeRouteRules = { ...nitro.options.runtimeConfig.nitro.routeRules }
         const headers = applyMarkdownHeaders()
-        const matchRouteRules = createNitroRouteRuleMatcher({ nitro: { routeRules: runtimeRouteRules } })
+        const matchRouteRules = createNitroRouteRuleMatcher({
+          nitro: { routeRules: runtimeRouteRules },
+        })
         prerenderedMarkdownHeaders = []
         for (const [path, values] of headers) {
           const rule = matchRouteRules(path)
@@ -1440,7 +1637,10 @@ export function trackDrizzleWork(event, work) { return work }
             }
           }
           else {
-            prerenderedMarkdownHeaders.push([decodePath(path), values])
+            prerenderedMarkdownHeaders.push([
+              decodePath(path),
+              values,
+            ])
           }
         }
         nitro.options.runtimeConfig.nitro.routeRules = runtimeRouteRules
@@ -1479,10 +1679,16 @@ export function trackDrizzleWork(event, work) { return work }
               return ''
             throw error
           })
-          const rootHeaders = exists ? await readHeaders(headersPath) : ''
-          const generatedHeaders = generatedHeadersPath === headersPath ? '' : await readHeaders(generatedHeadersPath)
+          const rootHeaders = exists
+            ? await readHeaders(headersPath)
+            : ''
+          const generatedHeaders = generatedHeadersPath === headersPath
+            ? ''
+            : await readHeaders(generatedHeadersPath)
           const headers = [rootHeaders, generatedHeaders].filter(Boolean).join('\n')
-          const markdownPattern = isCloudflarePreset ? toDeployedRoute('/*.md', staticBaseURL) : '/*.md'
+          const markdownPattern = isCloudflarePreset
+            ? toDeployedRoute('/*.md', staticBaseURL)
+            : '/*.md'
           // The /*.md glob cannot express a per-route canonical, so it carries
           // the describedby entry for every markdown file the exact rules above
           // do not cover (crawled pages).
@@ -1524,7 +1730,9 @@ export function trackDrizzleWork(event, work) { return work }
             // Cloudflare joins a header every matching rule sets, so the exact
             // `.md` rules, the `/*.md` glob and `/*` must not repeat a value.
             mergedHeaders = dedupeStaticHeaders(mergedHeaders, ['Content-Type', 'Link', 'Vary'])
-            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders, aiTermsLink ? [...discovery, aiTermsLink] : discovery)
+            mergedHeaders = normalizeStaticContentSignalHeaders(mergedHeaders, aiTermsLink
+              ? [...discovery, aiTermsLink]
+              : discovery)
             const budget = enforceStaticHeaderBudget(mergedHeaders, CLOUDFLARE_STATIC_HEADER_RULE_LIMIT)
             if (budget.dropped > 0) {
               mergedHeaders = budget.contents

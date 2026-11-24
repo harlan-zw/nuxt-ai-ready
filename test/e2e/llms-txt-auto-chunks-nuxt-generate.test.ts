@@ -19,7 +19,17 @@ describe('automatic chunks during Nuxt generate', async () => {
     rootDir: resolve('../fixtures/llms-auto-chunks'),
     build: true,
     server: false,
-    nuxtConfig: { robots: { robotsTxt: false }, nitro: { static: true, prerender: { routes: ['/about'], crawlLinks: false, failOnError: true } } },
+    nuxtConfig: {
+      robots: { robotsTxt: false },
+      nitro: {
+        static: true,
+        prerender: {
+          routes: ['/about'],
+          crawlLinks: false,
+          failOnError: true,
+        },
+      },
+    },
   })
 
   it('uses the normalized index to emit sitemap-only metadata and Markdown', async () => {

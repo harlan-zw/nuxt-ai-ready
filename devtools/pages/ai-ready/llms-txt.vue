@@ -49,24 +49,35 @@ const templatePreview = computed(() => {
   if (!config)
     return ''
 
-  const lines: string[] = ['# {Site Name}', '', '> {Site Description}', '']
+  const lines: string[] = [
+    '# {Site Name}',
+    '',
+    '> {Site Description}',
+    '',
+  ]
 
   for (const section of config.sections || []) {
     lines.push(`## ${section.title}`)
     if (section.description) {
-      const descs = Array.isArray(section.description) ? section.description : [section.description]
+      const descs = Array.isArray(section.description)
+        ? section.description
+        : [section.description]
       for (const d of descs)
         lines.push('', d)
     }
     for (const link of section.links || []) {
-      const desc = link.description ? `: ${link.description}` : ''
+      const desc = link.description
+        ? `: ${link.description}`
+        : ''
       lines.push(`- [${link.title}](${link.href})${desc}`)
     }
     lines.push('')
   }
 
   if (config.notes) {
-    const notes = Array.isArray(config.notes) ? config.notes : [config.notes]
+    const notes = Array.isArray(config.notes)
+      ? config.notes
+      : [config.notes]
     for (const note of notes)
       lines.push(note)
   }

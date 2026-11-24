@@ -6,68 +6,133 @@ const twin = (i: number) => ({ route: `/page-${i}.md`, headers })
 
 describe('planStaticMarkdownHeaderRules', () => {
   it('keeps a matching explicit Markdown policy instead of copying the source policy', () => {
-    const routeRules = { '/notes/*.md': { headers: { 'Content-Signal': 'search=no' } } }
-    const plan = planStaticMarkdownHeaderRules(routeRules, [{ route: '/notes/one.md', headers: { 'Content-Signal': 'ai-train=no', 'Vary': 'Accept' } }], null)
+    const routeRules = {
+      '/notes/*.md': {
+        headers: { 'Content-Signal': 'search=no' },
+      },
+    }
+    const plan = planStaticMarkdownHeaderRules(routeRules, [
+      {
+        route: '/notes/one.md',
+        headers: { 'Content-Signal': 'ai-train=no', 'Vary': 'Accept' },
+      },
+    ], null)
     applyStaticMarkdownHeaderPlan(routeRules, plan)
     expect(new Headers((routeRules as Record<string, { headers: Record<string, string> }>)['/notes/one.md']!.headers).has('content-signal')).toBe(false)
   })
   it('keeps an explicit twin policy authoritative in any casing', () => {
-    const routeRules = { '/about.md': { headers: { 'CONTENT-SIGNAL': 'search=no' } } }
+    const routeRules = {
+      '/about.md': {
+        headers: { 'CONTENT-SIGNAL': 'search=no' },
+      },
+    }
     applyStaticMarkdownHeaderPlan(routeRules, {
       _tag: 'apply',
-      rules: [{ route: '/about.md', headers: { 'Content-Signal': 'ai-train=no' } }],
+      rules: [
+        {
+          route: '/about.md',
+          headers: { 'Content-Signal': 'ai-train=no' },
+        },
+      ],
     })
     expect(new Headers(routeRules['/about.md'].headers).get('content-signal')).toBe('search=no')
   })
 
   it('retains policy rules when discovery rules exceed the limit', () => {
-    const routeRules = { '/*': { headers: { 'X-A': '1' } } }
-    const policy = { route: '/private.md', headers: { 'Content-Signal': 'ai-train=no' } }
-    const plan = planStaticMarkdownHeaderRules(routeRules, [twin(1), twin(2), policy], 2)
+    const routeRules = {
+      '/*': {
+        headers: { 'X-A': '1' },
+      },
+    }
+    const policy = {
+      route: '/private.md',
+      headers: { 'Content-Signal': 'ai-train=no' },
+    }
+    const plan = planStaticMarkdownHeaderRules(routeRules, [
+      twin(1),
+      twin(2),
+      policy,
+    ], 2)
     applyStaticMarkdownHeaderPlan(routeRules, plan)
     expect(new Headers((routeRules as Record<string, { headers: Record<string, string> }>)['/private.md']!.headers).get('content-signal')).toBe('ai-train=no')
   })
 
   it('blocks a static plan whose policy rules alone exceed the limit', () => {
-    const rules = ['one', 'two'].map(name => ({ route: `/${name}.md`, headers: { 'Content-Signal': 'ai-train=no' } }))
-    const plan = planStaticMarkdownHeaderRules({ '/*': { headers: { 'X-A': '1' } } }, rules, 2)
+    const rules = ['one', 'two'].map(name => ({
+      route: `/${name}.md`,
+      headers: { 'Content-Signal': 'ai-train=no' },
+    }))
+    const plan = planStaticMarkdownHeaderRules({
+      '/*': {
+        headers: { 'X-A': '1' },
+      },
+    }, rules, 2)
     expect(plan).toEqual({ _tag: 'blocked', total: 3, limit: 2 })
     expect(() => applyStaticMarkdownHeaderPlan({}, plan)).toThrow('Content-Signal policy rules exceed the static header limit (3/2)')
   })
   it('adds variation to a twin without existing headers and preserves the plan', () => {
     const routeRules: Record<string, object | undefined> = {}
-    const rule = { route: '/index.md', headers: { Vary: 'Accept' } }
-    applyStaticMarkdownHeaderPlan(routeRules, { _tag: 'apply', rules: [rule] })
-    expect(routeRules['/index.md']).toEqual({ headers: { Vary: 'Accept' } })
+    const rule = {
+      route: '/index.md',
+      headers: { Vary: 'Accept' },
+    }
+    applyStaticMarkdownHeaderPlan(routeRules, {
+      _tag: 'apply',
+      rules: [rule],
+    })
+    expect(routeRules['/index.md']).toEqual({
+      headers: { Vary: 'Accept' },
+    })
     expect(rule.headers).toEqual({ Vary: 'Accept' })
   })
 
   it('retains existing variation when applying generated Markdown headers', () => {
     const routeRules = {
-      '/index.md': { headers: { vary: 'Origin' } },
+      '/index.md': {
+        headers: { vary: 'Origin' },
+      },
     } satisfies Record<string, { headers: Record<string, string> }>
     applyStaticMarkdownHeaderPlan(routeRules, {
       _tag: 'apply',
-      rules: [{ route: '/index.md', headers: { Vary: 'Accept' } }],
+      rules: [
+        {
+          route: '/index.md',
+          headers: { Vary: 'Accept' },
+        },
+      ],
     })
     expect(routeRules['/index.md']?.headers).toEqual({ Vary: 'Origin, Accept' })
   })
 
   it('applies every twin when the file stays under the limit', () => {
-    const routeRules = { '/*': { headers: { 'X-A': '1' } }, '/llms.txt': { headers }, '/old': { redirect: '/new' } }
-    const rules = [twin(1), twin(2)]
+    const routeRules = {
+      '/*': {
+        headers: { 'X-A': '1' },
+      },
+      '/llms.txt': { headers },
+      '/old': { redirect: '/new' },
+    }
+    const rules = [
+      twin(1),
+      twin(2),
+    ]
 
     expect(planStaticMarkdownHeaderRules(routeRules, rules, 4)).toEqual({ _tag: 'apply', rules })
   })
 
   it('skips the twins and names the registered ones to drop when over the limit', () => {
     const routeRules = {
-      '/*': { headers: { 'X-A': '1' } },
+      '/*': {
+        headers: { 'X-A': '1' },
+      },
       '/guide/a.md': { headers },
       '/guide/b.md': { headers },
       '/api/:id': { headers },
     }
-    const rules = [{ route: '/guide/b.md', headers }, { route: '/guide/c.md', headers }]
+    const rules = [
+      { route: '/guide/b.md', headers },
+      { route: '/guide/c.md', headers },
+    ]
 
     expect(planStaticMarkdownHeaderRules(routeRules, rules, 3)).toEqual({
       _tag: 'skip',
@@ -79,16 +144,26 @@ describe('planStaticMarkdownHeaderRules', () => {
   })
 
   it('never skips without a limit', () => {
-    const routeRules = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`/p${i}.md`, { headers }]))
-    const rules = [twin(1)]
+    const routeRules = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [
+      `/p${i}.md`,
+      { headers },
+    ]))
+    const rules = [
+      twin(1),
+    ]
 
     expect(planStaticMarkdownHeaderRules(routeRules, rules, null)).toEqual({ _tag: 'apply', rules })
   })
 
   it('does not count the glob as a per-page rule', () => {
-    const routeRules = { '/*.md': { headers }, '/a.md': { headers } }
+    const routeRules = {
+      '/*.md': { headers },
+      '/a.md': { headers },
+    }
 
-    expect(planStaticMarkdownHeaderRules(routeRules, [twin(2)], 2)).toEqual({
+    expect(planStaticMarkdownHeaderRules(routeRules, [
+      twin(2),
+    ], 2)).toEqual({
       _tag: 'skip',
       drop: ['/a.md'],
       total: 3,
@@ -98,7 +173,10 @@ describe('planStaticMarkdownHeaderRules', () => {
   })
 
   it('counts :param route rules that carry headers, because Nitro writes them into _headers', () => {
-    const routeRules = { '/a/:id': { headers }, '/x.md': { headers } }
+    const routeRules = {
+      '/a/:id': { headers },
+      '/x.md': { headers },
+    }
 
     expect(planStaticMarkdownHeaderRules(routeRules, [], 1)).toEqual({
       _tag: 'skip',
@@ -110,10 +188,20 @@ describe('planStaticMarkdownHeaderRules', () => {
   })
 
   it('keeps non-header options on the registered rules the skip strips', () => {
-    const routeRules = { '/old.md': { redirect: '/new.md', headers } } satisfies Record<string, object | undefined>
-    const plan = planStaticMarkdownHeaderRules(routeRules, [twin(1)], 1)
+    const routeRules = {
+      '/old.md': { redirect: '/new.md', headers },
+    } satisfies Record<string, object | undefined>
+    const plan = planStaticMarkdownHeaderRules(routeRules, [
+      twin(1),
+    ], 1)
 
-    expect(plan).toEqual({ _tag: 'skip', drop: ['/old.md'], total: 2, dropped: 2, rules: [] })
+    expect(plan).toEqual({
+      _tag: 'skip',
+      drop: ['/old.md'],
+      total: 2,
+      dropped: 2,
+      rules: [],
+    })
     applyStaticMarkdownHeaderPlan(routeRules, plan)
 
     const rule = routeRules['/old.md'] as { redirect?: string, headers?: unknown }
@@ -122,9 +210,16 @@ describe('planStaticMarkdownHeaderRules', () => {
   })
 
   it('applies twin rules onto existing entries without clobbering them', () => {
-    const routeRules = { '/page-1.md': { prerender: true } } satisfies Record<string, object | undefined>
+    const routeRules = {
+      '/page-1.md': { prerender: true },
+    } satisfies Record<string, object | undefined>
 
-    applyStaticMarkdownHeaderPlan(routeRules, { _tag: 'apply', rules: [twin(1)] })
+    applyStaticMarkdownHeaderPlan(routeRules, {
+      _tag: 'apply',
+      rules: [
+        twin(1),
+      ],
+    })
 
     expect(routeRules['/page-1.md']).toEqual({ prerender: true, headers })
   })
