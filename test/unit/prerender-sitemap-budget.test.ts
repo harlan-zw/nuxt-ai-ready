@@ -25,8 +25,14 @@ function setup(routes: Record<string, string> = {}) {
       headings: [],
     })
   })
+  const fetchWithResponse = Object.assign(fetch, {
+    raw: async (path: string) => ({
+      headers: new Headers({ 'content-type': 'application/json' }),
+      _data: await fetch(path),
+    }),
+  })
   const state: CrawlerState = {
-    fetch: fetch as unknown as CrawlerState['fetch'],
+    fetch: fetchWithResponse as unknown as CrawlerState['fetch'],
     prerenderedRoutes: new Set(),
     errorRoutes: new Set(),
     totalProcessingTime: 0,
@@ -50,6 +56,13 @@ function setup(routes: Record<string, string> = {}) {
 }
 
 describe('trusted prerender sitemap documents', () => {
+  it('fails when a page declares JSON and returns a malformed Markdown envelope', async () => {
+    const { state, nuxt, nitro, fetch } = setup()
+    fetch.mockResolvedValue('{ malformed JSON')
+
+    await expect(crawlSitemapContent(state, nuxt, nitro, urlset('/malformed'))).rejects.toBeInstanceOf(SyntaxError)
+  })
+
   it('crawls normalized automatic chunks through their generated index during Nuxt generate', async () => {
     const { state, nuxt, nitro, fetch } = setup()
     state.llmsTxtConfig = {

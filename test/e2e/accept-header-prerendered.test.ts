@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createResolver } from '@nuxt/kit'
-import { fetch, setup, url } from '@nuxt/test-utils/e2e'
+import { fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const { resolve } = createResolver(import.meta.url)
@@ -18,6 +20,7 @@ describe('accept header negotiation for prerendered routes', async () => {
           headers: { 'vary': 'Origin', 'content-signal': 'search=no', 'x-markdown-rule': 'about' },
         },
         '/docs/getting-started.md': { proxy: '/api/prerendered-markdown-proxy' },
+        '/preserved.md': { proxy: '/api/raw-markdown' },
       },
       nitro: {
         preset: 'node-server',
@@ -39,7 +42,12 @@ describe('accept header negotiation for prerendered routes', async () => {
         },
         prerender: {
           crawlLinks: false,
-          routes: ['/', '/about', '/docs/getting-started.md'],
+          routes: [
+            '/',
+            '/about',
+            '/docs/getting-started.md',
+            '/preserved.md',
+          ],
           failOnError: false,
         },
       },
@@ -57,6 +65,13 @@ describe('accept header negotiation for prerendered routes', async () => {
     expect(response.headers.get('last-modified')).toBeTruthy()
     expect(response.headers.get('vary')).toContain('Accept')
     expect(response.headers.get('link')).toContain('rel="alternate"')
+  })
+
+  it('prerenders a Markdown response byte for byte', async () => {
+    const buildDir = useTestContext().nuxt!.options.buildDir
+    const rawMarkdown = await readFile(join(buildDir, 'output/public/preserved.md'), 'utf8')
+
+    expect(rawMarkdown).toBe('---\r\ntitle: Preserved\r\n---\r\n\r\n# Preserved\r\n')
   })
 
   it('redirects a markdown client to the prerendered .md twin', async () => {

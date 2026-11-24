@@ -32,6 +32,7 @@ type PrerenderFetch = ReturnType<typeof createPrerenderFetch>['fetch']
 const RE_HTML_MD_EXT = /\.(html|md)$/
 const RE_INDEX_SUFFIX = /\/index$/
 const RE_MD_EXT = /\.md$/
+const RE_JSON_CONTENT_TYPE = /^application\/(?:[^;\s]+\+)?json(?:\s*;|$)/i
 const RE_NEGATED_GLOB = /^(!?)(.*)$/
 const RE_PARENT_DIR_GLOB = /!?\.\.\//
 const RE_MARKDOWN_ALTERNATE_TAG = /<link\b[^>]*\sdata-ai-ready-markdown(?:="")?(?=[\s/>])[^>]*>/g
@@ -390,8 +391,9 @@ async function processSitemapEntry(
   // fails to render at build time fails the same way on the second attempt. The
   // caller skips the route either way, so the retry only pays for a second full
   // SSR render of every broken page.
-  const res = await crawlerFetch(state)(mdUrl, {
+  const res = await crawlerFetch(state).raw<string, 'text'>(mdUrl, {
     headers: { 'x-nitro-prerender': mdRoute },
+    responseType: 'text',
     retry: 0,
     signal: AbortSignal.timeout(PRERENDER_PAGE_TIMEOUT),
   }).catch((err) => {
@@ -402,21 +404,12 @@ async function processSitemapEntry(
     else
       logger.debug(`Skipping ${route}: ${err.message}`)
     return null
-  }) as string | null
+  })
 
-  if (!res)
+  if (!res || !RE_JSON_CONTENT_TYPE.test(res.headers.get('content-type') ?? ''))
     return { crawled: false, skipped: false }
 
-  // Check if response is JSON before parsing
-  let parsed: ParsedMarkdownResult
-  try {
-    parsed = JSON.parse(res) as ParsedMarkdownResult
-  }
-  catch (err) {
-    // Response is not JSON - likely HTML was returned instead of markdown
-    logger.debug(`Skipping ${route}: Response is not JSON (likely HTML instead of markdown conversion)`, err)
-    return { crawled: false, skipped: false }
-  }
+  const parsed = JSON.parse(res._data ?? '') as ParsedMarkdownResult
 
   // Skip llms-full.txt for sitemap-crawled pages - only include prerendered pages
   await processMarkdownRoute(state, nuxt, route, parsed, lastmod, { skipLlmsFullTxt: true })
@@ -438,6 +431,7 @@ async function processSitemapEntry(
     const generated: PrerenderRoute = {
       route: mdRoute,
       fileName: mdRoute,
+      contentType: 'application/json',
       contents: JSON.stringify(parsed),
     }
     await nitro.hooks.callHook('prerender:generate', generated, nitro)
@@ -739,7 +733,8 @@ export function setupPrerenderHandler(
         return
       }
 
-      if (!route.fileName?.endsWith('.md'))
+      // Only JSON holds a page twin envelope. Independently served Markdown already has its final bytes.
+      if (!route.fileName?.endsWith('.md') || !RE_JSON_CONTENT_TYPE.test(route.contentType ?? ''))
         return
 
       let pageRoute = withLeadingSlash(route.fileName).replace(RE_MD_EXT, '')
@@ -753,7 +748,7 @@ export function setupPrerenderHandler(
         initPromise = initCrawler(state)
       await initPromise
 
-      const parsed = JSON.parse(route.contents || '{}') as ParsedMarkdownResult
+      const parsed = JSON.parse(route.contents ?? '') as ParsedMarkdownResult
       if (parsed.contentSignal !== undefined) {
         ;(route as PrerenderRoute & { contentSignal?: string }).contentSignal = parsed.contentSignal
         // Cloudflare serves directory-index HTML at a trailing-slash URL.
