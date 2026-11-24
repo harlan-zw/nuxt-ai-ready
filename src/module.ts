@@ -1471,9 +1471,10 @@ export function trackDrizzleWork(event, work) { return work }
 
     // Add lifecycle plugin to handle database connection cleanup
     if (databaseEnabled) {
-      addNitroPlugin(resolve(getNitroVersion(nuxt) === 3
-        ? './runtime/server/plugins/db-lifecycle-nitro3'
-        : './runtime/server/plugins/db-lifecycle'))
+      addNitroPlugin({
+        nitro2: resolve('./runtime/server/plugins/db-lifecycle'),
+        nitro3: resolve('./runtime/server/plugins/db-lifecycle-nitro3'),
+      })
     }
 
     if (nuxt.options.dev) {
