@@ -63,11 +63,13 @@ export function setLinkHeader(event: H3Event, ctx: NegotiationContext, variant: 
 }
 
 export function setStatusAwareHeader(event: H3Event, ctx: NegotiationContext, variant: 'html' | 'markdown') {
-  if (!ctx.config.i18n) {
+  if (!ctx.config.i18n && !ctx.config.apiCatalog) {
     setLinkHeader(event, ctx, variant)
     return
   }
 
+  // Catalog route rules can overwrite the prepared Link on a native Response.
+  // Keep the discovery links available when the response becomes final.
   const headers = buildStatusAwareLinkHeaders(ctx.path, variant, ctx.config, createHeaderUrlResolver(event, ctx), ctx.routeContext)
   setStatusAwareLinkHeader(event, headers.error, headers.success)
 }

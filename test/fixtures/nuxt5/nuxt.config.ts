@@ -21,6 +21,9 @@ export default defineNuxtConfig({
   mcp: false,
   aiReady: {
     agentSkills: false,
+    apiCatalog: {
+      entries: [{ anchor: '/mcp', item: { href: '/mcp', type: 'application/json' } }],
+    },
     database: {
       type: 'sqlite',
     },
