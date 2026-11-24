@@ -120,7 +120,7 @@ catalog:
   nitro: 3.0.261103-rc
   nitropack: ^2.13.6
   nuxtseo-layer-devtools: ^6.0.2
-  nuxtseo-shared: ^6.0.4
+  nuxtseo-shared: ^6.0.5
   ohash: ^2.0.12
   pathe: ^2.0.3
   postgres: ^3.4.9
@@ -128,7 +128,7 @@ catalog:
   sitemapd: ^0.2.3
   ufo: ^1.6.4
   unbuild: ^3.6.1
-  vue: ^3.5.45
+  vue: ^3.5.46
   wrangler: ^4.163.0
   yaml: ^2.9.1
   zod: ^4.6.7
@@ -144,14 +144,14 @@ catalogs:
     eslint: ^10.15.0
   dev-test:
     '@nuxt/test-utils': ^4.4.0
-    '@vitest/coverage-v8': ^5.1.0
+    '@vitest/coverage-v8': ^5.1.1
     '@vue/test-utils': ^2.6.0
     happy-dom: ^21.0.4
     playwright: ^1.65.1
     playwright-core: ^1.65.1
-    vitest: ^5.1.0
+    vitest: ^5.1.1
   nuxt:
-    '@nuxt/content': ^3.16.2
+    '@nuxt/content': ^3.17.0
     '@nuxt/kit': ^4.6.4
     '@nuxt/module-builder': ^1.0.4
     '@nuxt/ui': ^4.12.2

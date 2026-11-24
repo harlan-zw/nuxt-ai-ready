@@ -7,10 +7,10 @@
     "test": "nuxt prepare && vue-tsc --noEmit -p .nuxt/tsconfig.app.json && vue-tsc --noEmit -p .nuxt/tsconfig.server.json && nuxt build && node test.mjs && nuxt generate --preset=cloudflare-pages-static && node generate.mjs"
   },
   "dependencies": {
-    "nuxtseo-shared": "^6.0.4",
+    "nuxtseo-shared": "^6.0.5",
     "nitro": "3.0.261103-rc",
     "nuxt": "npm:nuxt-nightly@5.0.0-2611231954-f3bb563",
-    "vue": "^3.5.45",
+    "vue": "^3.5.46",
     "vue-router": "^5.5.1",
     "@nuxtjs/robots": "^7.1.0",
     "@nuxtjs/sitemap": "^9.2.0",
