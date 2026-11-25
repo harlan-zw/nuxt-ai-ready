@@ -1,5 +1,5 @@
 import { joinURL, parseURL, withLeadingSlash, withoutBase } from 'ufo'
-import { normalizePagePath } from './markdown-path'
+import { normalizePagePath } from './markdown-path.ts'
 
 /** Convert a sitemap URL (which includes app.baseURL) to a logical route. */
 export function toLogicalRoute(pathOrUrl: string, baseURL: string): string {

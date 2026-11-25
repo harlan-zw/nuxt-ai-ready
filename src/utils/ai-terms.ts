@@ -1,5 +1,5 @@
 import type { AiTermsConfig, AiTermsDocument, AiTermsPayment, AiTermsPurpose, AiTermsUse, ResolvedAiTermsConfig } from '../runtime/ai-terms'
-import { AI_TERMS_PATH } from '../runtime/ai-terms'
+import { AI_TERMS_PATH } from '../runtime/ai-terms.ts'
 
 type AiTermsResult
   = | { _tag: 'Disabled' }

@@ -1,6 +1,6 @@
 import { hasNuxtModule, useNuxt } from '@nuxt/kit'
 import { resolveNuxtContentVersion } from 'nuxtseo-shared/kit'
-import { readPackageMetadata } from './package-metadata'
+import { readPackageMetadata } from './package-metadata.ts'
 
 /**
  * The content module that backs a route's Markdown, if any.

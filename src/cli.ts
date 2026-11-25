@@ -6,9 +6,9 @@ import { consola } from 'consola'
 import { colors } from 'consola/utils'
 import { join, resolve } from 'pathe'
 import { joinURL } from 'ufo'
-import { readPackageMetadata } from './package-metadata'
-import { auditSite, parseAuditOptions } from './readiness-audit'
-import { APPLICATION_SECRET_ERROR, deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
+import { readPackageMetadata } from './package-metadata.ts'
+import { auditSite, parseAuditOptions } from './readiness-audit.ts'
+import { APPLICATION_SECRET_ERROR, deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret.ts'
 
 async function getSecret(cwd: string): Promise<string | null> {
   const root = process.env.NITRO_APP_SECRET ?? process.env.NUXT_APP_SECRET

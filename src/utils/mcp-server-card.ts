@@ -2,8 +2,8 @@ import type { McpServerCardConfig } from '../runtime/types'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { resolvePackageMetadataPath } from '../package-metadata'
-import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../runtime/server/utils/discovery-response'
+import { resolvePackageMetadataPath } from '../package-metadata.ts'
+import { matchesDiscoveryEtag, MCP_SERVER_CARD_MEDIA_TYPE } from '../runtime/server/utils/discovery-response.ts'
 
 export const MCP_SERVER_CARD_SCHEMA = 'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json'
 export { MCP_SERVER_CARD_MEDIA_TYPE }

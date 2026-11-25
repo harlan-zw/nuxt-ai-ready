@@ -5,8 +5,8 @@
 import type { LlmsTxtConfig } from '../../types'
 import { joinURL } from 'ufo'
 import { isMap, isScalar, parseDocument, stringify } from 'yaml'
-import { normalizeLlmsTxtConfig } from '../../llms-txt-format'
-import { escapeMarkdownHtml } from '../../markdown-text'
+import { normalizeLlmsTxtConfig } from '../../llms-txt-format.ts'
+import { escapeMarkdownHtml } from '../../markdown-text.ts'
 
 const RE_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n*/
 const RE_INLINE_WHITESPACE = /\s+/g

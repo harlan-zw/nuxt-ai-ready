@@ -12,10 +12,10 @@ import { createHash } from 'node:crypto'
 import { readdir, readFile, realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parseDocument } from 'yaml'
-import { AGENT_SKILLS_SCHEMA } from './agent-skills-config'
+import { AGENT_SKILLS_SCHEMA } from './agent-skills-config.ts'
 
-export { AGENT_SKILLS_SCHEMA } from './agent-skills-config'
 export type { AgentSkillsConfigIssue, ResolvedAgentSkillsConfig } from './agent-skills-config'
+export { AGENT_SKILLS_SCHEMA } from './agent-skills-config.ts'
 
 const namePattern = /^(?!.*--)[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 const digestPattern = /^sha256:[a-f0-9]{64}$/

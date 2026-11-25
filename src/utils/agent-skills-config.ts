@@ -1,7 +1,7 @@
 import type {
   AgentSkillsIndex,
 } from '../runtime/types'
-import { publicCacheControl } from '../runtime/cache-control'
+import { publicCacheControl } from '../runtime/cache-control.ts'
 
 export const AGENT_SKILLS_SCHEMA = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json'
 export const AGENT_SKILLS_INDEX_ROUTE = '/.well-known/agent-skills/index.json'

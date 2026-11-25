@@ -126,8 +126,8 @@ catalog:
   postgres: ^3.4.9
   site-config-stack: ^5.0.4
   sitemapd: ^0.2.3
+  tsdown: ^0.23.7
   ufo: ^1.6.4
-  unbuild: ^3.6.1
   vue: ^3.5.46
   wrangler: ^4.163.0
   yaml: ^2.9.1
@@ -153,7 +153,7 @@ catalogs:
   nuxt:
     '@nuxt/content': ^3.17.0
     '@nuxt/kit': ^4.6.4
-    '@nuxt/module-builder': ^1.0.4
+    '@nuxt/module-builder': 2.0.0-alpha.1
     '@nuxt/ui': ^4.12.2
     '@nuxtjs/mcp-toolkit': ^0.24.3
     '@nuxtjs/robots': ^7.1.0

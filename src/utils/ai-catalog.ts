@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto'
 import {
   matchesDiscoveryEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
-} from '../runtime/server/utils/discovery-response'
+} from '../runtime/server/utils/discovery-response.ts'
 
 export const AI_CATALOG_PATH = '/.well-known/ai-catalog.json'
 export const ARD_PATH = '/.well-known/ard.json'
-export { AI_CATALOG_MEDIA_TYPE } from '../runtime/server/utils/discovery-response'
+export { AI_CATALOG_MEDIA_TYPE } from '../runtime/server/utils/discovery-response.ts'
 export type { AiCatalog }
 
 export function resolveAiCatalog(input: {
