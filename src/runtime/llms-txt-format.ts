@@ -1,5 +1,5 @@
 import type { LlmsTxtConfig, LlmsTxtLink, LlmsTxtSection } from './types'
-import { escapeMarkdownHtml } from './markdown-text'
+import { escapeMarkdownHtml } from './markdown-text.ts'
 
 const RE_INLINE_WHITESPACE = /\s+/g
 const RE_LINK_TITLE_BRACKET = /[[\]]/g

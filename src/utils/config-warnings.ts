@@ -1,8 +1,8 @@
 import type { NegotiationRouteRule } from '../runtime/server/utils/content-negotiation'
 import type { ContentNegotiationPolicy } from '../runtime/types'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
-import { hasMarkdownTwin } from '../runtime/markdown-path'
-import { getContentNegotiationVary, resolveContentNegotiation } from '../runtime/server/utils/content-negotiation'
+import { hasMarkdownTwin } from '../runtime/markdown-path.ts'
+import { getContentNegotiationVary, resolveContentNegotiation } from '../runtime/server/utils/content-negotiation.ts'
 
 const CACHE_GUIDE = 'https://nuxtseo.com/docs/ai-ready/guides/markdown#cache-safety'
 function cacheFix(botNegotiation = false): string {

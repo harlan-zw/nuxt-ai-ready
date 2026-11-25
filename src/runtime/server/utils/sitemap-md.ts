@@ -1,6 +1,6 @@
-import { toMarkdownPath } from '../../markdown-path'
-import { escapeMarkdownHtml } from '../../markdown-text'
-import { toDeployedRoute } from '../../route-path'
+import { toMarkdownPath } from '../../markdown-path.ts'
+import { escapeMarkdownHtml } from '../../markdown-text.ts'
+import { toDeployedRoute } from '../../route-path.ts'
 
 export const SITEMAP_MD_ROUTE = '/sitemap.md'
 

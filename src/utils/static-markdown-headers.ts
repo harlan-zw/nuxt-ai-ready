@@ -1,9 +1,9 @@
 import { defu } from 'defu'
-import { mergeVaryHeader } from '../runtime/cache-control'
-import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path'
-import { toDeployedRoute } from '../runtime/route-path'
-import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md'
-import { matchingStaticContentSignals } from './static-headers'
+import { mergeVaryHeader } from '../runtime/cache-control.ts'
+import { hasMarkdownTwin, normalizePagePath, toMarkdownPath } from '../runtime/markdown-path.ts'
+import { toDeployedRoute } from '../runtime/route-path.ts'
+import { SITEMAP_MD_ROUTE } from '../runtime/server/utils/sitemap-md.ts'
+import { matchingStaticContentSignals } from './static-headers.ts'
 
 const RE_MD_EXT = /\.md$/
 

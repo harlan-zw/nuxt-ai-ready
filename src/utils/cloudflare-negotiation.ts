@@ -1,6 +1,6 @@
-import { normalizePagePath } from '../runtime/markdown-path'
-import { toDeployedRoute } from '../runtime/route-path'
-import { isStaticMarkdownSourceRoute } from './static-markdown-headers'
+import { normalizePagePath } from '../runtime/markdown-path.ts'
+import { toDeployedRoute } from '../runtime/route-path.ts'
+import { isStaticMarkdownSourceRoute } from './static-markdown-headers.ts'
 
 const MAX_WORKER_FIRST_PATTERNS = 100
 const RE_PATTERN_CHARACTERS = /[.+?^${}()|[\]\\]/g

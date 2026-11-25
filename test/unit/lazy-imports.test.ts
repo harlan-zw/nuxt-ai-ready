@@ -1,8 +1,13 @@
 /* eslint-disable harlanzw/no-test-file-reads -- The static vs dynamic import split is a source graph property no exported API can observe. */
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { installModule } from '@nuxt/kit'
+import { loadNuxt } from 'nuxt'
 import ts from 'typescript'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import module from '../../src/module.ts'
 
 function importSpecifiers(path: string): { dynamic: string[], static: string[] } {
   const filename = resolve(import.meta.dirname, path)
@@ -38,18 +43,35 @@ function importSpecifiers(path: string): { dynamic: string[], static: string[] }
   return { dynamic, static: staticImports }
 }
 
-describe('lazy imports', () => {
-  it('loads optional build features only when enabled', () => {
-    const imports = importSpecifiers('../../src/module.ts')
+vi.mock('../../src/prerender.ts', () => {
+  throw new Error('Prerender code loaded without any prerendered routes.')
+})
+vi.mock('../../src/utils/agent-skills.ts', () => {
+  throw new Error('Agent Skills code loaded with Agent Skills disabled.')
+})
+vi.mock('nuxtseo-shared/devtools', () => {
+  throw new Error('DevTools code loaded for a production build.')
+})
 
-    expect(imports.static).not.toContain('./prerender')
-    expect(imports.static).not.toContain('./utils/agent-skills')
-    expect(imports.static).not.toContain('nuxtseo-shared/devtools')
-    expect(imports.dynamic).toEqual(expect.arrayContaining([
-      './prerender',
-      './utils/agent-skills',
-      'nuxtseo-shared/devtools',
-    ]))
+describe('lazy imports', () => {
+  it('installs with optional build features disabled without loading their dependencies', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'ai-ready-lazy-imports-'))
+    const nuxt = await loadNuxt({
+      cwd: rootDir,
+      ready: false,
+      dev: false,
+      overrides: { modules: [] },
+    })
+    const agentSkills = vi.fn()
+    nuxt.hook('ai-ready:agent-skills', agentSkills)
+    try {
+      await installModule(module, { database: false, agentSkills: false }, nuxt)
+      expect(agentSkills).not.toHaveBeenCalled()
+    }
+    finally {
+      await nuxt.close()
+      await rm(rootDir, { recursive: true, force: true })
+    }
   })
 
   it('loads database cleanup code only after a database was used', () => {

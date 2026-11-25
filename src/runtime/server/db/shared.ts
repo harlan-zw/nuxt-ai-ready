@@ -1,6 +1,6 @@
 // Shared database utilities for build-time and runtime
 import { isMap, isScalar, parseDocument } from 'yaml'
-import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql'
+import { buildSchemaSql, DROP_TABLES_SQL, resolveFtsTokenizer, SCHEMA_VERSION } from './schema-sql.ts'
 
 const LEADING_BLOCK_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 // Keys that mdream and the markdown middleware write into page frontmatter.

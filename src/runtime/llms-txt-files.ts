@@ -1,5 +1,5 @@
 import type { LlmsTxtConfig, LlmsTxtSection } from './types'
-import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format'
+import { formatLlmsTxtPageLink, normalizeLlmsTxtConfig } from './llms-txt-format.ts'
 
 export interface LlmsTxtPage {
   pathname: string

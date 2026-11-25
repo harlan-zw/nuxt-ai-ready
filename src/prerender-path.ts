@@ -1,6 +1,6 @@
 import { relative, resolve } from 'node:path'
 import { parseURL } from 'ufo'
-import { toLogicalRoute } from './runtime/route-path'
+import { toLogicalRoute } from './runtime/route-path.ts'
 
 type ParsedPrerenderRoute = { _tag: 'Valid', route: string } | { _tag: 'Invalid' }
 

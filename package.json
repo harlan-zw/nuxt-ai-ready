@@ -53,15 +53,15 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && pnpm run build:devtools && pnpm run test:dist",
+    "build": "nuxt-module-build prepare && tsdown && pnpm run build:devtools && pnpm run test:dist",
     "build:devtools": "node -e \"require('fs').cpSync('devtools','dist/devtools',{recursive:true})\"",
     "dev": "nuxt dev playground",
     "dev:minimal": "nuxt dev playground",
     "prepare:fixtures": "nuxt prepare playground && nuxt prepare playground && nuxt prepare test/fixtures/basic",
     "dev:build": "nuxt build playground",
     "dev:build:minimal": "nuxt build playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground && pnpm run build:devtools",
-    "dev:prepare:minimal": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxt-module-build build && nuxt prepare playground",
+    "dev:prepare": "nuxt-module-build prepare && tsdown && nuxt prepare playground && pnpm run build:devtools",
+    "dev:prepare:minimal": "nuxt-module-build prepare && tsdown && nuxt prepare playground",
     "release": "pnpm build && bumpp -x \"npx changelogen --output=CHANGELOG.md\"",
     "prepack": "pnpm run build",
     "test": "vitest run && pnpm test:nuxt5",
@@ -143,19 +143,13 @@
     "playwright": "catalog:dev-test",
     "playwright-core": "catalog:dev-test",
     "postgres": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:dev-build",
-    "unbuild": "catalog:",
     "vitest": "catalog:dev-test",
     "vue": "catalog:",
     "vue-router": "catalog:vue",
     "vue-tsc": "catalog:dev-build",
     "wrangler": "catalog:",
     "zod": "catalog:"
-  },
-  "build": {
-    "externals": [
-      "node:sqlite",
-      "nuxt/server"
-    ]
   }
 }

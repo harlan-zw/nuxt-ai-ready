@@ -16,30 +16,29 @@ import { useSiteConfig, withSiteUrl } from 'nuxt-site-config/kit'
 import { isAgent, isCI, setupNitroRuntimeCompatibility, setupRuntimeAliases } from 'nuxtseo-shared/kit'
 import { createNitroRouteRuleMatcher } from 'nuxtseo-shared/server'
 import { decodePath } from 'ufo'
-import { createBuildPageDataVirtual } from './build-page-data-virtual'
-import { contentLookupModule, resolveContentSource } from './content-source'
-import { logger } from './logger'
-import { resolveModuleEntryUrl } from './module-resolver'
-import { readPackageMetadata } from './package-metadata'
-import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants'
-import { AI_TERMS_PATH } from './runtime/ai-terms'
-import { parseLlmsTxtConfig } from './runtime/llms-txt-files'
-import { toDeployedRoute } from './runtime/route-path'
-import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md'
-import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret'
-import { registerTypeTemplates } from './templates'
-import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config'
-import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog'
-import { resolveAiTermsConfig } from './utils/ai-terms'
-import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog'
-import { readCloudflareAssetRouting } from './utils/cloudflare-config'
-import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation'
-import { resolveConfigurationWarnings } from './utils/config-warnings'
-import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal'
-import { AI_READY_CRON_SCHEDULE } from './utils/cron'
-import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database'
-import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n'
-import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp'
+import { createBuildPageDataVirtual } from './build-page-data-virtual.ts'
+import { contentLookupModule, resolveContentSource } from './content-source.ts'
+import { logger } from './logger.ts'
+import { resolveModuleEntryUrl } from './module-resolver.ts'
+import { readPackageMetadata } from './package-metadata.ts'
+import { MARKDOWN_LINK_AVAILABILITY_FILE } from './prerender-constants.ts'
+import { AI_TERMS_PATH } from './runtime/ai-terms.ts'
+import { parseLlmsTxtConfig } from './runtime/llms-txt-files.ts'
+import { toDeployedRoute } from './runtime/route-path.ts'
+import { SITEMAP_MD_ROUTE } from './runtime/server/utils/sitemap-md.ts'
+import { deriveRuntimeSyncSecret, LEGACY_RUNTIME_SYNC_SECRET_WARNING } from './runtime/sync-secret.ts'
+import { registerTypeTemplates } from './templates.ts'
+import { AGENT_SKILLS_CACHE_CONTROL, AGENT_SKILLS_INDEX_ROUTE, resolveExternalSkillUrl } from './utils/agent-skills-config.ts'
+import { AI_CATALOG_MEDIA_TYPE, AI_CATALOG_PATH, ARD_PATH, createAiCatalogEtag, resolveAiCatalog } from './utils/ai-catalog.ts'
+import { resolveAiTermsConfig } from './utils/ai-terms.ts'
+import { API_CATALOG_PATH, formatApiCatalogConfigError, resolveApiCatalogConfig } from './utils/api-catalog.ts'
+import { readCloudflareAssetRouting } from './utils/cloudflare-config.ts'
+import { cloudflarePrerenderedPages, cloudflareStaticFallbackPaths, cloudflareWorkerFirstAdditions } from './utils/cloudflare-negotiation.ts'
+import { resolveConfigurationWarnings } from './utils/config-warnings.ts'
+import { applyContentSignalPolicy, resolveContentSignalPolicy } from './utils/content-signal.ts'
+import { AI_READY_CRON_SCHEDULE } from './utils/cron.ts'
+import { checkDrizzleInstall, formatDrizzleMessage, resolveDatabaseConfig } from './utils/database.ts'
+import { detectI18n, hasCjkLocale, materializeI18nPages } from './utils/i18n.ts'
 import {
   createMcpServerCardEtag,
   MCP_SERVER_CARD_MEDIA_TYPE,
@@ -49,11 +48,12 @@ import {
   resolveMcpServerCard,
   resolveMcpServerCardName,
   resolveMcpServerCardRoute,
-} from './utils/mcp-server-card'
-import { opaqueJsonModule } from './utils/opaque-json-module'
-import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders, normalizeStaticContentSignalHeaders } from './utils/static-headers'
-import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers'
-import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp'
+} from './utils/mcp-server-card.ts'
+import { hasConfiguredNuxtModule, resolveMcpToolkitState } from './utils/mcp.ts'
+import { opaqueJsonModule } from './utils/opaque-json-module.ts'
+import { CLOUDFLARE_STATIC_HEADER_RULE_LIMIT, dedupeStaticHeaders, enforceStaticHeaderBudget, ensureStaticHeader, mergeStaticDiscoveryHeaders, normalizeStaticContentSignalHeaders } from './utils/static-headers.ts'
+import { applyStaticMarkdownHeaderPlan, planStaticMarkdownHeaderRules, prerenderedMarkdownHeaderRules, staticDescribedbyEntry } from './utils/static-markdown-headers.ts'
+import { resolveSiteToolsConfig, resolveWebMcpConfig } from './utils/webmcp.ts'
 
 const MODULE_PACKAGE_NAME = 'nuxt-ai-ready'
 // The sitemap parser's own files, not any path that contains its name.
@@ -210,7 +210,7 @@ export default defineNuxtModule<ModuleOptions>({
     }
     let agentSkillsResult: ResolvedAgentSkillsConfig = { _tag: 'Disabled' }
     if (agentSkillsConfig !== false) {
-      const { applyRootAlias, prepareAgentSkills, resolveAgentSkillsConfig } = await import('./utils/agent-skills')
+      const { applyRootAlias, prepareAgentSkills, resolveAgentSkillsConfig } = await import('./utils/agent-skills.ts')
       const prepared = await prepareAgentSkills(agentSkillsConfig, {
         rootDir: nuxt.options.rootDir,
         scanDirs: getLayerDirectories(nuxt).map(layer => layer.root),
@@ -1446,7 +1446,7 @@ export function trackDrizzleWork(event, work) { return work }
     }
 
     if (prerenderMarkdown) {
-      const { setupPrerenderHandler } = await import('./prerender')
+      const { setupPrerenderHandler } = await import('./prerender.ts')
       setupPrerenderHandler({
         ...config,
         llmsTxt: generateLlmsTxt ? config.llmsTxt : false,

@@ -1,5 +1,5 @@
-import { mergeVaryHeader } from '../runtime/cache-control'
-import { toDeployedRoute } from '../runtime/route-path'
+import { mergeVaryHeader } from '../runtime/cache-control.ts'
+import { toDeployedRoute } from '../runtime/route-path.ts'
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -1,7 +1,7 @@
 import type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
 import type { LocalePagePaths, RuntimeI18nConfig, UnlocalizedLocalePage } from 'nuxtseo-shared/i18n-runtime'
 import { resolveI18nConfig as resolveSharedI18nConfig, toRuntimeI18nConfig as toSharedRuntimeI18nConfig } from 'nuxtseo-shared/i18n'
-import { logger } from '../logger'
+import { logger } from '../logger.ts'
 
 export type { AutoI18nConfig } from 'nuxtseo-shared/i18n'
 export type { RuntimeI18nConfig } from 'nuxtseo-shared/i18n-runtime'
