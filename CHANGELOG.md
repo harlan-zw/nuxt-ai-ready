@@ -1,3 +1,17 @@
+## v3.6.2
+
+[Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.6.1...v3.6.2)
+
+### ⚡ Performance
+
+- **Runtime:** Fast-exit `/__nuxt_error`, static asset probes, and `.md` probes before loading headers or route matchers, and cache matched route rules per request. [#263](https://github.com/harlan-zw/nuxt-ai-ready/pull/263)
+
+### 🩹 Fixes
+
+- **Nitro 3:** Preserve discovery link headers on Nitro 3 responses and register the native Nitro 3 database lifecycle. [#260](https://github.com/harlan-zw/nuxt-ai-ready/pull/260), [#261](https://github.com/harlan-zw/nuxt-ai-ready/pull/261)
+- **Prerender:** Preserve native Markdown responses during prerendering. [#259](https://github.com/harlan-zw/nuxt-ai-ready/pull/259)
+- **Sitemap:** Fall back to an empty sitemap config when `@nuxtjs/sitemap` is disabled. [#254](https://github.com/harlan-zw/nuxt-ai-ready/pull/254)
+
 ## v3.6.1
 
 [Compare changes](https://github.com/harlan-zw/nuxt-ai-ready/compare/v3.6.0...v3.6.1)
