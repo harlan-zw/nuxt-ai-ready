@@ -1,10 +1,11 @@
 import { createError, defineEventHandler } from '#nuxtseo/h3'
 import { useRuntimeConfig } from '#nuxtseo/nitro'
+import { withoutQuery } from '../utils/negotiation-decision'
 import { applyNegotiation, decideNegotiation } from '../utils/negotiation-response'
 import { isSitemapMdRequest } from '../utils/sitemap-md'
 
 export default defineEventHandler(async (event) => {
-  if (event.path.split('?')[0]?.endsWith('/sitemap.md')) {
+  if (withoutQuery(event.path).endsWith('/sitemap.md')) {
     const runtimeConfig = useRuntimeConfig(event)
     if (isSitemapMdRequest(event.path, runtimeConfig.app.baseURL, (runtimeConfig['nuxt-ai-ready'] as any)?.sitemapMd !== false))
       return

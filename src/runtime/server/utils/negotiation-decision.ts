@@ -1,7 +1,7 @@
 import type { ContentNegotiationPolicy } from '../../types'
 import type { ContentNegotiationResolution, NegotiationRouteRule } from './content-negotiation'
 import type { MarkdownRequest } from './markdown-request'
-import { toMarkdownPath } from '../../markdown-path'
+import { hasMarkdownTwin, toMarkdownPath } from '../../markdown-path'
 import { getContentNegotiationVary, resolveContentNegotiation } from './content-negotiation'
 import { getRequestRenderInfo } from './markdown-request'
 
@@ -56,6 +56,10 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   if (request.headers[INTERNAL_HEADER])
     return { _tag: 'skip', reason: 'internal' }
 
+  const pathSkip = resolveNegotiationPathSkip(path, input.artifactPaths)
+  if (pathSkip)
+    return pathSkip
+
   const negotiation = resolveContentNegotiation({ policy: input.policy, routeRule: input.routeRule, botNegotiation: input.botNegotiation })
   const renderInfo = getRequestRenderInfo(request, {
     _tag: 'runtime',
@@ -105,9 +109,32 @@ export function resolveNegotiationDecision(input: NegotiationInput): Negotiation
   return { _tag: 'html', path: renderInfo.path, negotiation }
 }
 
-function withoutQuery(path: string): string {
+export function withoutQuery(path: string): string {
   const queryIndex = path.indexOf('?')
   return queryIndex === -1
     ? path
     : path.slice(0, queryIndex)
+}
+
+/**
+ * Skip requests that can never negotiate or render Markdown based on path
+ * alone, before reading headers, runtime config, or route rules.
+ */
+export function resolveNegotiationPathSkip(
+  requestPath: string,
+  artifactPaths?: ReadonlySet<string>,
+): Extract<NegotiationDecision, { _tag: 'skip' }> | undefined {
+  const path = withoutQuery(requestPath)
+
+  if (path.startsWith('/.well-known/'))
+    return { _tag: 'skip', reason: 'well-known' }
+
+  if (artifactPaths?.has(path))
+    return { _tag: 'skip', reason: 'artifact' }
+
+  const targetPath = path.endsWith('.md')
+    ? path.slice(0, -3)
+    : path
+  if (!hasMarkdownTwin(targetPath))
+    return { _tag: 'skip', reason: 'not-a-page' }
 }

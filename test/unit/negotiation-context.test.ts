@@ -281,7 +281,45 @@ describe('negotiation config access', () => {
     expect(useRuntimeConfig).not.toHaveBeenCalled()
   })
 
-  it('reuses a matcher across request config copies', () => {
+  it.each([
+    '/__nuxt_error',
+    '/__nuxt_error?url=%2Fmissing&statusCode=404',
+    '/__nuxt_error.md',
+    '/logo.png',
+    '/favicon.ico',
+    '/hero.jpg',
+    '/hero.jpeg',
+    '/hero.webp',
+    '/icon.svg',
+    '/app.js',
+    '/style.css',
+    '/font.woff2',
+    '/wp-login.php',
+    '/.env',
+    '/logo.png.md',
+    '/wp-login.php.md',
+    '/.env.md',
+    '/llms.txt',
+    '/llms-full.txt',
+    '/.well-known/agent-skills/index.json',
+    '/.well-known/agent-skills/nuxt/SKILL.md',
+  ])('skips %s without reading headers, config, or route matchers', (path) => {
+    vi.mocked(getHeaders).mockClear()
+    vi.mocked(useRuntimeConfig).mockClear()
+    vi.mocked(createNitroRouteRuleMatcher).mockClear()
+    const event = {
+      req: new Request(`https://example.com${path}`),
+      path,
+      context: {},
+    } as unknown as H3Event
+    expect(decideNegotiation(event, 'early')._tag).toBe('skip')
+    expect(decideNegotiation(event, 'middleware')._tag).toBe('skip')
+    expect(getHeaders).not.toHaveBeenCalled()
+    expect(useRuntimeConfig).not.toHaveBeenCalled()
+    expect(createNitroRouteRuleMatcher).not.toHaveBeenCalled()
+  })
+
+  it('reuses a matcher across request config copies and shared Nitro 3 references', () => {
     config.app.baseURL = '/cache-check/'
     vi.mocked(createNitroRouteRuleMatcher).mockClear()
     for (let i = 0; i < 3; i++) {
@@ -293,5 +331,32 @@ describe('negotiation config access', () => {
       expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
     }
     expect(createNitroRouteRuleMatcher).toHaveBeenCalledTimes(1)
+
+    // Nitro 3 returns the same runtime config object across requests.
+    vi.mocked(useRuntimeConfig).mockImplementation(() => config as any)
+    try {
+      for (let i = 0; i < 3; i++) {
+        const event = {
+          req: new Request('https://example.com/about.md'),
+          path: '/about.md',
+          context: {},
+        } as unknown as H3Event
+        expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
+      }
+      expect(createNitroRouteRuleMatcher).toHaveBeenCalledTimes(1)
+
+      // Distinct configs must still invalidate the cached matcher.
+      config.app.baseURL = '/other-base/'
+      const event = {
+        req: new Request('https://example.com/about.md'),
+        path: '/about.md',
+        context: {},
+      } as unknown as H3Event
+      expect(decideNegotiation(event, 'middleware')).toEqual({ _tag: 'render', path: '/about' })
+      expect(createNitroRouteRuleMatcher).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      vi.mocked(useRuntimeConfig).mockImplementation(() => structuredClone(config) as any)
+    }
   })
 })

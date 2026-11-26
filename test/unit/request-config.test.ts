@@ -71,12 +71,14 @@ describe('request-time configuration', () => {
       },
     }
     const request = event()
+    vi.mocked(useRuntimeConfig).mockClear()
     expect(decideNegotiation(request, 'early')._tag).toBe('redirect')
     await ensureSiteConfig(request)
     expect(initSiteConfig).toHaveBeenLastCalledWith(request, 'https://example.com', {
       cache: false,
       site: { name: 'Request site' },
     })
+    expect(useRuntimeConfig).toHaveBeenCalledTimes(1)
     expect(createMatcher).toHaveBeenCalledTimes(2)
 
     runtimeConfig.app.baseURL = '/other/'

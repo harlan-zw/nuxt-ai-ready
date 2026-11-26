@@ -3,9 +3,7 @@ import type { H3Event } from '#nuxtseo/h3'
 import { negotiateContent, parseAcceptHeader } from '@mdream/js/negotiate'
 import { getBotInfo } from '@nuxtjs/robots/util'
 import { getHeaders } from '#nuxtseo/h3'
-import { hasMarkdownTwin, isReservedPath } from '../../markdown-path'
-
-const RE_MD_EXT = /\.md$/
+import { hasMarkdownTwin } from '../../markdown-path'
 
 /**
  * Lower-cased request headers plus the request path. Every negotiation input is
@@ -76,23 +74,22 @@ export function getRequestRenderInfo(
     ? request.path
     : request.path.slice(0, queryIndex)
   const isPrerender = mode._tag === 'prerender'
-
-  if (isReservedPath(originalPath.replace(RE_MD_EXT, '')))
-    return null
-
-  const accept = request.headers.accept || ''
-  if (!originalPath.endsWith('.md') && accept
-    && /\b(?:application\/json|text\/event-stream)\b/i.test(accept)
-    && !/text\/(?:html|markdown|plain)\b|\*\/\*/i.test(accept)) {
-    return null
-  }
-
   const isExplicit = originalPath.endsWith('.md')
   if (isPrerender && !isExplicit)
     return null
 
-  if (!isExplicit && !hasMarkdownTwin(originalPath))
+  const targetPath = isExplicit
+    ? originalPath.slice(0, -3)
+    : originalPath
+  if (!hasMarkdownTwin(targetPath))
     return null
+
+  const accept = request.headers.accept || ''
+  if (!isExplicit && accept
+    && /\b(?:application\/json|text\/event-stream)\b/i.test(accept)
+    && !/text\/(?:html|markdown|plain)\b|\*\/\*/i.test(accept)) {
+    return null
+  }
 
   const negotiation: ContentNegotiationResult = isPrerender
     ? 'markdown'
