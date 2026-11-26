@@ -2,8 +2,10 @@ import { decodePath, withoutBase, withoutTrailingSlash } from 'ufo'
 import prerenderedMarkdownHeaders from '#ai-ready-virtual/prerendered-markdown-headers.mjs'
 import { defineEventHandler, getRequestURL, setHeader } from '#nuxtseo/h3'
 import { defineNitroPlugin, useRuntimeConfig } from '#nuxtseo/nitro'
+import { isReservedPath } from '../../markdown-path'
 import { logger } from '../logger'
 import { serveCloudflarePrerenderedPage } from '../utils/cloudflare-prerendered'
+import { withoutQuery } from '../utils/negotiation-decision'
 import { applyNegotiation, decideNegotiation } from '../utils/negotiation-response'
 
 interface H3Layer {
@@ -51,12 +53,15 @@ function resolveH3Runtime(candidate: unknown): H3Runtime {
 }
 
 const negotiationHandler = defineEventHandler(async (event) => {
-  if (prerenderedMarkdownHeaders.size && (event.path.includes('.md') || event.path.includes('%'))) {
-    const path = decodePath(withoutTrailingSlash(withoutBase(getRequestURL(event).pathname, useRuntimeConfig().app.baseURL)))
-    const headers = prerenderedMarkdownHeaders.get(path)
-    if (headers) {
-      for (const [name, value] of Object.entries(headers))
-        setHeader(event, name, value)
+  if (prerenderedMarkdownHeaders.size) {
+    const pathname = withoutQuery(event.path)
+    if ((pathname.includes('.md') || pathname.includes('%')) && !isReservedPath(pathname)) {
+      const path = decodePath(withoutTrailingSlash(withoutBase(getRequestURL(event).pathname, useRuntimeConfig().app.baseURL)))
+      const headers = prerenderedMarkdownHeaders.get(path)
+      if (headers) {
+        for (const [name, value] of Object.entries(headers))
+          setHeader(event, name, value)
+      }
     }
   }
   const decision = decideNegotiation(event, 'early')

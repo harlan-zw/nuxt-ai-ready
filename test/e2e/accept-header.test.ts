@@ -281,5 +281,15 @@ describe('accept header content negotiation', async () => {
       const html = await response.text()
       expect(html).toMatch(/<link[^>]+rel="alternate"[^>]+type="text\/markdown"/)
     })
+
+    it('omits <link rel="alternate" type="text/markdown"> on 404 error pages', async () => {
+      const response = await fetch(url('/does-not-exist'), {
+        headers: { Accept: 'text/html' },
+      })
+
+      expect(response.status).toBe(404)
+      const html = await response.text()
+      expect(html).not.toMatch(/<link[^>]+rel="alternate"[^>]+type="text\/markdown"/)
+    })
   })
 })

@@ -107,16 +107,49 @@ describe('resolveNegotiationDecision', () => {
     }))).toEqual({ _tag: 'skip', reason: 'well-known' })
   })
 
-  it('skips API routes and static assets', () => {
-    expect(resolveNegotiationDecision(input({
-      path: '/api/pages',
-      headers: { accept: 'text/markdown' },
-    }))).toEqual({ _tag: 'skip', reason: 'not-a-page' })
+  it('skips API routes, error routes, and static assets', () => {
+    for (const path of [
+      '/api/pages',
+      '/__nuxt_error',
+      '/__nuxt_error?url=%2Fmissing&statusCode=404',
+      '/__nuxt_error.md',
+      '/styles/main.css',
+      '/logo.png',
+      '/favicon.ico',
+      '/hero.jpg',
+      '/hero.jpeg',
+      '/hero.webp',
+      '/icon.svg',
+      '/app.js',
+      '/font.woff2',
+      '/wp-login.php',
+      '/.env',
+      '/llms.txt',
+      '/llms-full.txt',
+      '/logo.png.md',
+      '/wp-login.php.md',
+      '/.env.md',
+      '/robots.txt.md',
+    ]) {
+      expect(resolveNegotiationDecision(input({
+        stage: 'middleware',
+        path,
+        headers: { accept: 'text/markdown' },
+      })), path).toEqual({ _tag: 'skip', reason: 'not-a-page' })
+    }
+  })
 
-    expect(resolveNegotiationDecision(input({
-      path: '/styles/main.css',
-      headers: { accept: 'text/markdown' },
-    }))).toEqual({ _tag: 'skip', reason: 'not-a-page' })
+  it('skips agent skills under .well-known', () => {
+    for (const path of [
+      '/.well-known/agent-skills/index.json',
+      '/.well-known/agent-skills/nuxt/SKILL.md',
+    ]) {
+      expect(resolveNegotiationDecision(input({
+        stage: 'middleware',
+        path,
+        headers: { accept: 'text/markdown' },
+      })), path).toEqual({ _tag: 'skip', reason: 'well-known' })
+    }
   })
 
   it('serves HTML during prerender even when the client asks for markdown', () => {

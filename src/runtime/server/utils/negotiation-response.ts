@@ -17,7 +17,7 @@ import { toDeployedRoute } from '../../route-path'
 import { setStatusAwareLinkHeader } from '../plugins/link-header'
 import { buildLinkHeader, buildStatusAwareLinkHeaders } from './link-header'
 import { toMarkdownRequest } from './markdown-request'
-import { resolveNegotiationDecision } from './negotiation-decision'
+import { resolveNegotiationDecision, resolveNegotiationPathSkip } from './negotiation-decision'
 
 /** Set once the negotiation headers are on the response, so nothing repeats them. */
 const APPLIED_KEY = 'nuxt-ai-ready:negotiation-applied'
@@ -127,31 +127,6 @@ export function setMarkdownHeaders(event: H3Event, ctx: NegotiationContext, sour
   }
 }
 
-/**
- * Site config is set up by a Nitro middleware. The early negotiation handler
- * runs in front of that middleware, so it must run the setup itself before it
- * builds absolute URLs. The setup is idempotent.
- */
-export async function ensureSiteConfig(event: H3Event): Promise<void> {
-  if (!(event.context as { _initedSiteConfig?: boolean })._initedSiteConfig)
-    await initRequestSiteConfig(event, getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin, getRouteRuleMatcher(useRuntimeConfig(event))(event.path))
-}
-
-export function buildNegotiationContext(event: H3Event, path: string): NegotiationContext {
-  const runtimeConfig = useRuntimeConfig(event)
-  const baseURL = runtimeConfig.app.baseURL
-  const resolvePath = (target: string) => toDeployedRoute(target, baseURL)
-  return {
-    config: runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig,
-    path,
-    resolvePath,
-    resolveUrl: (target: string) => siteConfigUtils.withSiteUrl(event, resolvePath(target), { withBase: true }),
-    routeContext: {
-      host: getRequestHost(event, { xForwardedHost: true }),
-    },
-  }
-}
-
 type RouteRuleMatcher = (path: string) => AppRouteRules
 
 const REQUEST_DECISION = Symbol('nuxt-ai-ready:negotiation')
@@ -161,6 +136,7 @@ interface RequestDecision {
   path: string
   policy: ModulePublicRuntimeConfig['contentNegotiation']
   botNegotiation: boolean
+  routeRule: AppRouteRules
   decision: NegotiationDecision
 }
 
@@ -178,7 +154,43 @@ function getRouteRuleMatcher(runtimeConfig: ReturnType<typeof useRuntimeConfig>)
   return matcherCache.match
 }
 
+/**
+ * Site config is set up by a Nitro middleware. The early negotiation handler
+ * runs in front of that middleware, so it must run the setup itself before it
+ * builds absolute URLs. The setup is idempotent.
+ */
+export async function ensureSiteConfig(event: H3Event): Promise<void> {
+  const context = event.context as typeof event.context & { _initedSiteConfig?: boolean, [REQUEST_DECISION]?: RequestDecision }
+  if (!context._initedSiteConfig) {
+    const owner = event.node?.req ?? event.req ?? event
+    const cached = context[REQUEST_DECISION]
+    const routeRule = cached && cached.owner === owner && cached.path === event.path
+      ? cached.routeRule
+      : getRouteRuleMatcher(useRuntimeConfig(event))(event.path)
+    await initRequestSiteConfig(event, getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin, routeRule)
+  }
+}
+
+export function buildNegotiationContext(event: H3Event, path: string): NegotiationContext {
+  const runtimeConfig = useRuntimeConfig(event)
+  const baseURL = runtimeConfig.app.baseURL
+  const resolvePath = (target: string) => toDeployedRoute(target, baseURL)
+  return {
+    config: runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig,
+    path,
+    resolvePath,
+    resolveUrl: (target: string) => siteConfigUtils.withSiteUrl(event, resolvePath(target), { withBase: true }),
+    routeContext: {
+      host: getRequestHost(event, { xForwardedHost: true }),
+    },
+  }
+}
+
 export function decideNegotiation(event: H3Event, stage: NegotiationStage): NegotiationDecision {
+  const pathSkip = resolveNegotiationPathSkip(event.path, agentSkillArtifactPaths())
+  if (pathSkip)
+    return pathSkip
+
   const context = event.context as typeof event.context & { [REQUEST_DECISION]?: RequestDecision }
   const owner = event.node?.req ?? event.req ?? event
   let cached = context[REQUEST_DECISION]
@@ -201,15 +213,17 @@ export function decideNegotiation(event: H3Event, stage: NegotiationStage): Nego
   const config = runtimeConfig['nuxt-ai-ready'] as ModulePublicRuntimeConfig
   if (!cached || cached.owner !== owner || cached.path !== event.path || cached.policy !== config.contentNegotiation || cached.botNegotiation !== config.botNegotiation) {
     const markdownPaths = prerenderedMarkdownPaths
+    const routeRule = getRouteRuleMatcher(runtimeConfig)(event.path)
     cached = {
       owner,
       path: event.path,
       policy: config.contentNegotiation,
       botNegotiation: config.botNegotiation,
+      routeRule,
       decision: resolveNegotiationDecision({
         stage: 'middleware',
         request: request ?? toMarkdownRequest(event),
-        routeRule: getRouteRuleMatcher(runtimeConfig)(event.path),
+        routeRule,
         policy: config.contentNegotiation,
         botNegotiation: config.botNegotiation,
         artifactPaths: agentSkillArtifactPaths(),
